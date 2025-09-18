@@ -107,6 +107,7 @@ async def chat_stream(request: ChatRequest):
             request.max_plan_iterations,
             request.max_step_num,
             request.max_search_results,
+            request.search_engine,
             request.auto_accepted_plan,
             request.interrupt_feedback,
             request.mcp_settings if mcp_enabled else {},
@@ -283,6 +284,7 @@ async def _astream_workflow_generator(
     max_plan_iterations: int,
     max_step_num: int,
     max_search_results: int,
+    search_engine: str,
     auto_accepted_plan: bool,
     interrupt_feedback: str,
     mcp_settings: dict,
@@ -316,13 +318,16 @@ async def _astream_workflow_generator(
     # Prepare workflow config
     workflow_config = {
         "thread_id": thread_id,
-        "resources": resources,
-        "max_plan_iterations": max_plan_iterations,
-        "max_step_num": max_step_num,
-        "max_search_results": max_search_results,
-        "mcp_settings": mcp_settings,
-        "report_style": report_style.value,
-        "enable_deep_thinking": enable_deep_thinking,
+        "configurable": {
+            "resources": resources,
+            "max_plan_iterations": max_plan_iterations,
+            "max_step_num": max_step_num,
+            "max_search_results": max_search_results,
+            "search_engine": search_engine,
+            "mcp_settings": mcp_settings,
+            "report_style": report_style.value,
+            "enable_deep_thinking": enable_deep_thinking,
+        },
         "recursion_limit": get_recursion_limit(),
     }
 

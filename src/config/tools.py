@@ -15,6 +15,7 @@ class SearchEngine(enum.Enum):
     BRAVE_SEARCH = "brave_search"
     ARXIV = "arxiv"
     WIKIPEDIA = "wikipedia"
+    CUSTOM_SEARCH = "custom_search"  # 添加您的自定义搜索引擎
 
 
 # Tool configuration

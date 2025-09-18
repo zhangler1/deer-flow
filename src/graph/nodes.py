@@ -71,7 +71,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
             )
     else:
         background_investigation_results = get_web_search_tool(
-            configurable.max_search_results
+            configurable.max_search_results, configurable.search_engine
         ).invoke(query)
     return {
         "background_investigation_results": json.dumps(
@@ -483,7 +483,7 @@ async def researcher_node(
     """Researcher node that do research"""
     logger.info("Researcher node is researching.")
     configurable = Configuration.from_runnable_config(config)
-    tools = [get_web_search_tool(configurable.max_search_results), crawl_tool]
+    tools = [get_web_search_tool(configurable.max_search_results, configurable.search_engine), crawl_tool]
     retriever_tool = get_retriever_tool(state.get("resources", []))
     if retriever_tool:
         tools.insert(0, retriever_tool)

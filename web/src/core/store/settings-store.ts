@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     maxPlanIterations: 1,
     maxStepNum: 3,
     maxSearchResults: 3,
+    searchEngine: "tavily",
     reportStyle: "academic",
   },
   mcp: {
@@ -30,6 +31,7 @@ export type SettingsState = {
     maxPlanIterations: number;
     maxStepNum: number;
     maxSearchResults: number;
+    searchEngine: "tavily" | "duckduckgo" | "brave_search" | "arxiv" | "wikipedia" | "custom_search";
     reportStyle: "academic" | "popular_science" | "news" | "social_media";
   };
   mcp: {
@@ -125,6 +127,7 @@ export const getChatStreamSettings = () => {
   }
   return {
     ...general,
+    searchEngine: general.searchEngine, // 添加搜索引擎设置
     mcpSettings,
   };
 };

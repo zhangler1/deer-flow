@@ -1,0 +1,61 @@
+{
+	"RSP_BODY": {
+		"muwpUser": {
+			"muwp_branchID": "1000027159",
+			"muwp_loginName": "xuew_4",
+			"muwp_userCode": "9743616",
+			"muwp_userName": "薛巍",
+			"muwp_userID": "132298"
+		},
+		"result": [
+			{
+				"question": null,
+				"source": "交通银行规章制度管理办法_交银办〔2023〕249号_result",
+				"url": null,
+				"content": "交通银行规章制度管理办法_交银办〔2023〕249号_result.docx-交通银行规章制度管理办法-第一章 总则-第二条 \n\n交通银行规章制度管理办法-第一章 总则-第二条：第二条 本办法所称规章制度，是指本行就经营管理事项制定的具有普遍适用性和持续效力的规范性文件。本行公司治理文件遵循有关法律法规和本行章程的规定，不属于本办法管理范围。党委、纪委、团委、工会制定的规范性文件，领导讲话、会议纪要、年度工作计划、年度考核办法，以及各类转发文件、事务性通知等，不属于本办法管理范围。\n\n",
+				"title": "交通银行规章制度管理办法-第一章 总则-第二条 ",
+				"score": "0.91064453",
+				"docGuid": null,
+				"docId": "600100737b884004aad766b90b8db9b4",
+				"repository": "euvd-searchByChannelId",
+				"absContent": "交通银行规章制度管理办法_交银办〔2023〕249号_result.docx-交通银行规章制度管理办法-第一章 总则-第二条 \n\n交通银行规章制度管理办法-第一章 总则-第二条：第二条 本办法所称规章制度，是指本行就经营管理事项制定的具有普遍适用性和持续效力的规范性文件。本行公司治理文件遵循有关法律法规和本行章程的规定，不属于本办法管理范围。党委、纪委、团委、工会制定的规范性文件，领导讲话、会议纪要、年度工作计划、年度考核办法，以及各类转发文件、事务性通知等，不属于本办法管理范围。\n\n",
+				"knowType": null,
+				"createTime": null,
+				"updateTime": null,
+				"hobbies": null,
+				"fullCategoryName": null,
+				"orgId": null,
+				"fullOrgName": null
+			},
+			{
+				"question": null,
+				"source": "中国证券业协会现行自律规则汇编（20240524）",
+				"url": null,
+				"content": "中国证券业协会现行自律规则汇编（20240524）.docx-中国证券业协会会员管理办法的制定目的 \n\n中国证券业协会会员管理办法的制定目的:第一条为了规范会员管理，保障会员合法权益，促进证券市场公开、公平、公正，推动证券行业健康稳定发展，根据法律、行政法规、部门规章以及《中国证券业协会章程》（以下称《章程》），制定中国证券业协会会员管理办法。\n\n",
+				"title": "中国证券业协会会员管理办法的制定目的 ",
+				"score": "0.033325195",
+				"docGuid": null,
+				"docId": "010c375c931f42d6a39c4d85732e6ae6",
+				"repository": "euvd-searchByChannelId",
+				"absContent": "中国证券业协会现行自律规则汇编（20240524）.docx-中国证券业协会会员管理办法的制定目的 \n\n中国证券业协会会员管理办法的制定目的:第一条为了规范会员管理，保障会员合法权益，促进证券市场公开、公平、公正，推动证券行业健康稳定发展，根据法律、行政法规、部门规章以及《中国证券业协会章程》（以下称《章程》），制定中国证券业协会会员管理办法。\n\n",
+				"knowType": null,
+				"createTime": null,
+				"updateTime": null,
+				"hobbies": null,
+				"fullCategoryName": null,
+				"orgId": null,
+				"fullOrgName": null
+			}
+		],
+		"param": null,
+		"TRANS_PROCESS": "",
+		"TRAN_ID": ""
+	},
+	"RSP_HEAD": {
+		"TRAN_SUCCESS": "1",
+		"TRACE_NO": "office-uat-ellm-b458c997f-8k8cq-5986828119",
+		"TRACE_ID": "0cf475b7.1.65.4t3y3aef4d9",
+		"PROCESS_STATUS_CODE": "N",
+		"BIZ_TRACE_NO": null
+	}
+}

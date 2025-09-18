@@ -47,6 +47,9 @@ class ChatRequest(BaseModel):
     max_search_results: Optional[int] = Field(
         3, description="The maximum number of search results"
     )
+    search_engine: Optional[str] = Field(
+        "tavily", description="The search engine to use (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)"
+    )
     auto_accepted_plan: Optional[bool] = Field(
         False, description="Whether to automatically accept the plan"
     )

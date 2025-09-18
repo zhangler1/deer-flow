@@ -1,0 +1,51 @@
+services:
+  qwen3-vllm:
+    image: vllm/vllm-openai:v0.9.2
+    container_name: qwen3-vllm-service
+    restart: always
+    runtime: nvidia  # 启用NVIDIA运行时，用于GPU加速
+    environment:
+      - MODEL=/models/qwen3-0.6  # 模型在容器内的路径
+      - SERVER_PORT=8000     # 服务端口
+      - CUDA_VISIBLE_DEVICES=0  # 指定使用的GPU，默认使用第0块卡
+      - MAX_NUM_BATCHED_TOKENS=8192  # 批处理的最大token数
+      - MAX_NUM_SEQS=8 # 最大并发序列数
+      - TENSOR_PARALLEL_SIZE=1  # 张量并行大小，根据GPU数量调整
+      - TRUST_REMOTE_CODE=true  # 信任远程代码，Qwen模型需要
+      - DTYPE=float16  # 数据类型，float16适合GPU，节省显存
+      - ENABLE_STREAMING=true  # 启用流式输出
+      - GPU_MEMORY_UTILIZATION=0.8
+    volumes:
+      - /home/llm/llz/models/qwen3-0.6:/models/qwen3-0.6  # 挂载本地模型目录到容器
+      - ./logs:/var/log/vllm  # 挂载日志目录
+      - ./app:/app  # 挂载应用代码目录
+    ports:
+      - "8088:8000"  # 映射端口到主机
+      - "8001:8001"  # 映射端口到主机
+    command: >
+      --host 0.0.0.0
+      --port 8000
+      --model /models/qwen3-0.6
+      --max-model-len 8096
+      --served-model-name qwen3-0.6
+      --tensor-parallel-size ${TENSOR_PARALLEL_SIZE:-1}
+      --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS:-8192}
+      --max-num-seqs ${MAX_NUM_SEQS:-8}
+      --trust-remote-code
+      --dtype ${DTYPE:-float16}
+      --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION:-0.7}
+      --enable-auto-tool-choice 
+      --tool-call-parser hermes
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all  # 使用1块GPU，根据实际情况调整
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 300s
+      timeout: 10s
+      retries: 3
+      start_period: 60s  # 启动等待时间，模型加载需要时间

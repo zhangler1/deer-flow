@@ -22,6 +22,7 @@ from src.tools.decorators import create_logged_tool
 from src.tools.tavily_search.tavily_search_results_with_images import (
     TavilySearchWithImages,
 )
+from src.tools.custom_search import get_custom_search_tool
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +41,15 @@ def get_search_config():
 
 
 # Get the selected search tool
-def get_web_search_tool(max_search_results: int):
+def get_web_search_tool(max_search_results: int, engine: str = None):
     search_config = get_search_config()
+    
+    # Use provided engine or fall back to environment variable
+    selected_engine = engine or SELECTED_SEARCH_ENGINE
+    
+    logger.info(f"Using search engine: {selected_engine}")
 
-    if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
+    if selected_engine == SearchEngine.TAVILY.value:
         # Only get and apply include/exclude domains for Tavily
         include_domains: Optional[List[str]] = search_config.get("include_domains", [])
         exclude_domains: Optional[List[str]] = search_config.get("exclude_domains", [])
@@ -61,12 +67,12 @@ def get_web_search_tool(max_search_results: int):
             include_domains=include_domains,
             exclude_domains=exclude_domains,
         )
-    elif SELECTED_SEARCH_ENGINE == SearchEngine.DUCKDUCKGO.value:
+    elif selected_engine == SearchEngine.DUCKDUCKGO.value:
         return LoggedDuckDuckGoSearch(
             name="web_search",
             num_results=max_search_results,
         )
-    elif SELECTED_SEARCH_ENGINE == SearchEngine.BRAVE_SEARCH.value:
+    elif selected_engine == SearchEngine.BRAVE_SEARCH.value:
         return LoggedBraveSearch(
             name="web_search",
             search_wrapper=BraveSearchWrapper(
@@ -74,7 +80,7 @@ def get_web_search_tool(max_search_results: int):
                 search_kwargs={"count": max_search_results},
             ),
         )
-    elif SELECTED_SEARCH_ENGINE == SearchEngine.ARXIV.value:
+    elif selected_engine == SearchEngine.ARXIV.value:
         return LoggedArxivSearch(
             name="web_search",
             api_wrapper=ArxivAPIWrapper(
@@ -83,7 +89,7 @@ def get_web_search_tool(max_search_results: int):
                 load_all_available_meta=True,
             ),
         )
-    elif SELECTED_SEARCH_ENGINE == SearchEngine.WIKIPEDIA.value:
+    elif selected_engine == SearchEngine.WIKIPEDIA.value:
         wiki_lang = search_config.get("wikipedia_lang", "en")
         wiki_doc_content_chars_max = search_config.get(
             "wikipedia_doc_content_chars_max", 4000
@@ -97,5 +103,8 @@ def get_web_search_tool(max_search_results: int):
                 doc_content_chars_max=wiki_doc_content_chars_max,
             ),
         )
+    elif selected_engine == SearchEngine.CUSTOM_SEARCH.value:
+        # 使用自定义搜索引擎
+        return get_custom_search_tool(max_results=max_search_results)
     else:
-        raise ValueError(f"Unsupported search engine: {SELECTED_SEARCH_ENGINE}")
+        raise ValueError(f"Unsupported search engine: {selected_engine}")

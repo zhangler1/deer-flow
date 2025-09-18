@@ -19,6 +19,13 @@ import {
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import type { SettingsState } from "~/core/store";
 
@@ -35,6 +42,7 @@ const generalFormSchema = z.object({
   maxSearchResults: z.number().min(1, {
     message: "Max search results must be at least 1.",
   }),
+  searchEngine: z.enum(["tavily", "duckduckgo", "brave_search", "arxiv", "wikipedia", "custom_search"]),
   // Others
   enableBackgroundInvestigation: z.boolean(),
   enableDeepThinking: z.boolean(),
@@ -167,6 +175,49 @@ export const GeneralTab: Tab = ({
                   </FormControl>
                   <FormDescription>
                     {t("maxSearchResultsDescription")}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="searchEngine"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("searchEngine")}</FormLabel>
+                  <FormControl>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger className="w-60">
+                        <SelectValue placeholder={t("selectSearchEngine")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tavily">
+                          Tavily (推荐)
+                        </SelectItem>
+                        <SelectItem value="duckduckgo">
+                          DuckDuckGo
+                        </SelectItem>
+                        <SelectItem value="brave_search">
+                          Brave Search
+                        </SelectItem>
+                        <SelectItem value="arxiv">
+                          ArXiv (学术论文)
+                        </SelectItem>
+                        <SelectItem value="wikipedia">
+                          Wikipedia
+                        </SelectItem>
+                        <SelectItem value="custom_search">
+                          自定义搜索引擎
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormDescription>
+                    {t("searchEngineDescription")}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
