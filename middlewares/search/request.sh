@@ -1,5 +1,5 @@
 curl --request POST \
-  --url http://12.244.66.225/ELLM.ELLM-OFFICE.V-1.0/querySources.do \
+  --url http://192.168.0.106:8010/ELLM.ELLM-OFFICE.V-1.0/querySources.do \
   --header 'Accept: */*' \
   --header 'Accept-Encoding: gzip, deflate, br' \
   --header 'Connection: keep-alive' \
@@ -15,7 +15,7 @@ curl --request POST \
         "param": {
             "messages": [
                 {
-                    "content": "规章制度",
+                    "content": "f1赛车",
                     "role": "user"
                 }
             ],

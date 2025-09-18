@@ -177,20 +177,68 @@ def _create_event_stream_message(
 
 def _create_interrupt_event(thread_id, event_data):
     """Create interrupt event."""
-    return _make_event(
-        "interrupt",
-        {
-            "thread_id": thread_id,
-            "id": event_data["__interrupt__"][0].ns[0],
-            "role": "assistant",
-            "content": event_data["__interrupt__"][0].value,
-            "finish_reason": "interrupt",
-            "options": [
-                {"text": "Edit plan", "value": "edit_plan"},
-                {"text": "Start research", "value": "accepted"},
-            ],
-        },
-    )
+    try:
+        interrupt_obj = event_data["__interrupt__"][0]
+        
+        # 尝试获取 ID，适配不同版本的 LangGraph API
+        interrupt_id = None
+        if hasattr(interrupt_obj, 'ns') and interrupt_obj.ns:
+            # 旧版本 API：使用 ns 属性
+            interrupt_id = interrupt_obj.ns[0]
+        elif hasattr(interrupt_obj, 'id'):
+            # 新版本 API：使用 id 属性
+            interrupt_id = interrupt_obj.id
+        elif hasattr(interrupt_obj, 'task_id'):
+            # 另一种可能的新版本 API
+            interrupt_id = interrupt_obj.task_id
+        else:
+            # 回退：使用生成的 UUID
+            interrupt_id = str(uuid4())
+            logger.warning(f"Unable to extract interrupt ID from object {type(interrupt_obj)}, using generated UUID: {interrupt_id}")
+        
+        # 获取中断内容
+        content = ""
+        if hasattr(interrupt_obj, 'value'):
+            content = interrupt_obj.value
+        elif hasattr(interrupt_obj, 'content'):
+            content = interrupt_obj.content
+        elif hasattr(interrupt_obj, 'message'):
+            content = interrupt_obj.message
+        else:
+            content = str(interrupt_obj)
+            logger.warning(f"Unable to extract content from interrupt object {type(interrupt_obj)}, using string representation")
+        
+        return _make_event(
+            "interrupt",
+            {
+                "thread_id": thread_id,
+                "id": interrupt_id,
+                "role": "assistant",
+                "content": content,
+                "finish_reason": "interrupt",
+                "options": [
+                    {"text": "Edit plan", "value": "edit_plan"},
+                    {"text": "Start research", "value": "accepted"},
+                ],
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error creating interrupt event: {e}, interrupt object type: {type(event_data.get('__interrupt__', [None])[0])}, available attributes: {dir(event_data.get('__interrupt__', [None])[0]) if event_data.get('__interrupt__') else 'N/A'}")
+        # 返回一个基本的中断事件作为后备
+        return _make_event(
+            "interrupt",
+            {
+                "thread_id": thread_id,
+                "id": str(uuid4()),
+                "role": "assistant",
+                "content": "Plan ready for review",
+                "finish_reason": "interrupt",
+                "options": [
+                    {"text": "Edit plan", "value": "edit_plan"},
+                    {"text": "Start research", "value": "accepted"},
+                ],
+            },
+        )
 
 
 def _process_initial_messages(message, thread_id):

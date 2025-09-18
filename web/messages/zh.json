@@ -105,6 +105,7 @@
         "description": "启用后，DeerFlow 将在规划前进行快速搜索。这对于与时事和新闻相关的研究很有用。"
       },
       "enhancePrompt": "用 AI 增强提示",
+      "searchEngine": "搜索引擎",
       "on": "开启",
       "off": "关闭"
     },

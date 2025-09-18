@@ -73,6 +73,8 @@ export function MessageListView({
   const ongoingResearchIsOpen = useStore(
     (state) => state.ongoingResearchId === state.openResearchId,
   );
+  const researchIds = useStore((state) => state.researchIds);
+  const messages = useStore((state) => state.messages);
 
   const handleToggleResearch = useCallback(() => {
     // Fix the issue where auto-scrolling to the bottom
@@ -87,6 +89,35 @@ export function MessageListView({
     };
   }, []);
 
+  // 过滤出需要渲染的消息
+  const visibleMessages = useMemo(() => {
+    return messageIds
+      .map((messageId) => {
+        const message = messages.get(messageId);
+        if (!message) return null;
+        
+        const startOfResearch = researchIds.includes(messageId);
+        
+        // 检查是否应该渲染这个消息
+        if (!(
+          message.role === "user" ||
+          message.agent === "coordinator" ||
+          message.agent === "planner" ||
+          message.agent === "podcast" ||
+          startOfResearch
+        )) {
+          return null;
+        }
+        
+        return {
+          messageId,
+          message,
+          startOfResearch,
+        };
+      })
+      .filter((item): item is { messageId: string; message: Message; startOfResearch: boolean } => item !== null);
+  }, [messageIds, messages, researchIds]);
+
   return (
     <ScrollContainer
       className={cn("flex h-full w-full flex-col overflow-hidden", className)}
@@ -95,10 +126,12 @@ export function MessageListView({
       ref={scrollContainerRef}
     >
       <ul className="flex flex-col">
-        {messageIds.map((messageId) => (
+        {visibleMessages.map(({ messageId, message, startOfResearch }) => (
           <MessageListItem
             key={messageId}
             messageId={messageId}
+            message={message}
+            startOfResearch={startOfResearch}
             waitForFeedback={waitingForFeedbackMessageId === messageId}
             interruptMessage={interruptMessage}
             onFeedback={onFeedback}
@@ -118,6 +151,8 @@ export function MessageListView({
 function MessageListItem({
   className,
   messageId,
+  message,
+  startOfResearch,
   waitForFeedback,
   interruptMessage,
   onFeedback,
@@ -126,6 +161,8 @@ function MessageListItem({
 }: {
   className?: string;
   messageId: string;
+  message: Message;
+  startOfResearch: boolean;
   waitForFeedback?: boolean;
   onFeedback?: (feedback: { option: Option }) => void;
   interruptMessage?: Message | null;
@@ -135,91 +172,80 @@ function MessageListItem({
   ) => void;
   onToggleResearch?: () => void;
 }) {
-  const message = useMessage(messageId);
-  const researchIds = useStore((state) => state.researchIds);
-  const startOfResearch = useMemo(() => {
-    return researchIds.includes(messageId);
-  }, [researchIds, messageId]);
-  if (message) {
-    if (
-      message.role === "user" ||
-      message.agent === "coordinator" ||
-      message.agent === "planner" ||
-      message.agent === "podcast" ||
-      startOfResearch
-    ) {
-      let content: React.ReactNode;
-      if (message.agent === "planner") {
-        content = (
-          <div className="w-full px-4">
-            <PlanCard
-              message={message}
-              waitForFeedback={waitForFeedback}
-              interruptMessage={interruptMessage}
-              onFeedback={onFeedback}
-              onSendMessage={onSendMessage}
-            />
+  let content: React.ReactNode;
+  
+  if (message.agent === "planner") {
+    content = (
+      <div className="w-full px-4">
+        <PlanCard
+          message={message}
+          waitForFeedback={waitForFeedback}
+          interruptMessage={interruptMessage}
+          onFeedback={onFeedback}
+          onSendMessage={onSendMessage}
+        />
+      </div>
+    );
+  } else if (message.agent === "podcast") {
+    content = (
+      <div className="w-full px-4">
+        <PodcastCard message={message} />
+      </div>
+    );
+  } else if (startOfResearch) {
+    content = (
+      <div className="w-full px-4">
+        <ResearchCard
+          researchId={message.id}
+          onToggleResearch={onToggleResearch}
+        />
+      </div>
+    );
+  } else {
+    content = message.content ? (
+      <div
+        className={cn(
+          "flex w-full px-4",
+          message.role === "user" && "justify-end",
+          className,
+        )}
+      >
+        <MessageBubble message={message}>
+          <div className="flex w-full flex-col break-words">
+            <Markdown
+              className={cn(
+                message.role === "user" &&
+                  "prose-invert not-dark:text-secondary dark:text-inherit",
+              )}
+            >
+              {message?.content}
+            </Markdown>
           </div>
-        );
-      } else if (message.agent === "podcast") {
-        content = (
-          <div className="w-full px-4">
-            <PodcastCard message={message} />
-          </div>
-        );
-      } else if (startOfResearch) {
-        content = (
-          <div className="w-full px-4">
-            <ResearchCard
-              researchId={message.id}
-              onToggleResearch={onToggleResearch}
-            />
-          </div>
-        );
-      } else {
-        content = message.content ? (
-          <div
-            className={cn(
-              "flex w-full px-4",
-              message.role === "user" && "justify-end",
-              className,
-            )}
-          >
-            <MessageBubble message={message}>
-              <div className="flex w-full flex-col break-words">
-                <Markdown
-                  className={cn(
-                    message.role === "user" &&
-                      "prose-invert not-dark:text-secondary dark:text-inherit",
-                  )}
-                >
-                  {message?.content}
-                </Markdown>
-              </div>
-            </MessageBubble>
-          </div>
-        ) : null;
-      }
-      if (content) {
-        return (
-          <motion.li
-            className="mt-10"
-            key={messageId}
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            style={{ transition: "all 0.2s ease-out" }}
-            transition={{
-              duration: 0.2,
-              ease: "easeOut",
-            }}
-          >
-            {content}
-          </motion.li>
-        );
-      }
-    }
+        </MessageBubble>
+      </div>
+    ) : null;
+  }
+  
+  // 如果没有内容，不渲染任何东西
+  if (!content) {
     return null;
   }
+  
+  return (
+    <motion.li
+      className="mt-10"
+      key={messageId}
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{ transition: "all 0.2s ease-out" }}
+      transition={{
+        duration: 0.2,
+        ease: "easeOut",
+      }}
+    >
+      {content}
+    </motion.li>
+  );
 }
 
 function MessageBubble({

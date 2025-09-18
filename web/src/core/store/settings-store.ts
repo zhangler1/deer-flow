@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     maxPlanIterations: 1,
     maxStepNum: 3,
     maxSearchResults: 3,
-    searchEngine: "tavily",
+    searchEngine: "custom_search",
     reportStyle: "academic",
   },
   mcp: {

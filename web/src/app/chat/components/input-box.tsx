@@ -3,7 +3,7 @@
 
 import { MagicWandIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, Lightbulb, X } from "lucide-react";
+import { ArrowUp, Lightbulb, X, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState } from "react";
 
@@ -15,6 +15,13 @@ import { ReportStyleDialog } from "~/components/deer-flow/report-style-dialog";
 import { Tooltip } from "~/components/deer-flow/tooltip";
 import { BorderBeam } from "~/components/magicui/border-beam";
 import { Button } from "~/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { enhancePrompt } from "~/core/api";
 import { useConfig } from "~/core/api/hooks";
 import type { Option, Resource } from "~/core/messages";
@@ -22,6 +29,7 @@ import {
   setEnableDeepThinking,
   setEnableBackgroundInvestigation,
   useSettingsStore,
+  saveSettings,
 } from "~/core/store";
 import { cn } from "~/lib/utils";
 
@@ -49,11 +57,15 @@ export function InputBox({
 }) {
   const t = useTranslations("chat.inputBox");
   const tCommon = useTranslations("common");
+  const tSettings = useTranslations("settings.general");
   const enableDeepThinking = useSettingsStore(
     (state) => state.general.enableDeepThinking,
   );
   const backgroundInvestigation = useSettingsStore(
     (state) => state.general.enableBackgroundInvestigation,
+  );
+  const searchEngine = useSettingsStore(
+    (state) => state.general.searchEngine,
   );
   const { config, loading } = useConfig();
   const reportStyle = useSettingsStore((state) => state.general.reportStyle);
@@ -61,10 +73,20 @@ export function InputBox({
   const inputRef = useRef<MessageInputRef>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
 
-  // Enhancement state
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isEnhanceAnimating, setIsEnhanceAnimating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
+
+  // 搜索引擎选择处理函数
+  const handleSearchEngineChange = useCallback((engine: string) => {
+    useSettingsStore.setState((state) => ({
+      general: {
+        ...state.general,
+        searchEngine: engine as "tavily" | "duckduckgo" | "brave_search" | "arxiv" | "wikipedia" | "custom_search",
+      },
+    }));
+    saveSettings();
+  }, []);
 
   const handleSendMessage = useCallback(
     (message: string, resources: Array<Resource>) => {
@@ -214,6 +236,35 @@ export function InputBox({
       </div>
       <div className="flex items-center px-4 py-2">
         <div className="flex grow gap-2">
+          {/* 搜索引擎选择器 */}
+          <Tooltip title={tSettings("searchEngineDescription")}>
+            <Select value={searchEngine} onValueChange={handleSearchEngineChange}>
+              <SelectTrigger className="w-auto h-8 px-3 gap-2 border-muted text-sm">
+                <Search className="h-4 w-4" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tavily">
+                  Tavily
+                </SelectItem>
+                <SelectItem value="duckduckgo">
+                  DuckDuckGo
+                </SelectItem>
+                <SelectItem value="brave_search">
+                  Brave Search
+                </SelectItem>
+                <SelectItem value="arxiv">
+                  ArXiv
+                </SelectItem>
+                <SelectItem value="wikipedia">
+                  Wikipedia
+                </SelectItem>
+                <SelectItem value="custom_search">
+                  自定义搜索
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </Tooltip>
           {config?.models.reasoning?.[0] && (
             <Tooltip
               className="max-w-60"
