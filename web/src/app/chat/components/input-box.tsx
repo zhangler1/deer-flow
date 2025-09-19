@@ -67,6 +67,9 @@ export function InputBox({
   const searchEngine = useSettingsStore(
     (state) => state.general.searchEngine,
   );
+  const customSearchRepository = useSettingsStore(
+    (state) => state.general.customSearchRepository,
+  );
   const { config, loading } = useConfig();
   const reportStyle = useSettingsStore((state) => state.general.reportStyle);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -83,6 +86,17 @@ export function InputBox({
       general: {
         ...state.general,
         searchEngine: engine as "tavily" | "duckduckgo" | "brave_search" | "arxiv" | "wikipedia" | "custom_search",
+      },
+    }));
+    saveSettings();
+  }, []);
+
+  // 自定义搜索仓库选择处理函数
+  const handleCustomSearchRepositoryChange = useCallback((repositoryId: string) => {
+    useSettingsStore.setState((state) => ({
+      general: {
+        ...state.general,
+        customSearchRepository: repositoryId,
       },
     }));
     saveSettings();
@@ -265,6 +279,31 @@ export function InputBox({
               </SelectContent>
             </Select>
           </Tooltip>
+          {/* 自定义搜索仓库选择器 */}
+          {searchEngine === "custom_search" && config?.custom_search_repositories && config.custom_search_repositories.length > 0 && (
+            <Tooltip title={tSettings("customSearchRepositoryDescription")}>
+              <Select 
+                value={customSearchRepository || ""} 
+                onValueChange={handleCustomSearchRepositoryChange}
+              >
+                <SelectTrigger className="w-auto h-8 px-3 gap-2 border-muted text-sm">
+                  <SelectValue placeholder={tSettings("selectRepository")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {config.custom_search_repositories.map((repo) => (
+                    <SelectItem key={repo.id} value={repo.id}>
+                      <div className="flex flex-col items-start">
+                        <span className="text-sm">{repo.name}</span>
+                        <span className="text-xs text-muted-foreground truncate max-w-32">
+                          {repo.description}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Tooltip>
+          )}
           {config?.models.reasoning?.[0] && (
             <Tooltip
               className="max-w-60"

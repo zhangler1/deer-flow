@@ -44,7 +44,10 @@
       "maxSearchResultsDescription": "By default, each search step has 3 results.",
       "searchEngine": "Search Engine",
       "searchEngineDescription": "Choose the default search engine. Tavily is the recommended choice, and custom search engine can be used for enterprise internal search.",
-      "selectSearchEngine": "Select search engine"
+      "selectSearchEngine": "Select search engine",
+      "customSearchRepository": "Custom Search Repository",
+      "customSearchRepositoryDescription": "Select the data repository for custom search engine. Different repositories contain different types of data.",
+      "selectRepository": "Select repository"
     },
     "mcp": {
       "title": "MCP Servers",

@@ -32,6 +32,7 @@ export type SettingsState = {
     maxStepNum: number;
     maxSearchResults: number;
     searchEngine: "tavily" | "duckduckgo" | "brave_search" | "arxiv" | "wikipedia" | "custom_search";
+    customSearchRepository?: string;
     reportStyle: "academic" | "popular_science" | "news" | "social_media";
   };
   mcp: {
@@ -128,6 +129,7 @@ export const getChatStreamSettings = () => {
   return {
     ...general,
     searchEngine: general.searchEngine, // 添加搜索引擎设置
+    customSearchRepository: general.customSearchRepository, // 添加自定义搜索仓库设置
     mcpSettings,
   };
 };

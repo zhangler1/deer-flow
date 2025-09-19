@@ -38,7 +38,7 @@ from src.server.chat_request import (
     GenerateProseRequest,
     TTSRequest,
 )
-from src.server.config_request import ConfigResponse
+from src.server.config_request import ConfigResponse, CustomSearchRepositoryConfig
 from src.server.mcp_request import MCPServerMetadataRequest, MCPServerMetadataResponse
 from src.server.mcp_utils import load_mcp_tools
 from src.server.rag_request import (
@@ -47,6 +47,7 @@ from src.server.rag_request import (
     RAGResourcesResponse,
 )
 from src.tools import VolcengineTTS
+from src.tools.custom_search import get_available_repositories
 from src.graph.checkpoint import chat_stream_message
 from src.utils.json_utils import sanitize_args
 
@@ -108,6 +109,7 @@ async def chat_stream(request: ChatRequest):
             request.max_step_num,
             request.max_search_results,
             request.search_engine,
+            request.custom_search_repository,
             request.auto_accepted_plan,
             request.interrupt_feedback,
             request.mcp_settings if mcp_enabled else {},
@@ -333,6 +335,7 @@ async def _astream_workflow_generator(
     max_step_num: int,
     max_search_results: int,
     search_engine: str,
+    custom_search_repository: str,
     auto_accepted_plan: bool,
     interrupt_feedback: str,
     mcp_settings: dict,
@@ -372,6 +375,7 @@ async def _astream_workflow_generator(
             "max_step_num": max_step_num,
             "max_search_results": max_search_results,
             "search_engine": search_engine,
+            "custom_search_repository": custom_search_repository,
             "mcp_settings": mcp_settings,
             "report_style": report_style.value,
             "enable_deep_thinking": enable_deep_thinking,
@@ -660,7 +664,24 @@ async def rag_resources(request: Annotated[RAGResourceRequest, Query()]):
 @app.get("/api/config", response_model=ConfigResponse)
 async def config():
     """Get the config of the server."""
+    # 获取自定义搜索仓库配置
+    try:
+        repositories_data = get_available_repositories()
+        custom_search_repositories = [
+            CustomSearchRepositoryConfig(
+                id=repo["id"],
+                name=repo["name"],
+                description=repo["description"],
+                repository=repo["repository"]
+            )
+            for repo in repositories_data
+        ]
+    except Exception as e:
+        logger.warning(f"Failed to load custom search repositories: {e}")
+        custom_search_repositories = []
+    
     return ConfigResponse(
         rag=RAGConfigResponse(provider=SELECTED_RAG_PROVIDER),
         models=get_configured_llm_models(),
+        custom_search_repositories=custom_search_repositories,
     )

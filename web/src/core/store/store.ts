@@ -111,6 +111,7 @@ export async function sendMessage(
       max_step_num: settings.maxStepNum,
       max_search_results: settings.maxSearchResults,
       search_engine: settings.searchEngine,
+      custom_search_repository: settings.customSearchRepository,
       report_style: settings.reportStyle,
       mcp_settings: settings.mcpSettings,
     },

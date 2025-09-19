@@ -28,6 +28,8 @@ import {
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import type { SettingsState } from "~/core/store";
+import { useConfig } from "~/core/api/hooks";
+import type { CustomSearchRepositoryConfig } from "~/core/config";
 
 import type { Tab } from "./types";
 
@@ -43,6 +45,7 @@ const generalFormSchema = z.object({
     message: "Max search results must be at least 1.",
   }),
   searchEngine: z.enum(["tavily", "duckduckgo", "brave_search", "arxiv", "wikipedia", "custom_search"]),
+  customSearchRepository: z.string().optional(),
   // Others
   enableBackgroundInvestigation: z.boolean(),
   enableDeepThinking: z.boolean(),
@@ -57,6 +60,7 @@ export const GeneralTab: Tab = ({
   onChange: (changes: Partial<SettingsState>) => void;
 }) => {
   const t = useTranslations("settings.general");
+  const { config } = useConfig();
   const generalSettings = useMemo(() => settings.general, [settings]);
   const form = useForm<z.infer<typeof generalFormSchema>>({
     resolver: zodResolver(generalFormSchema, undefined, undefined),
@@ -66,6 +70,13 @@ export const GeneralTab: Tab = ({
   });
 
   const currentSettings = form.watch();
+  const searchEngine = form.watch("searchEngine");
+  
+  // 获取可用的自定义搜索仓库选项
+  const customSearchRepositories: CustomSearchRepositoryConfig[] = useMemo(
+    () => config?.custom_search_repositories || [],
+    [config]
+  );
   useEffect(() => {
     let hasChanges = false;
     for (const key in currentSettings) {
@@ -223,6 +234,43 @@ export const GeneralTab: Tab = ({
                 </FormItem>
               )}
             />
+            {searchEngine === "custom_search" && customSearchRepositories.length > 0 && (
+              <FormField
+                control={form.control}
+                name="customSearchRepository"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("customSearchRepository")}</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger className="w-60">
+                          <SelectValue placeholder={t("selectRepository")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {customSearchRepositories.map((repo) => (
+                            <SelectItem key={repo.id} value={repo.id}>
+                              <div className="flex flex-col items-start">
+                                <span>{repo.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {repo.description}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>
+                      {t("customSearchRepositoryDescription")}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </form>
         </Form>
       </main>

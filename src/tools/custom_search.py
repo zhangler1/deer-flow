@@ -14,12 +14,15 @@ from langchain_core.callbacks import (
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from src.config.custom_search import get_custom_search_config, CustomSearchRepository
+
 logger = logging.getLogger(__name__)
 
 
 class CustomSearchInput(BaseModel):
     """Input for custom search tool."""
     query: str = Field(description="Search query string")
+    repository_id: Optional[str] = Field(default=None, description="Repository ID to use for search")
 
 
 class CustomSearchTool(BaseTool):
@@ -38,19 +41,37 @@ class CustomSearchTool(BaseTool):
     api_key: str = Field(default="")
     max_results: int = Field(default=10)
     timeout: int = Field(default=30)
-    repository: str = Field(default="okic-dynamicSearch")
-    channel_id: str = Field(default="0")
+    repository_id: str = Field(default="dynamic_search")
     
     # 用户信息配置
     muwp_user: Dict[str, str] = Field(default_factory=dict)
+    
+    # 内部使用的repository配置
+    _repository_config: Optional[CustomSearchRepository] = None
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # 从环境变量获取配置
         self.api_url = os.getenv("CUSTOM_SEARCH_API_URL", "")
         self.api_key = os.getenv("CUSTOM_SEARCH_API_KEY", "")
-        self.repository = os.getenv("CUSTOM_SEARCH_REPOSITORY", "okic-dynamicSearch")
-        self.channel_id = os.getenv("CUSTOM_SEARCH_CHANNEL_ID", "0")
+        
+        # 获取自定义搜索配置
+        custom_config = get_custom_search_config()
+        
+        # 设置默认repository_id
+        if not hasattr(self, 'repository_id') or not self.repository_id:
+            self.repository_id = "dynamic_search"
+        
+        # 获取repository配置
+        self._repository_config = custom_config.get_repository(self.repository_id)
+        if not self._repository_config:
+            # 如果指定的repository不存在，使用默认的
+            self._repository_config = custom_config.get_default_repository()
+            if self._repository_config:
+                logger.warning(f"Repository '{self.repository_id}' not found, using default '{self._repository_config.repository}'")
+        
+        if not self._repository_config:
+            raise ValueError("No valid repository configuration found")
         
         # 设置默认用户信息（可以从环境变量获取）
         self.muwp_user = {
@@ -93,9 +114,9 @@ class CustomSearchTool(BaseTool):
                             "role": "user"
                         }
                     ],
-                    "repository": self.repository,
+                    "repository": self._repository_config.repository,
                     "param": {
-                        "channelId": self.channel_id
+                        "channelId": self._repository_config.channel_id
                     }
                 },
                 "muwpUser": self.muwp_user
@@ -179,14 +200,31 @@ class CustomSearchTool(BaseTool):
     def _run(
         self,
         query: str,
+        repository_id: Optional[str] = None,
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> List[Dict[str, Any]]:
         """同步执行搜索"""
+        # 如果提供了repository_id参数，则优先使用
+        if repository_id and repository_id != self.repository_id:
+            custom_config = get_custom_search_config()
+            temp_repo_config = custom_config.get_repository(repository_id)
+            if temp_repo_config:
+                # 临时更换repository配置
+                original_config = self._repository_config
+                self._repository_config = temp_repo_config
+                logger.info(f"Using repository: {temp_repo_config.name} ({temp_repo_config.repository})")
+        
         logger.info(f"Custom search query: {query}")
+        logger.info(f"Using repository: {self._repository_config.name} ({self._repository_config.repository})")
         
         try:
             results = self._call_search_api(query)
             logger.info(f"Custom search returned {len(results)} results")
+            
+            # 恢复原始配置（如果有的话）
+            if repository_id and repository_id != self.repository_id:
+                if 'original_config' in locals():
+                    self._repository_config = original_config
             
             # 返回结果列表，结果为空时返回提示
             if not results:
@@ -201,6 +239,11 @@ class CustomSearchTool(BaseTool):
             
             return results
         except Exception as e:
+            # 恢复原始配置（如果有的话）
+            if repository_id and repository_id != self.repository_id:
+                if 'original_config' in locals():
+                    self._repository_config = original_config
+            
             logger.error(f"Custom search error: {e}")
             return [{
                 "title": "搜索错误",
@@ -213,18 +256,18 @@ class CustomSearchTool(BaseTool):
     async def _arun(
         self,
         query: str,
+        repository_id: Optional[str] = None,
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
     ) -> List[Dict[str, Any]]:
         """异步执行搜索（可选实现）"""
         # 对于简单的 HTTP 请求，可以直接调用同步方法
-        return self._run(query, None)
+        return self._run(query, repository_id, None)
 
 
 def get_custom_search_tool(
     max_results: int = 10,
+    repository_id: str = None,
     api_url: str = None,
-    repository: str = None,
-    channel_id: str = None,
     muwp_user: Dict[str, str] = None
 ) -> CustomSearchTool:
     """创建自定义搜索工具实例"""
@@ -233,11 +276,20 @@ def get_custom_search_tool(
     # 如果提供了参数，则传递给工具
     if api_url:
         kwargs["api_url"] = api_url
-    if repository:
-        kwargs["repository"] = repository
-    if channel_id:
-        kwargs["channel_id"] = channel_id
+    if repository_id:
+        kwargs["repository_id"] = repository_id
     if muwp_user:
         kwargs["muwp_user"] = muwp_user
         
     return CustomSearchTool(**kwargs)
+
+
+def get_available_repositories() -> List[Dict[str, str]]:
+    """获取可用的repository选择列表"""
+    custom_config = get_custom_search_config()
+    return custom_config.get_repository_choices()
+
+
+def create_custom_search_with_repository(repository_id: str, max_results: int = 10) -> CustomSearchTool:
+    """根据repository_id创建自定义搜索工具"""
+    return CustomSearchTool(repository_id=repository_id, max_results=max_results)

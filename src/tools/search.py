@@ -22,7 +22,7 @@ from src.tools.decorators import create_logged_tool
 from src.tools.tavily_search.tavily_search_results_with_images import (
     TavilySearchWithImages,
 )
-from src.tools.custom_search import get_custom_search_tool
+from src.tools.custom_search import get_custom_search_tool, create_custom_search_with_repository
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def get_search_config():
 
 
 # Get the selected search tool
-def get_web_search_tool(max_search_results: int, engine: str = None):
+def get_web_search_tool(max_search_results: int, engine: str = None, repository_id: str = None):
     search_config = get_search_config()
     
     # Use provided engine or fall back to environment variable
@@ -105,6 +105,9 @@ def get_web_search_tool(max_search_results: int, engine: str = None):
         )
     elif selected_engine == SearchEngine.CUSTOM_SEARCH.value:
         # 使用自定义搜索引擎
-        return get_custom_search_tool(max_results=max_search_results)
+        if repository_id:
+            return create_custom_search_with_repository(repository_id=repository_id, max_results=max_search_results)
+        else:
+            return get_custom_search_tool(max_results=max_search_results)
     else:
         raise ValueError(f"Unsupported search engine: {selected_engine}")

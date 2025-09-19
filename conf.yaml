@@ -7,11 +7,11 @@
 # - A restart is required every time you change the `config.yaml` file.
 
 BASIC_MODEL:
-  base_url: https://ark.cn-beijing.volces.com/api/v3
-  model: "doubao-1-5-pro-32k-250115"
+  base_url: http://192.168.0.106:8088/v1
+  model: qwen3-0.6
   api_key: xxxx
   # max_retries: 3 # Maximum number of retries for LLM calls
-  # verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
+  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
 # To use Google Ai Studio as your basic platform:
 # BASIC_MODEL:

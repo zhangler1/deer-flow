@@ -22,6 +22,7 @@ export async function* chatStream(
     max_step_num: number;
     max_search_results?: number;
     search_engine?: string;
+    custom_search_repository?: string;
     interrupt_feedback?: string;
     enable_deep_thinking?: boolean;
     enable_background_investigation: boolean;

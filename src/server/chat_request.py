@@ -50,6 +50,9 @@ class ChatRequest(BaseModel):
     search_engine: Optional[str] = Field(
         "tavily", description="The search engine to use (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)"
     )
+    custom_search_repository: Optional[str] = Field(
+        None, description="The repository ID for custom search engine"
+    )
     auto_accepted_plan: Optional[bool] = Field(
         False, description="Whether to automatically accept the plan"
     )
