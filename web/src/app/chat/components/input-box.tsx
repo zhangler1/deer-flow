@@ -80,16 +80,17 @@ export function InputBox({
   const [isEnhanceAnimating, setIsEnhanceAnimating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
 
-  // 搜索引擎选择处理函数
-  const handleSearchEngineChange = useCallback((engine: string) => {
+  // 切换自定义搜索引擎的处理函数
+  const handleToggleCustomSearch = useCallback(() => {
+    const isCustomSearch = searchEngine === "custom_search";
     useSettingsStore.setState((state) => ({
       general: {
         ...state.general,
-        searchEngine: engine as "tavily" | "duckduckgo" | "brave_search" | "arxiv" | "wikipedia" | "custom_search",
+        searchEngine: isCustomSearch ? "tavily" : "custom_search", // 默认切换到 tavily
       },
     }));
     saveSettings();
-  }, []);
+  }, [searchEngine]);
 
   // 自定义搜索仓库选择处理函数
   const handleCustomSearchRepositoryChange = useCallback((repositoryId: string) => {
@@ -250,34 +251,19 @@ export function InputBox({
       </div>
       <div className="flex items-center px-4 py-2">
         <div className="flex grow gap-2">
-          {/* 搜索引擎选择器 */}
+          {/* 自定义搜索引擎切换按钮 */}
           <Tooltip title={tSettings("searchEngineDescription")}>
-            <Select value={searchEngine} onValueChange={handleSearchEngineChange}>
-              <SelectTrigger className="w-auto h-8 px-3 gap-2 border-muted text-sm">
-                <Search className="h-4 w-4" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tavily">
-                  Tavily
-                </SelectItem>
-                <SelectItem value="duckduckgo">
-                  DuckDuckGo
-                </SelectItem>
-                <SelectItem value="brave_search">
-                  Brave Search
-                </SelectItem>
-                <SelectItem value="arxiv">
-                  ArXiv
-                </SelectItem>
-                <SelectItem value="wikipedia">
-                  Wikipedia
-                </SelectItem>
-                <SelectItem value="custom_search">
-                  自定义搜索
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <Button
+              className={cn(
+                "rounded-2xl h-8 px-3 gap-2 text-sm",
+                searchEngine === "custom_search" && "!border-brand !text-brand",
+              )}
+              variant="outline"
+              onClick={handleToggleCustomSearch}
+            >
+              <Search className="h-4 w-4" />
+              自定义搜索
+            </Button>
           </Tooltip>
           {/* 自定义搜索仓库选择器 */}
           {searchEngine === "custom_search" && config?.custom_search_repositories && config.custom_search_repositories.length > 0 && (
