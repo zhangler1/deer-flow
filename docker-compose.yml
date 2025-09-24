@@ -1,12 +1,15 @@
 services:
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    image: deer-flow-backend:latest
     container_name: deer-flow-backend
     # Remove the ports section to not expose to host
     env_file:
       - .env
+    ports:
+      - "8000:8000"
     volumes:
       - ./conf.yaml:/app/conf.yaml:ro
     restart: unless-stopped
@@ -14,16 +17,24 @@ services:
       - deer-flow-network
 
   frontend:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+    # build:
+    #   context: ./web
+    #   dockerfile: Dockerfile.dev.yml
+    #   args:
+    #     - NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+    image: deer-flow-front:latest
     container_name: deer-flow-frontend
     ports:
       - "3000:3000"
+    #使用运行时候环境变量覆盖
+    # environment:
+      # - NEXT_PUBLIC_API_URL=value
     env_file:
-      - .env
+      - .env  
+    # 挂载环境变量
+    volumes:
+      - ./web/.env.local:/app/web/.env.local:ro
+      - ./conf.yaml:/app/conf.yaml:ro
     depends_on:
       - backend
     restart: unless-stopped

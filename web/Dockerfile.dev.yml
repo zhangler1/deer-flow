@@ -1,0 +1,41 @@
+# 开发环境基础镜像
+FROM node:20-bookworm
+
+# 安装必要的系统依赖
+# 先更新包索引，再安装对应依赖（--no-install-recommends 减少冗余依赖）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libc6 \                
+        openssl \                
+    && rm -rf /var/lib/apt/lists/*  # 清理缓存，减小镜像体积
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制依赖配置文件
+COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
+
+# 安装所有依赖（包括开发依赖）
+RUN  npm install -g pnpm 
+RUN pnpm i
+
+
+# 复制项目文件（实际开发时会被挂载覆盖）
+COPY . .
+
+# 暴露开发服务器端口
+EXPOSE 3000
+
+# 设置环境变量
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+# 启动开发服务器（带热重载）
+CMD \
+    if [ -f yarn.lock ]; then yarn dev; \
+    elif [ -f package-lock.json ]; then npm run dev; \
+    elif [ -f pnpm-lock.yaml ]; then pnpm dev; \
+    else echo "Lockfile not found." && exit 1; \
+    fi
