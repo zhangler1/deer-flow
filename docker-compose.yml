@@ -8,13 +8,21 @@ services:
     # Remove the ports section to not expose to host
     env_file:
       - .env
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
       - ./conf.yaml:/app/conf.yaml:ro
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./test_custom_search_simple.py:/app/test_custom_search_simple.py
+      - ./test_custom_search.py:/app/test_custom_search.py
+      - ./src:/app/src
+
     restart: unless-stopped
     networks:
       - deer-flow-network
+    tty: true
+    stdin_open: true
+    entrypoint: ["/app/.venv/bin/python" ,"server.py" ,"--host", "0.0.0.0" ,"--port", "8000"]
 
   frontend:
     # build:
@@ -24,8 +32,8 @@ services:
     #     - NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
     image: deer-flow-front:latest
     container_name: deer-flow-frontend
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     #使用运行时候环境变量覆盖
     # environment:
       # - NEXT_PUBLIC_API_URL=value
@@ -41,7 +49,7 @@ services:
     networks:
       - deer-flow-network
   nginx:
-    image: nginx:alpine
+    image: nginx:latest
     container_name: deer-flow-nginx
     ports:
       - "80:80"
