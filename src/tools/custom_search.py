@@ -48,6 +48,20 @@ class CustomSearchTool(BaseTool):
     
     # 内部使用的repository配置
     _repository_config: Optional[CustomSearchRepository] = None
+
+    @property
+    def repository(self) -> str:
+        """获取当前使用的repository名称"""
+        if self._repository_config:
+            return self._repository_config.repository
+        return self.repository_id
+    
+    @property
+    def channel_id(self) -> str:
+        """获取当前使用的channel_id"""
+        if self._repository_config:
+            return self._repository_config.channel_id
+        return "0"
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -21,7 +21,7 @@ COPY . /app
 
 # Install the application dependencies.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked
+    uv sync --locked 
 
 EXPOSE 8000
 
