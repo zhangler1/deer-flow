@@ -73,7 +73,12 @@
             "justMyCode": false,
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
-            }
+            },
+            "args": [
+                "--host",
+                "0.0.0.0",
+                "--reload"
+            ]
         },
         {
             "name": "Python: graph.py",

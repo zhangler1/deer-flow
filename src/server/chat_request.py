@@ -117,7 +117,6 @@ class EnhancePromptRequest(BaseModel):
 
 class SimpleResearchRequest(BaseModel):
     messages: List[Dict[str, str]] = Field(..., description="对话消息列表，OpenAI格式")
-    session_id: Optional[str] = Field(None, description="可选的会话标识符，用于标识同一个对话会话")
     max_search_results: Optional[int] = Field(3, description="最大搜索结果数")
     search_engine: Optional[str] = Field("custom_search", description="搜索引擎")
     enable_deep_thinking: Optional[bool] = Field(True, description="启用深度思考")
@@ -148,7 +147,6 @@ class SimpleResearchResponse(BaseModel):
     choices: List[ChatCompletionChoice] = Field(..., description="模型生成的选择项列表")
 
     sources: List[str] = Field(default_factory=list, description="参考来源")
-    session_id: str = Field(..., description="会话标识符（用于后续对话）")
     is_complete: bool = Field(True, description="是否完成回答")
     execution_time: float = Field(..., description="执行时间(秒)")
     thinking_steps: Optional[int] = Field(0, description="实际思考步骤数")

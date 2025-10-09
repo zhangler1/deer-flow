@@ -34,7 +34,6 @@ class CustomSearchTool(BaseTool):
     
     name: str = "web_search"
     description: str = "搜索网络信息。输入应该是搜索查询字符串。"
-    args_schema = CustomSearchInput
     
     # 配置参数
     api_url: str = Field(default="")
@@ -65,6 +64,9 @@ class CustomSearchTool(BaseTool):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # 设置args_schema
+        self.args_schema = CustomSearchInput
+        
         # 从环境变量获取配置
         self.api_url = os.getenv("CUSTOM_SEARCH_API_URL", "")
         self.api_key = os.getenv("CUSTOM_SEARCH_API_KEY", "")

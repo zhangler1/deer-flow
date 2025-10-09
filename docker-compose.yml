@@ -13,8 +13,6 @@ services:
     volumes:
       - ./conf.yaml:/app/conf.yaml:ro
       - ./pyproject.toml:/app/pyproject.toml
-      - ./test_custom_search_simple.py:/app/test_custom_search_simple.py
-      - ./test_custom_search.py:/app/test_custom_search.py
       - ./src:/app/src
 
     restart: unless-stopped

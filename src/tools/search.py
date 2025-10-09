@@ -41,11 +41,11 @@ def get_search_config():
 
 
 # Get the selected search tool
-def get_web_search_tool(max_search_results: int, engine: str = None, repository_id: str = None):
+def get_web_search_tool(max_search_results: int, engine: Optional[str] = None, repository_id: Optional[str] = None):
     search_config = get_search_config()
     
-    # Use provided engine or fall back to environment variable
-    selected_engine = engine or SELECTED_SEARCH_ENGINE
+    # Use provided engine, or from config file, or fall back to environment variable
+    selected_engine = engine or search_config.get("engine") or SELECTED_SEARCH_ENGINE
     
     logger.info(f"Using search engine: {selected_engine}")
 
@@ -64,8 +64,8 @@ def get_web_search_tool(max_search_results: int, engine: str = None, repository_
             include_raw_content=True,
             include_images=True,
             include_image_descriptions=True,
-            include_domains=include_domains,
-            exclude_domains=exclude_domains,
+            include_domains=include_domains or [],
+            exclude_domains=exclude_domains or [],
         )
     elif selected_engine == SearchEngine.DUCKDUCKGO.value:
         return LoggedDuckDuckGoSearch(

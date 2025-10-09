@@ -35,7 +35,7 @@ REASONING_MODEL:
 # OTHER SETTINGS:
 # Search engine configuration
 SEARCH_ENGINE:
-  engine: aggregation_search
+  engine: custom_search
   # Only include results from these domains (for Tavily)
   include_domains:
     - example.com

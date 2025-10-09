@@ -6,9 +6,9 @@ import json
 import logging
 import time
 import uuid
-from typing import Annotated, Any, List, cast, Dict
+from typing import Annotated, Any, List, cast, Dict,Optional
 from uuid import uuid4
-
+import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
@@ -718,6 +718,58 @@ async def config():
     )
 
 
+def get_node_id() -> str:
+    # 容器 ID 通常存储在 /proc/self/cgroup 或环境变量中
+    # 方案 1：从环境变量获取（推荐，需启动时注入）
+    node_id = os.getenv("NODE_ID")
+    if node_id:
+        return node_id
+    
+    # 方案 2：从 /proc/self/cgroup 解析（适用于未注入环境变量的场景）
+    try:
+        with open("/proc/self/cgroup", "r") as f:
+            for line in f:
+                if "docker" in line:
+                    # 提取容器 ID（通常是最后一段的前 12 位）
+                    container_id = line.strip().split("/")[-1].split(".")[0][:12]
+                    return f"docker-{container_id}"
+    except Exception:
+        pass
+    
+    #  fallback：生成临时 ID（不推荐，可能重复）
+    return f"temp-{uuid.uuid4().hex[:8]}"
+
+# 生成对话 ID 时传入 node_id
+def generate_conversation_id(
+    model_prefix: str = "chatcmpl",
+    node_id: Optional[str] = None
+) -> str:
+    """
+    生成符合大模型服务端标准的唯一对话ID
+    
+    参数:
+        model_prefix: 模型类型前缀（如"chatcmpl"表示聊天补全，"imgcmpl"表示图像生成）
+        node_id: 服务节点标识（分布式部署时用于区分不同服务节点）
+    
+    返回:
+        全局唯一的对话ID字符串
+    """
+    # 1. 时间戳部分：使用人类可读的日期时间格式，确保时序唯一性
+    from datetime import datetime
+    now = datetime.now()
+    timestamp_str = now.strftime("%Y-%m-%d %H %M")  # 格式：2003-mm-dd hh mm
+    
+    # 2. 随机部分：基于UUIDv4，确保同一时间戳内的唯一性（122位二进制≈30位十六进制）
+    # 取前16位十六进制字符（64位），平衡唯一性和长度
+    random_str = uuid.uuid4().hex[:16]
+    
+    # 3. 可选的服务节点标识（分布式部署时使用）
+    node_id=get_node_id()
+    node_suffix = f"-{node_id}" if node_id else ""
+    
+    # 组合生成最终ID
+    return f"{model_prefix}-{timestamp_str}-{random_str}{node_suffix}"
+
 @app.post("/api/research/simple", response_model=SimpleResearchResponse)
 async def simple_research(request: SimpleResearchRequest):
     """
@@ -727,8 +779,8 @@ async def simple_research(request: SimpleResearchRequest):
     import time
     start_time = time.time()
     
-    # 使用提供的session_id或生成新的会话标识符
-    session_id = request.session_id or str(uuid4())
+    # 生成唯一的对话 ID
+    conversation_id = generate_conversation_id(model_prefix="chatcmpl")
     
     try:
         # 验证messages格式
@@ -745,7 +797,7 @@ async def simple_research(request: SimpleResearchRequest):
         # 使用简化的流程进行对话式回答
         answer, sources, thinking_steps = await _simple_conversational_research(
             messages=request.messages,
-            session_id=session_id,
+            conversation_id=conversation_id,
             max_search_results=request.max_search_results or 3,
             search_engine=request.search_engine or "custom_search",
             enable_deep_thinking=request.enable_deep_thinking or True,
@@ -781,13 +833,12 @@ async def simple_research(request: SimpleResearchRequest):
         import uuid
         
         return SimpleResearchResponse(
-            id=f"chatcmpl-{str(uuid.uuid4())[:8]}",
+            id=conversation_id,
             object="chat.completion",
             created=int(time.time()),
             model="deer-flow-research",
             choices=[choice],
             sources=sources,
-            session_id=session_id,
             is_complete=True,
             execution_time=execution_time,
             thinking_steps=thinking_steps
@@ -802,7 +853,7 @@ async def simple_research(request: SimpleResearchRequest):
 
 async def _simple_conversational_research(
     messages: List[Dict[str, str]],
-    session_id: str,
+    conversation_id: str,
     max_search_results: int,
     search_engine: str,
     enable_deep_thinking: bool,
@@ -849,7 +900,7 @@ async def _simple_conversational_research(
     # 进行多轮思考和搜索
     for iteration in range(max_thinking_iterations):
         thinking_steps += 1
-        logger.info(f"Session {session_id}: 思考迭代 {iteration + 1}/{max_thinking_iterations}")
+        logger.info(f"Conversation {conversation_id}: 思考迭代 {iteration + 1}/{max_thinking_iterations}")
         
         try:
             # 调用LLM
@@ -864,7 +915,7 @@ async def _simple_conversational_research(
                 for tool_call in tool_calls:
                     if tool_call['name'] == search_tool.name:
                         search_query = tool_call['args'].get('query', messages[-1]['content'])
-                        logger.info(f"Session {session_id}: 执行搜索 - {search_query}")
+                        logger.info(f"Conversation {conversation_id}: 执行搜索 - {search_query}")
                         
                         search_results = search_tool.invoke(search_query)
                         
@@ -904,7 +955,7 @@ async def _simple_conversational_research(
             return response_content, sources, thinking_steps
             
         except Exception as e:
-            logger.warning(f"Session {session_id}: 思考迭代 {iteration + 1} 失败: {str(e)}")
+            logger.warning(f"Conversation {conversation_id}: 思考迭代 {iteration + 1} 失败: {str(e)}")
             if iteration == max_thinking_iterations - 1:
                 # 最后一次迭代，返回默认回答
                 return f"抱歉，我在处理您的问题“{messages[-1]['content']}”时遇到了一些困难。请您再试一次或者提供更具体的信息。", [], thinking_steps
