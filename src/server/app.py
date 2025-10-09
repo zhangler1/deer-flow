@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import base64
+from datetime import datetime
 import json
 import logging
 import time
@@ -756,7 +757,7 @@ def generate_conversation_id(
     """
     # 1. 时间戳部分：使用人类可读的日期时间格式，确保时序唯一性
     from datetime import datetime
-    now = datetime.now()
+    now: datetime = datetime.now()
     timestamp_str = now.strftime("%Y-%m-%d %H %M")  # 格式：2003-mm-dd hh mm
     
     # 2. 随机部分：基于UUIDv4，确保同一时间戳内的唯一性（122位二进制≈30位十六进制）

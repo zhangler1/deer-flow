@@ -16,6 +16,7 @@ from langchain_community.utilities import (
     BraveSearchWrapper,
     WikipediaAPIWrapper,
 )
+from pydantic import SecretStr
 
 from src.config import SELECTED_SEARCH_ENGINE, SearchEngine, load_yaml_config
 from src.tools.decorators import create_logged_tool
@@ -76,7 +77,7 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None, r
         return LoggedBraveSearch(
             name="web_search",
             search_wrapper=BraveSearchWrapper(
-                api_key=os.getenv("BRAVE_SEARCH_API_KEY", ""),
+                api_key=SecretStr(os.getenv("BRAVE_SEARCH_API_KEY", "")),
                 search_kwargs={"count": max_search_results},
             ),
         )
