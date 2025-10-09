@@ -1,7 +1,7 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -113,3 +113,42 @@ class EnhancePromptRequest(BaseModel):
     report_style: Optional[str] = Field(
         "academic", description="The style of the report"
     )
+
+
+class SimpleResearchRequest(BaseModel):
+    messages: List[Dict[str, str]] = Field(..., description="对话消息列表，OpenAI格式")
+    session_id: Optional[str] = Field(None, description="可选的会话标识符，用于标识同一个对话会话")
+    max_search_results: Optional[int] = Field(3, description="最大搜索结果数")
+    search_engine: Optional[str] = Field("custom_search", description="搜索引擎")
+    enable_deep_thinking: Optional[bool] = Field(True, description="启用深度思考")
+    # 新增控制参数
+    max_thinking_iterations: Optional[int] = Field(2, description="最大思考迭代次数")
+    max_recursion_limit: Optional[int] = Field(15, description="最大递归深度限制")
+
+
+class ChatCompletionMessage(BaseModel):
+    role: str = Field(..., description="消息角色，如 'assistant'")
+    content: str = Field(..., description="消息内容")
+    # 扩展字段，包含研究相关的元数据
+    research_metadata: Dict[str, Any] = Field(default_factory=dict, description="研究相关元数据")
+
+class ChatCompletionChoice(BaseModel):
+    index: int = Field(..., description="选择项索引")
+    message: ChatCompletionMessage = Field(..., description="消息内容")
+    finish_reason: str = Field(..., description="结束原因，如 'stop', 'length', 'tool_calls' 等")
+    # 研究特有的字段
+    sources: List[str] = Field(default_factory=list, description="参考来源")
+    thinking_steps: Optional[int] = Field(0, description="实际思考步骤数")
+
+class SimpleResearchResponse(BaseModel):
+    id: str = Field(..., description="对话的唯一标识符")
+    object: str = Field("chat.completion", description="对象类型，固定为 'chat.completion'")
+    created: int = Field(..., description="创建时间的 Unix 时间戳（秒）")
+    model: str = Field(..., description="生成响应的模型名称")
+    choices: List[ChatCompletionChoice] = Field(..., description="模型生成的选择项列表")
+
+    sources: List[str] = Field(default_factory=list, description="参考来源")
+    session_id: str = Field(..., description="会话标识符（用于后续对话）")
+    is_complete: bool = Field(True, description="是否完成回答")
+    execution_time: float = Field(..., description="执行时间(秒)")
+    thinking_steps: Optional[int] = Field(0, description="实际思考步骤数")

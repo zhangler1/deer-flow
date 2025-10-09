@@ -41,7 +41,7 @@ class CustomSearchConfig:
             )
         
         # 设置默认repository
-        self._default_repository = custom_search_config.get("default_repository", "dynamic_search")
+        self._default_repository = custom_search_config.get("default_repository", "aggregation_search")
         
         # 如果没有配置repositories，使用默认配置
         if not self._repositories:
@@ -70,7 +70,7 @@ class CustomSearchConfig:
             )
         }
         self._repositories = default_repos
-        self._default_repository = "dynamic_search"
+        self._default_repository = "aggregation_search"
     
     def get_repositories(self) -> Dict[str, CustomSearchRepository]:
         """获取所有可用的repository配置"""

@@ -4,7 +4,9 @@
 import base64
 import json
 import logging
-from typing import Annotated, Any, List, cast
+import time
+import uuid
+from typing import Annotated, Any, List, cast, Dict
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query
@@ -26,16 +28,21 @@ from src.llms.llm import get_configured_llm_models
 from src.podcast.graph.builder import build_graph as build_podcast_graph
 from src.ppt.graph.builder import build_graph as build_ppt_graph
 from src.prompt_enhancer.graph.builder import build_graph as build_prompt_enhancer_graph
+from src.prompt_enhancer.graph.state import PromptEnhancerState
 from src.prose.graph.builder import build_graph as build_prose_graph
 from src.rag.builder import build_retriever
 from src.rag.milvus import load_examples
 from src.rag.retriever import Resource
 from src.server.chat_request import (
+    ChatCompletionChoice,
+    ChatCompletionMessage,
     ChatRequest,
     EnhancePromptRequest,
     GeneratePodcastRequest,
     GeneratePPTRequest,
     GenerateProseRequest,
+    SimpleResearchRequest,
+    SimpleResearchResponse,
     TTSRequest,
 )
 from src.server.config_request import ConfigResponse, CustomSearchRepositoryConfig
@@ -96,26 +103,27 @@ async def chat_stream(request: ChatRequest):
             detail="MCP server configuration is disabled. Set ENABLE_MCP_SERVER_CONFIGURATION=true to enable MCP features.",
         )
 
+    # 确保 thread_id 不为 None，如果是 None 或默认值，则生成新的 UUID
     thread_id = request.thread_id
-    if thread_id == "__default__":
+    if thread_id is None or thread_id == "__default__":
         thread_id = str(uuid4())
 
     return StreamingResponse(
         _astream_workflow_generator(
             request.model_dump()["messages"],
             thread_id,
-            request.resources,
-            request.max_plan_iterations,
-            request.max_step_num,
-            request.max_search_results,
-            request.search_engine,
-            request.custom_search_repository,
-            request.auto_accepted_plan,
-            request.interrupt_feedback,
-            request.mcp_settings if mcp_enabled else {},
-            request.enable_background_investigation,
-            request.report_style,
-            request.enable_deep_thinking,
+            request.resources or [],
+            request.max_plan_iterations or 1,
+            request.max_step_num or 3,
+            request.max_search_results or 3,
+            request.search_engine or "tavily",
+            request.custom_search_repository or "",
+            request.auto_accepted_plan or False,
+            request.interrupt_feedback or "",
+            request.mcp_settings if (mcp_enabled and request.mcp_settings) else {},
+            request.enable_background_investigation or True,
+            request.report_style or ReportStyle.ACADEMIC,
+            request.enable_deep_thinking or False,
         ),
         media_type="text/event-stream",
     )
@@ -273,14 +281,14 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
         yield _make_event("tool_call_result", event_stream_message)
     elif isinstance(message_chunk, AIMessageChunk):
         # AI Message - Raw message tokens
-        if message_chunk.tool_calls:
+        if hasattr(message_chunk, 'tool_calls') and message_chunk.tool_calls:
             # AI Message - Tool Call
             event_stream_message["tool_calls"] = message_chunk.tool_calls
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
                 message_chunk.tool_call_chunks
             )
             yield _make_event("tool_calls", event_stream_message)
-        elif message_chunk.tool_call_chunks:
+        elif hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
             # AI Message - Tool Call Chunks
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
                 message_chunk.tool_call_chunks
@@ -394,10 +402,9 @@ async def _astream_workflow_generator(
     if checkpoint_saver and checkpoint_url != "":
         if checkpoint_url.startswith("postgresql://"):
             logger.info("start async postgres checkpointer.")
-            async with AsyncConnectionPool(
-                checkpoint_url, kwargs=connection_kwargs
-            ) as conn:
-                checkpointer = AsyncPostgresSaver(conn)
+            async with AsyncPostgresSaver.from_conn_string(
+                checkpoint_url, **connection_kwargs
+            ) as checkpointer:
                 await checkpointer.setup()
                 graph.checkpointer = checkpointer
                 graph.store = in_memory_store
@@ -425,7 +432,7 @@ async def _astream_workflow_generator(
             yield event
 
 
-def _make_event(event_type: str, data: dict[str, any]):
+def _make_event(event_type: str, data: Dict[str, Any]):
     if data.get("content") == "":
         data.pop("content")
     # Ensure JSON serialization with proper encoding
@@ -472,13 +479,13 @@ async def text_to_speech(request: TTSRequest):
         # Call the TTS API
         result = tts_client.text_to_speech(
             text=request.text[:1024],
-            encoding=request.encoding,
-            speed_ratio=request.speed_ratio,
-            volume_ratio=request.volume_ratio,
-            pitch_ratio=request.pitch_ratio,
-            text_type=request.text_type,
-            with_frontend=request.with_frontend,
-            frontend_type=request.frontend_type,
+            encoding=request.encoding or "mp3",
+            speed_ratio=request.speed_ratio or 1.0,
+            volume_ratio=request.volume_ratio or 1.0,
+            pitch_ratio=request.pitch_ratio or 1.0,
+            text_type=request.text_type or "plain",
+            with_frontend=request.with_frontend or 1,
+            frontend_type=request.frontend_type or "unitTson",
         )
 
         if not result["success"]:
@@ -509,7 +516,16 @@ async def generate_podcast(request: GeneratePodcastRequest):
         report_content = request.content
         print(report_content)
         workflow = build_podcast_graph()
-        final_state = workflow.invoke({"input": report_content})
+        # 创建正确的 PodcastState 输入
+        from src.podcast.graph.state import PodcastState
+        podcast_input: PodcastState = {
+            "messages": [],  # MessagesState 需要 messages 字段
+            "input": report_content,
+            "output": None,
+            "script": None,
+            "audio_chunks": []
+        }
+        final_state = workflow.invoke(podcast_input)
         audio_bytes = final_state["output"]
         return Response(content=audio_bytes, media_type="audio/mp3")
     except Exception as e:
@@ -523,7 +539,16 @@ async def generate_ppt(request: GeneratePPTRequest):
         report_content = request.content
         print(report_content)
         workflow = build_ppt_graph()
-        final_state = workflow.invoke({"input": report_content})
+        # 创建正确的 PPTState 输入
+        from src.ppt.graph.state import PPTState
+        ppt_input: PPTState = {
+            "messages": [],  # MessagesState 需要 messages 字段
+            "input": report_content,
+            "generated_file_path": "",
+            "ppt_content": "",
+            "ppt_file_path": ""
+        }
+        final_state = workflow.invoke(ppt_input)
         generated_file_path = final_state["generated_file_path"]
         with open(generated_file_path, "rb") as f:
             ppt_bytes = f.read()
@@ -542,17 +567,22 @@ async def generate_prose(request: GenerateProseRequest):
         sanitized_prompt = request.prompt.replace("\r\n", "").replace("\n", "")
         logger.info(f"Generating prose for prompt: {sanitized_prompt}")
         workflow = build_prose_graph()
+        # 创建正确的 ProseState 输入
+        from src.prose.graph.state import ProseState
+        prose_input: ProseState = {
+            "messages": [],  # MessagesState 需要 messages 字段
+            "content": request.prompt,
+            "option": request.option,
+            "command": request.command or "",
+            "output": ""
+        }
         events = workflow.astream(
-            {
-                "content": request.prompt,
-                "option": request.option,
-                "command": request.command,
-            },
+            prose_input,
             stream_mode="messages",
             subgraphs=True,
         )
         return StreamingResponse(
-            (f"data: {event[0].content}\n\n" async for _, event in events),
+            (f"data: {getattr(event[1][0], 'content', str(event[1][0]))}\n\n" async for agent, event in events if event and len(event) > 0),
             media_type="text/event-stream",
         )
     except Exception as e:
@@ -587,13 +617,14 @@ async def enhance_prompt(request: EnhancePromptRequest):
             report_style = ReportStyle.ACADEMIC
 
         workflow = build_prompt_enhancer_graph()
-        final_state = workflow.invoke(
-            {
-                "prompt": request.prompt,
-                "context": request.context,
-                "report_style": report_style,
-            }
-        )
+        # 创建符合 PromptEnhancerState 类型的输入
+        prompt_enhancer_input: PromptEnhancerState = {
+            "prompt": request.prompt,
+            "context": request.context,
+            "report_style": report_style,
+            "output": None,  # 初始化输出字段
+        }
+        final_state = workflow.invoke(prompt_enhancer_input)
         return {"result": final_state["output"]}
     except Exception as e:
         logger.exception(f"Error occurred during prompt enhancement: {str(e)}")
@@ -685,3 +716,198 @@ async def config():
         models=get_configured_llm_models(),
         custom_search_repositories=custom_search_repositories,
     )
+
+
+@app.post("/api/research/simple", response_model=SimpleResearchResponse)
+async def simple_research(request: SimpleResearchRequest):
+    """
+    OpenAI格式的简化对话式研究接口：边搜边想，带上下文的对话式回答
+    支持思考迭代和递归控制，不生成详细报告
+    """
+    import time
+    start_time = time.time()
+    
+    # 使用提供的session_id或生成新的会话标识符
+    session_id = request.session_id or str(uuid4())
+    
+    try:
+        # 验证messages格式
+        if not request.messages or len(request.messages) == 0:
+            raise HTTPException(status_code=400, detail="messages 不能为空")
+        
+        # 获取最后一条用户消息作为当前问题
+        last_message = request.messages[-1]
+        if last_message.get("role") != "user":
+            raise HTTPException(status_code=400, detail="最后一条消息必须是用户消息")
+        
+        current_question = last_message.get("content", "")
+        
+        # 使用简化的流程进行对话式回答
+        answer, sources, thinking_steps = await _simple_conversational_research(
+            messages=request.messages,
+            session_id=session_id,
+            max_search_results=request.max_search_results or 3,
+            search_engine=request.search_engine or "custom_search",
+            enable_deep_thinking=request.enable_deep_thinking or True,
+            max_thinking_iterations=request.max_thinking_iterations or 2,
+            max_recursion_limit=request.max_recursion_limit or 15
+        )
+        
+        execution_time = time.time() - start_time
+        
+        # 构建 ChatCompletionMessage
+        assistant_message = ChatCompletionMessage(
+            role="assistant",
+            content=answer,
+            research_metadata={
+                "sources": sources,
+                "thinking_steps": thinking_steps,
+                "search_engine": request.search_engine or "custom_search",
+                "max_search_results": request.max_search_results or 3
+            }
+        )
+        
+        # 构建 ChatCompletionChoice
+        choice: ChatCompletionChoice = ChatCompletionChoice(
+            index=0,
+            message=assistant_message,
+            finish_reason="stop",
+            sources=sources,
+            thinking_steps=thinking_steps
+        )
+        
+        # 生成唯一ID和时间戳
+        import time
+        import uuid
+        
+        return SimpleResearchResponse(
+            id=f"chatcmpl-{str(uuid.uuid4())[:8]}",
+            object="chat.completion",
+            created=int(time.time()),
+            model="deer-flow-research",
+            choices=[choice],
+            sources=sources,
+            session_id=session_id,
+            is_complete=True,
+            execution_time=execution_time,
+            thinking_steps=thinking_steps
+        )
+        
+    except HTTPException:
+        raise  # 重新抛出HTTP异常
+    except Exception as e:
+        logger.exception(f"Error in simple research endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
+
+
+async def _simple_conversational_research(
+    messages: List[Dict[str, str]],
+    session_id: str,
+    max_search_results: int,
+    search_engine: str,
+    enable_deep_thinking: bool,
+    max_thinking_iterations: int,
+    max_recursion_limit: int
+) -> tuple[str, List[str], int]:
+    """
+    简化的对话式研究流程：边搜边想
+    """
+    from src.llms.llm import get_llm_by_type
+    from src.tools import get_web_search_tool
+    
+    sources = []
+    thinking_steps = 0
+    
+    # 获取搜索工具
+    search_tool = get_web_search_tool(max_search_results, search_engine, "")
+    
+    # 构建对话式研究助手的提示词
+    system_prompt = """
+你是一个智能的研究助手，善于进行对话式的研究和回答。
+
+你的能力：
+1. 当需要最新信息时，使用搜索工具获取相关资料
+2. 基于搜索结果和你的知识进行综合分析
+3. 提供自然、对话式的回答，就像在和用户直接交流
+
+回答要求：
+- 保持对话式的自然语调
+- 不要生成正式的研究报告，而是简单直接的回答
+- 如果需要更多信息，可以向用户提问
+- 在回答末尾简单列出主要参考来源（如果有）
+"""
+    
+    # 将系统提示词添加到消息列表开头
+    conversation_messages = [{"role": "system", "content": system_prompt}] + messages
+    
+    # 获取LLM
+    if enable_deep_thinking:
+        llm = get_llm_by_type("reasoning").bind_tools([search_tool])
+    else:
+        llm = get_llm_by_type("basic").bind_tools([search_tool])
+    
+    # 进行多轮思考和搜索
+    for iteration in range(max_thinking_iterations):
+        thinking_steps += 1
+        logger.info(f"Session {session_id}: 思考迭代 {iteration + 1}/{max_thinking_iterations}")
+        
+        try:
+            # 调用LLM
+            response = llm.invoke(
+                conversation_messages,
+                config={"recursion_limit": max_recursion_limit}
+            )
+            
+            # 处理工具调用（搜索）
+            tool_calls = getattr(response, 'tool_calls', None)
+            if tool_calls:
+                for tool_call in tool_calls:
+                    if tool_call['name'] == search_tool.name:
+                        search_query = tool_call['args'].get('query', messages[-1]['content'])
+                        logger.info(f"Session {session_id}: 执行搜索 - {search_query}")
+                        
+                        search_results = search_tool.invoke(search_query)
+                        
+                        # 收集来源
+                        if isinstance(search_results, list):
+                            for result in search_results:
+                                if isinstance(result, dict) and result.get('url'):
+                                    sources.append(result['url'])
+                        
+                        # 将搜索结果添加到对话中
+                        search_context = f"搜索结果\uff1a{json.dumps(search_results, ensure_ascii=False, indent=2)}"
+                        conversation_messages.append({
+                            "role": "user", 
+                            "content": f"基于以下搜索结果，请给出对话式回答：\n{search_context}"
+                        })
+                        
+                        # 重新调用LLM生成最终回答
+                        final_response = llm.invoke(
+                            conversation_messages,
+                            config={"recursion_limit": max_recursion_limit}
+                        )
+                        # 确保返回内容是字符串类型
+                        final_content = final_response.content
+                        if isinstance(final_content, list):
+                            final_content = str(final_content)
+                        elif not isinstance(final_content, str):
+                            final_content = str(final_content)
+                        return final_content, sources, thinking_steps
+            
+            # 如果没有工具调用，直接返回回答
+            # 确保返回内容是字符串类型
+            response_content = response.content
+            if isinstance(response_content, list):
+                response_content = str(response_content)
+            elif not isinstance(response_content, str):
+                response_content = str(response_content)
+            return response_content, sources, thinking_steps
+            
+        except Exception as e:
+            logger.warning(f"Session {session_id}: 思考迭代 {iteration + 1} 失败: {str(e)}")
+            if iteration == max_thinking_iterations - 1:
+                # 最后一次迭代，返回默认回答
+                return f"抱歉，我在处理您的问题“{messages[-1]['content']}”时遇到了一些困难。请您再试一次或者提供更具体的信息。", [], thinking_steps
+    
+    # 如果所有迭代都失败，返回默认回答
+    return f"对于您的问题“{messages[-1]['content']}”，我需要更多信息才能给出准确的回答。请您提供更具体的背景或者明确您最关心的方面。", [], thinking_steps

@@ -24,17 +24,18 @@ BASIC_MODEL:
 # Uncomment the following settings if you want to use reasoning model
 # for planning.
 
-# REASONING_MODEL:
-#   base_url: https://ark.cn-beijing.volces.com/api/v3
-#   model: "doubao-1-5-thinking-pro-m-250428"
-#   api_key: xxxx
-#   max_retries: 3 # Maximum number of retries for LLM calls
+REASONING_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-reasoner 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  # max_retries: 3 # Maximum number of retries for LLM calls
+  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
 
 # OTHER SETTINGS:
 # Search engine configuration
 SEARCH_ENGINE:
-  engine: tavily
+  engine: aggregation_search
   # Only include results from these domains (for Tavily)
   include_domains:
     - example.com
@@ -66,4 +67,4 @@ CUSTOM_SEARCH:
       repository: "okic-dynamicSearch"
       channel_id: "0"
   # Default repository to use
-  default_repository: "dynamic_search"
+  default_repository: "aggregation_search"

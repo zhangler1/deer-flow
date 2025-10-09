@@ -4,7 +4,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Union
 
 import requests
 from langchain_core.callbacks import (
@@ -34,14 +34,14 @@ class CustomSearchTool(BaseTool):
     
     name: str = "web_search"
     description: str = "搜索网络信息。输入应该是搜索查询字符串。"
-    args_schema: Type[BaseModel] = CustomSearchInput
+    args_schema = CustomSearchInput
     
     # 配置参数
     api_url: str = Field(default="")
     api_key: str = Field(default="")
     max_results: int = Field(default=10)
     timeout: int = Field(default=30)
-    repository_id: str = Field(default="dynamic_search")
+    repository_id: str = Field(default="aggregation_search")
     
     # 用户信息配置
     muwp_user: Dict[str, str] = Field(default_factory=dict)
@@ -128,9 +128,9 @@ class CustomSearchTool(BaseTool):
                             "role": "user"
                         }
                     ],
-                    "repository": self._repository_config.repository,
+                    "repository": self._repository_config.repository if self._repository_config else "default",
                     "param": {
-                        "channelId": self._repository_config.channel_id
+                        "channelId": self._repository_config.channel_id if self._repository_config else "0"
                     }
                 },
                 "muwpUser": self.muwp_user
@@ -219,6 +219,7 @@ class CustomSearchTool(BaseTool):
     ) -> List[Dict[str, Any]]:
         """同步执行搜索"""
         # 如果提供了repository_id参数，则优先使用
+        original_config = None
         if repository_id and repository_id != self.repository_id:
             custom_config = get_custom_search_config()
             temp_repo_config = custom_config.get_repository(repository_id)
@@ -229,16 +230,16 @@ class CustomSearchTool(BaseTool):
                 logger.info(f"Using repository: {temp_repo_config.name} ({temp_repo_config.repository})")
         
         logger.info(f"Custom search query: {query}")
-        logger.info(f"Using repository: {self._repository_config.name} ({self._repository_config.repository})")
+        if self._repository_config:
+            logger.info(f"Using repository: {self._repository_config.name} ({self._repository_config.repository})")
         
         try:
             results = self._call_search_api(query)
             logger.info(f"Custom search returned {len(results)} results")
             
             # 恢复原始配置（如果有的话）
-            if repository_id and repository_id != self.repository_id:
-                if 'original_config' in locals():
-                    self._repository_config = original_config
+            if repository_id and repository_id != self.repository_id and original_config is not None:
+                self._repository_config = original_config
             
             # 返回结果列表，结果为空时返回提示
             if not results:
@@ -254,9 +255,8 @@ class CustomSearchTool(BaseTool):
             return results
         except Exception as e:
             # 恢复原始配置（如果有的话）
-            if repository_id and repository_id != self.repository_id:
-                if 'original_config' in locals():
-                    self._repository_config = original_config
+            if repository_id and repository_id != self.repository_id and original_config is not None:
+                self._repository_config = original_config
             
             logger.error(f"Custom search error: {e}")
             return [{
@@ -280,12 +280,12 @@ class CustomSearchTool(BaseTool):
 
 def get_custom_search_tool(
     max_results: int = 10,
-    repository_id: str = None,
-    api_url: str = None,
-    muwp_user: Dict[str, str] = None
+    repository_id: Optional[str] = None,
+    api_url: Optional[str] = None,
+    muwp_user: Optional[Dict[str, str]] = None
 ) -> CustomSearchTool:
     """创建自定义搜索工具实例"""
-    kwargs = {"max_results": max_results}
+    kwargs: Dict[str, Any] = {"max_results": max_results}
     
     # 如果提供了参数，则传递给工具
     if api_url:
