@@ -88,6 +88,8 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None, r
                 top_k_results=max_search_results,
                 load_max_docs=max_search_results,
                 load_all_available_meta=True,
+                arxiv_search=None,
+                arxiv_exceptions=None,
             ),
         )
     elif selected_engine == SearchEngine.WIKIPEDIA.value:
@@ -102,6 +104,7 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None, r
                 top_k_results=max_search_results,
                 load_all_available_meta=True,
                 doc_content_chars_max=wiki_doc_content_chars_max,
+                wiki_client=None,
             ),
         )
     elif selected_engine == SearchEngine.CUSTOM_SEARCH.value:
