@@ -57,13 +57,16 @@ Before creating a detailed plan, assess if there is sufficient context to answer
 
 Different types of steps have different web search requirements:
 
-1. **Research Steps** (`need_search: true`):
+1. **Research Steps** (`need_search: true` - REQUIRED for information gathering):
+   - **MUST use web search** for any topic requiring external knowledge
    - Retrieve information from the file with the URL with `rag://` or `http://` prefix specified by the user
    - Gathering market data or industry trends
    - Finding historical information
    - Collecting competitor analysis
    - Researching current events or news
    - Finding statistical data or reports
+   - **Technical topics, manufacturing processes, industry knowledge, etc. MUST use search**
+   - **Default: Set `need_search: true` unless the step is purely computational**
 
 2. **Data Processing Steps** (`need_search: false`):
    - API calls and data extraction
@@ -71,6 +74,9 @@ Different types of steps have different web search requirements:
    - Raw data collection from existing sources
    - Mathematical calculations and analysis
    - Statistical computations and data processing
+   - **Only for pure data manipulation without external information needs**
+
+**IMPORTANT**: For research questions about specialized topics (technology, manufacturing, industry processes, etc.), almost ALL research steps should have `need_search: true` to gather comprehensive external information.
 
 ## Exclusions
 
@@ -144,8 +150,9 @@ When planning information gathering, consider these key aspects and ensure COMPR
   - Ensure each step is substantial and covers related information categories
   - Prioritize breadth and depth within the {{ max_step_num }}-step constraint
   - For each step, carefully assess if web search is needed:
-    - Research and external data gathering: Set `need_search: true`
-    - Internal data processing: Set `need_search: false`
+    - **Research and external data gathering: Set `need_search: true` (DEFAULT for most research topics)**
+    - **Internal data processing only: Set `need_search: false`**
+  - **For specialized topics (technology, manufacturing, industry processes), DEFAULT to `need_search: true`**
 - Specify the exact data to be collected in step's `description`. Include a `note` if necessary.
 - Prioritize depth and volume of relevant information - limited information is not acceptable.
 - Use the same language as the user to generate the plan.
@@ -181,7 +188,8 @@ interface Plan {
 - Never settle for minimal information - the goal is a comprehensive, detailed final report
 - Limited or insufficient information will lead to an inadequate final report
 - Carefully assess each step's web search or retrieve from URL requirement based on its nature:
-  - Research steps (`need_search: true`) for gathering information
-  - Processing steps (`need_search: false`) for calculations and data processing
+  - **Research steps (`need_search: true`) for gathering external information - DEFAULT for most topics**
+  - **Processing steps (`need_search: false`) for calculations and data processing only**
+  - **For specialized/technical topics, almost always use `need_search: true`**
 - Default to gathering more information unless the strictest sufficient context criteria are met
 - Always use the language specified by the locale = **{{ locale }}**.

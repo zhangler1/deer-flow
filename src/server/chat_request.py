@@ -128,7 +128,7 @@ class SimpleResearchRequest(BaseModel):
     max_search_results: Optional[int] = Field(3, description="最大搜索结果数")
     search_engine: Optional[str] = Field("custom_search", description="搜索引擎 (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)")
     custom_search_repository: Optional[str] = Field(None, description="自定义搜索仓库ID")
-    auto_accepted_plan: Optional[bool] = Field(False, description="是否自动接受计划")
+    auto_accepted_plan: Optional[bool] = Field(True, description="是否自动接受计划")
     interrupt_feedback: Optional[str] = Field(None, description="用户对计划的中断反馈")
     mcp_settings: Optional[dict] = Field(None, description="MCP设置")
     enable_background_investigation: Optional[bool] = Field(True, description="是否启用背景调研")

@@ -20,7 +20,6 @@ from src.llms.llm import get_llm_by_type
 from src.prompts.planner_model import Plan
 from src.prompts.template import apply_prompt_template
 from src.tools import (
-    crawl_tool,
     get_retriever_tool,
     get_web_search_tool,
     python_repl_tool,
@@ -134,10 +133,9 @@ def planner_node(
     if configurable.enable_deep_thinking:
         llm = get_llm_by_type("reasoning")
     elif AGENT_LLM_MAP["planner"] == "basic":
-        llm = get_llm_by_type("basic").with_structured_output(
-            Plan,
-            method="json_mode",
-        )
+        # 不使用structured_output，避免在LLM层直接验证，而是在后处理中修复字段后再验证
+        llm = get_llm_by_type("basic")
+        enhanced_logger.logger.info("🔧 PLANNER_CONFIG | 使用basic LLM不带structured_output，启用字段修复机制")
     else:
         llm = get_llm_by_type(AGENT_LLM_MAP["planner"])
 
@@ -151,7 +149,11 @@ def planner_node(
     if AGENT_LLM_MAP["planner"] == "basic" and not configurable.enable_deep_thinking:
         response = llm.invoke(messages)
         try:
-            full_response = str(response)
+            # 不再使用structured_output，所以直接获取content
+            if hasattr(response, 'content'):
+                full_response = str(response.content)
+            else:
+                full_response = str(response)
         except Exception:
             full_response = "Response conversion failed"
     else:
@@ -172,6 +174,29 @@ def planner_node(
 
     try:
         curr_plan = json.loads(repair_json_output(full_response))
+        
+        # 检查是否为嵌套的 {"plan": {...}} 格式
+        if isinstance(curr_plan, dict) and 'plan' in curr_plan and isinstance(curr_plan['plan'], dict):
+            enhanced_logger.logger.warning("⚠️ PLAN_FORMAT_ERROR | 检测到嵌套plan格式，提取内层对象")
+            curr_plan = curr_plan['plan']  # 提取内层的plan对象
+        
+        # 立即检查并修复locale字段缺失问题
+        if isinstance(curr_plan, dict) and 'locale' not in curr_plan:
+            curr_plan['locale'] = state.get('locale', 'zh-CN')  # 使用状态中的locale或默认值
+            enhanced_logger.logger.warning(f"⚠️ PLAN_MISSING_LOCALE | 添加缺失的locale字段: {curr_plan['locale']}")
+            
+        # 检查并修复title字段缺失问题
+        if isinstance(curr_plan, dict) and 'title' not in curr_plan:
+            curr_plan['title'] = '智能研究计划'  # 默认标题
+            enhanced_logger.logger.warning(f"⚠️ PLAN_MISSING_TITLE | 添加缺失的title字段: {curr_plan['title']}")
+        
+        # 检查并修复steps中的step_type字段缺失问题
+        if isinstance(curr_plan, dict) and 'steps' in curr_plan and isinstance(curr_plan['steps'], list):
+            for i, step in enumerate(curr_plan['steps']):
+                if isinstance(step, dict) and 'step_type' not in step:
+                    step['step_type'] = 'research'  # 默认步骤类型
+                    enhanced_logger.logger.warning(f"⚠️ STEP_MISSING_TYPE | 为步骤#{i+1}添加缺失的step_type字段: {step['step_type']}")
+            
     except json.JSONDecodeError:
         logger.warning("Planner response is not a valid JSON")
         if plan_iterations > 0:
@@ -202,18 +227,34 @@ def planner_node(
         try:
             new_plan = Plan.model_validate(curr_plan)
             enhanced_logger.log_plan_generation(plan_iterations + 1, new_plan.title, len(new_plan.steps))
-            enhanced_logger.logger.info(f"🔀 NODE_TRANSITION | planner → reporter | 原因: 计划具有足够上下文")
             
-            duration = time.time() - start_time
-            enhanced_logger.logger.info(f"✅ NODE_EXIT | planner | 节点执行完成 | 耗时: {duration:.2f}s")
+            # 检查是否有需要执行的步骤
+            has_unexecuted_steps = any(step.execution_res is None for step in new_plan.steps)
             
-            return Command(
-                update={
-                    "messages": [AIMessage(content=full_response, name="planner")],
-                    "current_plan": new_plan,
-                },
-                goto="reporter",
-            )
+            if has_unexecuted_steps:
+                enhanced_logger.logger.info(f"🔀 NODE_TRANSITION | planner → human_feedback | 原因: 计划包含未执行的步骤，需要研究")
+                duration = time.time() - start_time
+                enhanced_logger.logger.info(f"✅ NODE_EXIT | planner | 节点执行完成 | 耗时: {duration:.2f}s")
+                
+                return Command(
+                    update={
+                        "messages": [AIMessage(content=full_response, name="planner")],
+                        "current_plan": new_plan,
+                    },
+                    goto="human_feedback",
+                )
+            else:
+                enhanced_logger.logger.info(f"🔀 NODE_TRANSITION | planner → reporter | 原因: 所有步骤已执行完成")
+                duration = time.time() - start_time
+                enhanced_logger.logger.info(f"✅ NODE_EXIT | planner | 节点执行完成 | 耗时: {duration:.2f}s")
+                
+                return Command(
+                    update={
+                        "messages": [AIMessage(content=full_response, name="planner")],
+                        "current_plan": new_plan,
+                    },
+                    goto="reporter",
+                )
         except Exception as e:
             enhanced_logger.logger.error(f"❌ PLAN_VALIDATION_ERROR | Plan验证失败: {str(e)}")
             logger.error(f"Plan validation failed: {e}")
@@ -265,11 +306,56 @@ def human_feedback_node(
     goto = "research_team"
     
     try:
+        # 检查current_plan的类型，如果已经是Plan对象则直接使用
+        if hasattr(current_plan, 'title') and hasattr(current_plan, 'steps'):
+            # current_plan已经是Plan对象
+            enhanced_logger.logger.info("📋 PLAN_OBJECT_DETECTED | 检测到Plan对象，直接验证")
+            validated_plan = current_plan
+            plan_iterations += 1
+            
+            # 检查是否有需要执行的步骤
+            has_unexecuted_steps = any(step.execution_res is None for step in validated_plan.steps)
+            if not has_unexecuted_steps:
+                enhanced_logger.logger.info("✅ ALL_STEPS_COMPLETED | 所有步骤已完成，跳转到reporter")
+                goto = "reporter"
+            
+            return Command(
+                update={
+                    "current_plan": validated_plan,
+                    "plan_iterations": plan_iterations,
+                    "locale": validated_plan.locale,
+                },
+                goto=goto,
+            )
+        
+        # current_plan是字符串，需要解析
         current_plan = repair_json_output(current_plan)
         # increment the plan iterations
         plan_iterations += 1
         # parse the plan
         new_plan = json.loads(current_plan)
+        
+        # 检查是否为嵌套的 {"plan": {...}} 格式
+        if isinstance(new_plan, dict) and 'plan' in new_plan and isinstance(new_plan['plan'], dict):
+            enhanced_logger.logger.warning("⚠️ PLAN_FORMAT_ERROR | 在human_feedback中检测到嵌套plan格式，提取内层对象")
+            new_plan = new_plan['plan']  # 提取内层的plan对象
+        
+        # 立即检查并修复locale字段缺失问题
+        if isinstance(new_plan, dict) and 'locale' not in new_plan:
+            new_plan['locale'] = state.get('locale', 'zh-CN')  # 使用状态中的locale或默认值
+            enhanced_logger.logger.warning(f"⚠️ PLAN_MISSING_LOCALE | 在human_feedback中添加缺失的locale字段: {new_plan['locale']}")
+        
+        # 检查并修复title字段缺失问题
+        if isinstance(new_plan, dict) and 'title' not in new_plan:
+            new_plan['title'] = '智能研究计划'  # 默认标题
+            enhanced_logger.logger.warning(f"⚠️ PLAN_MISSING_TITLE | 在human_feedback中添加缺失的title字段: {new_plan['title']}")
+        
+        # 检查并修复steps中的step_type字段缺失问题
+        if isinstance(new_plan, dict) and 'steps' in new_plan and isinstance(new_plan['steps'], list):
+            for i, step in enumerate(new_plan['steps']):
+                if isinstance(step, dict) and 'step_type' not in step:
+                    step['step_type'] = 'research'  # 默认步骤类型
+                    enhanced_logger.logger.warning(f"⚠️ STEP_MISSING_TYPE | 在human_feedback中为步骤#{i+1}添加缺失的step_type字段: {step['step_type']}")
         
         # 添加格式检测和错误处理机制
         # 检查是否为工具调用格式
@@ -390,8 +476,15 @@ def coordinator_node(
 
 def reporter_node(state: State, config: RunnableConfig):
     """Reporter node that write a final report."""
+    start_time = time.time()
+    enhanced_logger.logger.info(f"🔄 NODE_ENTRY | reporter | 开始执行报告生成节点")
+    
     logger.info("Reporter write final report")
     configurable = Configuration.from_runnable_config(config)
+    
+    # 记录报告生成的基本信息
+    observations = state.get("observations", [])
+    enhanced_logger.logger.info(f"📊 REPORT_INIT | 开始生成最终报告 | 研究步骤数: {len(observations)}")
     current_plan = state.get("current_plan")
     # 处理current_plan的类型差异
     if hasattr(current_plan, 'title') and hasattr(current_plan, 'thought'):
@@ -410,7 +503,7 @@ def reporter_node(state: State, config: RunnableConfig):
                 f"# Research Requirements\n\n## Task\n\n{plan_title}\n\n## Description\n\n{plan_thought}"
             )
         ],
-        "locale": state.get("locale", "en-US"),
+        "locale": state.get("locale", "zh-CN"),  # 默认使用中文
     }
     invoke_messages = apply_prompt_template("reporter", input_, configurable)
     observations = state.get("observations", [])
@@ -418,22 +511,35 @@ def reporter_node(state: State, config: RunnableConfig):
     # Add a reminder about the new report format, citation style, and table usage
     invoke_messages.append(
         HumanMessage(
-            content="IMPORTANT: Structure your report according to the format in the prompt. Remember to include:\n\n1. Key Points - A bulleted list of the most important findings\n2. Overview - A brief introduction to the topic\n3. Detailed Analysis - Organized into logical sections\n4. Survey Note (optional) - For more comprehensive reports\n5. Key Citations - List all references at the end\n\nFor citations, DO NOT include inline citations in the text. Instead, place all citations in the 'Key Citations' section at the end using the format: `- [Source Title](URL)`. Include an empty line between each citation for better readability.\n\nPRIORITIZE USING MARKDOWN TABLES for data presentation and comparison. Use tables whenever presenting comparative data, statistics, features, or options. Structure tables with clear headers and aligned columns. Example table format:\n\n| Feature | Description | Pros | Cons |\n|---------|-------------|------|------|\n| Feature 1 | Description 1 | Pros 1 | Cons 1 |\n| Feature 2 | Description 2 | Pros 2 | Cons 2 |",
+            content=f"IMPORTANT: Structure your report according to the format in the prompt. Remember to include:\n\n1. Key Points - A bulleted list of the most important findings\n2. Overview - A brief introduction to the topic\n3. Detailed Analysis - Organized into logical sections\n4. Survey Note (optional) - For more comprehensive reports\n5. Key Citations - List all references at the end\n\nFor citations, DO NOT include inline citations in the text. Instead, place all citations in the 'Key Citations' section at the end using the format: `- [Source Title](URL)`. Include an empty line between each citation for better readability.\n\nPRIORITIZE USING MARKDOWN TABLES for data presentation and comparison. Use tables whenever presenting comparative data, statistics, features, or options. Structure tables with clear headers and aligned columns. Example table format:\n\n| Feature | Description | Pros | Cons |\n|---------|-------------|------|------|\n| Feature 1 | Description 1 | Pros 1 | Cons 1 |\n| Feature 2 | Description 2 | Pros 2 | Cons 2 |\n\n**请用{state.get('locale', 'zh-CN')}语言编写报告，并充分引用下面的研究结果。**",
             name="system",
         )
     )
 
-    for observation in observations:
+    for i, observation in enumerate(observations):
         invoke_messages.append(
             HumanMessage(
-                content=f"Below are some observations for the research task:\n\n{observation}",
+                content=f"# 研究步骤 {i+1} 的结果\n\n{observation}\n\n---",
                 name="observation",
             )
         )
     logger.debug(f"Current invoke messages: {invoke_messages}")
+    
+    # 记录LLM调用过程
+    llm_start_time = time.time()
+    enhanced_logger.logger.info(f"🤖 LLM_INVOKE | reporter | 开始生成最终报告 | 提示消息数: {len(invoke_messages)}")
+    
     response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
     response_content = response.content
+    
+    llm_duration = time.time() - llm_start_time
+    report_length = len(response_content) if response_content else 0
+    enhanced_logger.logger.info(f"✅ LLM_COMPLETE | reporter | 报告生成完成 | 报告长度: {report_length} | LLM耗时: {llm_duration:.2f}s")
+    
     logger.info(f"reporter response: {response_content}")
+    
+    duration = time.time() - start_time
+    enhanced_logger.logger.info(f"✅ NODE_EXIT | reporter | 节点执行完成 | 总耗时: {duration:.2f}s")
 
     return {"final_report": response_content}
 
@@ -448,9 +554,14 @@ async def _execute_agent_step(
     state: State, agent, agent_name: str
 ) -> Command[Literal["research_team"]]:
     """Helper function to execute a step using the specified agent."""
+    step_start_time = time.time()
+    enhanced_logger.logger.info(f"🔄 AGENT_STEP_ENTRY | {agent_name} | 开始执行研究步骤")
+    
     current_plan = state.get("current_plan")
     plan_title = current_plan.title
     observations = state.get("observations", [])
+    
+    enhanced_logger.logger.info(f"📝 STEP_CONTEXT | {agent_name} | 计划标题: {plan_title} | 已完成步骤: {len(observations)}")
 
     # Find the first unexecuted step
     current_step = None
@@ -472,9 +583,11 @@ async def _execute_agent_step(
             completed_steps.append(step)
 
     if not current_step:
+        enhanced_logger.logger.warning(f"⚠️ STEP_NOT_FOUND | {agent_name} | 未找到未执行的步骤")
         logger.warning("No unexecuted step found")
         return Command(goto="research_team")
 
+    enhanced_logger.logger.info(f"🎯 STEP_SELECTED | {agent_name} | 正在执行: {current_step.title}")
     logger.info(f"Executing step: {current_step.title}, agent: {agent_name}")
 
     # Format completed steps information
@@ -540,17 +653,32 @@ async def _execute_agent_step(
         recursion_limit = default_recursion_limit
 
     logger.info(f"Agent input: {agent_input}")
+    
+    # 记录Agent执行过程
+    agent_exec_start_time = time.time()
+    enhanced_logger.logger.info(f"🤖 AGENT_INVOKE | {agent_name} | 开始智能体执行 | 递归限制: {recursion_limit}")
+    
     result = await agent.ainvoke(
         input=agent_input, config={"recursion_limit": recursion_limit}
     )
+    
+    agent_exec_duration = time.time() - agent_exec_start_time
+    enhanced_logger.logger.info(f"✅ AGENT_COMPLETE | {agent_name} | 智能体执行完成 | 耗时: {agent_exec_duration:.2f}s")
 
     # Process the result
     response_content = result["messages"][-1].content
+    response_length = len(response_content) if response_content else 0
+    enhanced_logger.logger.info(f"📊 STEP_RESULT | {agent_name} | 步骤结果处理完成 | 响应长度: {response_length}")
+    
     logger.debug(f"{agent_name.capitalize()} full response: {response_content}")
 
     # Update the step with the execution result
     current_step.execution_res = response_content
+    enhanced_logger.logger.info(f"✅ STEP_COMPLETE | {agent_name} | 步骤执行完成: '{current_step.title}'")
     logger.info(f"Step '{current_step.title}' execution completed by {agent_name}")
+    
+    step_duration = time.time() - step_start_time
+    enhanced_logger.logger.info(f"✅ AGENT_STEP_EXIT | {agent_name} | 步骤执行总耗时: {step_duration:.2f}s")
 
     return Command(
         update={
@@ -588,9 +716,14 @@ async def _setup_and_execute_agent_step(
     Returns:
         Command to update state and go to research_team
     """
+    setup_start_time = time.time()
+    enhanced_logger.logger.info(f"🔄 AGENT_SETUP_ENTRY | {agent_type} | 开始配置智能体")
+    
     configurable = Configuration.from_runnable_config(config)
     mcp_servers = {}
     enabled_tools = {}
+    
+    enhanced_logger.logger.info(f"🔧 TOOL_CONFIG | {agent_type} | 默认工具数: {len(default_tools)}")
 
     # Extract MCP server configuration for this agent type
     if configurable.mcp_settings:
@@ -609,20 +742,34 @@ async def _setup_and_execute_agent_step(
 
     # Create and execute agent with MCP tools if available
     if mcp_servers:
+        enhanced_logger.logger.info(f"🔌 MCP_ENABLED | {agent_type} | 检测到MCP服务器 | 服务器数: {len(mcp_servers)}")
         client = MultiServerMCPClient(mcp_servers)
         loaded_tools = default_tools[:]
         all_tools = await client.get_tools()
+        mcp_tool_count = 0
         for tool in all_tools:
             if tool.name in enabled_tools:
                 tool.description = (
                     f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
                 )
                 loaded_tools.append(tool)
+                mcp_tool_count += 1
+        
+        enhanced_logger.logger.info(f"🔧 MCP_TOOLS_LOADED | {agent_type} | MCP工具加载完成 | 新增工具: {mcp_tool_count} | 总工具数: {len(loaded_tools)}")
         agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
+        
+        setup_duration = time.time() - setup_start_time
+        enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | MCP智能体配置完成 | 耗时: {setup_duration:.2f}s")
+        
         return await _execute_agent_step(state, agent, agent_type)
     else:
+        enhanced_logger.logger.info(f"🔧 DEFAULT_TOOLS | {agent_type} | 使用默认工具 | 工具数: {len(default_tools)}")
         # Use default tools if no MCP servers are configured
         agent = create_agent(agent_type, agent_type, default_tools, agent_type)
+        
+        setup_duration = time.time() - setup_start_time
+        enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | 默认智能体配置完成 | 耗时: {setup_duration:.2f}s")
+        
         return await _execute_agent_step(state, agent, agent_type)
 
 
@@ -630,19 +777,52 @@ async def researcher_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["research_team"]]:
     """Researcher node that do research"""
+    start_time = time.time()
+    enhanced_logger.logger.info(f"🔄 NODE_ENTRY | researcher | 开始执行研究节点")
+    
     logger.info("Researcher node is researching.")
     configurable = Configuration.from_runnable_config(config)
-    tools = [get_web_search_tool(configurable.max_search_results, configurable.search_engine, configurable.custom_search_repository), crawl_tool]
+    
+    # 获取当前要执行的步骤信息用于日志
+    current_plan = state.get("current_plan")
+    current_step_title = "未知步骤"
+    if current_plan:
+        if hasattr(current_plan, 'steps'):
+            plan_steps = current_plan.steps
+        elif isinstance(current_plan, dict) and 'steps' in current_plan:
+            plan_steps = current_plan['steps']
+        else:
+            plan_steps = []
+            
+        for step in plan_steps:
+            if not step.execution_res:
+                current_step_title = step.title
+                break
+    
+    enhanced_logger.logger.info(f"🔍 RESEARCH_INIT | 开始研究步骤: {current_step_title}")
+    
+    # 配置工具
+    tools = [get_web_search_tool(configurable.max_search_results, configurable.search_engine, configurable.custom_search_repository)]
     retriever_tool = get_retriever_tool(state.get("resources", []))
     if retriever_tool:
         tools.insert(0, retriever_tool)
+        enhanced_logger.logger.info(f"🔧 TOOLS_READY | 研究工具配置完成 | 工具数: {len(tools)} | 包含本地检索: 是")
+    else:
+        enhanced_logger.logger.info(f"🔧 TOOLS_READY | 研究工具配置完成 | 工具数: {len(tools)} | 包含本地检索: 否")
+    
     logger.info(f"Researcher tools: {tools}")
-    return await _setup_and_execute_agent_step(
+    
+    result = await _setup_and_execute_agent_step(
         state,
         config,
         "researcher",
         tools,
     )
+    
+    duration = time.time() - start_time
+    enhanced_logger.logger.info(f"✅ NODE_EXIT | researcher | 节点执行完成 | 总耗时: {duration:.2f}s")
+    
+    return result
 
 
 async def coder_node(

@@ -813,7 +813,7 @@ async def _direct_langgraph_generator(
             max_search_results=request.max_search_results or 3,
             search_engine=request.search_engine or "custom_search",
             custom_search_repository=request.custom_search_repository or "",
-            auto_accepted_plan=request.auto_accepted_plan or False,
+            auto_accepted_plan=request.auto_accepted_plan if request.auto_accepted_plan is not None else True,
             interrupt_feedback=request.interrupt_feedback or "",
             mcp_settings=request.mcp_settings or {},
             enable_background_investigation=request.enable_background_investigation or True,

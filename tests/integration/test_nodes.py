@@ -1288,10 +1288,10 @@ def patch_get_web_search_tool():
         yield mock
 
 
-@pytest.fixture
-def patch_crawl_tool():
-    with patch("src.graph.nodes.crawl_tool", MagicMock(name="crawl_tool")):
-        yield
+# @pytest.fixture
+# def patch_crawl_tool():
+#     with patch("src.graph.nodes.crawl_tool", MagicMock(name="crawl_tool")):
+#         yield
 
 
 @pytest.fixture
@@ -1318,7 +1318,7 @@ async def test_researcher_node_with_retriever_tool(
     mock_config,
     patch_config_from_runnable_config,
     patch_get_web_search_tool,
-    patch_crawl_tool,
+    # patch_crawl_tool,  # Disabled for intranet deployment
     patch_get_retriever_tool,
     patch_setup_and_execute_agent_step,
 ):
@@ -1371,7 +1371,7 @@ async def test_researcher_node_without_resources(
     mock_config,
     patch_config_from_runnable_config,
     patch_get_web_search_tool,
-    patch_crawl_tool,
+    # patch_crawl_tool,  # Disabled for intranet deployment
     patch_get_retriever_tool,
     patch_setup_and_execute_agent_step,
 ):
