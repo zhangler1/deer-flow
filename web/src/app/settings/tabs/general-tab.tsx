@@ -207,7 +207,7 @@ export const GeneralTab: Tab = ({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="tavily">
-                          Tavily (推荐)
+                          Tavily
                         </SelectItem>
                         <SelectItem value="duckduckgo">
                           DuckDuckGo
@@ -222,7 +222,7 @@ export const GeneralTab: Tab = ({
                           Wikipedia
                         </SelectItem>
                         <SelectItem value="custom_search">
-                          自定义搜索引擎
+                          自定义搜索引擎 (推荐)
                         </SelectItem>
                       </SelectContent>
                     </Select>

@@ -86,7 +86,7 @@ export function InputBox({
     useSettingsStore.setState((state) => ({
       general: {
         ...state.general,
-        searchEngine: isCustomSearch ? "tavily" : "custom_search", // 默认切换到 tavily
+        searchEngine: isCustomSearch ? "custom_search" : "custom_search", // 保持 custom_search
       },
     }));
     saveSettings();

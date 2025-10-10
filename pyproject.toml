@@ -43,6 +43,7 @@ dependencies = [
     "pytest-cov>=7.0.0",
     "mongomock>=4.3.0",
     "pyright>=1.1.406",
+    "colorama>=0.4.6",
 ]
 
 [project.optional-dependencies]

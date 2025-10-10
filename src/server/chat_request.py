@@ -48,7 +48,7 @@ class ChatRequest(BaseModel):
         3, description="The maximum number of search results"
     )
     search_engine: Optional[str] = Field(
-        "tavily", description="The search engine to use (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)"
+        "custom_search", description="The search engine to use (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)"
     )
     custom_search_repository: Optional[str] = Field(
         None, description="The repository ID for custom search engine"
@@ -116,13 +116,24 @@ class EnhancePromptRequest(BaseModel):
 
 
 class SimpleResearchRequest(BaseModel):
+    """简化研究请求模型 - 直接使用 LangGraph 工作流，参数可定制"""
     messages: List[Dict[str, str]] = Field(..., description="对话消息列表，OpenAI格式")
+    
+    # === 与 /api/chat/stream 完全一致的参数配置 ===
+    resources: Optional[List[Resource]] = Field([], description="资源列表")
+    debug: Optional[bool] = Field(False, description="是否启用调试日志")
+    thread_id: Optional[str] = Field("__default__", description="会话标识符")
+    max_plan_iterations: Optional[int] = Field(1, description="最大计划迭代次数")
+    max_step_num: Optional[int] = Field(3, description="计划中的最大步骤数")
     max_search_results: Optional[int] = Field(3, description="最大搜索结果数")
-    search_engine: Optional[str] = Field("custom_search", description="搜索引擎")
-    enable_deep_thinking: Optional[bool] = Field(True, description="启用深度思考")
-    # 新增控制参数
-    max_thinking_iterations: Optional[int] = Field(2, description="最大思考迭代次数")
-    max_recursion_limit: Optional[int] = Field(15, description="最大递归深度限制")
+    search_engine: Optional[str] = Field("custom_search", description="搜索引擎 (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)")
+    custom_search_repository: Optional[str] = Field(None, description="自定义搜索仓库ID")
+    auto_accepted_plan: Optional[bool] = Field(False, description="是否自动接受计划")
+    interrupt_feedback: Optional[str] = Field(None, description="用户对计划的中断反馈")
+    mcp_settings: Optional[dict] = Field(None, description="MCP设置")
+    enable_background_investigation: Optional[bool] = Field(True, description="是否启用背景调研")
+    report_style: Optional[ReportStyle] = Field(ReportStyle.ACADEMIC, description="报告风格")
+    enable_deep_thinking: Optional[bool] = Field(False, description="是否启用深度思考")
 
 
 class ChatCompletionMessage(BaseModel):
@@ -150,3 +161,6 @@ class SimpleResearchResponse(BaseModel):
     is_complete: bool = Field(True, description="是否完成回答")
     execution_time: float = Field(..., description="执行时间(秒)")
     thinking_steps: Optional[int] = Field(0, description="实际思考步骤数")
+    # 新增plan相关字段
+    research_plan: Optional[Dict[str, Any]] = Field(None, description="研究计划详情")
+    plan_generated: Optional[bool] = Field(False, description="是否生成了计划")
