@@ -8,6 +8,8 @@ services:
     # Remove the ports section to not expose to host
     env_file:
       - .env
+    environment:
+      - NODE_ID=docker-${HOSTNAME}
     expose:
       - "8000"
     volumes:

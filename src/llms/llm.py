@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: MIT
 
 import os
+import time
 from pathlib import Path
-from typing import Any, Dict, get_args
+from typing import Any, Dict, get_args, Union
 
 import httpx
 from langchain_core.language_models import BaseChatModel
@@ -15,9 +16,179 @@ from typing import get_args
 from src.config import load_yaml_config
 from src.config.agents import LLMType
 from src.llms.providers.dashscope import ChatDashscope
+from src.utils.enhanced_logger import get_enhanced_logger
+
+
+class EnhancedLLMWrapper:
+    """增弾LLM包装器，用于记录思考过程"""
+    
+    def __init__(self, llm: BaseChatModel, llm_type: str):
+        self.llm = llm
+        self.llm_type = llm_type
+        self.enhanced_logger = get_enhanced_logger(f'llm.{llm_type}')
+        
+    def invoke(self, messages, **kwargs):
+        """记录并执行LLM调用"""
+        start_time = time.time()
+        prompt_length = self._calculate_prompt_length(messages)
+        
+        self.enhanced_logger.logger.info(f"🤖 LLM_INVOKE | {self.llm_type} | 开始思考 | 提示长度: {prompt_length}")
+        
+        try:
+            result = self.llm.invoke(messages, **kwargs)
+            duration = time.time() - start_time
+            response_length = len(str(result.content)) if hasattr(result, 'content') else 0
+            
+            self.enhanced_logger.log_llm_thinking(self.llm_type, prompt_length, response_length, duration)
+            
+            # 记录有关思考过程的额外信息
+            if hasattr(result, 'response_metadata'):
+                usage = result.response_metadata.get('usage', {})
+                if usage:
+                    self.enhanced_logger.logger.debug(f"🤖 LLM_USAGE | {self.llm_type} | token使用: {usage}")
+                    
+            return result
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            self.enhanced_logger.logger.error(f"❌ LLM_INVOKE_ERROR | {self.llm_type} | 思考失败: {str(e)} | 耗时: {duration:.2f}s")
+            raise
+            
+    def stream(self, messages, **kwargs):
+        """记录并执行流式LLM调用"""
+        start_time = time.time()
+        prompt_length = self._calculate_prompt_length(messages)
+        
+        self.enhanced_logger.logger.info(f"🤖 LLM_STREAM | {self.llm_type} | 开始流式思考 | 提示长度: {prompt_length}")
+        
+        try:
+            stream = self.llm.stream(messages, **kwargs)
+            chunks_count = 0
+            total_content_length = 0
+            
+            for chunk in stream:
+                chunks_count += 1
+                if hasattr(chunk, 'content') and chunk.content:
+                    total_content_length += len(str(chunk.content))
+                yield chunk
+                
+            duration = time.time() - start_time
+            self.enhanced_logger.logger.info(f"🤖 LLM_STREAM_COMPLETE | {self.llm_type} | 流式思考完成 | 块数: {chunks_count} | 总长度: {total_content_length} | 耗时: {duration:.2f}s")
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            self.enhanced_logger.logger.error(f"❌ LLM_STREAM_ERROR | {self.llm_type} | 流式思考失败: {str(e)} | 耗时: {duration:.2f}s")
+            raise
+            
+    def with_structured_output(self, *args, **kwargs):
+        """包装结构化输出方法"""
+        structured_llm = self.llm.with_structured_output(*args, **kwargs)
+        return EnhancedStructuredLLMWrapper(structured_llm, self.llm_type, self.enhanced_logger)
+        
+    def bind_tools(self, *args, **kwargs):
+        """包装工具绑定方法"""
+        tool_bound_llm = self.llm.bind_tools(*args, **kwargs)
+        return EnhancedToolBoundLLMWrapper(tool_bound_llm, self.llm_type, self.enhanced_logger)
+        
+    def _calculate_prompt_length(self, messages):
+        """计算提示长度"""
+        if isinstance(messages, list):
+            return sum(len(str(msg)) for msg in messages)
+        else:
+            return len(str(messages))
+            
+    def __getattr__(self, name):
+        """委托其他属性到原始LLM"""
+        return getattr(self.llm, name)
+
+
+class EnhancedStructuredLLMWrapper:
+    """增强结构化LLM包装器"""
+    
+    def __init__(self, structured_llm, llm_type: str, enhanced_logger):
+        self.structured_llm = structured_llm
+        self.llm_type = llm_type
+        self.enhanced_logger = enhanced_logger
+        
+    def invoke(self, messages, **kwargs):
+        start_time = time.time()
+        prompt_length = self._calculate_prompt_length(messages)
+        
+        self.enhanced_logger.logger.info(f"🤖 LLM_STRUCTURED | {self.llm_type} | 开始结构化思考 | 提示长度: {prompt_length}")
+        
+        try:
+            result = self.structured_llm.invoke(messages, **kwargs)
+            duration = time.time() - start_time
+            
+            # 计算结构化输出的大小
+            result_size = len(str(result)) if result else 0
+            
+            self.enhanced_logger.logger.info(f"🤖 LLM_STRUCTURED_COMPLETE | {self.llm_type} | 结构化思考完成 | 输出大小: {result_size} | 耗时: {duration:.2f}s")
+            return result
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            self.enhanced_logger.logger.error(f"❌ LLM_STRUCTURED_ERROR | {self.llm_type} | 结构化思考失败: {str(e)} | 耗时: {duration:.2f}s")
+            raise
+            
+    def _calculate_prompt_length(self, messages):
+        if isinstance(messages, list):
+            return sum(len(str(msg)) for msg in messages)
+        else:
+            return len(str(messages))
+            
+    def __getattr__(self, name):
+        return getattr(self.structured_llm, name)
+
+
+class EnhancedToolBoundLLMWrapper:
+    """增强工具绑定LLM包装器"""
+    
+    def __init__(self, tool_bound_llm, llm_type: str, enhanced_logger):
+        self.tool_bound_llm = tool_bound_llm
+        self.llm_type = llm_type
+        self.enhanced_logger = enhanced_logger
+        
+    def invoke(self, messages, **kwargs):
+        start_time = time.time()
+        prompt_length = self._calculate_prompt_length(messages)
+        
+        self.enhanced_logger.logger.info(f"🤖 LLM_TOOLS | {self.llm_type} | 开始工具思考 | 提示长度: {prompt_length}")
+        
+        try:
+            result = self.tool_bound_llm.invoke(messages, **kwargs)
+            duration = time.time() - start_time
+            
+            # 检查是否有工具调用
+            tool_calls = getattr(result, 'tool_calls', [])
+            tool_count = len(tool_calls) if tool_calls else 0
+            
+            self.enhanced_logger.logger.info(f"🤖 LLM_TOOLS_COMPLETE | {self.llm_type} | 工具思考完成 | 工具调用数: {tool_count} | 耗时: {duration:.2f}s")
+            
+            if tool_calls:
+                for i, tool_call in enumerate(tool_calls):
+                    tool_name = tool_call.get('name', '未知工具')
+                    self.enhanced_logger.logger.info(f"🔧 TOOL_CALL_PLANNED | {tool_name} | 计划调用工具 #{i+1}")
+            
+            return result
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            self.enhanced_logger.logger.error(f"❌ LLM_TOOLS_ERROR | {self.llm_type} | 工具思考失败: {str(e)} | 耗时: {duration:.2f}s")
+            raise
+            
+    def _calculate_prompt_length(self, messages):
+        if isinstance(messages, list):
+            return sum(len(str(msg)) for msg in messages)
+        else:
+            return len(str(messages))
+            
+    def __getattr__(self, name):
+        return getattr(self.tool_bound_llm, name)
 
 # Cache for LLM instances
 _llm_cache: dict[LLMType, BaseChatModel] = {}
+enhanced_logger = get_enhanced_logger('llms.llm')
 
 
 def _get_config_file_path() -> str:
@@ -125,17 +296,34 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
         return ChatOpenAI(**merged_conf)
 
 
-def get_llm_by_type(llm_type: LLMType) -> BaseChatModel:
+def get_llm_by_type(llm_type: LLMType) -> Union[BaseChatModel, 'EnhancedLLMWrapper']:
     """
     Get LLM instance by type. Returns cached instance if available.
     """
-    if llm_type in _llm_cache:
-        return _llm_cache[llm_type]
+    start_time = time.time()
+    enhanced_logger.logger.info(f"🤖 LLM_INIT | {llm_type} | 初始化LLM实例")
+    
+    try:
+        if llm_type in _llm_cache:
+            duration = time.time() - start_time
+            enhanced_logger.logger.info(f"🤖 LLM_CACHE_HIT | {llm_type} | 使用缓存实例 | 耗时: {duration:.2f}s")
+            return _llm_cache[llm_type]
 
-    conf = load_yaml_config(_get_config_file_path())
-    llm = _create_llm_use_conf(llm_type, conf)
-    _llm_cache[llm_type] = llm
-    return llm
+        conf = load_yaml_config(_get_config_file_path())
+        llm = _create_llm_use_conf(llm_type, conf)
+        _llm_cache[llm_type] = llm
+        
+        # 包装LLM以添加日志功能
+        wrapped_llm = EnhancedLLMWrapper(llm, llm_type)
+        
+        duration = time.time() - start_time
+        enhanced_logger.logger.info(f"🤖 LLM_READY | {llm_type} | LLM实例创建完成 | 耗时: {duration:.2f}s")
+        return wrapped_llm
+        
+    except Exception as e:
+        duration = time.time() - start_time
+        enhanced_logger.logger.error(f"❌ LLM_ERROR | {llm_type} | LLM初始化失败: {str(e)} | 耗时: {duration:.2f}s")
+        raise
 
 
 def get_configured_llm_models() -> dict[str, list[str]]:
