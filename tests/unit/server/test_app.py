@@ -3,16 +3,19 @@
 
 import base64
 import os
+import json
+import asyncio
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from langchain_core.messages import AIMessageChunk, ToolMessage
 from langgraph.types import Command
 
 from src.config.report_style import ReportStyle
-from src.server.app import _astream_workflow_generator, _make_event, app
+from src.server.app import _astream_workflow_generator, _make_event, app, _make_stream_event
 
 
 @pytest.fixture
@@ -527,6 +530,7 @@ class TestAstreamWorkflowGenerator:
             max_step_num=10,
             max_search_results=5,
             search_engine="tavily",
+            custom_search_repository="",
             auto_accepted_plan=True,
             interrupt_feedback="",
             mcp_settings={},

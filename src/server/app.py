@@ -58,8 +58,13 @@ from src.tools import VolcengineTTS
 from src.tools.custom_search import get_available_repositories
 from src.graph.checkpoint import chat_stream_message
 from src.utils.json_utils import sanitize_args
+from src.utils.enhanced_logger import get_enhanced_logger, setup_enhanced_logging
 
 logger = logging.getLogger(__name__)
+
+# 初始化增强日志系统
+setup_enhanced_logging(level=logging.INFO, enable_colors=True)
+enhanced_logger = get_enhanced_logger("deer-flow.api")
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
 
@@ -783,6 +788,19 @@ async def simple_research(request: SimpleResearchRequest):
     # 生成唯一的对话 ID
     conversation_id = generate_conversation_id(model_prefix="chatcmpl")
     
+    # 设置增强日志上下文
+    enhanced_logger.set_session_context(
+        session_id=conversation_id,
+        user_query=request.messages[-1].get("content", "") if request.messages else ""
+    )
+    enhanced_logger.log_node_entry("simple_research", {
+        "conversation_id": conversation_id,
+        "messages_count": len(request.messages) if request.messages else 0,
+        "max_search_results": request.max_search_results,
+        "search_engine": request.search_engine,
+        "enable_deep_thinking": request.enable_deep_thinking
+    })
+    
     try:
         # 验证messages格式
         if not request.messages or len(request.messages) == 0:
@@ -796,6 +814,13 @@ async def simple_research(request: SimpleResearchRequest):
         current_question = last_message.get("content", "")
         
         # 使用简化的流程进行对话式回答
+        enhanced_logger.log_step_execution(
+            step_number=1,
+            step_title="对话式研究处理",
+            step_type="conversational_research",
+            agent_name="research_assistant"
+        )
+        
         answer, sources, thinking_steps = await _simple_conversational_research(
             messages=request.messages,
             conversation_id=conversation_id,
@@ -807,6 +832,13 @@ async def simple_research(request: SimpleResearchRequest):
         )
         
         execution_time = time.time() - start_time
+        
+        # 记录工作流程摘要
+        enhanced_logger.log_workflow_summary(
+            total_duration=execution_time,
+            nodes_executed=["simple_research", "conversational_research"],
+            tools_used=["llm", "web_search"] if sources else ["llm"]
+        )
         
         # 构建 ChatCompletionMessage
         assistant_message = ChatCompletionMessage(
@@ -871,7 +903,12 @@ async def _simple_conversational_research(
     thinking_steps = 0
     
     # 获取搜索工具
+    enhanced_logger.log_tool_call_start("search_tool_init", {
+        "max_results": max_search_results,
+        "engine": search_engine
+    })
     search_tool = get_web_search_tool(max_search_results, search_engine, "")
+    enhanced_logger.log_tool_call_end("search_tool_init", "工具初始化完成", 0.1)
     
     # 构建对话式研究助手的提示词
     system_prompt = """
@@ -894,14 +931,22 @@ async def _simple_conversational_research(
     
     # 获取LLM
     if enable_deep_thinking:
+        enhanced_logger.log_llm_thinking("reasoning_llm", len(str(conversation_messages)), 0, 0)
         llm = get_llm_by_type("reasoning").bind_tools([search_tool])
     else:
+        enhanced_logger.log_llm_thinking("basic_llm", len(str(conversation_messages)), 0, 0)
         llm = get_llm_by_type("basic").bind_tools([search_tool])
     
     # 进行多轮思考和搜索
     for iteration in range(max_thinking_iterations):
         thinking_steps += 1
-        logger.info(f"Conversation {conversation_id}: 思考迭代 {iteration + 1}/{max_thinking_iterations}")
+        enhanced_logger.log_step_execution(
+            step_number=iteration + 1,
+            step_title=f"思考迭代 {iteration + 1}",
+            step_type="llm_reasoning",
+            agent_name="research_assistant"
+        )
+        enhanced_logger.logger.info(f"🔄 THINKING_ITERATION | {conversation_id}: 思考迭代 {iteration + 1}/{max_thinking_iterations}")
         
         try:
             # 调用LLM
@@ -916,15 +961,23 @@ async def _simple_conversational_research(
                 for tool_call in tool_calls:
                     if tool_call['name'] == search_tool.name:
                         search_query = tool_call['args'].get('query', messages[-1]['content'])
-                        logger.info(f"Conversation {conversation_id}: 执行搜索 - {search_query}")
+                        enhanced_logger.log_search_process(search_query, "web_search", 0)
+                        enhanced_logger.logger.info(f"🔍 SEARCH_START | {conversation_id}: 执行搜索 - {search_query}")
                         
+                        search_start_time = time.time()
                         search_results = search_tool.invoke(search_query)
+                        search_duration = time.time() - search_start_time
                         
                         # 收集来源
+                        results_count = 0
                         if isinstance(search_results, list):
+                            results_count = len(search_results)
                             for result in search_results:
                                 if isinstance(result, dict) and result.get('url'):
                                     sources.append(result['url'])
+                        
+                        enhanced_logger.log_search_process(search_query, "web_search", results_count)
+                        enhanced_logger.log_tool_call_end("web_search", f"找到 {results_count} 条结果", search_duration)
                         
                         # 将搜索结果添加到对话中
                         search_context = f"搜索结果\uff1a{json.dumps(search_results, ensure_ascii=False, indent=2)}"
@@ -934,6 +987,7 @@ async def _simple_conversational_research(
                         })
                         
                         # 重新调用LLM生成最终回答
+                        enhanced_logger.logger.info(f"💬 ANSWER_GENERATION | {conversation_id}: 基于搜索结果生成回答")
                         final_response = llm.invoke(
                             conversation_messages,
                             config={"recursion_limit": max_recursion_limit}
@@ -944,6 +998,14 @@ async def _simple_conversational_research(
                             final_content = str(final_content)
                         elif not isinstance(final_content, str):
                             final_content = str(final_content)
+                        
+                        enhanced_logger.log_llm_thinking(
+                            "research_assistant",
+                            len(str(conversation_messages)),
+                            len(final_content),
+                            search_duration
+                        )
+                        
                         return final_content, sources, thinking_steps
             
             # 如果没有工具调用，直接返回回答
@@ -956,10 +1018,324 @@ async def _simple_conversational_research(
             return response_content, sources, thinking_steps
             
         except Exception as e:
-            logger.warning(f"Conversation {conversation_id}: 思考迭代 {iteration + 1} 失败: {str(e)}")
+            enhanced_logger.logger.warning(f"⚠️ THINKING_ERROR | {conversation_id}: 思考迭代 {iteration + 1} 失败: {str(e)}")
             if iteration == max_thinking_iterations - 1:
                 # 最后一次迭代，返回默认回答
                 return f"抱歉，我在处理您的问题“{messages[-1]['content']}”时遇到了一些困难。请您再试一次或者提供更具体的信息。", [], thinking_steps
     
     # 如果所有迭代都失败，返回默认回答
-    return f"对于您的问题“{messages[-1]['content']}”，我需要更多信息才能给出准确的回答。请您提供更具体的背景或者明确您最关心的方面。", [], thinking_steps
+    return f"对于您的问题'{messages[-1]['content']}'，我需要更多信息才能给出准确的回答。请您提供更具体的背景或者明确您最关心的方面。", [], thinking_steps
+
+
+@app.post("/api/research/simple/stream")
+async def simple_research_stream(request: SimpleResearchRequest):
+    """
+    流式版本的简化对话式研究接口：实时流式输出思考过程和回答
+    支持SSE (Server-Sent Events) 实时推送每一步的检索、思考和处理过程
+    """
+    # 生成唯一的对话 ID
+    conversation_id = generate_conversation_id(model_prefix="streamcmpl")
+    
+    enhanced_logger.set_session_context(
+        session_id=conversation_id,
+        user_query=request.messages[-1].get("content", "") if request.messages else ""
+    )
+    enhanced_logger.log_node_entry("simple_research_stream", {
+        "conversation_id": conversation_id,
+        "messages_count": len(request.messages) if request.messages else 0,
+        "max_search_results": request.max_search_results,
+        "search_engine": request.search_engine,
+        "enable_deep_thinking": request.enable_deep_thinking
+    })
+    
+    return StreamingResponse(
+        _stream_simple_research_generator(
+            request=request,
+            conversation_id=conversation_id
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
+
+async def _stream_simple_research_generator(
+    request: SimpleResearchRequest,
+    conversation_id: str
+):
+    """
+    流式研究生成器：实时推送每一步的处理过程
+    """
+    import time
+    import asyncio
+    from src.llms.llm import get_llm_by_type
+    from src.tools import get_web_search_tool
+    
+    start_time = time.time()
+    sources = []
+    thinking_steps = 0
+    
+    try:
+        # 验证请求
+        if not request.messages or len(request.messages) == 0:
+            yield _make_stream_event("error", {"error": "messages 不能为空"})
+            return
+        
+        last_message = request.messages[-1]
+        if last_message.get("role") != "user":
+            yield _make_stream_event("error", {"error": "最后一条消息必须是用户消息"})
+            return
+        
+        current_question = last_message.get("content", "")
+        enhanced_logger.log_search_process(current_question, "initial_question", 0)
+        
+        # 发送开始事件
+        yield _make_stream_event("start", {
+            "conversation_id": conversation_id,
+            "question": current_question,
+            "timestamp": int(time.time())
+        })
+        
+        # 初始化工具和LLM
+        enhanced_logger.log_tool_call_start("search_tool_init", {
+            "max_results": request.max_search_results or 3,
+            "engine": request.search_engine or "custom_search"
+        })
+        
+        search_tool = get_web_search_tool(
+            request.max_search_results or 3, 
+            request.search_engine or "custom_search", 
+            ""
+        )
+        
+        enhanced_logger.log_tool_call_end("search_tool_init", "工具初始化完成", 0.1)
+        
+        # 构建对话上下文
+        system_prompt = """
+你是一个智能的研究助手，善于进行对话式的研究和回答。
+
+你的能力：
+1. 当需要最新信息时，使用搜索工具获取相关资料
+2. 基于搜索结果和你的知识进行综合分析
+3. 提供自然、对话式的回答，就像在和用户直接交流
+
+回答要求：
+- 保持对话式的自然语调
+- 不要生成正式的研究报告，而是简单直接的回答
+- 如果需要更多信息，可以向用户提问
+- 在回答末尾简单列出主要参考来源（如果有）
+"""
+        
+        conversation_messages = [{"role": "system", "content": system_prompt}] + request.messages
+        
+        # 获取LLM
+        if request.enable_deep_thinking:
+            enhanced_logger.log_llm_thinking("reasoning_llm", len(str(conversation_messages)), 0, 0)
+            llm = get_llm_by_type("reasoning").bind_tools([search_tool])
+        else:
+            enhanced_logger.log_llm_thinking("basic_llm", len(str(conversation_messages)), 0, 0)
+            llm = get_llm_by_type("basic").bind_tools([search_tool])
+        
+        # 发送思考开始事件
+        yield _make_stream_event("thinking_start", {
+            "iteration": 1,
+            "model_type": "reasoning" if request.enable_deep_thinking else "basic"
+        })
+        
+        # 开始思考迭代
+        max_iterations = request.max_thinking_iterations or 2
+        for iteration in range(max_iterations):
+            thinking_steps += 1
+            iteration_start = time.time()
+            
+            enhanced_logger.log_step_execution(
+                step_number=iteration + 1,
+                step_title=f"思考迭代 {iteration + 1}",
+                step_type="llm_reasoning",
+                agent_name="research_assistant"
+            )
+            
+            yield _make_stream_event("thinking_iteration", {
+                "iteration": iteration + 1,
+                "total_iterations": max_iterations
+            })
+            
+            try:
+                # 调用LLM
+                response = llm.invoke(
+                    conversation_messages,
+                    config={"recursion_limit": request.max_recursion_limit or 15}
+                )
+                
+                iteration_duration = time.time() - iteration_start
+                enhanced_logger.log_llm_thinking(
+                    "research_assistant", 
+                    len(str(conversation_messages)), 
+                    len(str(response.content)), 
+                    iteration_duration
+                )
+                
+                # 检查是否有工具调用
+                tool_calls = getattr(response, 'tool_calls', None)
+                if tool_calls:
+                    for tool_call in tool_calls:
+                        if tool_call['name'] == search_tool.name:
+                            search_query = tool_call['args'].get('query', current_question)
+                            
+                            enhanced_logger.log_search_process(search_query, "web_search", 0)
+                            
+                            # 发送搜索开始事件
+                            yield _make_stream_event("search_start", {
+                                "query": search_query,
+                                "engine": request.search_engine or "custom_search"
+                            })
+                            
+                            search_start = time.time()
+                            search_results = search_tool.invoke(search_query)
+                            search_duration = time.time() - search_start
+                            
+                            # 收集来源
+                            results_count = 0
+                            if isinstance(search_results, list):
+                                results_count = len(search_results)
+                                for result in search_results:
+                                    if isinstance(result, dict) and result.get('url'):
+                                        sources.append(result['url'])
+                            
+                            enhanced_logger.log_search_process(search_query, "web_search", results_count)
+                            enhanced_logger.log_tool_call_end("web_search", f"找到 {results_count} 条结果", search_duration)
+                            
+                            # 发送搜索结果事件
+                            yield _make_stream_event("search_results", {
+                                "query": search_query,
+                                "results_count": results_count,
+                                "duration": search_duration,
+                                "sources": sources[-results_count:] if sources else []
+                            })
+                            
+                            # 将搜索结果添加到对话中
+                            search_context = f"搜索结果：{json.dumps(search_results, ensure_ascii=False, indent=2)}"
+                            conversation_messages.append({
+                                "role": "user", 
+                                "content": f"基于以下搜索结果，请给出对话式回答：\n{search_context}"
+                            })
+                            
+                            # 发送生成回答开始事件
+                            yield _make_stream_event("answer_generation_start", {
+                                "has_search_context": True
+                            })
+                            
+                            # 重新调用LLM生成最终回答
+                            final_response = llm.invoke(
+                                conversation_messages,
+                                config={"recursion_limit": request.max_recursion_limit or 15}
+                            )
+                            
+                            # 流式输出最终回答
+                            final_content = str(final_response.content) if final_response.content else ""
+                            yield _make_stream_event("answer_chunk", {"content": final_content})
+                            
+                            # 发送完成事件
+                            total_duration = time.time() - start_time
+                            enhanced_logger.log_workflow_summary(
+                                total_duration=total_duration,
+                                nodes_executed=["simple_research_stream", "llm_reasoning", "web_search"],
+                                tools_used=["web_search", "llm"]
+                            )
+                            
+                            yield _make_stream_event("complete", {
+                                "conversation_id": conversation_id,
+                                "answer": final_content,
+                                "sources": sources,
+                                "thinking_steps": thinking_steps,
+                                "execution_time": total_duration,
+                                "timestamp": int(time.time())
+                            })
+                            return
+                
+                # 如果没有工具调用，直接返回回答
+                response_content = str(response.content) if response.content else ""
+                
+                yield _make_stream_event("answer_generation_start", {
+                    "has_search_context": False
+                })
+                yield _make_stream_event("answer_chunk", {"content": response_content})
+                
+                total_duration = time.time() - start_time
+                enhanced_logger.log_workflow_summary(
+                    total_duration=total_duration,
+                    nodes_executed=["simple_research_stream", "llm_reasoning"],
+                    tools_used=["llm"]
+                )
+                
+                yield _make_stream_event("complete", {
+                    "conversation_id": conversation_id,
+                    "answer": response_content,
+                    "sources": sources,
+                    "thinking_steps": thinking_steps,
+                    "execution_time": total_duration,
+                    "timestamp": int(time.time())
+                })
+                return
+                
+            except Exception as e:
+                enhanced_logger.logger.warning(f"思考迭代 {iteration + 1} 失败: {str(e)}")
+                yield _make_stream_event("thinking_error", {
+                    "iteration": iteration + 1,
+                    "error": str(e)
+                })
+                
+                if iteration == max_iterations - 1:
+                    # 最后一次迭代，返回默认回答
+                    default_answer = f"抱歉，我在处理您的问题'{current_question}'时遇到了一些困难。请您再试一次或者提供更具体的信息。"
+                    yield _make_stream_event("answer_chunk", {"content": default_answer})
+                    
+                    total_duration = time.time() - start_time
+                    yield _make_stream_event("complete", {
+                        "conversation_id": conversation_id,
+                        "answer": default_answer,
+                        "sources": sources,
+                        "thinking_steps": thinking_steps,
+                        "execution_time": total_duration,
+                        "error": "部分处理失败",
+                        "timestamp": int(time.time())
+                    })
+                    return
+        
+        # 如果所有迭代都没有返回结果
+        default_answer = f"对于您的问题'{current_question}'，我需要更多信息才能给出准确的回答。请您提供更具体的背景或者明确您最关心的方面。"
+        yield _make_stream_event("answer_chunk", {"content": default_answer})
+        
+        total_duration = time.time() - start_time
+        yield _make_stream_event("complete", {
+            "conversation_id": conversation_id,
+            "answer": default_answer,
+            "sources": sources,
+            "thinking_steps": thinking_steps,
+            "execution_time": total_duration,
+            "timestamp": int(time.time())
+        })
+        
+    except Exception as e:
+        enhanced_logger.logger.exception(f"流式研究接口发生错误: {str(e)}")
+        yield _make_stream_event("error", {
+            "conversation_id": conversation_id,
+            "error": str(e),
+            "timestamp": int(time.time())
+        })
+
+
+def _make_stream_event(event_type: str, data: Dict[str, Any]) -> str:
+    """
+    创建SSE格式的流式事件
+    """
+    try:
+        json_data = json.dumps(data, ensure_ascii=False)
+        return f"event: {event_type}\ndata: {json_data}\n\n"
+    except (TypeError, ValueError) as e:
+        enhanced_logger.logger.error(f"流式事件序列化失败: {e}")
+        error_data = json.dumps({"error": "序列化失败"}, ensure_ascii=False)
+        return f"event: error\ndata: {error_data}\n\n"
