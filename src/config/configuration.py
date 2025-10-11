@@ -47,7 +47,7 @@ class Configuration:
     )  # Resources to be used for the research
     max_plan_iterations: int = 1  # Maximum number of plan iterations
     max_step_num: int = 3  # Maximum number of steps in a plan
-    max_search_results: int = 3  # Maximum number of search results
+    max_search_results: int = 2  # Maximum number of search results
     search_engine: str = "custom_search"  # Search engine to use
     custom_search_repository: Optional[str] = None  # Custom search repository ID
     mcp_settings: dict = None  # MCP settings, including dynamic loaded tools

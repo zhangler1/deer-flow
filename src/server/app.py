@@ -676,7 +676,6 @@ def generate_conversation_id(
     # 组合生成最终ID
     return f"{model_prefix}-{timestamp_str}-{random_str}{node_suffix}"
 
-# 已移除 /api/research/simple 非流式接口
 # 该接口功能被更强大的 /api/research/simple/stream 替代
 
 @app.post("/api/research/simple/stream")
@@ -810,7 +809,7 @@ async def _direct_langgraph_generator(
             resources=request.resources or [],
             max_plan_iterations=request.max_plan_iterations or 1,
             max_step_num=request.max_step_num or 3,
-            max_search_results=request.max_search_results or 3,
+            max_search_results=request.max_search_results or 1,
             search_engine=request.search_engine or "custom_search",
             custom_search_repository=request.custom_search_repository or "",
             auto_accepted_plan=request.auto_accepted_plan if request.auto_accepted_plan is not None else True,

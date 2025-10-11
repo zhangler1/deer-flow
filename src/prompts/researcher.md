@@ -60,9 +60,9 @@ You have access to two types of tools:
     - **Conclusion**: Provide a synthesized response to the problem based on the gathered information.
     - **References**: List all sources used with their complete URLs in link reference format at the end of the document. Make sure to include an empty line between each reference for better readability. Use this format for each reference:
       ```markdown
-      - [Source Title](https://example.com/page1)
+      - [Source Title](URL)
 
-      - [Source Title](https://example.com/page2)
+      - [Another Source Title](URL)
       ```
 - Always output in the locale of **{{ locale }}**.
 - DO NOT include inline citations in the text. Instead, track all sources and list them in the References section at the end using link reference format.
