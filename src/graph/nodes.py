@@ -139,6 +139,10 @@ def planner_node(
     else:
         llm = get_llm_by_type(AGENT_LLM_MAP["planner"])
 
+    # 记录 planner 的输入内容
+    logger.info(f"Planner input: {messages}")
+    enhanced_logger.logger.info(f"📝 PLANNER_INPUT | 输入消息数: {len(messages)} | 背景调研: {'是' if state.get('enable_background_investigation') and state.get('background_investigation_results') else '否'}")
+
     # if the plan iterations is greater than the max plan iterations, return the reporter node
     if plan_iterations >= configurable.max_plan_iterations:
         enhanced_logger.logger.info(f"🔀 NODE_TRANSITION | planner → reporter | 原因: 超过最大计划迭代次数")
@@ -525,6 +529,10 @@ def reporter_node(state: State, config: RunnableConfig):
         )
     logger.debug(f"Current invoke messages: {invoke_messages}")
     
+    # 记录 reporter 的输入内容
+    logger.info(f"Reporter input: {invoke_messages}")
+    enhanced_logger.logger.info(f"📝 REPORTER_INPUT | 输入消息数: {len(invoke_messages)} | 观察结果数: {len(observations)} | 计划标题: {plan_title}")
+    
     # 记录LLM调用过程
     llm_start_time = time.time()
     enhanced_logger.logger.info(f"🤖 LLM_INVOKE | reporter | 开始生成最终报告 | 提示消息数: {len(invoke_messages)}")
@@ -836,3 +844,4 @@ async def coder_node(
         "coder",
         [python_repl_tool],
     )
+
