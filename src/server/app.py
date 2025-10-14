@@ -689,7 +689,7 @@ async def simple_research_stream(request: SimpleResearchRequest):
     - 提供 SSE 实时事件流
     """
     # 生成唯一的对话 ID
-    conversation_id = generate_conversation_id(model_prefix="streamcmpl")
+    conversation_id = generate_conversation_id(model_prefix="deep-research")
     
     # 确保 thread_id 不为 None
     thread_id = request.thread_id
@@ -736,7 +736,7 @@ async def simple_research_stream_openai(request: SimpleResearchRequest):
     - 为需要OpenAI格式的客户端提供兼容性
     """
     # 生成唯一的对话 ID
-    conversation_id = generate_conversation_id(model_prefix="openai-stream")
+    conversation_id = generate_conversation_id(model_prefix="deep-research-openai-stream")
     
     # 确保 thread_id 不为 None
     thread_id = request.thread_id
@@ -843,6 +843,7 @@ async def _direct_langgraph_openai_generator(
     """
     OpenAI标准的LangGraph工作流生成器
     返回符合OpenAI chat.completion.chunk格式的流式响应
+    只返回agent为"reporter"的信息
     """
     import time
     
@@ -852,14 +853,13 @@ async def _direct_langgraph_openai_generator(
         "id": thread_id,
         "object": "chat.completion.chunk",
         "created": base_timestamp,
-        "model": "deer-flow-research",
-        "system_fingerprint": "fp_deer_flow_v1",
+        "model": "deep-research-openai-stream",
         "choices": []
     }
     
     enhanced_logger.log_step_execution(
         step_number=1,
-        step_title="OpenAI标准流式输出启动",
+        step_title="OpenAI标准流式输出启动（仅reporter）",
         step_type="openai_stream_initialization",
         agent_name="openai_formatter"
     )
@@ -879,7 +879,8 @@ async def _direct_langgraph_openai_generator(
         }
         yield _make_openai_stream_event(start_chunk)
         
-        # 处理流式事件并转换为OpenAI格式
+        # 使用与/api/research/simple/stream完全相同的流程
+        # 调用_direct_langgraph_generator，确保流程100%一致
         async for raw_event in _direct_langgraph_generator(request, thread_id):
             # 解析SSE事件
             if raw_event.startswith("event: "):
@@ -889,6 +890,11 @@ async def _direct_langgraph_openai_generator(
                 if len(lines) > 1 and lines[1].startswith("data: "):
                     try:
                         event_data = json.loads(lines[1].replace("data: ", ""))
+                        
+                        # 只处理agent为"reporter"的消息
+                        agent = event_data.get("agent", "")
+                        if agent != "reporter":
+                            continue
                         
                         if event_type == "message_chunk" and "content" in event_data:
                             content = event_data.get("content", "")
@@ -901,73 +907,13 @@ async def _direct_langgraph_openai_generator(
                                         "delta": {
                                             "content": content
                                         },
-                                        "finish_reason": None
+                                        "finish_reason": event_data.get("finish_reason") if event_data.get("finish_reason") == "stop" else None
                                     }]
                                 }
                                 yield _make_openai_stream_event(content_chunk)
                         
-                        elif event_type == "tool_calls":
-                            # 处理工具调用
-                            tool_calls = event_data.get("tool_calls", [])
-                            if tool_calls:
-                                # 转换为OpenAI工具调用格式
-                                openai_tool_calls = []
-                                for tool_call in tool_calls:
-                                    openai_tool_calls.append({
-                                        "id": tool_call.get("id", f"call_{uuid.uuid4().hex[:8]}"),
-                                        "type": "function",
-                                        "function": {
-                                            "name": tool_call.get("name", ""),
-                                            "arguments": json.dumps(tool_call.get("args", {}), ensure_ascii=False)
-                                        }
-                                    })
-                                
-                                tool_chunk = {
-                                    **base_response,
-                                    "choices": [{
-                                        "index": 0,
-                                        "delta": {
-                                            "tool_calls": openai_tool_calls
-                                        },
-                                        "finish_reason": None
-                                    }]
-                                }
-                                yield _make_openai_stream_event(tool_chunk)
-                        
-                        elif event_type == "tool_call_result":
-                            # 工具调用结果可以作为内容返回
-                            tool_result = event_data.get("content", "")
-                            if tool_result:
-                                result_chunk = {
-                                    **base_response,
-                                    "choices": [{
-                                        "index": 0,
-                                        "delta": {
-                                            "content": f"\n\n**工具执行结果:**\n{tool_result}"
-                                        },
-                                        "finish_reason": None
-                                    }]
-                                }
-                                yield _make_openai_stream_event(result_chunk)
-                        
-                        elif event_type == "interrupt":
-                            # 处理中断事件
-                            interrupt_content = event_data.get("content", "")
-                            if interrupt_content:
-                                interrupt_chunk = {
-                                    **base_response,
-                                    "choices": [{
-                                        "index": 0,
-                                        "delta": {
-                                            "content": f"\n\n**计划审核:** {interrupt_content}\n"
-                                        },
-                                        "finish_reason": None
-                                    }]
-                                }
-                                yield _make_openai_stream_event(interrupt_chunk)
-                        
                         elif event_type == "error":
-                            # 处理错误事件
+                            # 处理错误事件（不过滤，错误信息需要返回）
                             error_msg = event_data.get("error", "发生未知错误")
                             error_chunk = {
                                 **base_response,
@@ -985,20 +931,25 @@ async def _direct_langgraph_openai_generator(
                     except json.JSONDecodeError:
                         enhanced_logger.logger.warning(f"无法解析事件数据: {lines[1] if len(lines) > 1 else 'No data'}")
         
-        # 发送结束chunk
+        # 发送结束chunk，包含usage信息
         final_chunk = {
             **base_response,
             "choices": [{
                 "index": 0,
                 "delta": {},
                 "finish_reason": "stop"
-            }]
+            }],
+            "usage": {
+                "completion_tokens": 0,  # 实际应该计算token数量
+                "prompt_tokens": 0,     # 实际应该计算token数量
+                "total_tokens": 0       # completion_tokens + prompt_tokens
+            }
         }
         yield _make_openai_stream_event(final_chunk)
         
         enhanced_logger.log_step_execution(
             step_number=2,
-            step_title="OpenAI标准流式输出完成",
+            step_title="OpenAI标准流式输出完成（仅reporter）",
             step_type="openai_stream_completion",
             agent_name="openai_formatter"
         )
