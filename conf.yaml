@@ -26,7 +26,7 @@ BASIC_MODEL:
 
 REASONING_MODEL:
   base_url: https://api.deepseek.com/v1
-  model: deepseek-reasoner 
+  model: deepseek-chat 
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates

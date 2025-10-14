@@ -1,8 +1,4 @@
-.env
-Dockerfile
-.dockerignore
-.git
-.gitignore
+.venv/
 
 # Python
 __pycache__/

@@ -10,7 +10,8 @@ from src.utils.enhanced_logger import get_enhanced_logger
 
 from .nodes import (
     background_investigation_node,
-    coder_node,
+    # 暂时注释掉 coder_node 的导入
+    # coder_node,
     coordinator_node,
     human_feedback_node,
     planner_node,
@@ -81,9 +82,14 @@ def continue_to_running_research_team(state: State):
         if step_type == StepType.RESEARCH:
             next_node = "researcher"
             enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → researcher | 原因: 下一步是研究类型 | 步骤: '{step_title}'")
+        # 暂时注释掉 coder 节点的路由
+        # elif step_type == StepType.PROCESSING:
+        #     next_node = "coder"
+        #     enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → coder | 原因: 下一步是处理类型 | 步骤: '{step_title}'")
         elif step_type == StepType.PROCESSING:
-            next_node = "coder"
-            enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → coder | 原因: 下一步是处理类型 | 步骤: '{step_title}'")
+            # 暂时跳过处理类型，直接回到 planner
+            next_node = "planner"
+            enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → planner | 原因: 处理类型暂时跳过（coder已注释） | 步骤: '{step_title}'")
         else:
             enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → planner | 原因: 未知步骤类型 | 类型: {step_type}")
     except (AttributeError, TypeError):
@@ -104,13 +110,15 @@ def _build_base_graph():
     builder.add_node("reporter", reporter_node)
     builder.add_node("research_team", research_team_node)
     builder.add_node("researcher", researcher_node)
-    builder.add_node("coder", coder_node)
+    # 暂时注释掉 coder 节点
+    # builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
     builder.add_edge("background_investigator", "planner")
     builder.add_conditional_edges(
         "research_team",
         continue_to_running_research_team,
-        ["planner", "researcher", "coder"],
+        # 暂时移除 "coder" 从条件边
+        ["planner", "researcher"],
     )
     builder.add_edge("reporter", END)
     return builder
