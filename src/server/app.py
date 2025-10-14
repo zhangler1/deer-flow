@@ -843,9 +843,10 @@ async def _direct_langgraph_openai_generator(
     """
     OpenAI标准的LangGraph工作流生成器
     返回符合OpenAI chat.completion.chunk格式的流式响应
-    只返回agent为"reporter"的信息
+    只返回agent为"reporter"的信息，并过滤掉<think>标签内的思考内容
     """
     import time
+    import re
     
     # 初始化OpenAI格式基本信息（所有chunk共享相同的基础信息）
     base_timestamp = int(time.time())
@@ -859,10 +860,24 @@ async def _direct_langgraph_openai_generator(
     
     enhanced_logger.log_step_execution(
         step_number=1,
-        step_title="OpenAI标准流式输出启动（仅reporter）",
+        step_title="OpenAI标准流式输出启动（仅reporter，过滤思考标签）",
         step_type="openai_stream_initialization",
         agent_name="openai_formatter"
     )
+    
+    # 用于累积内容，以便处理跨chunk的<think>标签
+    content_buffer = ""
+    in_think_tag = False
+    
+    def filter_think_tags(text: str) -> str:
+        """
+        过滤<think>...</think>标签及其内部内容
+        使用正则表达式删除所有思考标签块
+        """
+        # 使用正则表达式删除<think>...</think>标签及其内容
+        # re.DOTALL 使得 . 匹配包括换行符在内的所有字符
+        filtered_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE)
+        return filtered_text
     
     try:
         # 发送初始chunk（包含role信息）
@@ -899,18 +914,46 @@ async def _direct_langgraph_openai_generator(
                         if event_type == "message_chunk" and "content" in event_data:
                             content = event_data.get("content", "")
                             if content:
-                                # 发送内容chunk
-                                content_chunk = {
-                                    **base_response,
-                                    "choices": [{
-                                        "index": 0,
-                                        "delta": {
-                                            "content": content
-                                        },
-                                        "finish_reason": event_data.get("finish_reason") if event_data.get("finish_reason") == "stop" else None
-                                    }]
-                                }
-                                yield _make_openai_stream_event(content_chunk)
+                                # 累积内容到缓冲区
+                                content_buffer += content
+                                
+                                # 检查是否有完整的<think>...</think>标签
+                                # 如果缓冲区包含完整的think标签，则过滤并发送
+                                if "</think>" in content_buffer:
+                                    # 过滤掉think标签
+                                    filtered_content = filter_think_tags(content_buffer)
+                                    
+                                    # 如果过滤后有内容，则发送
+                                    if filtered_content:
+                                        content_chunk = {
+                                            **base_response,
+                                            "choices": [{
+                                                "index": 0,
+                                                "delta": {
+                                                    "content": filtered_content
+                                                },
+                                                "finish_reason": event_data.get("finish_reason") if event_data.get("finish_reason") == "stop" else None
+                                            }]
+                                        }
+                                        yield _make_openai_stream_event(content_chunk)
+                                    
+                                    # 清空缓冲区
+                                    content_buffer = ""
+                                elif "<think>" not in content_buffer:
+                                    # 如果缓冲区没有think标签开始标记，说明是正常内容，直接发送
+                                    content_chunk = {
+                                        **base_response,
+                                        "choices": [{
+                                            "index": 0,
+                                            "delta": {
+                                                "content": content_buffer
+                                            },
+                                            "finish_reason": event_data.get("finish_reason") if event_data.get("finish_reason") == "stop" else None
+                                        }]
+                                    }
+                                    yield _make_openai_stream_event(content_chunk)
+                                    content_buffer = ""
+                                # 否则，继续累积内容，等待完整的think标签
                         
                         elif event_type == "error":
                             # 处理错误事件（不过滤，错误信息需要返回）
@@ -931,6 +974,23 @@ async def _direct_langgraph_openai_generator(
                     except json.JSONDecodeError:
                         enhanced_logger.logger.warning(f"无法解析事件数据: {lines[1] if len(lines) > 1 else 'No data'}")
         
+        # 流结束前，处理缓冲区中剩余的内容
+        if content_buffer:
+            # 过滤掉可能残留的think标签
+            filtered_content = filter_think_tags(content_buffer)
+            if filtered_content:
+                remaining_chunk = {
+                    **base_response,
+                    "choices": [{
+                        "index": 0,
+                        "delta": {
+                            "content": filtered_content
+                        },
+                        "finish_reason": None
+                    }]
+                }
+                yield _make_openai_stream_event(remaining_chunk)
+        
         # 发送结束chunk，包含usage信息
         final_chunk = {
             **base_response,
@@ -949,7 +1009,7 @@ async def _direct_langgraph_openai_generator(
         
         enhanced_logger.log_step_execution(
             step_number=2,
-            step_title="OpenAI标准流式输出完成（仅reporter）",
+            step_title="OpenAI标准流式输出完成（仅reporter，已过滤思考标签）",
             step_type="openai_stream_completion",
             agent_name="openai_formatter"
         )
