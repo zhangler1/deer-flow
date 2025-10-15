@@ -15,6 +15,7 @@ from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from src.config.custom_search import get_custom_search_config, CustomSearchRepository
+from src.utils.enhanced_logger import console_print
 
 logger = logging.getLogger(__name__)
 
@@ -238,6 +239,35 @@ class CustomSearchTool(BaseTool):
         try:
             results = self._call_search_api(query)
             logger.info(f"Custom search returned {len(results)} results")
+            
+            # 打印检索结果摘要（带日志级别判断）
+            console_print(
+                f"\033[32m[网络检索摘要] 查询: '{query}'\033[0m \033[35m| 返回结果数: {len(results)} 条\033[0m",
+                level=logging.INFO
+            )
+            if results and results[0].get('title') != "未找到相关结果" and results[0].get('title') != "搜索错误":
+                console_print(
+                    f"\033[32m[结果详情] 共{len(results)}条结果:\033[0m",
+                    level=logging.DEBUG
+                )
+                for i, result in enumerate(results):
+                    title = result.get('title', '无标题')
+                    content = result.get('content', '')
+                    # 截取内容前40字
+                    content_preview = content[:40] if content else '无内容'
+                    score = result.get('score', 0)
+                    console_print(
+                        f"\033[32m  {i+1}. 标题: {title}\033[0m",
+                        level=logging.DEBUG
+                    )
+                    console_print(
+                        f"\033[35m     内容: {content_preview}...\033[0m",
+                        level=logging.DEBUG
+                    )
+                    console_print(
+                        f"\033[35m     [评分: {score}]\033[0m",
+                        level=logging.DEBUG
+                    )
             
             # 恢复原始配置（如果有的话）
             if repository_id and repository_id != self.repository_id and original_config is not None:

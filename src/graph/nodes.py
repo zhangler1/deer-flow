@@ -418,19 +418,48 @@ def coordinator_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["planner", "background_investigator", "__end__"]]:
     """Coordinator node that communicate with customers."""
+    start_time = time.time()
+    enhanced_logger.logger.info(f"🔄 NODE_ENTRY | coordinator | 开始执行协调节点")
+    
     logger.info("Coordinator talking.")
     configurable = Configuration.from_runnable_config(config)
+    
+    # 打印状态信息
+    enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | research_topic: {state.get('research_topic', 'Not set')}")
+    enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | locale: {state.get('locale', 'Not set')}")
+    enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | messages数量: {len(state.get('messages', []))}")
+    
     try:
         messages = apply_prompt_template("coordinator", dict(state))
+        enhanced_logger.logger.info(f"📝 COORDINATOR_PROMPT | 提示模板应用成功 | 消息数: {len(messages)}")
     except Exception as e:
         enhanced_logger.logger.error(f"Failed to apply coordinator template: {e}")
         # 使用默认消息
         messages = [HumanMessage(content=f"Coordinate request: {state.get('research_topic', 'Unknown request')}")]
+    
+    # 打印发送给LLM的消息
+    enhanced_logger.logger.info(f"🤖 COORDINATOR_LLM_INPUT | 准备调用LLM | 输入消息数: {len(messages)}")
+    for i, msg in enumerate(messages):
+        msg_preview = str(msg)[:200] + "..." if len(str(msg)) > 200 else str(msg)
+        enhanced_logger.logger.info(f"  消息{i+1}: {msg_preview}")
+    
+    llm_start_time = time.time()
     response = (
         get_llm_by_type(AGENT_LLM_MAP["coordinator"])
         .bind_tools([handoff_to_planner])
         .invoke(messages)
     )
+    llm_duration = time.time() - llm_start_time
+    
+    # 打印LLM响应的详细信息
+    enhanced_logger.logger.info(f"🤖 COORDINATOR_LLM_RESPONSE | LLM调用完成 | 耗时: {llm_duration:.2f}s")
+    enhanced_logger.logger.info(f"📤 COORDINATOR_RESPONSE_TYPE | 响应类型: {type(response).__name__}")
+    enhanced_logger.logger.info(f"📤 COORDINATOR_RESPONSE_CONTENT | 响应内容: {response.content if hasattr(response, 'content') else 'No content'}")
+    
+    # 打印响应的所有属性
+    response_attrs = dir(response)
+    enhanced_logger.logger.info(f"📤 COORDINATOR_RESPONSE_ATTRS | 响应属性: {[attr for attr in response_attrs if not attr.startswith('_')]}")
+    
     logger.debug(f"Current state messages: {state['messages']}")
 
     goto = "__end__"
@@ -440,33 +469,61 @@ def coordinator_node(
     # 处理response的tool_calls属性问题
     try:
         tool_calls = getattr(response, 'tool_calls', [])
+        enhanced_logger.logger.info(f"🔧 COORDINATOR_TOOL_CALLS | 工具调用数量: {len(tool_calls)}")
+        
+        # 打印每个tool_call的详细信息
+        for i, tool_call in enumerate(tool_calls):
+            enhanced_logger.logger.info(f"🔧 TOOL_CALL_{i+1} | 完整内容: {tool_call}")
+            enhanced_logger.logger.info(f"  - name: {tool_call.get('name', 'N/A')}")
+            enhanced_logger.logger.info(f"  - args: {tool_call.get('args', {})}")
+        
         if len(tool_calls) > 0:
             goto = "planner"
             if state.get("enable_background_investigation"):
                 # if the search_before_planning is True, add the web search tool to the planner agent
                 goto = "background_investigator"
+                enhanced_logger.logger.info(f"🔀 COORDINATOR_GOTO | 启用背景调研，跳转到: {goto}")
+            else:
+                enhanced_logger.logger.info(f"🔀 COORDINATOR_GOTO | 直接跳转到: {goto}")
+            
             try:
                 for tool_call in tool_calls:
                     if tool_call.get("name", "") != "handoff_to_planner":
+                        enhanced_logger.logger.warning(f"⚠️ UNEXPECTED_TOOL | 意外的工具调用: {tool_call.get('name', '')}")
                         continue
                     if tool_call.get("args", {}).get("locale") and tool_call.get(
                         "args", {}
                     ).get("research_topic"):
                         locale = tool_call.get("args", {}).get("locale")
                         research_topic = tool_call.get("args", {}).get("research_topic")
+                        enhanced_logger.logger.info(f"📝 EXTRACTED_INFO | locale: {locale}, research_topic: {research_topic}")
                         break
             except Exception as e:
                 logger.error(f"Error processing tool calls: {e}")
+                enhanced_logger.logger.error(f"❌ TOOL_CALL_ERROR | 处理工具调用失败: {str(e)}")
         else:
             logger.warning(
                 "Coordinator response contains no tool calls. Terminating workflow execution."
             )
+            enhanced_logger.logger.warning(f"⚠️ NO_TOOL_CALLS | Coordinator未返回工具调用，将终止工作流")
             logger.debug(f"Coordinator response: {response}")
+            enhanced_logger.logger.info(f"📤 FULL_RESPONSE | {response}")
     except Exception as e:
         logger.error(f"Error accessing tool_calls: {e}")
+        enhanced_logger.logger.error(f"❌ TOOL_CALLS_ACCESS_ERROR | 访问tool_calls属性失败: {str(e)}")
+    
     messages = state.get("messages", [])
     if response.content:
         messages.append(HumanMessage(content=response.content, name="coordinator"))
+        enhanced_logger.logger.info(f"📝 ADDED_MESSAGE | 添加coordinator响应到消息列表")
+    
+    # 打印最终的返回命令
+    enhanced_logger.logger.info(f"🎯 COORDINATOR_FINAL_GOTO | 最终跳转目标: {goto}")
+    enhanced_logger.logger.info(f"📊 COORDINATOR_FINAL_UPDATE | locale: {locale}, research_topic: {research_topic}")
+    
+    duration = time.time() - start_time
+    enhanced_logger.logger.info(f"✅ NODE_EXIT | coordinator | 节点执行完成 | 总耗时: {duration:.2f}s")
+    
     return Command(
         update={
             "messages": messages,

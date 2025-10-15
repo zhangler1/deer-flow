@@ -9,9 +9,57 @@
 import logging
 import time
 import json
+import os
 from typing import Any, Dict, List, Optional, Union
 from functools import wraps
 from contextlib import contextmanager
+
+
+# 从环境变量读取日志级别配置
+def get_log_level_from_env() -> int:
+    """
+    从环境变量获取日志级别
+    支持的值: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    默认: INFO
+    """
+    level_str = os.getenv('LOG_LEVEL', 'INFO').upper()
+    level_map = {
+        'DEBUG': logging.DEBUG,
+        'INFO': logging.INFO,
+        'WARNING': logging.WARNING,
+        'ERROR': logging.ERROR,
+        'CRITICAL': logging.CRITICAL,
+    }
+    return level_map.get(level_str, logging.INFO)
+
+
+# 全局日志级别
+CURRENT_LOG_LEVEL = get_log_level_from_env()
+
+
+def should_log(level: int = logging.INFO) -> bool:
+    """
+    判断是否应该输出日志
+    
+    Args:
+        level: 日志级别 (logging.DEBUG, logging.INFO等)
+        
+    Returns:
+        bool: 如果当前日志级别允许输出，返回True
+    """
+    return level >= CURRENT_LOG_LEVEL
+
+
+def console_print(message: str, level: int = logging.INFO):
+    """
+    带日志级别判断的控制台打印函数
+    
+    Args:
+        message: 要打印的消息
+        level: 日志级别
+    """
+    if should_log(level):
+        print(message)
 
 
 class ColoredFormatter(logging.Formatter):
