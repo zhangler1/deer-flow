@@ -515,6 +515,9 @@ def coordinator_node(
     # LangGraph会自动捕获LLM的响应并流式输出，无需手动添加到messages
     # 只有当需要保存上下文时才添加到messages
     messages = state.get("messages", [])
+    if response.content:
+        messages.append(HumanMessage(content=response.content, name="coordinator"))
+        enhanced_logger.logger.info(f"📝 ADDED_MESSAGE | 添加coordinator响应到消息列表")
     
     # 打印最终的返回命令
     enhanced_logger.logger.info(f"🎯 COORDINATOR_FINAL_GOTO | 最终跳转目标: {goto}")
