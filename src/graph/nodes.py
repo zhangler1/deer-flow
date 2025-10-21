@@ -512,14 +512,18 @@ def coordinator_node(
         logger.error(f"Error accessing tool_calls: {e}")
         enhanced_logger.logger.error(f"❌ TOOL_CALLS_ACCESS_ERROR | 访问tool_calls属性失败: {str(e)}")
     
+    # LangGraph会自动捕获LLM的响应并流式输出，无需手动添加到messages
+    # 只有当需要保存上下文时才添加到messages
     messages = state.get("messages", [])
-    if response.content:
-        messages.append(HumanMessage(content=response.content, name="coordinator"))
-        enhanced_logger.logger.info(f"📝 ADDED_MESSAGE | 添加coordinator响应到消息列表")
     
     # 打印最终的返回命令
     enhanced_logger.logger.info(f"🎯 COORDINATOR_FINAL_GOTO | 最终跳转目标: {goto}")
     enhanced_logger.logger.info(f"📊 COORDINATOR_FINAL_UPDATE | locale: {locale}, research_topic: {research_topic}")
+    
+    # 如果有response.content，说明coordinator选择了直接回复（追问等情况）
+    if response.content:
+        enhanced_logger.logger.info(f"💬 COORDINATOR_RESPONSE | 协调者直接回复 | 内容长度: {len(response.content)}")
+        # response本身已经被LangGraph的流式机制捕获并输出了
     
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | coordinator | 节点执行完成 | 总耗时: {duration:.2f}s")

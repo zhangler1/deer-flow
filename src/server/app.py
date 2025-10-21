@@ -906,10 +906,15 @@ async def _direct_langgraph_openai_generator(
                     try:
                         event_data = json.loads(lines[1].replace("data: ", ""))
                         
-                        # 只处理agent为"reporter"的消息
+                        # 处理reporter和coordinator的消息
+                        # coordinator的消息包含追问等直接回复
+                        # reporter的消息包含最终研究报告
                         agent = event_data.get("agent", "")
-                        if agent != "reporter":
+                        if agent not in ["reporter", "coordinator"]:
+                            enhanced_logger.logger.debug(f"⚠️ FILTERED_AGENT | 过滤非agent: {agent}")
                             continue
+                        
+                        enhanced_logger.logger.debug(f"✅ PROCESSING_AGENT | 处理agent: {agent} | event_type: {event_type}")
                         
                         if event_type == "message_chunk" and "content" in event_data:
                             content = event_data.get("content", "")
@@ -1009,7 +1014,7 @@ async def _direct_langgraph_openai_generator(
         
         enhanced_logger.log_step_execution(
             step_number=2,
-            step_title="OpenAI标准流式输出完成（仅reporter，已过滤思考标签）",
+            step_title="OpenAI标准流式输出完成（coordinator+reporter，已过滤思考标签）",
             step_type="openai_stream_completion",
             agent_name="openai_formatter"
         )
