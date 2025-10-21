@@ -22,3 +22,4 @@ class State(MessagesState):
     auto_accepted_plan: bool = False
     enable_background_investigation: bool = True
     background_investigation_results: str = None
+    system_context: str = ""  # 系统背景上下文，会自动添加到所有查询中

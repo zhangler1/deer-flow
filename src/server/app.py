@@ -133,6 +133,7 @@ async def chat_stream(request: ChatRequest):
             request.enable_background_investigation or True,
             request.report_style or ReportStyle.ACADEMIC,
             request.enable_deep_thinking or False,
+            system_context="问题关于交通银行",  # 默认系统背景：交通银行
         ),
         media_type="text/event-stream",
     )
@@ -359,11 +360,23 @@ async def _astream_workflow_generator(
     enable_background_investigation: bool,
     report_style: ReportStyle,
     enable_deep_thinking: bool,
+    system_context: str = "",  # 系统背景上下文
 ):
     # Process initial messages
     for message in messages:
         if isinstance(message, dict) and "content" in message:
             _process_initial_messages(message, thread_id)
+
+    # 如果有系统背景上下文，在用户消息前注入背景
+    if system_context and messages:
+        # 在第一条用户消息中添加系统背景
+        enhanced_logger.logger.info(f"🏛️ SYSTEM_CONTEXT | 注入系统背景上下文: {system_context}")
+        first_user_message = messages[0]
+        if isinstance(first_user_message, dict) and first_user_message.get("role") == "user":
+            original_content = first_user_message.get("content", "")
+            # 将系统背景添加在用户问题之前
+            first_user_message["content"] = f"[系统背景上下文: {system_context}]\n\n{original_content}"
+            enhanced_logger.logger.info(f"✅ CONTEXT_INJECTED | 背景已注入到用户消息中")
 
     # Prepare workflow input
     workflow_input = {
@@ -375,6 +388,7 @@ async def _astream_workflow_generator(
         "auto_accepted_plan": auto_accepted_plan,
         "enable_background_investigation": enable_background_investigation,
         "research_topic": messages[-1]["content"] if messages else "",
+        "system_context": system_context,  # 将系统背景传递给工作流
     }
 
     if not auto_accepted_plan and interrupt_feedback:
@@ -396,6 +410,7 @@ async def _astream_workflow_generator(
             "mcp_settings": mcp_settings,
             "report_style": report_style.value,
             "enable_deep_thinking": enable_deep_thinking,
+            "system_context": system_context,  # 将系统背景传递到配置中
         },
         "recursion_limit": get_recursion_limit(),
     }
@@ -818,6 +833,7 @@ async def _direct_langgraph_generator(
             enable_background_investigation=request.enable_background_investigation or True,
             report_style=request.report_style or ReportStyle.ACADEMIC,
             enable_deep_thinking=request.enable_deep_thinking or False,
+            system_context="问题关于交通银行",  # 默认系统背景：交通银行
         ):
             yield event
             
