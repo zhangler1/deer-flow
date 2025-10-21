@@ -201,8 +201,11 @@ def planner_node(
                     step['step_type'] = 'research'  # 默认步骤类型
                     enhanced_logger.logger.warning(f"⚠️ STEP_MISSING_TYPE | 为步骤#{i+1}添加缺失的step_type字段: {step['step_type']}")
             
-    except json.JSONDecodeError:
-        logger.warning("Planner response is not a valid JSON")
+    except json.JSONDecodeError as e:
+        logger.warning(f"Planner response is not a valid JSON: {str(e)}")
+        enhanced_logger.logger.error(f"❌ JSON_DECODE_ERROR | JSON解析失败 | 错误: {str(e)}")
+        enhanced_logger.logger.error(f"📄 INVALID_JSON_CONTENT | 无效的JSON内容 (前500字符): {full_response[:500]}")
+        enhanced_logger.logger.debug(f"📄 FULL_RESPONSE | 完整响应内容: {full_response}")
         if plan_iterations > 0:
             enhanced_logger.logger.info(f"🔀 NODE_TRANSITION | planner → reporter | 原因: JSON解析失败，重定向到reporter")
             return Command(goto="reporter")
@@ -382,8 +385,11 @@ def human_feedback_node(
             logger.warning(f"Plan missing required fields: {missing_fields}")
             return Command(goto="planner")  # 重新生成计划
             
-    except json.JSONDecodeError:
-        logger.warning("Planner response is not a valid JSON")
+    except json.JSONDecodeError as e:
+        logger.warning(f"Planner response is not a valid JSON in human_feedback: {str(e)}")
+        enhanced_logger.logger.error(f"❌ JSON_DECODE_ERROR | human_feedback节点JSON解析失败 | 错误: {str(e)}")
+        enhanced_logger.logger.error(f"📄 INVALID_JSON_CONTENT | 无效的JSON内容 (前500字符): {str(current_plan)[:500]}")
+        enhanced_logger.logger.debug(f"📄 FULL_CURRENT_PLAN | 完整current_plan内容: {current_plan}")
         if plan_iterations > 1:  # the plan_iterations is increased before this check
             return Command(goto="reporter")
         else:

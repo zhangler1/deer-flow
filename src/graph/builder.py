@@ -51,12 +51,31 @@ def continue_to_running_research_team(state: State):
 
     # 检查所有步骤是否完成
     try:
-        all_completed = all(getattr(step, 'execution_res', None) for step in plan_steps)
+        completed_steps = []
+        incomplete_steps = []
+        for step in plan_steps:
+            step_res = getattr(step, 'execution_res', None)
+            step_title = getattr(step, 'title', '未知步骤')
+            if step_res:
+                completed_steps.append(step_title)
+            else:
+                incomplete_steps.append(step_title)
+        
+        all_completed = len(incomplete_steps) == 0
+        enhanced_logger.logger.info(f"📊 STEPS_STATUS | 总步骤数: {len(plan_steps)} | 已完成: {len(completed_steps)} | 未完成: {len(incomplete_steps)}")
+        
+        if completed_steps:
+            enhanced_logger.logger.info(f"✅ COMPLETED_STEPS | {', '.join(completed_steps)}")
+        if incomplete_steps:
+            enhanced_logger.logger.info(f"⏳ INCOMPLETE_STEPS | {', '.join(incomplete_steps)}")
+        
         if all_completed:
-            enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → planner | 原因: 所有步骤已完成")
-            return "planner"
-    except (AttributeError, TypeError):
-        enhanced_logger.logger.warning("无法检查步骤完成状态，默认返回planner")
+            enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → reporter | 原因: 所有步骤已完成，生成最终报告")
+            duration = time.time() - start_time
+            enhanced_logger.logger.info(f"⏱️ TRANSITION_TIME | research_team 跳转逻辑 | 耗时: {duration:.2f}s")
+            return "reporter"
+    except (AttributeError, TypeError) as e:
+        enhanced_logger.logger.warning(f"无法检查步骤完成状态: {e}，默认返回planner")
         return "planner"
 
     # Find first incomplete step
@@ -117,8 +136,8 @@ def _build_base_graph():
     builder.add_conditional_edges(
         "research_team",
         continue_to_running_research_team,
-        # 暂时移除 "coder" 从条件边
-        ["planner", "researcher"],
+        # 添加 "reporter" 到条件边，当所有步骤完成时跳转
+        ["planner", "researcher", "reporter"],
     )
     builder.add_edge("reporter", END)
     return builder
