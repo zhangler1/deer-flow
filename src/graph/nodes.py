@@ -26,6 +26,7 @@ from src.tools import (
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
+from src.utils.text_utils import remove_think_tags
 from src.utils.enhanced_logger import get_enhanced_logger
 
 from ..config import SELECTED_SEARCH_ENGINE, SearchEngine
@@ -744,6 +745,14 @@ async def _execute_agent_step(
 
     # Process the result
     response_content = result["messages"][-1].content
+    
+    # 移除思考标签（如果存在）
+    if response_content and '<think>' in response_content.lower():
+        original_length = len(response_content)
+        response_content = remove_think_tags(response_content)
+        cleaned_length = len(response_content)
+        enhanced_logger.logger.info(f"🧹 CLEAN_THINK_TAGS | {agent_name} | 移除思考标签 | 原始长度: {original_length} | 清理后长度: {cleaned_length} | 减少: {original_length - cleaned_length}")
+    
     response_length = len(response_content) if response_content else 0
     enhanced_logger.logger.info(f"📊 STEP_RESULT | {agent_name} | 步骤结果处理完成 | 响应长度: {response_length}")
     
