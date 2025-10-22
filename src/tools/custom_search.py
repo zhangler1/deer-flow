@@ -15,9 +15,10 @@ from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from src.config.custom_search import get_custom_search_config, CustomSearchRepository
-from src.utils.enhanced_logger import console_print
+from src.utils.enhanced_logger import console_print, get_enhanced_logger
 
 logger = logging.getLogger(__name__)
+enhanced_logger = get_enhanced_logger('tools.custom_search')
 
 
 class CustomSearchInput(BaseModel):
@@ -221,6 +222,9 @@ class CustomSearchTool(BaseTool):
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> List[Dict[str, Any]]:
         """同步执行搜索"""
+        import time
+        start_time = time.time()
+        
         # 如果提供了repository_id参数，则优先使用
         original_config = None
         if repository_id and repository_id != self.repository_id:
@@ -232,30 +236,50 @@ class CustomSearchTool(BaseTool):
                 self._repository_config = temp_repo_config
                 logger.info(f"Using repository: {temp_repo_config.name} ({temp_repo_config.repository})")
         
+        # 记录检索开始
+        repo_name = self._repository_config.name if self._repository_config else "默认仓库"
+        enhanced_logger.logger.info(
+            f"🔍 SEARCH_START | custom_search | 开始自定义搜索 | "
+            f"仓库: {repo_name} | 查询: '{query}'"
+        )
+        console_print(
+            f"\033[32m[🔍 开始搜索] 仓库: {repo_name}\033[0m \033[35m| 查询: '{query}'\033[0m",
+            level=logging.INFO
+        )
+        
         logger.info(f"Custom search query: {query}")
         if self._repository_config:
             logger.info(f"Using repository: {self._repository_config.name} ({self._repository_config.repository})")
         
         try:
             results = self._call_search_api(query)
-            logger.info(f"Custom search returned {len(results)} results")
+            duration = time.time() - start_time
+            
+            enhanced_logger.logger.info(
+                f"✅ SEARCH_COMPLETE | custom_search | 搜索完成 | "
+                f"结果数: {len(results)} | 耗时: {duration:.2f}s"
+            )
+            logger.info(f"Custom search returned {len(results)} results in {duration:.2f}s")
             
             # 打印检索结果摘要（带日志级别判断）
             console_print(
-                f"\033[32m[网络检索摘要] 查询: '{query}'\033[0m \033[35m| 返回结果数: {len(results)} 条\033[0m",
+                f"\033[32m[✅ 搜索完成] 查询: '{query}'\033[0m \033[35m| 返回 {len(results)} 条结果 | 耗时: {duration:.2f}s\033[0m",
                 level=logging.INFO
             )
+            
             if results and results[0].get('title') != "未找到相关结果" and results[0].get('title') != "搜索错误":
                 console_print(
-                    f"\033[32m[结果详情] 共{len(results)}条结果:\033[0m",
+                    f"\033[32m[📊 结果详情] 共 {len(results)} 条结果:\033[0m",
                     level=logging.DEBUG
                 )
-                for i, result in enumerate(results):
+                for i, result in enumerate(results[:5]):  # 只打印前5条
                     title = result.get('title', '无标题')
                     content = result.get('content', '')
-                    # 截取内容前40字
-                    content_preview = content[:40] if content else '无内容'
+                    # 截取内容前60字
+                    content_preview = content[:60] if content else '无内容'
                     score = result.get('score', 0)
+                    source = result.get('source', '')
+                    
                     console_print(
                         f"\033[32m  {i+1}. 标题: {title}\033[0m",
                         level=logging.DEBUG
@@ -264,10 +288,22 @@ class CustomSearchTool(BaseTool):
                         f"\033[35m     内容: {content_preview}...\033[0m",
                         level=logging.DEBUG
                     )
+                    if score > 0:
+                        console_print(
+                            f"\033[35m     [评分: {score:.2f} | 来源: {source}]\033[0m",
+                            level=logging.DEBUG
+                        )
+                        
+                if len(results) > 5:
                     console_print(
-                        f"\033[35m     [评分: {score}]\033[0m",
+                        f"\033[35m  ... 还有 {len(results) - 5} 条结果\033[0m",
                         level=logging.DEBUG
                     )
+            elif not results or results[0].get('title') == "未找到相关结果":
+                console_print(
+                    f"\033[33m[⚠️  无结果] 未找到与 '{query}' 相关的信息\033[0m",
+                    level=logging.INFO
+                )
             
             # 恢复原始配置（如果有的话）
             if repository_id and repository_id != self.repository_id and original_config is not None:
@@ -286,11 +322,22 @@ class CustomSearchTool(BaseTool):
             
             return results
         except Exception as e:
+            duration = time.time() - start_time
+            
             # 恢复原始配置（如果有的话）
             if repository_id and repository_id != self.repository_id and original_config is not None:
                 self._repository_config = original_config
             
+            enhanced_logger.logger.error(
+                f"❌ SEARCH_ERROR | custom_search | 搜索失败 | "
+                f"耗时: {duration:.2f}s | 错误: {str(e)}"
+            )
             logger.error(f"Custom search error: {e}")
+            console_print(
+                f"\033[31m[❌ 搜索错误] 搜索服务出现错误: {str(e)}\033[0m",
+                level=logging.ERROR
+            )
+            
             return [{
                 "title": "搜索错误",
                 "url": "",

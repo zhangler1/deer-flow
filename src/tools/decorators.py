@@ -3,9 +3,13 @@
 
 import functools
 import logging
+import time
 from typing import Any, Callable, Type, TypeVar
 
+from src.utils.enhanced_logger import get_enhanced_logger, console_print
+
 logger = logging.getLogger(__name__)
+enhanced_logger = get_enhanced_logger('tools.decorators')
 
 T = TypeVar("T")
 
@@ -48,18 +52,99 @@ class LoggedToolMixin:
         """Helper method to log tool operations."""
         tool_name = self.__class__.__name__.replace("Logged", "")
         params = ", ".join(
-            [*(str(arg) for arg in args), *(f"{k}={v}" for k, v in kwargs.items())]
+            [*(str(arg)[:100] for arg in args), *(f"{k}={str(v)[:50]}" for k, v in kwargs.items())]
         )
         logger.debug(f"Tool {tool_name}.{method_name} called with parameters: {params}")
 
     def _run(self, *args: Any, **kwargs: Any) -> Any:
         """Override _run method to add logging."""
-        self._log_operation("_run", *args, **kwargs)
-        result = super()._run(*args, **kwargs)
-        logger.debug(
-            f"Tool {self.__class__.__name__.replace('Logged', '')} returned: {result}"
+        tool_name = self.__class__.__name__.replace("Logged", "")
+        start_time = time.time()
+        
+        # 记录工具调用开始
+        query = args[0] if args else kwargs.get('query', '')
+        enhanced_logger.logger.info(f"🔍 TOOL_CALL_START | {tool_name} | 开始检索")
+        console_print(
+            f"\033[32m[开始检索] 工具: {tool_name}\033[0m \033[35m| 查询: '{str(query)[:50]}...'\033[0m",
+            level=logging.INFO
         )
-        return result
+        
+        self._log_operation("_run", *args, **kwargs)
+        
+        try:
+            result = super()._run(*args, **kwargs)
+            duration = time.time() - start_time
+            
+            # 解析结果数量
+            result_count = 0
+            if isinstance(result, list):
+                result_count = len(result)
+            elif isinstance(result, str):
+                # 对于返回字符串的工具，尝试估算内容长度
+                result_count = len(result) if result else 0
+            
+            # 记录工具调用结果
+            enhanced_logger.logger.info(
+                f"✅ TOOL_CALL_END | {tool_name} | 检索完成 | "
+                f"耗时: {duration:.2f}s | 结果数: {result_count}"
+            )
+            
+            # 打印检索结果摘要
+            if isinstance(result, list) and result:
+                console_print(
+                    f"\033[32m[检索完成] 工具: {tool_name}\033[0m "
+                    f"\033[35m| 返回 {result_count} 条结果 | 耗时: {duration:.2f}s\033[0m",
+                    level=logging.INFO
+                )
+                
+                # DEBUG级别打印详细结果
+                for i, item in enumerate(result[:3]):  # 只打印前3条
+                    if isinstance(item, dict):
+                        title = item.get('title', item.get('url', '未知'))
+                        content = item.get('content', '')
+                        content_preview = content[:60] if content else '无内容'
+                        console_print(
+                            f"\033[32m  [{i+1}] {title}\033[0m",
+                            level=logging.DEBUG
+                        )
+                        console_print(
+                            f"\033[35m      {content_preview}...\033[0m",
+                            level=logging.DEBUG
+                        )
+            elif isinstance(result, str) and result:
+                result_preview = result[:100] if len(result) > 100 else result
+                console_print(
+                    f"\033[32m[检索完成] 工具: {tool_name}\033[0m "
+                    f"\033[35m| 返回文本长度: {len(result)} | 耗时: {duration:.2f}s\033[0m",
+                    level=logging.INFO
+                )
+                console_print(
+                    f"\033[35m  内容预览: {result_preview}...\033[0m",
+                    level=logging.DEBUG
+                )
+            else:
+                console_print(
+                    f"\033[32m[检索完成] 工具: {tool_name}\033[0m "
+                    f"\033[35m| 无结果返回 | 耗时: {duration:.2f}s\033[0m",
+                    level=logging.INFO
+                )
+            
+            logger.debug(
+                f"Tool {tool_name} returned: {str(result)[:200]}..."
+            )
+            return result
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            enhanced_logger.logger.error(
+                f"❌ TOOL_CALL_ERROR | {tool_name} | 检索失败 | "
+                f"耗时: {duration:.2f}s | 错误: {str(e)}"
+            )
+            console_print(
+                f"\033[31m[检索失败] 工具: {tool_name} | 错误: {str(e)}\033[0m",
+                level=logging.ERROR
+            )
+            raise
 
 
 def create_logged_tool(base_tool_class: Type[T]) -> Type[T]:
