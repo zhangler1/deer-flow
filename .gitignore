@@ -13,7 +13,7 @@ static/browser_history/*.gif
 # Virtual environments
 .venv
 venv/
-
+patch*
 # Environment variables
 
 
