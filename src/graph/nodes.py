@@ -37,12 +37,11 @@ enhanced_logger = get_enhanced_logger('graph.nodes')
 
 @tool
 def handoff_to_planner(
-    research_topic: Annotated[str, "The topic of the research task to be handed off."],
-    locale: Annotated[str, "The user's detected language locale (e.g., en-US, zh-CN)."],
+    research_topic: Annotated[str, "要移交的研究任务主题"],
+    locale: Annotated[str, "用户检测到的语言区域设置（例如：en-US, zh-CN）"],
 ):
-    """Handoff to planner agent to do plan."""
-    # This tool is not returning anything: we're just using it
-    # as a way for LLM to signal that it needs to hand off to planner agent
+    """移交给规划智能体进行计划制定"""
+    # 此工具不返回任何内容：我们只是用它作为LLM信号表示需要移交给规划智能体
     return
 
 
@@ -100,7 +99,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
 def planner_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["human_feedback", "reporter"]]:
-    """Planner node that generate the full plan."""
+    """生成完整计划的规划节点"""
     start_time = time.time()
     enhanced_logger.logger.info(f"🔄 NODE_ENTRY | planner | 开始执行计划生成节点")
     
@@ -114,7 +113,7 @@ def planner_node(
     except Exception as e:
         enhanced_logger.logger.error(f"Failed to apply prompt template: {e}")
         # 使用默认消息
-        messages = [HumanMessage(content=f"Plan for: {state.get('research_topic', 'Unknown topic')}")]
+        messages = [HumanMessage(content=f"为以下主题制定计划：{state.get('research_topic', '未知主题')}")]
 
     if state.get("enable_background_investigation") and state.get(
         "background_investigation_results"
@@ -123,7 +122,7 @@ def planner_node(
             {
                 "role": "user",
                 "content": (
-                    "background investigation results of user query:\n"
+                    "用户查询的背景调研结果：\n"
                     + state["background_investigation_results"]
                     + "\n"
                 ),
@@ -423,7 +422,7 @@ def human_feedback_node(
 def coordinator_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["planner", "background_investigator", "__end__"]]:
-    """Coordinator node that communicate with customers."""
+    """与客户沟通的协调节点"""
     start_time = time.time()
     enhanced_logger.logger.info(f"🔄 NODE_ENTRY | coordinator | 开始执行协调节点")
     
@@ -441,7 +440,7 @@ def coordinator_node(
     except Exception as e:
         enhanced_logger.logger.error(f"Failed to apply coordinator template: {e}")
         # 使用默认消息
-        messages = [HumanMessage(content=f"Coordinate request: {state.get('research_topic', 'Unknown request')}")]
+        messages = [HumanMessage(content=f"协调请求：{state.get('research_topic', '未知请求')}")]
     
     # 打印发送给LLM的消息
     enhanced_logger.logger.info(f"🤖 COORDINATOR_LLM_INPUT | 准备调用LLM | 输入消息数: {len(messages)}")
@@ -469,7 +468,7 @@ def coordinator_node(
     logger.debug(f"Current state messages: {state['messages']}")
 
     goto = "__end__"
-    locale = state.get("locale", "en-US")  # Default locale if not specified
+    locale = state.get("locale", "zh-CN")  # 默认语言区域（如果未指定）
     research_topic = state.get("research_topic", "")
 
     # 处理response的tool_calls属性问题
@@ -549,7 +548,7 @@ def coordinator_node(
 
 
 def reporter_node(state: State, config: RunnableConfig):
-    """Reporter node that write a final report."""
+    """撰写最终报告的报告员节点"""
     start_time = time.time()
     enhanced_logger.logger.info(f"🔄 NODE_ENTRY | reporter | 开始执行报告生成节点")
     
@@ -565,16 +564,16 @@ def reporter_node(state: State, config: RunnableConfig):
         plan_title = current_plan.title
         plan_thought = current_plan.thought
     elif isinstance(current_plan, dict):
-        plan_title = current_plan.get('title', 'Unknown Plan')
-        plan_thought = current_plan.get('thought', 'Plan details not available')
+        plan_title = current_plan.get('title', '未知计划')
+        plan_thought = current_plan.get('thought', '计划详情不可用')
     else:
-        plan_title = str(current_plan) if current_plan else "Unknown Plan"
-        plan_thought = "Plan details not available"
+        plan_title = str(current_plan) if current_plan else "未知计划"
+        plan_thought = "计划详情不可用"
         
     input_ = {
         "messages": [
             HumanMessage(
-                f"# Research Requirements\n\n## Task\n\n{plan_title}\n\n## Description\n\n{plan_thought}"
+                f"# 研究要求\n\n## 任务\n\n{plan_title}\n\n## 描述\n\n{plan_thought}"
             )
         ],
         "locale": state.get("locale", "zh-CN"),  # 默认使用中文
@@ -582,10 +581,10 @@ def reporter_node(state: State, config: RunnableConfig):
     invoke_messages = apply_prompt_template("reporter", input_, configurable)
     observations = state.get("observations", [])
 
-    # Add a reminder about the new report format, citation style, and table usage
+    # 添加关于新报告格式、引用风格和表格使用的提醒
     invoke_messages.append(
         HumanMessage(
-            content=f"IMPORTANT: Structure your report according to the format in the prompt. Remember to include:\n\n1. Key Points - A bulleted list of the most important findings\n2. Overview - A brief introduction to the topic\n3. Detailed Analysis - Organized into logical sections\n4. Survey Note (optional) - For more comprehensive reports\n5. Key Citations - List all references at the end\n\nFor citations, DO NOT include inline citations in the text. Instead, place all citations in the 'Key Citations' section at the end using the format: `- [Source Title](URL)`. Include an empty line between each citation for better readability.\n\nPRIORITIZE USING MARKDOWN TABLES for data presentation and comparison. Use tables whenever presenting comparative data, statistics, features, or options. Structure tables with clear headers and aligned columns. Example table format:\n\n| Feature | Description | Pros | Cons |\n|---------|-------------|------|------|\n| Feature 1 | Description 1 | Pros 1 | Cons 1 |\n| Feature 2 | Description 2 | Pros 2 | Cons 2 |\n\n**请用{state.get('locale', 'zh-CN')}语言编写报告，并充分引用下面的研究结果。**",
+            content=f"重要提示：请按照提示词中的格式组织您的报告。记得包含：\n\n1. 关键要点 - 最重要发现的要点列表\n2. 概述 - 主题的简要介绍\n3. 详细分析 - 按逻辑部分组织\n4. 调研说明（可选）- 用于更全面的报告\n5. 主要引用 - 在末尾列出所有参考文献\n\n对于引用，不要在正文中包含内联引用。而是将所有引用放在末尾的"主要引用"部分，使用格式：`- [来源标题](URL)`。在每个引用之间包含一个空行以提高可读性。\n\n优先使用MARKDOWN表格进行数据展示和对比。在展示对比数据、统计信息、功能或选项时使用表格。使用清晰的表头和对齐的列来构建表格。示例表格格式：\n\n| 功能 | 描述 | 优点 | 缺点 |\n|------|------|------|------|\n| 功能1 | 描述1 | 优点1 | 缺点1 |\n| 功能2 | 描述2 | 优点2 | 缺点2 |\n\n**请用{state.get('locale', 'zh-CN')}语言编写报告，并充分引用下面的研究结果。**",
             name="system",
         )
     )
@@ -623,15 +622,15 @@ def reporter_node(state: State, config: RunnableConfig):
 
 
 def research_team_node(state: State):
-    """Research team node that collaborates on tasks."""
-    logger.info("Research team is collaborating on tasks.")
+    """研究团队节点，协作完成任务"""
+    logger.info("研究团队正在协作执行任务")
     pass
 
 
 async def _execute_agent_step(
     state: State, agent, agent_name: str
 ) -> Command[Literal["research_team"]]:
-    """Helper function to execute a step using the specified agent."""
+    """使用指定智能体执行步骤的辅助函数"""
     step_start_time = time.time()
     enhanced_logger.logger.info(f"🔄 AGENT_STEP_ENTRY | {agent_name} | 开始执行研究步骤")
     
@@ -650,7 +649,7 @@ async def _execute_agent_step(
     elif isinstance(current_plan, dict) and 'steps' in current_plan:
         plan_steps = current_plan['steps']
     else:
-        logger.warning("No steps found in current_plan")
+        logger.warning("在当前计划中未找到步骤")
         return Command(goto="research_team")
         
     for step in plan_steps:
@@ -662,33 +661,33 @@ async def _execute_agent_step(
 
     if not current_step:
         enhanced_logger.logger.warning(f"⚠️ STEP_NOT_FOUND | {agent_name} | 未找到未执行的步骤")
-        logger.warning("No unexecuted step found")
+        logger.warning("未找到未执行的步骤")
         return Command(goto="research_team")
 
     enhanced_logger.logger.info(f"🎯 STEP_SELECTED | {agent_name} | 正在执行: {current_step.title}")
     logger.info(f"Executing step: {current_step.title}, agent: {agent_name}")
 
-    # Format completed steps information
+    # 格式化已完成步骤信息
     completed_steps_info = ""
     if completed_steps:
-        completed_steps_info = "# Completed Research Steps\n\n"
+        completed_steps_info = "# 已完成的研究步骤\n\n"
         for i, step in enumerate(completed_steps):
-            completed_steps_info += f"## Completed Step {i + 1}: {step.title}\n\n"
+            completed_steps_info += f"## 已完成步骤 {i + 1}：{step.title}\n\n"
             completed_steps_info += f"<finding>\n{step.execution_res}\n</finding>\n\n"
 
-    # Prepare the input for the agent with completed steps info
+    # 为智能体准备包含已完成步骤信息的输入
     agent_input = {
         "messages": [
             HumanMessage(
-                content=f"# Research Topic\n\n{plan_title}\n\n{completed_steps_info}# Current Step\n\n## Title\n\n{current_step.title}\n\n## Description\n\n{current_step.description}\n\n## Locale\n\n{state.get('locale', 'en-US')}"
+                content=f"# 研究主题\n\n{plan_title}\n\n{completed_steps_info}# 当前步骤\n\n## 标题\n\n{current_step.title}\n\n## 描述\n\n{current_step.description}\n\n## 语言区域\n\n{state.get('locale', 'zh-CN')}"
             )
         ]
     }
 
-    # Add citation reminder for researcher agent
+    # 为研究智能体添加引用提醒
     if agent_name == "researcher":
         if state.get("resources"):
-            resources_info = "**The user mentioned the following resource files:**\n\n"
+            resources_info = "**用户提到了以下资源文件：**\n\n"
             for resource in state.get("resources"):
                 resources_info += f"- {resource.title} ({resource.description})\n"
 
@@ -696,18 +695,18 @@ async def _execute_agent_step(
                 HumanMessage(
                     content=resources_info
                     + "\n\n"
-                    + "You MUST use the **local_search_tool** to retrieve the information from the resource files.",
+                    + "您必须使用 **local_search_tool** 从资源文件中检索信息。",
                 )
             )
 
         agent_input["messages"].append(
             HumanMessage(
-                content="IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)",
+                content="重要提示：不要在正文中包含内联引用。而是跟踪所有来源，并在末尾使用链接引用格式包含参考文献部分。在每个引用之间包含一个空行以提高可读性。每个引用使用以下格式：\n- [来源标题](URL)\n\n- [另一个来源](URL)",
                 name="system",
             )
         )
 
-    # Invoke the agent
+    # 调用智能体
     default_recursion_limit = 25
     try:
         env_value_str = os.getenv("AGENT_RECURSION_LIMIT", str(default_recursion_limit))
@@ -715,18 +714,18 @@ async def _execute_agent_step(
 
         if parsed_limit > 0:
             recursion_limit = parsed_limit
-            logger.info(f"Recursion limit set to: {recursion_limit}")
+            logger.info(f"递归限制设置为：{recursion_limit}")
         else:
             logger.warning(
-                f"AGENT_RECURSION_LIMIT value '{env_value_str}' (parsed as {parsed_limit}) is not positive. "
-                f"Using default value {default_recursion_limit}."
+                f"AGENT_RECURSION_LIMIT 值 '{env_value_str}' (解析为 {parsed_limit}) 不是正数。"
+                f"使用默认值 {default_recursion_limit}。"
             )
             recursion_limit = default_recursion_limit
     except ValueError:
         raw_env_value = os.getenv("AGENT_RECURSION_LIMIT")
         logger.warning(
-            f"Invalid AGENT_RECURSION_LIMIT value: '{raw_env_value}'. "
-            f"Using default value {default_recursion_limit}."
+            f"无效的 AGENT_RECURSION_LIMIT 值：'{raw_env_value}'。"
+            f"使用默认值 {default_recursion_limit}。"
         )
         recursion_limit = default_recursion_limit
 
@@ -778,21 +777,21 @@ async def _setup_and_execute_agent_step(
     agent_type: str,
     default_tools: list,
 ) -> Command[Literal["research_team"]]:
-    """Helper function to set up an agent with appropriate tools and execute a step.
+    """设置智能体并使用适当工具执行步骤的辅助函数
 
-    This function handles the common logic for both researcher_node and coder_node:
-    1. Configures MCP servers and tools based on agent type
-    2. Creates an agent with the appropriate tools or uses the default agent
-    3. Executes the agent on the current step
+    此函数处理 researcher_node 和 coder_node 的通用逻辑：
+    1. 根据智能体类型配置 MCP 服务器和工具
+    2. 使用适当的工具创建智能体或使用默认智能体
+    3. 在当前步骤上执行智能体
 
-    Args:
-        state: The current state
-        config: The runnable config
-        agent_type: The type of agent ("researcher" or "coder")
-        default_tools: The default tools to add to the agent
+    参数：
+        state: 当前状态
+        config: 可运行配置
+        agent_type: 智能体类型（"researcher" 或 "coder"）
+        default_tools: 要添加到智能体的默认工具
 
-    Returns:
-        Command to update state and go to research_team
+    返回：
+        Command 对象，用于更新状态并转到 research_team
     """
     setup_start_time = time.time()
     enhanced_logger.logger.info(f"🔄 AGENT_SETUP_ENTRY | {agent_type} | 开始配置智能体")
@@ -854,7 +853,7 @@ async def _setup_and_execute_agent_step(
 async def researcher_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["research_team"]]:
-    """Researcher node that do research"""
+    """执行研究任务的研究员节点"""
     start_time = time.time()
     enhanced_logger.logger.info(f"🔄 NODE_ENTRY | researcher | 开始执行研究节点")
     
@@ -906,8 +905,8 @@ async def researcher_node(
 async def coder_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["research_team"]]:
-    """Coder node that do code analysis."""
-    logger.info("Coder node is coding.")
+    """执行代码分析的编码员节点"""
+    logger.info("编码员节点正在编写代码")
     return await _setup_and_execute_agent_step(
         state,
         config,
