@@ -1,0 +1,50 @@
+{
+  "comment": "自定义脱敏规则配置文件",
+  "description": "定义字段名与脱敏类型的映射关系",
+  
+  "rules": {
+    "客户姓名": "name",
+    "customer_name": "name",
+    "real_name": "name",
+    "真实姓名": "name",
+    "联系人": "name",
+    
+    "手机号码": "phone",
+    "mobile_phone": "phone",
+    "contact_phone": "phone",
+    "联系电话": "phone",
+    "备用电话": "phone",
+    
+    "电子邮箱": "email",
+    "user_email": "email",
+    "contact_email": "email",
+    "邮件地址": "email",
+    
+    "身份证号码": "id_card",
+    "identity_number": "id_card",
+    "id_number": "id_card",
+    "证件号码": "id_card",
+    
+    "银行账号": "bank_card",
+    "account_number": "bank_card",
+    "card_no": "bank_card",
+    "账户号码": "bank_card",
+    
+    "详细地址": "address",
+    "home_address": "address",
+    "work_address": "address",
+    "shipping_address": "address",
+    "收货地址": "address",
+    "公司地址": "address",
+    
+    "IP地址": "ip",
+    "server_ip": "ip",
+    "client_ip": "ip",
+    "登录IP": "ip",
+    
+    "用户ID": "hash",
+    "user_id": "hash",
+    "openid": "hash",
+    "session_id": "hash"
+  }
+}
