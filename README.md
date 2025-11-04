@@ -42,6 +42,7 @@ In this demo, we showcase how to use DeerFlow to:
 ## 📑 Table of Contents
 
 - [🚀 Quick Start](#quick-start)
+- [📖 API Documentation](#api-documentation)
 - [🌟 Features](#features)
 - [🏗️ Architecture](#architecture)
 - [🛠️ Development](#development)
@@ -147,6 +148,44 @@ bootstrap.bat -d
 Open your browser and visit [`http://localhost:3000`](http://localhost:3000) to explore the web UI.
 
 Explore more details in the [`web`](./web/) directory.
+
+## API Documentation
+
+DeerFlow provides comprehensive REST API interfaces for programmatic access. Perfect for integrating into your own applications!
+
+### 📚 Documentation
+
+- **[Complete API Reference](./docs/API_REFERENCE.md)** - Full documentation with examples
+- **[Quick Reference Card](./docs/API_QUICK_REFERENCE.md)** - One-page cheat sheet
+- **[API Testing Guide](./docs/API_TESTING_GUIDE.md)** - Testing tools and examples
+- **[Documentation Index](./docs/README.md)** - Browse all documentation
+
+### 🚀 Quick Test
+
+```bash
+# Interactive test tool
+./test_all_apis.sh
+
+# Run all tests
+./test_all_apis.sh all
+
+# Test specific endpoints
+curl -X POST http://localhost:8000/api/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+### 🎯 Core Endpoints
+
+| Endpoint | Description | Documentation |
+|----------|-------------|---------------|
+| `/api/chat/stream` | Main streaming chat interface with intelligent routing | [Details](./docs/API_REFERENCE.md#1-流式聊天接口-apichatstream) |
+| `/api/research/simple/stream` | Simplified research interface | [Details](./docs/API_REFERENCE.md#2-简化流式研究接口-apiresearchsimplestream) |
+| `/api/research/simple/stream/openai` | OpenAI-compatible streaming | [Details](./docs/API_REFERENCE.md#3-openai-兼容流式接口-apiresearchsimplestreamopenai) |
+| `/api/ppt/generate` | Generate PowerPoint presentations | [Details](./docs/API_REFERENCE.md#1-ppt-生成接口-apipptgenerate) |
+| `/api/prompt/enhance` | Enhance user prompts | [Details](./docs/API_REFERENCE.md#2-提示词增强接口-apipromptenhance) |
+
+For complete API documentation, see [docs/API_REFERENCE.md](./docs/API_REFERENCE.md).
 
 ## Supported Search Engines
 
