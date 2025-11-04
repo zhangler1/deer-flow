@@ -16,14 +16,14 @@ enhanced_logger = get_enhanced_logger('graph.classifier')
 
 class RouteDecision(BaseModel):
     """路由决策模型"""
-    path: Literal["simple_qa", "deep_research", "department_specific"] = Field(
-        description="路由路径: simple_qa(简单问答), deep_research(深度研究), department_specific(部门专用)"
+    path: Literal["direct_answer", "simple_search", "deep_research", "domain_knowledge"] = Field(
+        description="路由路径: direct_answer(直接回答), simple_search(简单检索), deep_research(深度研究), domain_knowledge(领域知识)"
     )
-    complexity: Literal["simple", "medium", "complex"] = Field(
-        description="问题复杂度: simple(简单), medium(中等), complex(复杂)"
+    complexity: Literal["simple", "medium", "complex", "expert"] = Field(
+        description="问题复杂度: simple(简单通用), medium(适中专业), complex(复杂分散), expert(专家集中)"
     )
-    department_match: bool = Field(
-        description="是否需要部门专用处理"
+    needs_search: bool = Field(
+        description="是否需要外部检索"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
@@ -55,83 +55,100 @@ def classify_request(
         f"🔍 CLASSIFIER_START | 查询: '{query[:50]}...' | 部门: {department}"
     )
     
-    # 如果未启用智能路由，默认使用深度研究路径
+    # 如果未启用智能路由，默认使用简单检索路径
     if not enable_smart_routing:
-        enhanced_logger.logger.info("⚠️ 智能路由未启用，使用默认简单问答路径")
+        enhanced_logger.logger.info("⚠️ 智能路由未启用，使用默认简单检索路径")
         return RouteDecision(
-            path="simple_qa",
+            path="simple_search",
             complexity="medium",
-            department_match=False,
+            needs_search=True,
             confidence=1.0,
-            reasoning="智能路由未启用，使用默认路径"
+            reasoning="智能路由未启用，使用默认主流路径"
         )
     
     # 构建分类提示词
-    classification_prompt = f"""你是一个智能路由分类器。分析用户的查询请求，并决定最合适的处理路径。
+    classification_prompt = f"""你是一个银行业务智能路由分类器。分析用户的查询请求，并决定最合适的处理路径。
 
-**用户部门**: {department}
 **用户查询**: {query}
 
 请根据以下规则进行精确分类:
 
-## 1. 简单问答 (simple_qa)
+## 1. 直接回答 (direct_answer)
 适用场景:
-- ✅ 事实性问题，可通过单次搜索回答
-- ✅ 定义、解释类问题（如"什么是..."、"解释..."）
-- ✅ 简单计算或数据查询
-- ✅ 简短的操作指导（如"如何..."单步操作）
-- ✅ 问题长度通常较短（<30字）
+- ✅ 通用常识性问题，不需要外部检索
+- ✅ 基础概念、定义类问题（如"什么是汽车"、"什么是互联网"）
+- ✅ 简单数学计算、日期时间查询
+- ✅ 非银行业务相关的通用知识
+- ✅ LLM训练数据中包含的基础知识
 
 示例:
-- "什么是人工智能?"
-- "Python如何定义函数?"
-- "今天的日期是?"
-- "GDP的全称是什么?"
+- "什么是汽车?"
+- "地球有多大?"
+- "1+1等于几?"
+- "Python是什么编程语言?"
 
-## 2. 深度研究 (deep_research)
+## 2. 简单检索 (simple_search) - **主流路径，默认选择**
 适用场景:
-- ✅ 需要多步骤分析的复杂问题
-- ✅ 需要综合多个来源信息
-- ✅ 研究性、分析性、对比性问题
-- ✅ 需要生成详细报告
-- ✅ 趋势分析、影响评估类问题
+- ✅ 银行业务相关的常规问题
+- ✅ 金融产品介绍、业务流程查询
+- ✅ 专业度适中，主流业务知识
+- ✅ 单次检索即可获得答案
+- ✅ 信息相对集中，不需要多源对比
 
 示例:
-- "分析AI在医疗行业的应用趋势和未来发展"
-- "对比React、Vue、Angular三种框架的优劣"
-- "研究区块链技术在金融领域的应用现状"
-- "评估新能源汽车市场的发展前景"
+- "信用卡如何申请?"
+- "个人贷款需要什么条件?"
+- "网上银行如何开通?"
+- "手机银行转账限额是多少?"
 
-## 3. 部门专用 (department_specific)
+## 3. 深度研究 (deep_research)
 适用场景:
-- ✅ 与特定部门高度相关的专业问题
-- ✅ 需要部门特定知识库或工具
-- ✅ 部门内部流程、规范相关
-
-部门识别:
-- **tech/技术部**: 代码分析、系统架构、技术方案、算法、数据库、API设计
-- **marketing/市场部**: 市场调研、竞品分析、营销策略、用户研究、推广方案
-- **finance/财务部**: 财务分析、成本核算、预算编制、财务报表、投资分析
+- ✅ 需要多维度分析的复杂问题
+- ✅ 需要综合多个来源的信息
+- ✅ 趋势分析、对比研究类问题
+- ✅ 知识比较分散，需要多次检索
+- ✅ 研究性、分析性问题
 
 示例:
-- tech: "设计一个用户认证系统的数据库架构"
-- marketing: "分析竞品的营销策略和市场定位"
-- finance: "计算项目的投资回报率和成本效益"
+- "分析金融科技对传统银行的影响趋势"
+- "对比国内外数字货币政策的异同"
+- "研究普惠金融在农村地区的发展现状"
+- "评估开放银行API的安全风险"
+
+## 4. 领域知识 (domain_knowledge)
+适用场景:
+- ✅ 高度专业化的银行内部知识
+- ✅ 特定产品规则、内部流程
+- ✅ 专业术语、监管要求
+- ✅ 知识高度集中但专业性强
+- ✅ 需要特定领域知识库
+
+示例:
+- "交通银行沃德财富卡的积分规则"
+- "理财产品风险评级R3是什么标准?"
+- "SWIFT报文MT103的字段说明"
+- "反洗钱可疑交易监测规则"
 
 ## 分类规则总结
-1. **优先级**: 部门专用 > 深度研究 > 简单问答
-2. **部门匹配**: 如果查询包含部门关键词且department不是general，考虑department_specific
+1. **优先级**: 直接回答 < 简单检索(主流) < 深度研究 < 领域知识
+2. **默认原则**: 有疑问时选择"simple_search"（简单检索）
 3. **复杂度判断**:
-   - simple: 单一事实、定义、简单操作
-   - medium: 需要一定分析但不复杂
-   - complex: 多维度分析、研究性问题
-4. **置信度**: 
+   - simple: 通用常识，不需检索
+   - medium: 主流业务，单次检索
+   - complex: 分析研究，多次检索
+   - expert: 专业知识，领域检索
+4. **检索判断**:
+   - direct_answer: needs_search = false
+   - simple_search: needs_search = true
+   - deep_research: needs_search = true
+   - domain_knowledge: needs_search = true
+5. **置信度**: 
    - 0.9-1.0: 非常明确
    - 0.7-0.9: 较为明确
-   - 0.5-0.7: 一般明确
-   - <0.5: 不太确定
+   - 0.5-0.7: 一般明确（默认simple_search）
+   - <0.5: 不确定（默认simple_search）
 
-请提供你的分类决策，包括路径、复杂度、部门匹配、置信度和理由。
+请提供你的分类决策，包括路径、复杂度、是否需要检索、置信度和理由。
 """
 
     try:
@@ -170,13 +187,13 @@ def classify_request(
         return _fallback_classification(query, department, "")
 
 
-def _fallback_classification(query: str, department: str, llm_response: str = "") -> RouteDecision:
+def _fallback_classification(query: str, department: str = "general", llm_response: str = "") -> RouteDecision:
     """
     备用分类方法，使用基于规则的启发式策略
     
     Args:
         query: 用户查询
-        department: 用户部门
+        department: 用户部门（不再使用）
         llm_response: LLM的响应（如果有）
         
     Returns:
@@ -186,84 +203,111 @@ def _fallback_classification(query: str, department: str, llm_response: str = ""
     query_lower = query.lower()
     query_length = len(query)
     
-    # 简单问答的关键词
-    simple_keywords = [
-        "什么是", "是什么", "定义", "解释", "how to", "what is",
-        "如何", "怎么", "为什么", "why", "when", "where"
+    # 直接回答的关键词（通用常识）
+    direct_keywords = [
+        "什么是汽车", "什么是互联网", "什么是python",
+        "地球有多大", "1+1", "汽车是什么",
+        "what is car", "what is internet"
+    ]
+    
+    # 简单检索的关键词（银行业务主流）
+    simple_search_keywords = [
+        "信用卡", "贷款", "网上银行", "手机银行",
+        "转账", "存款", "取款", "理财",
+        "如何申请", "如何开通", "需要什么条件",
+        "产品介绍", "业务流程", "操作步骤"
     ]
     
     # 深度研究的关键词
     research_keywords = [
         "分析", "研究", "对比", "比较", "评估", "趋势",
-        "影响", "发展", "现状", "未来", "analyze", "research",
-        "compare", "trend", "impact"
+        "影响", "发展", "现状", "未来", 
+        "analyze", "research", "compare", "trend", "impact"
     ]
     
-    # 部门关键词
-    department_keywords = {
-        "tech": ["代码", "架构", "算法", "数据库", "API", "系统", "技术", "code", "architecture"],
-        "marketing": ["市场", "营销", "竞品", "用户", "推广", "marketing", "promotion"],
-        "finance": ["财务", "成本", "预算", "报表", "投资", "finance", "budget", "cost"]
-    }
+    # 领域知识关键词（银行专业）
+    domain_keywords = [
+        "积分规则", "风险评级", "swift报文", "mt103",
+        "反洗钱", "监测规则", "内部流程", "监管要求",
+        "产品规则", "专业术语", "技术标准"
+    ]
     
-    # 判断是否匹配部门关键词
-    department_match = False
-    if department in department_keywords:
-        for keyword in department_keywords[department]:
-            if keyword in query_lower:
-                department_match = True
-                break
+    # 检查直接回答（通用常识）
+    for keyword in direct_keywords:
+        if keyword in query_lower:
+            return RouteDecision(
+                path="direct_answer",
+                complexity="simple",
+                needs_search=False,
+                confidence=0.8,
+                reasoning=f"查询包含通用常识关键词，不需要外部检索"
+            )
     
-    # 判断复杂度和路径
-    if department != "general" and department_match:
-        # 部门专用路径
+    # 非银行业务相关的通用知识（如汽车、地理等）
+    non_banking_keywords = ["汽车", "地球", "历史", "科学", "数学", "物理"]
+    is_non_banking = any(kw in query_lower for kw in non_banking_keywords)
+    is_banking_related = any(kw in query_lower for kw in simple_search_keywords + domain_keywords)
+    
+    if is_non_banking and not is_banking_related and query_length < 30:
         return RouteDecision(
-            path="department_specific",
-            complexity="medium",
-            department_match=True,
-            confidence=0.7,
-            reasoning=f"查询包含{department}部门的专业关键词"
-        )
-    
-    # 检查是否为简单问答
-    is_simple = False
-    for keyword in simple_keywords:
-        if keyword in query_lower and query_length < 50:
-            is_simple = True
-            break
-    
-    if is_simple:
-        return RouteDecision(
-            path="simple_qa",
+            path="direct_answer",
             complexity="simple",
-            department_match=False,
+            needs_search=False,
             confidence=0.75,
-            reasoning="查询包含简单问答关键词且长度较短"
+            reasoning="非银行业务相关的通用知识，使用直接回答"
         )
     
-    # 检查是否为深度研究
-    is_research = False
+    # 检查领域知识（高度专业）
+    for keyword in domain_keywords:
+        if keyword in query_lower:
+            return RouteDecision(
+                path="domain_knowledge",
+                complexity="expert",
+                needs_search=True,
+                confidence=0.8,
+                reasoning=f"查询包含专业领域关键词，需要专业知识库"
+            )
+    
+    # 检查深度研究
     for keyword in research_keywords:
         if keyword in query_lower:
-            is_research = True
-            break
+            return RouteDecision(
+                path="deep_research",
+                complexity="complex",
+                needs_search=True,
+                confidence=0.75,
+                reasoning="查询包含研究分析关键词，需要深度研究"
+            )
     
-    if is_research or query_length > 50:
+    # 检查简单检索（主流路径）
+    for keyword in simple_search_keywords:
+        if keyword in query_lower:
+            return RouteDecision(
+                path="simple_search",
+                complexity="medium",
+                needs_search=True,
+                confidence=0.8,
+                reasoning="查询包含业务关键词，使用简单检索"
+            )
+    
+    # 根据问题长度判断
+    if query_length > 80:
+        # 长问题，可能是深度研究
         return RouteDecision(
             path="deep_research",
-            complexity="complex" if query_length > 80 else "medium",
-            department_match=False,
-            confidence=0.7,
-            reasoning="查询包含研究分析关键词或长度较长"
+            complexity="complex",
+            needs_search=True,
+            confidence=0.65,
+            reasoning="问题长度较长，可能需要深度研究"
         )
     
-    # 默认使用深度研究路径
+    # 默认：简单检索（主流路径）
     return RouteDecision(
-        path="deep_research",
+        path="simple_search",
         complexity="medium",
-        department_match=False,
+        needs_search=True,
         confidence=0.6,
-        reasoning="无明确特征，使用默认深度研究路径"
+        reasoning="无明确特征，使用默认主流路径（简单检索）"
     )
 
 

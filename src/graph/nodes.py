@@ -50,14 +50,15 @@ def handoff_to_planner(
 
 def router_node(
     state: State, config: RunnableConfig
-) -> Command[Literal["simple_qa_node", "coordinator", "department_node"]]:
+) -> Command[Literal["direct_answer_node", "simple_search_node", "coordinator", "domain_knowledge_node"]]:
     """
     智能路由节点，分析用户请求并决定处理路径
     
     根据用户查询和部门信息，自动选择最优处理路径：
-    - simple_qa_node: 简单问答，快速响应
-    - coordinator: 深度研究路径（原有流程）
-    - department_node: 部门专用处理
+    - direct_answer_node: 直接回答，通用知识（不走检索）
+    - simple_search_node: 简单检索，主流业务（单次检索）
+    - coordinator: 深度研究路径（多轮检索研究）
+    - domain_knowledge_node: 领域知识，专业知识库
     """
     start_time = time.time()
     enhanced_logger.logger.info("🔀 NODE_ENTRY | router | 开始智能路由分析")
@@ -85,7 +86,7 @@ def router_node(
     enhanced_logger.logger.info(
         f"🎯 ROUTING_DECISION | 路径: {route_decision.path} | "
         f"复杂度: {route_decision.complexity} | "
-        f"部门匹配: {route_decision.department_match} | "
+        f"需要检索: {route_decision.needs_search} | "
         f"置信度: {route_decision.confidence:.2f} | "
         f"理由: {route_decision.reasoning}"
     )
@@ -102,12 +103,173 @@ def router_node(
     )
     
     # 根据决策路由到不同节点
-    if route_decision.path == "simple_qa":
-        return Command(update=state_update, goto="simple_qa_node")
-    elif route_decision.path == "department_specific":
-        return Command(update=state_update, goto="department_node")
-    else:  # deep_research
+    if route_decision.path == "direct_answer":
+        return Command(update=state_update, goto="direct_answer_node")
+    elif route_decision.path == "simple_search":
+        return Command(update=state_update, goto="simple_search_node")
+    elif route_decision.path == "deep_research":
         return Command(update=state_update, goto="coordinator")
+    else:  # domain_knowledge
+        return Command(update=state_update, goto="domain_knowledge_node")
+
+
+def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
+    """
+    直接回答节点 - 不走检索，使用LLM的通用知识直接回答
+    
+    适用于通用常识性问题，如基础概念、定义等
+    """
+    start_time = time.time()
+    enhanced_logger.logger.info("🔄 NODE_ENTRY | direct_answer | 开始直接回答处理")
+    
+    configurable = Configuration.from_runnable_config(config)
+    query = state.get("research_topic") or (
+        state["messages"][-1].content if state.get("messages") else ""
+    )
+    
+    enhanced_logger.logger.info(f"❓ DIRECT_ANSWER_QUERY | '{query}'")
+    
+    try:
+        # 直接使用LLM回答，不调用检索工具
+        answer_prompt = f"""你是一个专业的知识助手。请用简洁准确的语言回答以下通用知识问题。
+
+**用户问题**: {query}
+
+**回答要求**:
+1. 直接回答问题，不超过300字
+2. 基于你的通用知识提供准确信息
+3. 使用简洁清晰的语言
+4. 如果是定义类问题，可以分点说明
+5. 不需要引用外部资料来源
+
+请提供你的回答：
+"""
+        
+        # 生成回答
+        llm_start = time.time()
+        llm = get_llm_by_type("basic")
+        response = llm.invoke([{"role": "user", "content": answer_prompt}])
+        answer = response.content if hasattr(response, 'content') else str(response)
+        llm_duration = time.time() - llm_start
+        
+        enhanced_logger.logger.info(
+            f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
+        )
+        
+        duration = time.time() - start_time
+        enhanced_logger.logger.info(
+            f"✅ NODE_EXIT | direct_answer | 节点执行完成 | 总耗时: {duration:.2f}s"
+        )
+        
+        return Command(
+            update={
+                "final_report": answer,
+                "messages": [AIMessage(content=answer, name="direct_answer_assistant")]
+            },
+            goto="__end__"
+        )
+        
+    except Exception as e:
+        logger.error(f"直接回答处理失败: {e}")
+        enhanced_logger.logger.error(f"❌ DIRECT_ANSWER_ERROR | {str(e)}")
+        
+        # 失败时返回错误信息
+        error_msg = f"抱歉，在处理您的问题时遇到了错误。请尝试重新提问。\n\n错误信息: {str(e)}"
+        return Command(
+            update={
+                "final_report": error_msg,
+                "messages": [AIMessage(content=error_msg, name="direct_answer_assistant")]
+            },
+            goto="__end__"
+        )
+
+
+def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
+    """
+    简单检索节点 - 单次搜索并直接回答（主流路径）
+    
+    适用于银行业务的常规问题，通过一次搜索快速提供答案
+    """
+    start_time = time.time()
+    enhanced_logger.logger.info("🔄 NODE_ENTRY | simple_search | 开始简单检索处理")
+    
+    configurable = Configuration.from_runnable_config(config)
+    query = state.get("research_topic") or (
+        state["messages"][-1].content if state.get("messages") else ""
+    )
+    
+    enhanced_logger.logger.info(f"❓ SIMPLE_SEARCH_QUERY | '{query}'")
+    
+    try:
+        # 单次搜索获取信息（为银行业务优化）
+        search_start = time.time()
+        search_results = get_web_search_tool(
+            3,  # 简单检索只需少量结果
+            configurable.search_engine,
+            configurable.custom_search_repository
+        ).invoke(query)
+        search_duration = time.time() - search_start
+        
+        enhanced_logger.logger.info(
+            f"🔍 SEARCH_COMPLETE | 结果数: {len(search_results) if isinstance(search_results, list) else '未知'} | "
+            f"耗时: {search_duration:.2f}s"
+        )
+        
+        # 构建回答提示词（为银行业务场景优化）
+        answer_prompt = f"""你是一个专业的银行业务知识助手。请基于以下搜索结果，简洁准确地回答用户问题。
+
+**用户问题**: {query}
+
+**搜索结果**:
+{json.dumps(search_results, ensure_ascii=False, indent=2)}
+
+**回答要求**:
+1. 直接回答问题，不超过300字
+2. 基于搜索结果提供准确信息
+3. 使用简洁清晰的语言，适合银行业务场景
+4. 必要时可以分点列出
+5. 如果信息不足，请说明
+
+请提供你的回答：
+"""
+        
+        # 生成回答
+        llm_start = time.time()
+        llm = get_llm_by_type("basic")
+        response = llm.invoke([{"role": "user", "content": answer_prompt}])
+        answer = response.content if hasattr(response, 'content') else str(response)
+        llm_duration = time.time() - llm_start
+        
+        enhanced_logger.logger.info(
+            f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
+        )
+        
+        duration = time.time() - start_time
+        enhanced_logger.logger.info(
+            f"✅ NODE_EXIT | simple_search | 节点执行完成 | 总耗时: {duration:.2f}s"
+        )
+        
+        return Command(
+            update={
+                "final_report": answer,
+                "messages": [AIMessage(content=answer, name="simple_search_assistant")]
+            },
+            goto="__end__"
+        )
+        
+    except Exception as e:
+        logger.error(f"简单检索处理失败: {e}")
+        enhanced_logger.logger.error(f"❌ SIMPLE_SEARCH_ERROR | {str(e)}")
+        
+        # 失败时返回错误信息
+        error_msg = f"抱歉，在处理您的问题时遇到了错误。请尝试重新提问或使用深度研究模式。\n\n错误信息: {str(e)}"
+        return Command(
+            update={
+                "final_report": error_msg,
+                "messages": [AIMessage(content=error_msg, name="simple_search_assistant")]
+            },
+            goto="__end__"
+        )
 
 
 def simple_qa_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
@@ -196,6 +358,98 @@ def simple_qa_node(state: State, config: RunnableConfig) -> Command[Literal["__e
             },
             goto="__end__"
         )
+
+
+def domain_knowledge_node(
+    state: State, config: RunnableConfig
+) -> Command[Literal["__end__"]]:
+    """
+    领域知识节点 - 使用专业知识库处理高度专业化的银行业务问题
+    
+    适用于高度专业化但知识集中的银行内部知识，如特定产品规则、监管要求等
+    """
+    start_time = time.time()
+    enhanced_logger.logger.info("🔄 NODE_ENTRY | domain_knowledge | 开始领域知识处理")
+    
+    configurable = Configuration.from_runnable_config(config)
+    query = state.get("research_topic") or (
+        state["messages"][-1].content if state.get("messages") else ""
+    )
+    resources = state.get("resources", [])
+    
+    enhanced_logger.logger.info(
+        f"🎯 DOMAIN_KNOWLEDGE_QUERY | 查询: '{query[:50]}...' | 资源数: {len(resources)}"
+    )
+    
+    try:
+        # 优先使用本地知识库
+        if resources:
+            enhanced_logger.logger.info("📚 USING_LOCAL_RESOURCES | 使用本地知识库检索")
+            retriever_tool = get_retriever_tool(resources)
+            search_results = retriever_tool.invoke(query)
+        else:
+            # 如果没有本地资源，使用网络搜索（但更针对专业内容）
+            enhanced_logger.logger.info("🌐 USING_WEB_SEARCH | 使用网络搜索（专业模式）")
+            search_results = get_web_search_tool(
+                5,  # 领域知识需要更多结果
+                configurable.search_engine,
+                configurable.custom_search_repository
+            ).invoke(query)
+        
+        enhanced_logger.logger.info(
+            f"🔍 SEARCH_COMPLETE | 结果数: {len(search_results) if isinstance(search_results, list) else '未知'}"
+        )
+        
+        # 构建专业回答提示词
+        answer_prompt = f"""你是一个专业的银行领域知识专家。请基于以下专业知识库的信息，详细准确地回答用户问题。
+
+**用户问题**: {query}
+
+**领域知识库信息**:
+{json.dumps(search_results, ensure_ascii=False, indent=2)}
+
+**回答要求**:
+1. 提供详细的专业解答，可以400-600字
+2. 基于知识库信息提供准确的专业内容
+3. 包含具体的规则、条款或技术细节
+4. 使用专业术语，但保持清晰易懂
+5. 如果信息不足或不确定，请明确说明
+6. 可以分点列出关键信息
+
+请提供你的专业解答：
+"""
+        
+        # 生成回答
+        llm_start = time.time()
+        llm = get_llm_by_type("basic")
+        response = llm.invoke([{"role": "user", "content": answer_prompt}])
+        answer = response.content if hasattr(response, 'content') else str(response)
+        llm_duration = time.time() - llm_start
+        
+        enhanced_logger.logger.info(
+            f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
+        )
+        
+        duration = time.time() - start_time
+        enhanced_logger.logger.info(
+            f"✅ NODE_EXIT | domain_knowledge | 节点执行完成 | 总耗时: {duration:.2f}s"
+        )
+        
+        return Command(
+            update={
+                "final_report": answer,
+                "messages": [AIMessage(content=answer, name="domain_knowledge_assistant")]
+            },
+            goto="__end__"
+        )
+        
+    except Exception as e:
+        logger.error(f"领域知识处理失败: {e}")
+        enhanced_logger.logger.error(f"❌ DOMAIN_KNOWLEDGE_ERROR | {str(e)}")
+        
+        # 失败时回退到简单检索
+        enhanced_logger.logger.warning("⚠️ FALLBACK_TO_SIMPLE | 领域知识处理失败，回退到简单检索")
+        return simple_qa_node(state, config)  # 暂时回退到simple_qa_node
 
 
 def department_node(
@@ -824,8 +1078,8 @@ def reporter_node(state: State, config: RunnableConfig):
     # 添加关于新报告格式、引用风格和表格使用的提醒
     invoke_messages.append(
         HumanMessage(
-            content=f"重要提示：请按照提示词中的格式组织您的报告。记得包含：\n\n1. 关键要点 - 最重要发现的要点列表\n2. 概述 - 主题的简要介绍\n3. 详细分析 - 按逻辑部分组织\n4. 调研说明（可选）- 用于更全面的报告\n5. 主要引用 - 在末尾列出所有参考文献\n\n对于引用，不要在正文中包含内联引用。而是将所有引用放在末尾的"主要引用"部分，使用格式：`- [来源标题](URL)`。在每个引用之间包含一个空行以提高可读性。\n\n优先使用MARKDOWN表格进行数据展示和对比。在展示对比数据、统计信息、功能或选项时使用表格。使用清晰的表头和对齐的列来构建表格。示例表格格式：\n\n| 功能 | 描述 | 优点 | 缺点 |\n|------|------|------|------|\n| 功能1 | 描述1 | 优点1 | 缺点1 |\n| 功能2 | 描述2 | 优点2 | 缺点2 |\n\n**请用{state.get('locale', 'zh-CN')}语言编写报告，并充分引用下面的研究结果。**",
-            name="system",
+            content=f"重要提示：请按照提示词中的格式组织您的报告。记得包含：\n\n1. 关键要点 - 最重要发现的要点列表\n2. 概述 - 主题的简要介绍\n3. 详细分析 - 按逻辑部分组织\n4. 调研说明（可选）- 用于更全面的报告\n5. 主要引用 - 在末尾列出所有参考文献\n\n对于引用，不要在正文中包含内联引用。而是将所有引用放在末尾的'主要引用'部分，使用格式：`- [来源标题](URL)`。在每个引用之间包含一个空行以提高可读性。\n\n优先使用MARKDOWN表格进行数据展示和对比。在展示对比数据、统计信息、功能或选项时使用表格。使用清晰的表头和对齐的列来构建表格。示例表格格式：\n\n| 功能 | 描述 | 优点 | 缺点 |\n|------|------|------|------|\n| 功能1 | 描述1 | 优点1 | 缺点1 |\n| 功能2 | 描述2 | 优点2 | 缺点2 |\n\n**请用{state.get('locale', 'zh-CN')}语言编写报告，并充分引用下面的研究结果。**",
+            name="system"
         )
     )
 
@@ -1162,3 +1416,26 @@ async def coder_node(
         [python_repl_tool],
     )
 
+
+# 导出所有节点函数
+__all__ = [
+    # 路由和简单路径节点
+    "router_node",
+    "direct_answer_node",
+    "simple_search_node",
+    "domain_knowledge_node",
+    "department_node",
+    
+    # 深度研究路径节点
+    "coordinator_node",
+    "background_investigation_node",
+    "planner_node",
+    "human_feedback_node",
+    "reporter_node",
+    "research_team_node",
+    "researcher_node",
+    "coder_node",
+    
+    # 辅助函数
+    "handoff_to_planner",
+]

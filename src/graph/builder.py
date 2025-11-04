@@ -18,10 +18,12 @@ from .nodes import (
     reporter_node,
     research_team_node,
     researcher_node,
-    # 新增的路由节点
+    # 新增的智能路由节点（4种路径）
     router_node,
-    simple_qa_node,
-    department_node,
+    direct_answer_node,
+    simple_search_node,
+    domain_knowledge_node,
+    department_node,  # 保留原有部门节点作为兼容
 )
 from .types import State
 
@@ -130,16 +132,21 @@ def _build_base_graph():
     # 起始节点改为router，实现智能路由
     builder.add_edge(START, "router")
     
-    # 添加路由节点
+    # 添加智能路由节点（入口节点）
     builder.add_node("router", router_node)
     
-    # 添加简单问答节点
-    builder.add_node("simple_qa_node", simple_qa_node)
+    # 添加4种路径的节点
+    # 1. 直接回答节点（通用知识，不走检索）
+    builder.add_node("direct_answer_node", direct_answer_node)
     
-    # 添加部门专用节点
-    builder.add_node("department_node", department_node)
+    # 2. 简单检索节点（主流路径，单次检索）
+    builder.add_node("simple_search_node", simple_search_node)
     
-    # 原有的深度研究路径节点
+    # 3. 领域知识节点（专业知识库）
+    builder.add_node("domain_knowledge_node", domain_knowledge_node)
+    
+    # 4. 深度研究路径（原有的复杂流程，通过coordinator进入）
+    # coordinator 是深度研究的入口
     builder.add_node("coordinator", coordinator_node)
     builder.add_node("background_investigator", background_investigation_node)
     builder.add_node("planner", planner_node)
@@ -149,6 +156,9 @@ def _build_base_graph():
     # 暂时注释掉 coder 节点
     # builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
+    
+    # 保留原有部门节点作为兼容（可选）
+    builder.add_node("department_node", department_node)
     
     # 深度研究路径的边（保持不变）
     builder.add_edge("background_investigator", "planner")
@@ -160,8 +170,10 @@ def _build_base_graph():
     )
     builder.add_edge("reporter", END)
     
-    # 简单问答和部门节点直接结束
-    builder.add_edge("simple_qa_node", END)
+    # 简单路径节点直接结束
+    builder.add_edge("direct_answer_node", END)
+    builder.add_edge("simple_search_node", END)
+    builder.add_edge("domain_knowledge_node", END)
     builder.add_edge("department_node", END)
     
     return builder
