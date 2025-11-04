@@ -18,6 +18,10 @@ from .nodes import (
     reporter_node,
     research_team_node,
     researcher_node,
+    # 新增的路由节点
+    router_node,
+    simple_qa_node,
+    department_node,
 )
 from .types import State
 
@@ -122,7 +126,20 @@ def continue_to_running_research_team(state: State):
 def _build_base_graph():
     """Build and return the base state graph with all nodes and edges."""
     builder = StateGraph(State)
-    builder.add_edge(START, "coordinator")
+    
+    # 起始节点改为router，实现智能路由
+    builder.add_edge(START, "router")
+    
+    # 添加路由节点
+    builder.add_node("router", router_node)
+    
+    # 添加简单问答节点
+    builder.add_node("simple_qa_node", simple_qa_node)
+    
+    # 添加部门专用节点
+    builder.add_node("department_node", department_node)
+    
+    # 原有的深度研究路径节点
     builder.add_node("coordinator", coordinator_node)
     builder.add_node("background_investigator", background_investigation_node)
     builder.add_node("planner", planner_node)
@@ -132,6 +149,8 @@ def _build_base_graph():
     # 暂时注释掉 coder 节点
     # builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
+    
+    # 深度研究路径的边（保持不变）
     builder.add_edge("background_investigator", "planner")
     builder.add_conditional_edges(
         "research_team",
@@ -140,6 +159,11 @@ def _build_base_graph():
         ["planner", "researcher", "reporter"],
     )
     builder.add_edge("reporter", END)
+    
+    # 简单问答和部门节点直接结束
+    builder.add_edge("simple_qa_node", END)
+    builder.add_edge("department_node", END)
+    
     return builder
 
 

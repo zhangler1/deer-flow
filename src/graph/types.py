@@ -23,3 +23,10 @@ class State(MessagesState):
     enable_background_investigation: bool = True
     background_investigation_results: str = None
     system_context: str = ""  # 系统背景上下文，会自动添加到所有查询中
+    
+    # 智能路由相关字段
+    user_department: str = "general"  # 用户部门
+    query_complexity: str = "unknown"  # 查询复杂度: simple/medium/complex
+    routing_path: str = "auto"  # 路由路径: auto/simple_qa/deep_research/department_specific
+    enable_smart_routing: bool = True  # 是否启用智能路由
+    department_context: dict = {}  # 部门特定上下文

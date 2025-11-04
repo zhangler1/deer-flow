@@ -31,6 +31,8 @@ from src.utils.enhanced_logger import get_enhanced_logger
 
 from ..config import SELECTED_SEARCH_ENGINE, SearchEngine
 from .types import State
+from .classifier import classify_request
+from .department_agents import create_department_agent, get_department_config
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes')
@@ -44,6 +46,243 @@ def handoff_to_planner(
     """移交给规划智能体进行计划制定"""
     # 此工具不返回任何内容：我们只是用它作为LLM信号表示需要移交给规划智能体
     return
+
+
+def router_node(
+    state: State, config: RunnableConfig
+) -> Command[Literal["simple_qa_node", "coordinator", "department_node"]]:
+    """
+    智能路由节点，分析用户请求并决定处理路径
+    
+    根据用户查询和部门信息，自动选择最优处理路径：
+    - simple_qa_node: 简单问答，快速响应
+    - coordinator: 深度研究路径（原有流程）
+    - department_node: 部门专用处理
+    """
+    start_time = time.time()
+    enhanced_logger.logger.info("🔀 NODE_ENTRY | router | 开始智能路由分析")
+    
+    # 提取用户信息
+    user_query = state.get("research_topic") or (
+        state["messages"][-1].content if state.get("messages") else ""
+    )
+    user_department = state.get("user_department", "general")
+    enable_smart_routing = state.get("enable_smart_routing", True)
+    
+    enhanced_logger.logger.info(
+        f"📝 ROUTER_INPUT | 查询: '{user_query[:50]}...' | 部门: {user_department} | "
+        f"智能路由: {'启用' if enable_smart_routing else '禁用'}"
+    )
+    
+    # 调用分类模型
+    route_decision = classify_request(
+        query=user_query,
+        department=user_department,
+        enable_smart_routing=enable_smart_routing
+    )
+    
+    # 记录路由决策
+    enhanced_logger.logger.info(
+        f"🎯 ROUTING_DECISION | 路径: {route_decision.path} | "
+        f"复杂度: {route_decision.complexity} | "
+        f"部门匹配: {route_decision.department_match} | "
+        f"置信度: {route_decision.confidence:.2f} | "
+        f"理由: {route_decision.reasoning}"
+    )
+    
+    # 更新状态
+    state_update = {
+        "query_complexity": route_decision.complexity,
+        "routing_path": route_decision.path,
+    }
+    
+    duration = time.time() - start_time
+    enhanced_logger.logger.info(
+        f"✅ NODE_EXIT | router | 路由决策完成 | 耗时: {duration:.2f}s"
+    )
+    
+    # 根据决策路由到不同节点
+    if route_decision.path == "simple_qa":
+        return Command(update=state_update, goto="simple_qa_node")
+    elif route_decision.path == "department_specific":
+        return Command(update=state_update, goto="department_node")
+    else:  # deep_research
+        return Command(update=state_update, goto="coordinator")
+
+
+def simple_qa_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
+    """
+    简单问答节点 - 单次搜索并直接回答
+    
+    适用于简单的事实性问题，通过一次搜索快速提供答案
+    """
+    start_time = time.time()
+    enhanced_logger.logger.info("🔄 NODE_ENTRY | simple_qa | 开始简单问答处理")
+    
+    configurable = Configuration.from_runnable_config(config)
+    query = state.get("research_topic") or (
+        state["messages"][-1].content if state.get("messages") else ""
+    )
+    
+    enhanced_logger.logger.info(f"❓ SIMPLE_QA_QUERY | '{query}'")
+    
+    try:
+        # 单次搜索获取信息
+        search_start = time.time()
+        search_results = get_web_search_tool(
+            max_results=3,  # 简单问答只需少量结果
+            search_engine=configurable.search_engine,
+            custom_search_repository=configurable.custom_search_repository
+        ).invoke(query)
+        search_duration = time.time() - search_start
+        
+        enhanced_logger.logger.info(
+            f"🔍 SEARCH_COMPLETE | 结果数: {len(search_results) if isinstance(search_results, list) else '未知'} | "
+            f"耗时: {search_duration:.2f}s"
+        )
+        
+        # 构建回答提示词
+        answer_prompt = f"""你是一个专业的知识助手。请基于以下搜索结果，简洁准确地回答用户问题。
+
+**用户问题**: {query}
+
+**搜索结果**:
+{json.dumps(search_results, ensure_ascii=False, indent=2)}
+
+**回答要求**:
+1. 直接回答问题，不超过200字
+2. 基于搜索结果提供准确信息
+3. 如果信息不足，请说明
+4. 使用简洁清晰的语言
+5. 必要时可以分点列出
+
+请提供你的回答：
+"""
+        
+        # 生成回答
+        llm_start = time.time()
+        llm = get_llm_by_type("basic")
+        response = llm.invoke([{"role": "user", "content": answer_prompt}])
+        answer = response.content if hasattr(response, 'content') else str(response)
+        llm_duration = time.time() - llm_start
+        
+        enhanced_logger.logger.info(
+            f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
+        )
+        
+        duration = time.time() - start_time
+        enhanced_logger.logger.info(
+            f"✅ NODE_EXIT | simple_qa | 节点执行完成 | 总耗时: {duration:.2f}s"
+        )
+        
+        return Command(
+            update={
+                "final_report": answer,
+                "messages": [AIMessage(content=answer, name="simple_qa_assistant")]
+            },
+            goto="__end__"
+        )
+        
+    except Exception as e:
+        logger.error(f"简单问答处理失败: {e}")
+        enhanced_logger.logger.error(f"❌ SIMPLE_QA_ERROR | {str(e)}")
+        
+        # 失败时返回错误信息
+        error_msg = f"抱歉，在处理您的问题时遇到了错误。请尝试重新提问或使用深度研究模式。\n\n错误信息: {str(e)}"
+        return Command(
+            update={
+                "final_report": error_msg,
+                "messages": [AIMessage(content=error_msg, name="simple_qa_assistant")]
+            },
+            goto="__end__"
+        )
+
+
+def department_node(
+    state: State, config: RunnableConfig
+) -> Command[Literal["__end__"]]:
+    """
+    部门专用处理节点
+    
+    根据用户所属部门，使用专用智能体和工具进行处理
+    """
+    start_time = time.time()
+    enhanced_logger.logger.info("🔄 NODE_ENTRY | department | 开始部门专用处理")
+    
+    configurable = Configuration.from_runnable_config(config)
+    department = state.get("user_department", "general")
+    query = state.get("research_topic") or (
+        state["messages"][-1].content if state.get("messages") else ""
+    )
+    resources = state.get("resources", [])
+    
+    enhanced_logger.logger.info(
+        f"🏢 DEPARTMENT_INFO | 部门: {department} | 查询: '{query[:50]}...'"
+    )
+    
+    try:
+        # 获取部门配置
+        dept_config = get_department_config(department)
+        enhanced_logger.logger.info(
+            f"📋 DEPARTMENT_CONFIG | {dept_config['name']} | 描述: {dept_config['description']}"
+        )
+        
+        # 创建部门专用智能体
+        agent_start = time.time()
+        agent = create_department_agent(
+            department=department,
+            search_engine=configurable.search_engine,
+            custom_search_repository=configurable.custom_search_repository,
+            resources=resources
+        )
+        agent_create_duration = time.time() - agent_start
+        
+        enhanced_logger.logger.info(
+            f"🤖 AGENT_CREATED | 耗时: {agent_create_duration:.2f}s"
+        )
+        
+        # 调用智能体处理请求
+        invoke_start = time.time()
+        result = agent.invoke({
+            "messages": [{"role": "user", "content": query}]
+        })
+        invoke_duration = time.time() - invoke_start
+        
+        # 提取输出
+        output = ""
+        if isinstance(result, dict) and "messages" in result:
+            last_message = result["messages"][-1]
+            output = last_message.content if hasattr(last_message, 'content') else str(last_message)
+        else:
+            output = str(result)
+        
+        enhanced_logger.logger.info(
+            f"💬 DEPARTMENT_RESPONSE | 长度: {len(output)} | 处理耗时: {invoke_duration:.2f}s"
+        )
+        
+        duration = time.time() - start_time
+        enhanced_logger.logger.info(
+            f"✅ NODE_EXIT | department | 部门专用处理完成 | 总耗时: {duration:.2f}s"
+        )
+        
+        return Command(
+            update={
+                "final_report": output,
+                "messages": [AIMessage(content=output, name=f"{dept_config['name']}_assistant")]
+            },
+            goto="__end__"
+        )
+        
+    except Exception as e:
+        logger.error(f"部门专用处理失败: {e}")
+        enhanced_logger.logger.error(f"❌ DEPARTMENT_ERROR | {str(e)}")
+        
+        # 失败时回退到简单问答
+        error_msg = f"部门专用处理失败，尝试使用通用方式回答。\n\n错误: {str(e)}"
+        enhanced_logger.logger.warning(f"⚠️ FALLBACK_TO_SIMPLE | {error_msg}")
+        
+        # 调用简单问答逻辑作为后备
+        return simple_qa_node(state, config)
 
 
 def background_investigation_node(state: State, config: RunnableConfig):
