@@ -800,9 +800,9 @@ async def _full_workflow_sse_generator(
     """
     enhanced_logger.log_step_execution(
         step_number=1,
-        step_title="完整工作流启动（SSE格式）",
+        step_title="🚀 智能研究工作流启动",
         step_type="workflow_initialization",
-        agent_name="simple_research_coordinator"
+        agent_name="workflow_orchestrator"  # 工作流协调器（非真实Agent，仅用于日志标记）
     )
     
     try:
@@ -841,9 +841,9 @@ async def _full_workflow_sse_generator(
             
         enhanced_logger.log_step_execution(
             step_number=2,
-            step_title="完整工作流完成（SSE格式）",
+            step_title="✅ 智能研究工作流完成",
             step_type="workflow_completion",
-            agent_name="simple_research_coordinator"
+            agent_name="workflow_orchestrator"  # 工作流协调器（非真实Agent，仅用于日志标记）
         )
         
     except Exception as e:
@@ -882,9 +882,9 @@ async def _full_workflow_openai_generator(
     
     enhanced_logger.log_step_execution(
         step_number=1,
-        step_title="OpenAI标准流式输出启动（所有输出节点，过滤思考标签）",
+        step_title="🔄 OpenAI兼容格式转换启动",
         step_type="openai_stream_initialization",
-        agent_name="openai_formatter"
+        agent_name="OpenAI兼容格式输出"  # 格式转换器（非真实Agent，仅用于日志标记）
     )
     
     # 用于累积内容，以便处理跨chunk的<think>标签
@@ -1048,9 +1048,9 @@ async def _full_workflow_openai_generator(
         
         enhanced_logger.log_step_execution(
             step_number=2,
-            step_title="OpenAI标准流式输出完成（所有输出节点，已过滤思考标签）",
+            step_title="✅ OpenAI兼容格式转换完成",
             step_type="openai_stream_completion",
-            agent_name="openai_formatter"
+            agent_name="OpenAI兼容格式输出器"  # 格式转换器（非真实Agent，仅用于日志标记）
         )
         
     except Exception as e:
