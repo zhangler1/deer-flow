@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from src.llms.llm import get_llm_by_type
 from src.utils.enhanced_logger import get_enhanced_logger
-from src.prompts.template import get_prompt_template, apply_prompt_template
+from src.prompts.template import env  # 直接导入 Jinja2 环境
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.classifier')
@@ -71,17 +71,24 @@ def classify_request(
     
     # 构建分类提示词 - 使用模板系统
     try:
-        # 使用模板系统加载和渲染提示词
-        messages = apply_prompt_template(
-            "classifier/classifier",
-            {"query": query}
-        )
+        # 直接使用 Jinja2 环境渲染模板，避免 AgentState 类型问题
+        template = env.get_template("classifier/classifier.md")
+        classification_prompt = template.render(query=query)
         
         # 使用LLM进行分类
         llm = get_llm_by_type("basic")
         
+        # DEBUG级别：打印LLM输入
+        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            enhanced_logger.logger.debug(
+                f"🤖 CLASSIFIER_LLM_INPUT | Prompt长度: {len(classification_prompt)}\n"
+                f"{'='*80}\n{classification_prompt}\n{'='*80}"
+            )
+        
         # 直接调用LLM，不使用with_structured_output
-        response = llm.invoke(messages)
+        response = llm.invoke([
+            {"role": "user", "content": classification_prompt}
+        ])
         
         # 提取响应内容
         content = response.content if hasattr(response, 'content') else str(response)
