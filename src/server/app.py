@@ -116,6 +116,9 @@ async def chat_stream(request: ChatRequest):
     thread_id = request.thread_id
     if thread_id is None or thread_id == "__default__":
         thread_id = str(uuid4())
+    
+    # 从环境变量读取系统背景上下文
+    system_context = get_str_env("SYSTEM_CONTEXT", "")
 
     return StreamingResponse(
         _astream_workflow_generator(
@@ -133,7 +136,7 @@ async def chat_stream(request: ChatRequest):
             request.enable_background_investigation or True,
             request.report_style or ReportStyle.ACADEMIC,
             request.enable_deep_thinking or False,
-            system_context="问题关于交通银行",  # 默认系统背景：交通银行
+            system_context=system_context,  # 从环境变量读取
         ),
         media_type="text/event-stream",
     )
@@ -370,7 +373,7 @@ async def _astream_workflow_generator(
     # system_context 通过 State 和 Configuration 传递给各节点
     # 各节点在 Prompt Template 中按需使用，不在此处修改用户消息
     if system_context:
-        enhanced_logger.logger.info(
+        enhanced_logger.logger.debug(  # 改为 DEBUG 级别，减少日志噪音
             f"🏛️ SYSTEM_CONTEXT | 系统背景已配置: {system_context} | "
             f"将通过State传递给工作流节点"
         )
@@ -835,7 +838,7 @@ async def _full_workflow_sse_generator(
             enable_background_investigation=request.enable_background_investigation or True,
             report_style=request.report_style or ReportStyle.ACADEMIC,
             enable_deep_thinking=request.enable_deep_thinking or False,
-            system_context="问题关于交通银行",  # 默认系统背景：交通银行
+            system_context=get_str_env("SYSTEM_CONTEXT", ""),  # 从环境变量读取
         ):
             yield event
             
