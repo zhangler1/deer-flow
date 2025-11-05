@@ -16,7 +16,7 @@ import os
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
-from langchain_core.messages import AIMessageChunk, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolMessage
 from langgraph.types import Command
 from langgraph.store.memory import InMemoryStore
 from langgraph.checkpoint.mongodb import AsyncMongoDBSaver
@@ -289,8 +289,8 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
         # Tool Message - Return the result of the tool call
         event_stream_message["tool_call_id"] = message_chunk.tool_call_id
         yield _make_event("tool_call_result", event_stream_message)
-    elif isinstance(message_chunk, AIMessageChunk):
-        # AI Message - Raw message tokens
+    elif isinstance(message_chunk, (AIMessageChunk, AIMessage)):
+        # AI Message - Raw message tokens (support both AIMessageChunk and AIMessage)
         if hasattr(message_chunk, 'tool_calls') and message_chunk.tool_calls:
             # AI Message - Tool Call
             event_stream_message["tool_calls"] = message_chunk.tool_calls
@@ -859,7 +859,8 @@ async def _direct_langgraph_openai_generator(
     """
     OpenAI标准的LangGraph工作流生成器
     返回符合OpenAI chat.completion.chunk格式的流式响应
-    只返回agent为"reporter"的信息，并过滤掉<think>标签内的思考内容
+    返回所有输出节点(reporter/coordinator/direct_answer_assistant/simple_search_assistant等)的信息
+    并过滤掉<think>标签内的思考内容
     """
     import time
     import re
@@ -876,7 +877,7 @@ async def _direct_langgraph_openai_generator(
     
     enhanced_logger.log_step_execution(
         step_number=1,
-        step_title="OpenAI标准流式输出启动（仅reporter，过滤思考标签）",
+        step_title="OpenAI标准流式输出启动（所有输出节点，过滤思考标签）",
         step_type="openai_stream_initialization",
         agent_name="openai_formatter"
     )
@@ -922,12 +923,24 @@ async def _direct_langgraph_openai_generator(
                     try:
                         event_data = json.loads(lines[1].replace("data: ", ""))
                         
-                        # 处理reporter和coordinator的消息
-                        # coordinator的消息包含追问等直接回复
-                        # reporter的消息包含最终研究报告
+                        # 处理所有输出节点的消息
+                        # - reporter: 深度研究报告
+                        # - coordinator: 深度研究协调/追问
+                        # - direct_answer_assistant: 直接回答
+                        # - simple_search_assistant: 简单检索
+                        # - domain_knowledge_assistant: 领域知识
+                        # - department_assistant: 部门专用
                         agent = event_data.get("agent", "")
-                        if agent not in ["reporter", "coordinator"]:
-                            enhanced_logger.logger.debug(f"⚠️ FILTERED_AGENT | 过滤非agent: {agent}")
+                        allowed_agents = [
+                            "reporter",                    # 深度研究报告
+                            "coordinator",                # 深度研究协调
+                            "direct_answer_node",         # 直接回答节点
+                            "simple_search_node",         # 简单检索节点
+                            "domain_knowledge_node",      # 领域知识节点
+                            "department_node"              # 部门专用节点
+                        ]
+                        if agent not in allowed_agents:
+                            enhanced_logger.logger.debug(f"⚠️ FILTERED_AGENT | 过滤非输出agent: {agent}")
                             continue
                         
                         enhanced_logger.logger.debug(f"✅ PROCESSING_AGENT | 处理agent: {agent} | event_type: {event_type}")
@@ -1030,7 +1043,7 @@ async def _direct_langgraph_openai_generator(
         
         enhanced_logger.log_step_execution(
             step_number=2,
-            step_title="OpenAI标准流式输出完成（coordinator+reporter，已过滤思考标签）",
+            step_title="OpenAI标准流式输出完成（所有输出节点，已过滤思考标签）",
             step_type="openai_stream_completion",
             agent_name="openai_formatter"
         )
