@@ -148,9 +148,24 @@ def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal[
         # 生成回答
         llm_start = time.time()
         llm = get_llm_by_type("basic")
+        
+        # DEBUG级别：打印LLM输入
+        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            enhanced_logger.logger.debug(
+                f"🤖 LLM_INPUT | direct_answer | Prompt长度: {len(answer_prompt)}\n"
+                f"{'='*80}\n{answer_prompt}\n{'='*80}"
+            )
+        
         response = llm.invoke([{"role": "user", "content": answer_prompt}])
         answer = response.content if hasattr(response, 'content') else str(response)
         llm_duration = time.time() - llm_start
+        
+        # DEBUG级别：打印LLM输出
+        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            enhanced_logger.logger.debug(
+                f"🤖 LLM_OUTPUT | direct_answer | 响应长度: {len(answer)}\n"
+                f"{'='*80}\n{answer}\n{'='*80}"
+            )
         
         enhanced_logger.logger.info(
             f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
@@ -236,9 +251,24 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
         # 生成回答
         llm_start = time.time()
         llm = get_llm_by_type("basic")
+        
+        # DEBUG级别：打印LLM输入
+        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            enhanced_logger.logger.debug(
+                f"🤖 LLM_INPUT | simple_search | Prompt长度: {len(answer_prompt)}\n"
+                f"{'='*80}\n{answer_prompt}\n{'='*80}"
+            )
+        
         response = llm.invoke([{"role": "user", "content": answer_prompt}])
         answer = response.content if hasattr(response, 'content') else str(response)
         llm_duration = time.time() - llm_start
+        
+        # DEBUG级别：打印LLM输出
+        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            enhanced_logger.logger.debug(
+                f"🤖 LLM_OUTPUT | simple_search | 响应长度: {len(answer)}\n"
+                f"{'='*80}\n{answer}\n{'='*80}"
+            )
         
         enhanced_logger.logger.info(
             f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
@@ -422,9 +452,24 @@ def domain_knowledge_node(
         # 生成回答
         llm_start = time.time()
         llm = get_llm_by_type("basic")
+        
+        # DEBUG级别：打印LLM输入
+        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            enhanced_logger.logger.debug(
+                f"🤖 LLM_INPUT | domain_knowledge | Prompt长度: {len(answer_prompt)}\n"
+                f"{'='*80}\n{answer_prompt}\n{'='*80}"
+            )
+        
         response = llm.invoke([{"role": "user", "content": answer_prompt}])
         answer = response.content if hasattr(response, 'content') else str(response)
         llm_duration = time.time() - llm_start
+        
+        # DEBUG级别：打印LLM输出
+        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            enhanced_logger.logger.debug(
+                f"🤖 LLM_OUTPUT | domain_knowledge | 响应长度: {len(answer)}\n"
+                f"{'='*80}\n{answer}\n{'='*80}"
+            )
         
         enhanced_logger.logger.info(
             f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
@@ -495,6 +540,13 @@ def department_node(
             f"🤖 AGENT_CREATED | 耗时: {agent_create_duration:.2f}s"
         )
         
+        # DEBUG级别：打印部门智能体输入
+        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            enhanced_logger.logger.debug(
+                f"🤖 AGENT_INPUT | department | 部门: {department} | 查询长度: {len(query)}\n"
+                f"{'='*80}\n{query}\n{'='*80}"
+            )
+        
         # 调用智能体处理请求
         invoke_start = time.time()
         result = agent.invoke({
@@ -509,6 +561,13 @@ def department_node(
             output = last_message.content if hasattr(last_message, 'content') else str(last_message)
         else:
             output = str(result)
+        
+        # DEBUG级别：打印部门智能体输出
+        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            enhanced_logger.logger.debug(
+                f"🤖 AGENT_OUTPUT | department | 响应长度: {len(output)}\n"
+                f"{'='*80}\n{output}\n{'='*80}"
+            )
         
         enhanced_logger.logger.info(
             f"💬 DEPARTMENT_RESPONSE | 长度: {len(output)} | 处理耗时: {invoke_duration:.2f}s"
