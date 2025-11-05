@@ -130,20 +130,19 @@ def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal[
     enhanced_logger.logger.info(f"❓ DIRECT_ANSWER_QUERY | '{query}'")
     
     try:
-        # 直接使用LLM回答，不调用检索工具
-        answer_prompt = f"""你是一个专业的知识助手。请用简洁准确的语言回答以下通用知识问题。
-
-**用户问题**: {query}
-
-**回答要求**:
-1. 直接回答问题，不超过300字
-2. 基于你的通用知识提供准确信息
-3. 使用简洁清晰的语言
-4. 如果是定义类问题，可以分点说明
-5. 不需要引用外部资料来源
-
-请提供你的回答：
-"""
+        # 使用 Prompt 模板（不调用检索工具）
+        try:
+            messages_for_llm = apply_prompt_template(
+                "direct_answer",
+                dict(state),
+                configurable
+            )
+        except Exception as e:
+            logger.warning(f"应用Prompt模板失败，使用备用方案: {e}")
+            # 备用方案：简单提示词
+            messages_for_llm = [
+                {"role": "user", "content": f"请简洁准确地回答以下问题（不超过300字）: {query}"}
+            ]
         
         # 生成回答
         llm_start = time.time()
@@ -151,12 +150,13 @@ def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal[
         
         # DEBUG级别：打印LLM输入
         if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            prompt_str = str(messages_for_llm)
             enhanced_logger.logger.debug(
-                f"🤖 LLM_INPUT | direct_answer | Prompt长度: {len(answer_prompt)}\n"
-                f"{'='*80}\n{answer_prompt}\n{'='*80}"
+                f"🤖 LLM_INPUT | direct_answer | Prompt长度: {len(prompt_str)}\n"
+                f"{'='*80}\n{prompt_str}\n{'='*80}"
             )
         
-        response = llm.invoke([{"role": "user", "content": answer_prompt}])
+        response = llm.invoke(messages_for_llm)
         answer = response.content if hasattr(response, 'content') else str(response)
         llm_duration = time.time() - llm_start
         
@@ -230,23 +230,27 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
             f"耗时: {search_duration:.2f}s"
         )
         
-        # 构建回答提示词（为银行业务场景优化）
-        answer_prompt = f"""你是一个专业的银行业务知识助手。请基于以下搜索结果，简洁准确地回答用户问题。
+        # 使用 Prompt 模板（为银行业务场景优化）
+        # 准备模板变量：添加 search_results
+        state_with_search = dict(state)
+        state_with_search['search_results'] = search_results
+        
+        try:
+            messages_for_llm = apply_prompt_template(
+                "simple_search",
+                state_with_search,
+                configurable
+            )
+        except Exception as e:
+            logger.warning(f"应用Prompt模板失败，使用备用方案: {e}")
+            # 备用方案：简单提示词
+            answer_prompt_fallback = f"""请基于以下搜索结果回答问题（不超过300字）:
 
-**用户问题**: {query}
+问题: {query}
 
-**搜索结果**:
-{json.dumps(search_results, ensure_ascii=False, indent=2)}
-
-**回答要求**:
-1. 直接回答问题，不超过300字
-2. 基于搜索结果提供准确信息
-3. 使用简洁清晰的语言，适合银行业务场景
-4. 必要时可以分点列出
-5. 如果信息不足，请说明
-
-请提供你的回答：
+搜索结果: {json.dumps(search_results, ensure_ascii=False, indent=2)}
 """
+            messages_for_llm = [{"role": "user", "content": answer_prompt_fallback}]
         
         # 生成回答
         llm_start = time.time()
@@ -254,12 +258,13 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
         
         # DEBUG级别：打印LLM输入
         if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            prompt_str = str(messages_for_llm)
             enhanced_logger.logger.debug(
-                f"🤖 LLM_INPUT | simple_search | Prompt长度: {len(answer_prompt)}\n"
-                f"{'='*80}\n{answer_prompt}\n{'='*80}"
+                f"🤖 LLM_INPUT | simple_search | Prompt长度: {len(prompt_str)}\n"
+                f"{'='*80}\n{prompt_str}\n{'='*80}"
             )
         
-        response = llm.invoke([{"role": "user", "content": answer_prompt}])
+        response = llm.invoke(messages_for_llm)
         answer = response.content if hasattr(response, 'content') else str(response)
         llm_duration = time.time() - llm_start
         
@@ -430,24 +435,27 @@ def domain_knowledge_node(
             f"🔍 SEARCH_COMPLETE | 结果数: {len(search_results) if isinstance(search_results, list) else '未知'}"
         )
         
-        # 构建专业回答提示词
-        answer_prompt = f"""你是一个专业的银行领域知识专家。请基于以下专业知识库的信息，详细准确地回答用户问题。
+        # 使用 Prompt 模板（专业知识场景）
+        # 准备模板变量：添加 search_results，resources 已在 state 中
+        state_with_knowledge = dict(state)
+        state_with_knowledge['search_results'] = search_results
+        
+        try:
+            messages_for_llm = apply_prompt_template(
+                "domain_knowledge",
+                state_with_knowledge,
+                configurable
+            )
+        except Exception as e:
+            logger.warning(f"应用Prompt模板失败，使用备用方案: {e}")
+            # 备用方案：简单提示词
+            answer_prompt_fallback = f"""请基于以下专业知识库信息回答问题（400-600字）:
 
-**用户问题**: {query}
+问题: {query}
 
-**领域知识库信息**:
-{json.dumps(search_results, ensure_ascii=False, indent=2)}
-
-**回答要求**:
-1. 提供详细的专业解答，可以400-600字
-2. 基于知识库信息提供准确的专业内容
-3. 包含具体的规则、条款或技术细节
-4. 使用专业术语，但保持清晰易懂
-5. 如果信息不足或不确定，请明确说明
-6. 可以分点列出关键信息
-
-请提供你的专业解答：
+知识库: {json.dumps(search_results, ensure_ascii=False, indent=2)}
 """
+            messages_for_llm = [{"role": "user", "content": answer_prompt_fallback}]
         
         # 生成回答
         llm_start = time.time()

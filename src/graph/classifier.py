@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from src.llms.llm import get_llm_by_type
 from src.utils.enhanced_logger import get_enhanced_logger
+from src.prompts.template import get_prompt_template, apply_prompt_template
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.classifier')
@@ -68,124 +69,19 @@ def classify_request(
             reasoning="智能路由未启用，使用默认主流路径"
         )
     
-    # 构建分类提示词
-    classification_prompt = f"""你是一个银行业务智能路由分类器。分析用户的查询请求，并决定最合适的处理路径。
-
-**用户查询**: {query}
-
-请根据以下规则进行精确分类:
-
-## 1. 直接回答 (direct_answer)
-适用场景:
-- ✅ 通用常识性问题，不需要外部检索
-- ✅ 基础概念、定义类问题（如"什么是汽车"、"什么是互联网"）
-- ✅ 简单数学计算、日期时间查询
-- ✅ 非银行业务相关的通用知识
-- ✅ LLM训练数据中包含的基础知识
-
-示例:
-- "什么是汽车?"
-- "地球有多大?"
-- "1+1等于几?"
-- "Python是什么编程语言?"
-
-## 2. 简单检索 (simple_search) - **主流路径，默认选择**
-适用场景:
-- ✅ 银行业务相关的常规问题
-- ✅ 金融产品介绍、业务流程查询
-- ✅ 专业度适中，主流业务知识
-- ✅ 单次检索即可获得答案
-- ✅ 信息相对集中，不需要多源对比
-
-示例:
-- "信用卡如何申请?"
-- "个人贷款需要什么条件?"
-- "网上银行如何开通?"
-- "手机银行转账限额是多少?"
-
-## 3. 深度研究 (deep_research)
-适用场景:
-- ✅ 需要多维度分析的复杂问题
-- ✅ 需要综合多个来源的信息
-- ✅ 趋势分析、对比研究类问题
-- ✅ 知识比较分散，需要多次检索
-- ✅ 研究性、分析性问题
-
-示例:
-- "分析金融科技对传统银行的影响趋势"
-- "对比国内外数字货币政策的异同"
-- "研究普惠金融在农村地区的发展现状"
-- "评估开放银行API的安全风险"
-
-## 4. 领域知识 (domain_knowledge)
-适用场景:
-- ✅ 高度专业化的银行内部知识
-- ✅ 特定产品规则、内部流程
-- ✅ 专业术语、监管要求
-- ✅ 知识高度集中但专业性强
-- ✅ 需要特定领域知识库
-
-示例:
-- "交通银行沃德财富卡的积分规则"
-- "理财产品风险评级R3是什么标准?"
-- "SWIFT报文MT103的字段说明"
-- "反洗钱可疑交易监测规则"
-
-## 分类规则总结
-1. **优先级**: 直接回答 < 简单检索(主流) < 深度研究 < 领域知识
-2. **默认原则**: 有疑问时选择"simple_search"（简单检索）
-3. **复杂度判断**:
-   - simple: 通用常识，不需检索
-   - medium: 主流业务，单次检索
-   - complex: 分析研究，多次检索
-   - expert: 专业知识，领域检索
-4. **检索判断**:
-   - direct_answer: needs_search = false
-   - simple_search: needs_search = true
-   - deep_research: needs_search = true
-   - domain_knowledge: needs_search = true
-5. **置信度**: 
-   - 0.9-1.0: 非常明确
-   - 0.7-0.9: 较为明确
-   - 0.5-0.7: 一般明确（默认simple_search）
-   - <0.5: 不确定（默认simple_search）
-
-请提供你的分类决策，包括路径、复杂度、是否需要检索、置信度和理由。
-"""
-
+    # 构建分类提示词 - 使用模板系统
     try:
+        # 使用模板系统加载和渲染提示词
+        messages = apply_prompt_template(
+            "classifier/classifier",
+            {"query": query}
+        )
+        
         # 使用LLM进行分类
         llm = get_llm_by_type("basic")
         
-        # 注意：根据经验教训，避免过早使用结构化输出验证
-        # DeepSeek 等部分模型不支持 with_structured_output
-        # 改为在 Prompt 中要求返回JSON格式，然后手动解析
-        
-        # 添加JSON输出要求到Prompt中
-        json_instruction = """\n\n**输出格式要求**：
-请以JSON格式返回你的分类结果，包含以下字段：
-```json
-{
-  "path": "direct_answer",  // 必须是: direct_answer, simple_search, deep_research, domain_knowledge 之一
-  "complexity": "simple",  // 必须是: simple, medium, complex, expert 之一
-  "needs_search": true,  // 布尔值: true 或 false
-  "confidence": 0.85,  // 浮点数: 0.0-1.0
-  "reasoning": "决策理由的简要说明"  // 字符串
-}
-```
-
-**重要**：
-1. 只返回JSON对象，不要添加其他解释性文本
-2. 确保字段名称与上述完全一致
-3. 确保每个字段的类型正确
-"""
-        
-        enhanced_classification_prompt = classification_prompt + json_instruction
-        
         # 直接调用LLM，不使用with_structured_output
-        response = llm.invoke([
-            {"role": "user", "content": enhanced_classification_prompt}
-        ])
+        response = llm.invoke(messages)
         
         # 提取响应内容
         content = response.content if hasattr(response, 'content') else str(response)
