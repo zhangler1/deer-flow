@@ -22,7 +22,7 @@ class State(MessagesState):
     auto_accepted_plan: bool = False
     enable_background_investigation: bool = True
     background_investigation_results: str = None
-    system_context: str = ""  # 系统背景上下文，会自动添加到所有查询中
+    system_context: str = ""  # 系统背景上下文，各节点在Prompt Template中按需使用（不修改用户消息）
     
     # 智能路由相关字段
     user_department: str = "general"  # 用户部门

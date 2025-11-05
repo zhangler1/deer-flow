@@ -367,16 +367,13 @@ async def _astream_workflow_generator(
         if isinstance(message, dict) and "content" in message:
             _process_initial_messages(message, thread_id)
 
-    # 如果有系统背景上下文，在用户消息前注入背景
-    if system_context and messages:
-        # 在第一条用户消息中添加系统背景
-        enhanced_logger.logger.info(f"🏛️ SYSTEM_CONTEXT | 注入系统背景上下文: {system_context}")
-        first_user_message = messages[0]
-        if isinstance(first_user_message, dict) and first_user_message.get("role") == "user":
-            original_content = first_user_message.get("content", "")
-            # 将系统背景添加在用户问题之前
-            first_user_message["content"] = f"[系统背景上下文: {system_context}]\n\n{original_content}"
-            enhanced_logger.logger.info(f"✅ CONTEXT_INJECTED | 背景已注入到用户消息中")
+    # system_context 通过 State 和 Configuration 传递给各节点
+    # 各节点在 Prompt Template 中按需使用，不在此处修改用户消息
+    if system_context:
+        enhanced_logger.logger.info(
+            f"🏛️ SYSTEM_CONTEXT | 系统背景已配置: {system_context} | "
+            f"将通过State传递给工作流节点"
+        )
 
     # Prepare workflow input
     workflow_input = {

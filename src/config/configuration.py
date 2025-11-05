@@ -53,7 +53,7 @@ class Configuration:
     mcp_settings: dict = None  # MCP settings, including dynamic loaded tools
     report_style: str = ReportStyle.ACADEMIC.value  # Report style
     enable_deep_thinking: bool = False  # Whether to enable deep thinking
-    system_context: str = ""  # 系统背景上下文，会自动添加到用户查询中
+    system_context: str = ""  # 系统背景上下文，通过State传递给各节点，在Prompt Template中按需使用
 
     @classmethod
     def from_runnable_config(
