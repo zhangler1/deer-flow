@@ -696,7 +696,7 @@ def generate_conversation_id(
 @app.post("/api/research/simple/stream")
 async def simple_research_stream(request: SimpleResearchRequest):
     """
-    简化流式研究接口：直接使用完整的 LangGraph 工作流，支持参数定制
+    简化流式研究接口：使用完整的 LangGraph 工作流，返回原生SSE格式
     
     - 移除双模式选择，统一使用 LangGraph 工作流
     - 支持与 /api/chat/stream 一致的完整功能
@@ -725,9 +725,9 @@ async def simple_research_stream(request: SimpleResearchRequest):
         "enable_deep_thinking": request.enable_deep_thinking
     })
     
-    # 直接使用 LangGraph 工作流
+    # 使用完整的 LangGraph 工作流（原生 SSE 格式）
     return StreamingResponse(
-        _direct_langgraph_generator(
+        _full_workflow_sse_generator(
             request=request,
             thread_id=thread_id
         ),
@@ -773,9 +773,9 @@ async def simple_research_stream_openai(request: SimpleResearchRequest):
         "format": "openai_compatible"
     })
     
-    # 使用OpenAI格式的生成器
+    # 使用完整的 LangGraph 工作流（OpenAI 兼容格式）
     return StreamingResponse(
-        _direct_langgraph_openai_generator(
+        _full_workflow_openai_generator(
             request=request,
             thread_id=thread_id
         ),
@@ -788,17 +788,22 @@ async def simple_research_stream_openai(request: SimpleResearchRequest):
     )
 
 
-async def _direct_langgraph_generator(
+async def _full_workflow_sse_generator(
     request: SimpleResearchRequest,
     thread_id: str
 ):
     """
-    直接使用 LangGraph 工作流生成器，与 /api/chat/stream 保持一致
+    完整工作流SSE生成器：使用完整的 LangGraph 工作流，返回原生SSE格式事件流
+    
+    功能说明：
+    - 支持智能路由（direct_answer/simple_search/domain_knowledge/deep_research）
+    - 返回原生 SSE 格式事件（event: message_chunk\ndata: {...}\n\n）
+    - 与 /api/chat/stream 保持一致
     将 SimpleResearchRequest 参数转换并调用现有的 _astream_workflow_generator
     """
     enhanced_logger.log_step_execution(
         step_number=1,
-        step_title="直接LangGraph工作流启动",
+        step_title="完整工作流启动（SSE格式）",
         step_type="workflow_initialization",
         agent_name="simple_research_coordinator"
     )
@@ -839,7 +844,7 @@ async def _direct_langgraph_generator(
             
         enhanced_logger.log_step_execution(
             step_number=2,
-            step_title="直接LangGraph工作流完成",
+            step_title="完整工作流完成（SSE格式）",
             step_type="workflow_completion",
             agent_name="simple_research_coordinator"
         )
@@ -852,15 +857,18 @@ async def _direct_langgraph_generator(
         })
 
 
-async def _direct_langgraph_openai_generator(
+async def _full_workflow_openai_generator(
     request: SimpleResearchRequest,
     thread_id: str
 ):
     """
-    OpenAI标准的LangGraph工作流生成器
-    返回符合OpenAI chat.completion.chunk格式的流式响应
-    返回所有输出节点(reporter/coordinator/direct_answer_assistant/simple_search_assistant等)的信息
-    并过滤掉<think>标签内的思考内容
+    完整工作流OpenAI生成器：使用完整的 LangGraph 工作流，返回OpenAI兼容格式
+    
+    功能说明：
+    - 支持智能路由（direct_answer/simple_search/domain_knowledge/deep_research）
+    - 返回 OpenAI chat.completion.chunk 格式（data: {...}\n\n）
+    - 自动过滤 <think>...</think> 标签内的思考内容
+    - 返回所有输出节点的信息（reporter/coordinator/各路径节点）
     """
     import time
     import re
@@ -912,8 +920,8 @@ async def _direct_langgraph_openai_generator(
         yield _make_openai_stream_event(start_chunk)
         
         # 使用与/api/research/simple/stream完全相同的流程
-        # 调用_direct_langgraph_generator，确保流程100%一致
-        async for raw_event in _direct_langgraph_generator(request, thread_id):
+        # 调用完整工作流SSE生成器，确保流程100%一致
+        async for raw_event in _full_workflow_sse_generator(request, thread_id):
             # 解析SSE事件
             if raw_event.startswith("event: "):
                 lines = raw_event.strip().split("\n")

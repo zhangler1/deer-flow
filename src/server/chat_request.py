@@ -116,7 +116,7 @@ class EnhancePromptRequest(BaseModel):
 
 
 class SimpleResearchRequest(BaseModel):
-    """简化研究请求模型 - 直接使用 LangGraph 工作流，参数可定制"""
+    """简化研究请求模型 - 使用完整的 LangGraph 工作流（支持智能路由）"""
     messages: List[Dict[str, str]] = Field(..., description="对话消息列表，OpenAI格式")
     
     # === 与 /api/chat/stream 完全一致的参数配置 ===
