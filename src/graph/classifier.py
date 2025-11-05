@@ -3,9 +3,11 @@
 
 """智能路由分类器模块"""
 
+import json
+import re
 import logging
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from src.llms.llm import get_llm_by_type
 from src.utils.enhanced_logger import get_enhanced_logger
@@ -155,22 +157,45 @@ def classify_request(
         # 使用LLM进行分类
         llm = get_llm_by_type("basic")
         
-        # 尝试使用结构化输出
-        try:
-            structured_llm = llm.with_structured_output(RouteDecision)
-            result = structured_llm.invoke([
-                {"role": "user", "content": classification_prompt}
-            ])
-        except Exception as e:
-            # 如果结构化输出失败，使用普通调用并手动解析
-            logger.warning(f"结构化输出失败，使用备用方案: {e}")
-            response = llm.invoke([
-                {"role": "user", "content": classification_prompt}
-            ])
-            
-            # 简单的启发式规则作为后备
-            content = response.content if hasattr(response, 'content') else str(response)
-            result = _fallback_classification(query, department, content)
+        # 注意：根据经验教训，避免过早使用结构化输出验证
+        # DeepSeek 等部分模型不支持 with_structured_output
+        # 改为在 Prompt 中要求返回JSON格式，然后手动解析
+        
+        # 添加JSON输出要求到Prompt中
+        json_instruction = """\n\n**输出格式要求**：
+请以JSON格式返回你的分类结果，包含以下字段：
+```json
+{
+  "path": "direct_answer",  // 必须是: direct_answer, simple_search, deep_research, domain_knowledge 之一
+  "complexity": "simple",  // 必须是: simple, medium, complex, expert 之一
+  "needs_search": true,  // 布尔值: true 或 false
+  "confidence": 0.85,  // 浮点数: 0.0-1.0
+  "reasoning": "决策理由的简要说明"  // 字符串
+}
+```
+
+**重要**：
+1. 只返回JSON对象，不要添加其他解释性文本
+2. 确保字段名称与上述完全一致
+3. 确保每个字段的类型正确
+"""
+        
+        enhanced_classification_prompt = classification_prompt + json_instruction
+        
+        # 直接调用LLM，不使用with_structured_output
+        response = llm.invoke([
+            {"role": "user", "content": enhanced_classification_prompt}
+        ])
+        
+        # 提取响应内容
+        content = response.content if hasattr(response, 'content') else str(response)
+        
+        # 确保 content 是字符串类型
+        if not isinstance(content, str):
+            content = str(content)
+        
+        # 手动解析JSON
+        result = _parse_llm_response_to_route_decision(content, query, department)
         
         enhanced_logger.logger.info(
             f"✅ CLASSIFIER_RESULT | 路径: {result.path} | "
@@ -185,6 +210,102 @@ def classify_request(
         logger.error(f"分类过程出错: {e}，使用默认路径")
         # 出错时使用保守的默认策略
         return _fallback_classification(query, department, "")
+
+
+def _parse_llm_response_to_route_decision(
+    content: str, 
+    query: str, 
+    department: str
+) -> RouteDecision:
+    """
+    解析LLM返回的JSON字符串为RouteDecision对象
+    
+    Args:
+        content: LLM返回的内容（可能包含JSON）
+        query: 原始查询
+        department: 部门信息
+        
+    Returns:
+        RouteDecision: 解析后的路由决策
+    """
+    try:
+        # 尝试直接解析JSON
+        # 首先尝试找到JSON代码块
+        json_match = re.search(r'```json\s*({.*?})\s*```', content, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            # 尝试找到纯JSON对象
+            json_match = re.search(r'{[^{}]*"path"[^{}]*}', content, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+            else:
+                # 如果都找不到，尝试整个内容
+                json_str = content.strip()
+        
+        # 解析JSON
+        data = json.loads(json_str)
+        
+        # 验证必需字段
+        required_fields = ["path", "complexity", "needs_search", "confidence", "reasoning"]
+        missing_fields = [f for f in required_fields if f not in data]
+        
+        if missing_fields:
+            enhanced_logger.logger.warning(
+                f"⚠️ JSON解析缺少字段: {missing_fields}，使用默认值填充"
+            )
+            # 使用默认值填充缺失字段
+            defaults = {
+                "path": "simple_search",
+                "complexity": "medium",
+                "needs_search": True,
+                "confidence": 0.6,
+                "reasoning": "JSON解析不完整，使用默认值"
+            }
+            for field in missing_fields:
+                data[field] = defaults.get(field)
+        
+        # 验证枚举值
+        valid_paths = ["direct_answer", "simple_search", "deep_research", "domain_knowledge"]
+        if data["path"] not in valid_paths:
+            enhanced_logger.logger.warning(
+                f"⚠️ 无效的path值: {data['path']}，使用默认值 simple_search"
+            )
+            data["path"] = "simple_search"
+        
+        valid_complexity = ["simple", "medium", "complex", "expert"]
+        if data["complexity"] not in valid_complexity:
+            enhanced_logger.logger.warning(
+                f"⚠️ 无效的complexity值: {data['complexity']}，使用默认值 medium"
+            )
+            data["complexity"] = "medium"
+        
+        # 确保confidence在0-1之间
+        if not isinstance(data["confidence"], (int, float)) or not (0 <= data["confidence"] <= 1):
+            enhanced_logger.logger.warning(
+                f"⚠️ 无效的confidence值: {data['confidence']}，使用默认值 0.6"
+            )
+            data["confidence"] = 0.6
+        
+        # 创建RouteDecision对象
+        try:
+            result = RouteDecision(**data)
+            enhanced_logger.logger.info("✅ JSON解析成功，创建RouteDecision对象")
+            return result
+        except ValidationError as e:
+            enhanced_logger.logger.error(f"❌ Pydantic验证失败: {e}，使用备用方案")
+            return _fallback_classification(query, department, content)
+            
+    except json.JSONDecodeError as e:
+        enhanced_logger.logger.warning(
+            f"⚠️ JSON解析失败: {e}，使用基于规则的备用方案"
+        )
+        return _fallback_classification(query, department, content)
+    except Exception as e:
+        enhanced_logger.logger.error(
+            f"❌ 解析过程出错: {e}，使用备用方案"
+        )
+        return _fallback_classification(query, department, content)
 
 
 def _fallback_classification(query: str, department: str = "general", llm_response: str = "") -> RouteDecision:
