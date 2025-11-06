@@ -67,6 +67,9 @@ def router_node(
     user_query = state.get("research_topic") or (
         state["messages"][-1].content if state.get("messages") else ""
     )
+    # 确保 user_query 是字符串类型
+    if not isinstance(user_query, str):
+        user_query = str(user_query)
     user_department = state.get("user_department", "general")
     enable_smart_routing = state.get("enable_smart_routing", True)
     
@@ -134,7 +137,7 @@ def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal[
         try:
             messages_for_llm = apply_prompt_template(
                 "direct_answer",
-                dict(state),
+                state,
                 configurable
             )
         except Exception as e:
@@ -219,9 +222,9 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
         # 单次搜索获取信息（为银行业务优化）
         search_start = time.time()
         search_results = get_web_search_tool(
-            3,  # 简单检索只需少量结果
-            configurable.search_engine,
-            configurable.custom_search_repository
+            max_search_results=3,  # 简单检索只需少量结果
+            engine=configurable.search_engine,
+            repository_id=configurable.custom_search_repository
         ).invoke(query)
         search_duration = time.time() - search_start
         
@@ -307,93 +310,6 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
         )
 
 
-def simple_qa_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
-    """
-    简单问答节点 - 单次搜索并直接回答
-    
-    适用于简单的事实性问题，通过一次搜索快速提供答案
-    """
-    start_time = time.time()
-    enhanced_logger.logger.info("🔄 NODE_ENTRY | simple_qa | 开始简单问答处理")
-    
-    configurable = Configuration.from_runnable_config(config)
-    query = state.get("research_topic") or (
-        state["messages"][-1].content if state.get("messages") else ""
-    )
-    
-    enhanced_logger.logger.info(f"❓ SIMPLE_QA_QUERY | '{query}'")
-    
-    try:
-        # 单次搜索获取信息
-        search_start = time.time()
-        search_results = get_web_search_tool(
-            max_results=3,  # 简单问答只需少量结果
-            search_engine=configurable.search_engine,
-            custom_search_repository=configurable.custom_search_repository
-        ).invoke(query)
-        search_duration = time.time() - search_start
-        
-        enhanced_logger.logger.info(
-            f"🔍 SEARCH_COMPLETE | 结果数: {len(search_results) if isinstance(search_results, list) else '未知'} | "
-            f"耗时: {search_duration:.2f}s"
-        )
-        
-        # 构建回答提示词
-        answer_prompt = f"""你是一个专业的知识助手。请基于以下搜索结果，简洁准确地回答用户问题。
-
-**用户问题**: {query}
-
-**搜索结果**:
-{json.dumps(search_results, ensure_ascii=False, indent=2)}
-
-**回答要求**:
-1. 直接回答问题，不超过200字
-2. 基于搜索结果提供准确信息
-3. 如果信息不足，请说明
-4. 使用简洁清晰的语言
-5. 必要时可以分点列出
-
-请提供你的回答：
-"""
-        
-        # 生成回答
-        llm_start = time.time()
-        llm = get_llm_by_type("basic")
-        response = llm.invoke([{"role": "user", "content": answer_prompt}])
-        answer = response.content if hasattr(response, 'content') else str(response)
-        llm_duration = time.time() - llm_start
-        
-        enhanced_logger.logger.info(
-            f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
-        )
-        
-        duration = time.time() - start_time
-        enhanced_logger.logger.info(
-            f"✅ NODE_EXIT | simple_qa | 节点执行完成 | 总耗时: {duration:.2f}s"
-        )
-        
-        return Command(
-            update={
-                "final_report": answer,
-                "messages": [AIMessage(content=answer, name="simple_qa_assistant")]
-            },
-            goto="__end__"
-        )
-        
-    except Exception as e:
-        logger.error(f"简单问答处理失败: {e}")
-        enhanced_logger.logger.error(f"❌ SIMPLE_QA_ERROR | {str(e)}")
-        
-        # 失败时返回错误信息
-        error_msg = f"抱歉，在处理您的问题时遇到了错误。请尝试重新提问或使用深度研究模式。\n\n错误信息: {str(e)}"
-        return Command(
-            update={
-                "final_report": error_msg,
-                "messages": [AIMessage(content=error_msg, name="simple_qa_assistant")]
-            },
-            goto="__end__"
-        )
-
 
 def domain_knowledge_node(
     state: State, config: RunnableConfig
@@ -421,14 +337,23 @@ def domain_knowledge_node(
         if resources:
             enhanced_logger.logger.info("📚 USING_LOCAL_RESOURCES | 使用本地知识库检索")
             retriever_tool = get_retriever_tool(resources)
-            search_results = retriever_tool.invoke(query)
+            # 确保 retriever_tool 不为 None
+            if retriever_tool is not None:
+                search_results = retriever_tool.invoke(query)
+            else:
+                # 如果 retriever_tool 为 None，使用网络搜索作为后备
+                search_results = get_web_search_tool(
+                    max_search_results=5,  # 领域知识需要更多结果
+                    engine=configurable.search_engine,
+                    repository_id=configurable.custom_search_repository
+                ).invoke(query)
         else:
             # 如果没有本地资源，使用网络搜索（但更针对专业内容）
             enhanced_logger.logger.info("🌐 USING_WEB_SEARCH | 使用网络搜索（专业模式）")
             search_results = get_web_search_tool(
-                5,  # 领域知识需要更多结果
-                configurable.search_engine,
-                configurable.custom_search_repository
+                max_search_results=5,  # 领域知识需要更多结果
+                engine=configurable.search_engine,
+                repository_id=configurable.custom_search_repository
             ).invoke(query)
         
         enhanced_logger.logger.info(
@@ -464,11 +389,11 @@ def domain_knowledge_node(
         # DEBUG级别：打印LLM输入
         if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
             enhanced_logger.logger.debug(
-                f"🤖 LLM_INPUT | domain_knowledge | Prompt长度: {len(answer_prompt)}\n"
-                f"{'='*80}\n{answer_prompt}\n{'='*80}"
+                f"🤖 LLM_INPUT | domain_knowledge | Prompt长度: {len(str(messages_for_llm))}\n"
+                f"{'='*80}\n{str(messages_for_llm)}\n{'='*80}"
             )
         
-        response = llm.invoke([{"role": "user", "content": answer_prompt}])
+        response = llm.invoke(messages_for_llm)
         answer = response.content if hasattr(response, 'content') else str(response)
         llm_duration = time.time() - llm_start
         
@@ -502,7 +427,7 @@ def domain_knowledge_node(
         
         # 失败时回退到简单检索
         enhanced_logger.logger.warning("⚠️ FALLBACK_TO_SIMPLE | 领域知识处理失败，回退到简单检索")
-        return simple_qa_node(state, config)  # 暂时回退到simple_qa_node
+        return simple_search_node(state, config)  # 回退到simple_search_node
 
 
 def department_node(
@@ -602,8 +527,8 @@ def department_node(
         error_msg = f"部门专用处理失败，尝试使用通用方式回答。\n\n错误: {str(e)}"
         enhanced_logger.logger.warning(f"⚠️ FALLBACK_TO_SIMPLE | {error_msg}")
         
-        # 调用简单问答逻辑作为后备
-        return simple_qa_node(state, config)
+        # 调用简单检索逻辑作为后备
+        return simple_search_node(state, config)
 
 
 def background_investigation_node(state: State, config: RunnableConfig):
@@ -642,9 +567,9 @@ def background_investigation_node(state: State, config: RunnableConfig):
     else:
         enhanced_logger.logger.info(f"🔍 使用{configurable.search_engine}搜索引擎进行背景调研 | 查询: '{query}'")
         background_investigation_results = get_web_search_tool(
-            configurable.max_search_results, 
-            configurable.search_engine,
-            configurable.custom_search_repository
+            max_search_results=configurable.max_search_results, 
+            engine=configurable.search_engine,
+            repository_id=configurable.custom_search_repository
         ).invoke(query)
         result = {
             "background_investigation_results": json.dumps(
@@ -670,7 +595,7 @@ def planner_node(
     
     messages = []
     try:
-        messages = apply_prompt_template("planner", dict(state), configurable)
+        messages = apply_prompt_template("planner", state, configurable)
     except Exception as e:
         enhanced_logger.logger.error(f"Failed to apply prompt template: {e}")
         # 使用默认消息
@@ -996,7 +921,7 @@ def coordinator_node(
     enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | messages数量: {len(state.get('messages', []))}")
     
     try:
-        messages = apply_prompt_template("coordinator", dict(state))
+        messages = apply_prompt_template("coordinator", state)
         enhanced_logger.logger.info(f"📝 COORDINATOR_PROMPT | 提示模板应用成功 | 消息数: {len(messages)}")
     except Exception as e:
         enhanced_logger.logger.error(f"Failed to apply coordinator template: {e}")
