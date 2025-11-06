@@ -4,7 +4,7 @@
 """部门专用智能体配置和创建模块"""
 
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 from src.agents import create_agent
 from src.tools import (
@@ -207,8 +207,8 @@ def get_department_config(department: str) -> Dict[str, Any]:
 def get_department_tools(
     department: str,
     search_engine: str = "tavily",
-    custom_search_repository: str = None,
-    resources: list = None
+    custom_search_repository: Optional[str] = None,
+    resources: Optional[list] = None
 ) -> List:
     """
     根据部门配置获取工具列表
@@ -230,9 +230,9 @@ def get_department_tools(
     if tools_config.get("web_search", False):
         max_results = tools_config.get("max_search_results", 5)
         search_tool = get_web_search_tool(
-            max_results=max_results,
-            search_engine=search_engine,
-            custom_search_repository=custom_search_repository
+            max_search_results=max_results,
+            engine=search_engine,
+            repository_id=custom_search_repository
         )
         tools.append(search_tool)
         logger.info(f"为{config['name']}添加网络搜索工具 (max_results={max_results})")
@@ -255,8 +255,8 @@ def get_department_tools(
 def create_department_agent(
     department: str,
     search_engine: str = "tavily",
-    custom_search_repository: str = None,
-    resources: list = None
+    custom_search_repository: Optional[str] = None,
+    resources: Optional[list] = None
 ):
     """
     创建部门专用智能体

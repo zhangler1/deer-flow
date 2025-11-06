@@ -14,6 +14,7 @@ static/browser_history/*.gif
 .venv
 venv/
 patch*
+*.bundle 
 # Environment variables
 
 
