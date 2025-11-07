@@ -163,16 +163,17 @@ def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal[
         answer = response.content if hasattr(response, 'content') else str(response)
         llm_duration = time.time() - llm_start
         
-        # DEBUG级别：打印LLM输出
+        # INFO级别：打印LLM最终输出
+        enhanced_logger.logger.info(
+            f"🤖 LLM_OUTPUT | direct_answer | 响应长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s\n"
+            f"{'='*80}\n{answer}\n{'='*80}"
+        )
+        
+        # DEBUG级别：打印更详细的输出信息
         if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
             enhanced_logger.logger.debug(
-                f"🤖 LLM_OUTPUT | direct_answer | 响应长度: {len(answer)}\n"
-                f"{'='*80}\n{answer}\n{'='*80}"
+                f"🤖 LLM_OUTPUT_DETAIL | direct_answer | 响应类型: {type(response)} | 完整响应: {response}"
             )
-        
-        enhanced_logger.logger.info(
-            f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
-        )
         
         duration = time.time() - start_time
         enhanced_logger.logger.info(
@@ -271,16 +272,17 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
         answer = response.content if hasattr(response, 'content') else str(response)
         llm_duration = time.time() - llm_start
         
-        # DEBUG级别：打印LLM输出
+        # INFO级别：打印LLM最终输出
+        enhanced_logger.logger.info(
+            f"🤖 LLM_OUTPUT | simple_search | 响应长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s\n"
+            f"{'='*80}\n{answer}\n{'='*80}"
+        )
+        
+        # DEBUG级别：打印更详细的输出信息
         if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
             enhanced_logger.logger.debug(
-                f"🤖 LLM_OUTPUT | simple_search | 响应长度: {len(answer)}\n"
-                f"{'='*80}\n{answer}\n{'='*80}"
+                f"🤖 LLM_OUTPUT_DETAIL | simple_search | 响应类型: {type(response)} | 完整响应: {response}"
             )
-        
-        enhanced_logger.logger.info(
-            f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
-        )
         
         duration = time.time() - start_time
         enhanced_logger.logger.info(
@@ -398,16 +400,17 @@ def domain_knowledge_node(
         answer = response.content if hasattr(response, 'content') else str(response)
         llm_duration = time.time() - llm_start
         
-        # DEBUG级别：打印LLM输出
+        # INFO级别：打印LLM最终输出
+        enhanced_logger.logger.info(
+            f"🤖 LLM_OUTPUT | domain_knowledge | 响应长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s\n"
+            f"{'='*80}\n{answer}\n{'='*80}"
+        )
+        
+        # DEBUG级别：打印更详细的输出信息
         if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
             enhanced_logger.logger.debug(
-                f"🤖 LLM_OUTPUT | domain_knowledge | 响应长度: {len(answer)}\n"
-                f"{'='*80}\n{answer}\n{'='*80}"
+                f"🤖 LLM_OUTPUT_DETAIL | domain_knowledge | 响应类型: {type(response)} | 完整响应: {response}"
             )
-        
-        enhanced_logger.logger.info(
-            f"💬 ANSWER_GENERATED | 长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s"
-        )
         
         duration = time.time() - start_time
         enhanced_logger.logger.info(
