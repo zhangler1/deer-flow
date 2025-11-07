@@ -106,24 +106,55 @@ class EnhancedLogger:
         self.logger = logging.getLogger(name)
         self.session_id = None
         self.workflow_context = {}
+        self.file_handler = None
         
-    def setup_enhanced_logging(self, level=logging.INFO, enable_colors=True):
-        """设置增强日志"""
-        handler = logging.StreamHandler()
+    def setup_enhanced_logging(self, level=logging.INFO, enable_colors=True, log_file=None):
+        """设置增强日志
+        
+        Args:
+            level: 日志级别
+            enable_colors: 是否启用彩色输出（仅控制台）
+            log_file: 日志文件路径，如果为None则不输出到文件
+        """
+        # 设置控制台输出
+        console_handler = logging.StreamHandler()
         
         if enable_colors:
-            formatter = ColoredFormatter(
+            console_formatter = ColoredFormatter(
                 '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                 datefmt='%H:%M:%S'
             )
         else:
-            formatter = logging.Formatter(
+            console_formatter = logging.Formatter(
                 '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                 datefmt='%H:%M:%S'
             )
             
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+        console_handler.setFormatter(console_formatter)
+        self.logger.addHandler(console_handler)
+        
+        # 设置文件输出（如果指定了日志文件）
+        if log_file:
+            # 确保日志目录存在
+            log_dir = os.path.dirname(log_file)
+            if log_dir and not os.path.exists(log_dir):
+                os.makedirs(log_dir, exist_ok=True)
+            
+            # 创建文件处理器
+            self.file_handler = logging.FileHandler(
+                log_file, 
+                mode='a',  # 追加模式
+                encoding='utf-8'
+            )
+            
+            # 文件输出使用无颜色格式
+            file_formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+            self.file_handler.setFormatter(file_formatter)
+            self.logger.addHandler(self.file_handler)
+            
         self.logger.setLevel(level)
         
     def set_session_context(self, session_id: str, user_query: str):
@@ -241,10 +272,21 @@ def get_enhanced_logger(name: str) -> EnhancedLogger:
     return _enhanced_loggers[name]
 
 
-def setup_enhanced_logging(level=logging.INFO, enable_colors=True):
-    """全局设置增强日志"""
+def setup_enhanced_logging(level=logging.INFO, enable_colors=True, log_file=None):
+    """全局设置增强日志
+    
+    Args:
+        level: 日志级别
+        enable_colors: 是否启用彩色输出（仅控制台）
+        log_file: 日志文件路径，如果为None则不输出到文件
+                 可以从环境变量LOG_FILE读取
+    """
+    # 如果没有指定log_file，尝试从环境变量读取
+    if log_file is None:
+        log_file = os.getenv('LOG_FILE')
+    
     for logger in _enhanced_loggers.values():
-        logger.setup_enhanced_logging(level, enable_colors)
+        logger.setup_enhanced_logging(level, enable_colors, log_file)
 
 
 @contextmanager

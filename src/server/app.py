@@ -65,8 +65,9 @@ from src.utils.enhanced_logger import get_enhanced_logger, setup_enhanced_loggin
 
 logger = logging.getLogger(__name__)
 
-# 初始化增强日志系统
-setup_enhanced_logging(level=logging.INFO, enable_colors=True)
+# 初始化增强日志系统，支持从环境变量LOG_FILE读取日志文件路径
+log_file = os.getenv('LOG_FILE')  # 例如: logs/deer-flow.log
+setup_enhanced_logging(level=logging.INFO, enable_colors=True, log_file=log_file)
 enhanced_logger = get_enhanced_logger("deer-flow.api")
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
