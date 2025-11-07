@@ -388,9 +388,10 @@ def domain_knowledge_node(
         
         # DEBUG级别：打印LLM输入
         if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            prompt_str = str(messages_for_llm)
             enhanced_logger.logger.debug(
-                f"🤖 LLM_INPUT | domain_knowledge | Prompt长度: {len(str(messages_for_llm))}\n"
-                f"{'='*80}\n{str(messages_for_llm)}\n{'='*80}"
+                f"🤖 LLM_INPUT | domain_knowledge | Prompt长度: {len(str(prompt_str))}\n"
+                f"{'='*80}\n{str(prompt_str)}\n{'='*80}"
             )
         
         response = llm.invoke(messages_for_llm)
