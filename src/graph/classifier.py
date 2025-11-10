@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 from src.llms.llm import get_llm_by_type
 from src.utils.enhanced_logger import get_enhanced_logger
 from src.prompts.template import env  # 直接导入 Jinja2 环境
+from src.utils.performance_monitor import PerformanceMonitor
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.classifier')
@@ -54,65 +55,89 @@ def classify_request(
         RouteDecision: 路由决策结果
     """
     
-    enhanced_logger.logger.info(
-        f"🔍 CLASSIFIER_START | 查询: '{query[:50]}...' | 部门: {department}"
-    )
-    
-    # 如果未启用智能路由，默认使用简单检索路径
-    if not enable_smart_routing:
-        enhanced_logger.logger.info("⚠️ 智能路由未启用，使用默认简单检索路径")
-        return RouteDecision(
-            path="simple_search",
-            complexity="medium",
-            needs_search=True,
-            confidence=1.0,
-            reasoning="智能路由未启用，使用默认主流路径"
-        )
-    
-    # 构建分类提示词 - 使用模板系统
-    try:
-        # 直接使用 Jinja2 环境渲染模板，避免 AgentState 类型问题
-        template = env.get_template("classifier/classifier.md")
-        classification_prompt = template.render(query=query)
-        
-        # 使用LLM进行分类
-        llm = get_llm_by_type("basic")
-        
-        # DEBUG级别：打印LLM输入
-        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
-            enhanced_logger.logger.debug(
-                f"🤖 CLASSIFIER_LLM_INPUT | Prompt长度: {len(classification_prompt)}\n"
-                f"{'='*80}\n{classification_prompt}\n{'='*80}"
-            )
-        
-        # 直接调用LLM，不使用with_structured_output
-        response = llm.invoke([
-            {"role": "user", "content": classification_prompt}
-        ])
-        
-        # 提取响应内容
-        content = response.content if hasattr(response, 'content') else str(response)
-        
-        # 确保 content 是字符串类型
-        if not isinstance(content, str):
-            content = str(content)
-        
-        # 手动解析JSON
-        result = _parse_llm_response_to_route_decision(content, query, department)
+    # 🎯 监控整个分类流程
+    with PerformanceMonitor(
+        "分类器整体流程",
+        threshold=3.0,  # 整体流程超过3秒会告警
+        metadata={"query_length": len(query), "department": department}
+    ) as overall_monitor:
         
         enhanced_logger.logger.info(
-            f"✅ CLASSIFIER_RESULT | 路径: {result.path} | "
-            f"复杂度: {result.complexity} | "
-            f"置信度: {result.confidence:.2f} | "
-            f"理由: {result.reasoning}"
+            f"🔍 CLASSIFIER_START | 查询: '{query[:50]}...' | 部门: {department}"
         )
         
-        return result
+        # 如果未启用智能路由，默认使用简单检索路径
+        if not enable_smart_routing:
+            enhanced_logger.logger.info("⚠️ 智能路由未启用，使用默认简单检索路径")
+            return RouteDecision(
+                path="simple_search",
+                complexity="medium",
+                needs_search=True,
+                confidence=1.0,
+                reasoning="智能路由未启用，使用默认主流路径"
+            )
         
-    except Exception as e:
-        logger.error(f"分类过程出错: {e}，使用默认路径")
-        # 出错时使用保守的默认策略
-        return _fallback_classification(query, department, "")
+        # 构建分类提示词 - 使用模板系统
+        try:
+            # 🎯 监控模板渲染
+            with PerformanceMonitor("分类器-模板渲染", level=logging.DEBUG):
+                # 直接使用 Jinja2 环境渲染模板，避免 AgentState 类型问题
+                template = env.get_template("classifier/classifier.md")
+                classification_prompt = template.render(query=query)
+            
+            # 使用LLM进行分类
+            llm = get_llm_by_type("basic")
+            
+            # DEBUG级别：打印LLM输入
+            if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+                enhanced_logger.logger.debug(
+                    f"🤖 CLASSIFIER_LLM_INPUT | Prompt长度: {len(classification_prompt)}\n"
+                    f"{'='*80}\n{classification_prompt}\n{'='*80}"
+                )
+            
+            # 🎯 监控LLM推理（关键性能瓶颈）
+            with PerformanceMonitor(
+                "分类器-LLM推理",
+                threshold=2.0,  # LLM推理超过2秒会告警
+                metadata={
+                    "prompt_length": len(classification_prompt),
+                    "model_type": "basic"
+                },
+                level=logging.INFO
+            ) as llm_monitor:
+                # 直接调用LLM，不使用with_structured_output
+                response = llm.invoke([
+                    {"role": "user", "content": classification_prompt}
+                ])
+                
+                # 提取响应内容
+                content = response.content if hasattr(response, 'content') else str(response)
+                
+                # 确保 content 是字符串类型
+                if not isinstance(content, str):
+                    content = str(content)
+            
+            # 🎯 监控结果解析
+            with PerformanceMonitor("分类器-结果解析", level=logging.DEBUG):
+                # 手动解析JSON
+                result = _parse_llm_response_to_route_decision(content, query, department)
+            
+            # 记录分类结果和性能信息
+            enhanced_logger.logger.info(
+                f"✅ CLASSIFIER_RESULT | 路径: {result.path} | "
+                f"复杂度: {result.complexity} | "
+                f"置信度: {result.confidence:.2f} | "
+                f"理由: {result.reasoning} | "
+                f"总耗时: {overall_monitor.get_duration_formatted()} | "
+                f"LLM耗时: {llm_monitor.get_duration_formatted()}"
+            )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"分类过程出错: {e}，使用默认路径")
+            # 出错时使用保守的默认策略
+            return _fallback_classification(query, department, "")
 
 
 def _parse_llm_response_to_route_decision(
