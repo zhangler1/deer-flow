@@ -84,13 +84,13 @@ services:
     # 数据卷挂载
     volumes:
       # 初始化脚本目录（容器首次启动时自动执行）
-      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+      - ./SQL/init-scripts:/docker-entrypoint-initdb.d:ro
       # 数据持久化（使用命名卷）
       - mysql-data:/var/lib/mysql
       # MySQL 日志目录
       - mysql-logs:/var/log/mysql
       # 自定义配置文件（可选）
-      - ./my.cnf:/etc/mysql/conf.d/custom.cnf:ro
+      - ./SQL/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
     # 启动命令参数
     command:
       # 字符集配置
@@ -112,7 +112,7 @@ services:
       - --max-allowed-packet=64M
     # 健康检查
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p7175723zl"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$YSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 5
