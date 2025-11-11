@@ -1,72 +1,15 @@
+# ==========================================
+# MySQL 服务 Docker Compose 配置示例
+# ==========================================
+# 使用方法:
+#   1. 将此配置合并到主 docker-compose.yml 中
+#   2. 或单独启动: docker-compose -f docker-compose.mysql.yml up -d
+# ==========================================
+
 services:
-  backend:
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile
-    image: deer-flow-backend:1014
-    container_name: deer-flow-backend
-    # Remove the ports section to not expose to host
-    env_file:
-      - .env
-    environment:
-      - NODE_ID=docker-${HOSTNAME}
-    expose:
-      - "8000"
-    volumes:
-      - ./conf.yaml:/app/conf.yaml:ro
-      - ./pyproject.toml:/app/pyproject.toml
-      - ./src:/app/src
-
-    restart: unless-stopped
-    networks:
-      - deer-flow-network
-    tty: true
-    stdin_open: true
-    entrypoint: ["/app/.venv/bin/python" ,"server.py" ,"--host", "0.0.0.0" ,"--port", "8000"]
-
-  frontend:
-    # build:
-    #   context: ./web
-    #   dockerfile: Dockerfile.dev.yml
-    #   args:
-    #     - NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-    image: deer-flow-front:latest
-    container_name: deer-flow-frontend
-    expose:
-      - "3000"
-    #使用运行时候环境变量覆盖
-    # environment:
-      # - NEXT_PUBLIC_API_URL=value
-    env_file:
-      - .env  
-    # 挂载环境变量
-    volumes:
-      - ./web/.env.local:/app/web/.env.local:ro
-      - ./conf.yaml:/app/conf.yaml:ro
-    depends_on:
-      - backend
-    restart: unless-stopped
-    networks:
-      - deer-flow-network
-  nginx:
-    image: nginx:latest
-    container_name: deer-flow-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - frontend
-      - backend
-    restart: unless-stopped
-    networks:
-      - deer-flow-network
-
+  # MySQL 数据库服务
   mysql:
-    image: mysql:8.0.39
+    image: mysql:8.0
     container_name: deer-flow-mysql
     # 环境变量配置
     environment:
@@ -84,13 +27,13 @@ services:
     # 数据卷挂载
     volumes:
       # 初始化脚本目录（容器首次启动时自动执行）
-      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+      - ./SQL/init-scripts:/docker-entrypoint-initdb.d:ro
       # 数据持久化（使用命名卷）
       - mysql-data:/var/lib/mysql
       # MySQL 日志目录
       - mysql-logs:/var/log/mysql
       # 自定义配置文件（可选）
-      - ./my.cnf:/etc/mysql/conf.d/custom.cnf:ro
+      - ./SQL/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
     # 启动命令参数
     command:
       # 字符集配置
@@ -136,7 +79,7 @@ services:
       UPLOAD_LIMIT: 64M
     
     ports:
-      - "8089:80"
+      - "8080:80"
     
     depends_on:
       mysql:
@@ -157,7 +100,7 @@ volumes:
   mysql-logs:
     driver: local
 
-
+# 网络定义
 networks:
   deer-flow-network:
     driver: bridge
