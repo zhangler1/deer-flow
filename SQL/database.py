@@ -14,7 +14,7 @@ from sqlalchemy import create_engine, Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import QueuePool
 
-from .config import DatabaseConfig, get_default_config
+from config import DatabaseConfig, get_default_config
 
 
 # ==================== 数据库管理器 ====================

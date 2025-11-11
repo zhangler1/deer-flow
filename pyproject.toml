@@ -45,6 +45,7 @@ dependencies = [
     "pyright>=1.1.406",
     "colorama>=0.4.6",
     "pip>=25.2",
+    "pymysql>=1.1.2",
 ]
 
 [project.optional-dependencies]
