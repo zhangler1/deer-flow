@@ -34,6 +34,10 @@ from .types import State
 from .classifier import classify_request
 from .department_agents import create_department_agent, get_department_config
 
+import requests
+from SQL.services import SceneMapService
+from SQL.database import init_database
+
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes')
 
@@ -272,11 +276,6 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
         answer = response.content if hasattr(response, 'content') else str(response)
         llm_duration = time.time() - llm_start
         
-        # INFO级别：打印LLM最终输出
-        enhanced_logger.logger.info(
-            f"🤖 LLM_OUTPUT | simple_search | 响应长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s\n"
-            f"{'='*80}\n{answer}\n{'='*80}"
-        )
         
         # DEBUG级别：打印更详细的输出信息
         if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
@@ -335,104 +334,118 @@ def domain_knowledge_node(
     )
     
     try:
-        # 优先使用本地知识库
-        if resources:
-            enhanced_logger.logger.info("📚 USING_LOCAL_RESOURCES | 使用本地知识库检索")
-            retriever_tool = get_retriever_tool(resources)
-            # 确保 retriever_tool 不为 None
-            if retriever_tool is not None:
-                search_results = retriever_tool.invoke(query)
-            else:
-                # 如果 retriever_tool 为 None，使用网络搜索作为后备
-                search_results = get_web_search_tool(
-                    max_search_results=5,  # 领域知识需要更多结果
-                    engine=configurable.search_engine,
-                    repository_id=configurable.custom_search_repository
-                ).invoke(query)
-        else:
-            # 如果没有本地资源，使用网络搜索（但更针对专业内容）
-            enhanced_logger.logger.info("🌐 USING_WEB_SEARCH | 使用网络搜索（专业模式）")
-            search_results = get_web_search_tool(
-                max_search_results=5,  # 领域知识需要更多结果
-                engine=configurable.search_engine,
-                repository_id=configurable.custom_search_repository
-            ).invoke(query)
-        
-        enhanced_logger.logger.info(
-            f"🔍 SEARCH_COMPLETE | 结果数: {len(search_results) if isinstance(search_results, list) else '未知'}"
-        )
-        
-        # 使用 Prompt 模板（专业知识场景）
-        # 准备模板变量：添加 search_results，resources 已在 state 中
-        state_with_knowledge = dict(state)
-        state_with_knowledge['search_results'] = search_results
-        
+        # 新增：金融场景分类并调用外部接口 jxChat（优先执行）
         try:
-            messages_for_llm = apply_prompt_template(
-                "domain_knowledge",
-                state_with_knowledge,
-                configurable
+            init_database()
+        except Exception as e:
+            enhanced_logger.logger.warning(f"⚠️ DB_INIT_WARN | 数据库初始化失败，继续执行但可能无场景列表: {e}")
+        
+        fin_scene_tuples = []
+        try:
+            scenes = SceneMapService.get_scene_details(
+                repository='EUVD',
+                exclude_empty_template=False
+            )
+            fin_scene_tuples = [
+                (
+                    s.get('scene_name', ''),
+                    s.get('scene_code', ''),
+                    s.get('description', 'N/A')
+                )
+                for s in scenes
+                if str(s.get('scene_code', '')).startswith('FIN_') or str(s.get('scene_code', '')) == 'SXZSWD'
+            ]
+        except Exception as e:
+            enhanced_logger.logger.warning(f"⚠️ SCENE_FETCH_WARN | 获取金融场景失败: {e}")
+            fin_scene_tuples = []
+        
+        allowed_codes = {t[1] for t in fin_scene_tuples if t[1]}
+        enhanced_logger.logger.info(f"📚 FIN_SCENES | 候选数: {len(allowed_codes)}")
+        
+        classification_prompt = f"""
+你是银行财务领域的场景分类助手。请从候选列表中选择最匹配本问题的场景码（scene_code）。
+
+用户问题：{query}
+候选场景（name|code|desc，最多展示20条）：{json.dumps(fin_scene_tuples[:20], ensure_ascii=False)}
+
+请只输出严格的JSON：{{"scene_code": "<CODE>", "confidence": 0.0, "reason": "简要理由"}}。
+- 必须从候选列表的 code 中选择；若无明确匹配则返回默认 {{"scene_code": "SXZSWD", "confidence": 0.5, "reason": "默认兜底"}}。
+- 不要输出除上述JSON以外的任何额外文本。
+"""
+        
+        scene_code = ""
+        try:
+            llm_cls = get_llm_by_type("basic")
+            resp_cls = llm_cls.invoke([{"role": "user", "content": classification_prompt}])
+            raw_content_cls = resp_cls.content if hasattr(resp_cls, 'content') else str(resp_cls)
+            parsed_cls = json.loads(repair_json_output(str(raw_content_cls)))
+            scene_code = str(parsed_cls.get("scene_code", "")).strip()
+            if not scene_code or (allowed_codes and scene_code not in allowed_codes):
+                enhanced_logger.logger.warning(f"⚠️ CODE_VALIDATION | 非候选或空code: '{scene_code}'，使用兜底SXZSWD")
+                scene_code = "SXZSWD"
+        except Exception as e:
+            enhanced_logger.logger.warning(f"⚠️ CLASSIFY_FALLBACK | 分类失败，使用兜底SXZSWD: {e}")
+            scene_code = "SXZSWD"
+        
+        # 调用外部场景码接口（jxChat），并将结果作为本节点输出（SSE由系统统一流式返回）
+        try:
+            url = os.getenv("JXCHAT_URL", "http://localhost:9080/jxChat")
+            headers = {
+                "Accept": "*/*",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Connection": "keep-alive",
+                "Content-Type": "application/json",
+                "User-Agent": os.getenv("JXCHAT_UA", "PostmanRuntime-ApipostRuntime/1.1.0"),
+                "api-key": os.getenv("JXCHAT_API_KEY", "123456789"),
+                "jumpCloud-Env": os.getenv("JXCHAT_ENV", "BASE"),
+            }
+            payload = {
+                "messages": [{"role": "user", "content": query}],
+                "stream": False,
+                "model": os.getenv("JXCHAT_MODEL", "gpt-fire-general"),
+                "flag": False,
+                "scene_code": scene_code,
+                "assistantId": "-1",
+                "muwpUser": {
+                    "muwp_branchID": os.getenv("MUWP_BRANCH_ID", "1000027159"),
+                    "muwp_loginName": os.getenv("MUWP_LOGIN_NAME", "xuew_4"),
+                    "muwp_userCode": os.getenv("MUWP_USER_CODE", "9743616"),
+                    "muwp_userName": os.getenv("MUWP_USER_NAME", "薛巍"),
+                    "muwp_userID": os.getenv("MUWP_USER_ID", "132298"),
+                },
+            }
+            enhanced_logger.logger.info(f"🌐 JXCHAT_REQUEST | URL: {url} | scene_code: {scene_code}")
+            r = requests.post(url, headers=headers, json=payload, timeout=int(os.getenv("JXCHAT_TIMEOUT", "20")))
+            r.raise_for_status()
+            final_text = ""
+            try:
+                data = r.json()
+                final_text = (
+                    data.get("answer") or data.get("data") or data.get("message") or json.dumps(data, ensure_ascii=False)
+                )
+            except Exception:
+                final_text = r.text
+            
+            duration = time.time() - start_time
+            enhanced_logger.logger.info(
+                f"✅ NODE_EXIT | domain_knowledge(jxchat) | 完成 | 耗时: {duration:.2f}s"
+            )
+            return Command(
+                update={
+                    "final_report": final_text,
+                    "messages": [AIMessage(content=final_text, name="domain_knowledge_assistant")]
+                },
+                goto="__end__"
             )
         except Exception as e:
-            logger.warning(f"应用Prompt模板失败，使用备用方案: {e}")
-            # 备用方案：简单提示词
-            answer_prompt_fallback = f"""请基于以下专业知识库信息回答问题（400-600字）:
+            enhanced_logger.logger.error(f"❌ JXCHAT_ERROR | {str(e)}")
+            return simple_search_node(state, config)
 
-问题: {query}
-
-知识库: {json.dumps(search_results, ensure_ascii=False, indent=2)}
-"""
-            messages_for_llm = [{"role": "user", "content": answer_prompt_fallback}]
-        
-        # 生成回答
-        llm_start = time.time()
-        llm = get_llm_by_type("basic")
-        
-        # DEBUG级别：打印LLM输入
-        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
-            prompt_str = str(messages_for_llm)
-            enhanced_logger.logger.debug(
-                f"🤖 LLM_INPUT | domain_knowledge | Prompt长度: {len(str(prompt_str))}\n"
-                f"{'='*80}\n{str(prompt_str)}\n{'='*80}"
-            )
-        
-        response = llm.invoke(messages_for_llm)
-        answer = response.content if hasattr(response, 'content') else str(response)
-        llm_duration = time.time() - llm_start
-        
-        # INFO级别：打印LLM最终输出
-        enhanced_logger.logger.info(
-            f"🤖 LLM_OUTPUT | domain_knowledge | 响应长度: {len(answer)} | LLM耗时: {llm_duration:.2f}s\n"
-            f"{'='*80}\n{answer}\n{'='*80}"
-        )
-        
-        # DEBUG级别：打印更详细的输出信息
-        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
-            enhanced_logger.logger.debug(
-                f"🤖 LLM_OUTPUT_DETAIL | domain_knowledge | 响应类型: {type(response)} | 完整响应: {response}"
-            )
-        
-        duration = time.time() - start_time
-        enhanced_logger.logger.info(
-            f"✅ NODE_EXIT | domain_knowledge | 节点执行完成 | 总耗时: {duration:.2f}s"
-        )
-        
-        return Command(
-            update={
-                "final_report": answer,
-                "messages": [AIMessage(content=answer, name="domain_knowledge_assistant")]
-            },
-            goto="__end__"
-        )
-        
     except Exception as e:
         logger.error(f"领域知识处理失败: {e}")
         enhanced_logger.logger.error(f"❌ DOMAIN_KNOWLEDGE_ERROR | {str(e)}")
+        return simple_search_node(state, config)
         
-        # 失败时回退到简单检索
-        enhanced_logger.logger.warning("⚠️ FALLBACK_TO_SIMPLE | 领域知识处理失败，回退到简单检索")
-        return simple_search_node(state, config)  # 回退到simple_search_node
-
 
 def department_node(
     state: State, config: RunnableConfig

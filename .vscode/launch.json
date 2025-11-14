@@ -72,7 +72,12 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}",
+                "DB_HOST": "192.168.0.106",
+                "DB_PORT": "3306",
+                "DB_USER": "omuser@tellmua100#obhfcgb03uat",
+                "DB_PASSWORD": "OceanBase_123#",
+                "DB_NAME": "omservice"
             },
             "args": [
                 "--host",
