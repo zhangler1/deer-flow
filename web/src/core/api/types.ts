@@ -27,7 +27,7 @@ interface GenericEvent<T extends string, D extends object> {
   data: {
     id: string;
     thread_id: string;
-    agent: "coordinator" | "planner" | "researcher" | "coder" | "reporter" | "direct_answer_node" | "simple_search_node" | "domain_knowledge_node" | "department_node";
+    agent: "coordinator" | "planner" | "researcher" | "coder" | "reporter" | "router" | "direct_answer_node" | "simple_search_node" | "domain_knowledge_node" | "department_node";
     role: "user" | "assistant" | "tool";
     finish_reason?: "stop" | "tool_calls" | "interrupt";
   } & D;

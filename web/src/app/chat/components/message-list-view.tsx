@@ -105,6 +105,7 @@ export function MessageListView({
           message.agent === "coordinator" ||
           message.agent === "planner" ||
           message.agent === "podcast" ||
+          message.agent === "router" ||
           message.agent === "direct_answer_node" ||
           message.agent === "simple_search_node" ||
           message.agent === "domain_knowledge_node" ||

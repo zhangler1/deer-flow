@@ -13,6 +13,7 @@ export interface Message {
     | "coder"
     | "reporter"
     | "podcast"
+    | "router"
     | "direct_answer_node"
     | "simple_search_node"
     | "domain_knowledge_node"
