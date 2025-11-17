@@ -99,11 +99,16 @@ export function MessageListView({
         const startOfResearch = researchIds.includes(messageId);
         
         // 检查是否应该渲染这个消息
+        // 用户消息、coordinator、planner、podcast、深度研究节点、智能路由节点都应该显示
         if (!(
           message.role === "user" ||
           message.agent === "coordinator" ||
           message.agent === "planner" ||
           message.agent === "podcast" ||
+          message.agent === "direct_answer_node" ||
+          message.agent === "simple_search_node" ||
+          message.agent === "domain_knowledge_node" ||
+          message.agent === "department_node" ||
           startOfResearch
         )) {
           return null;

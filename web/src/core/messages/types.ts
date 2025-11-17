@@ -12,7 +12,11 @@ export interface Message {
     | "researcher"
     | "coder"
     | "reporter"
-    | "podcast";
+    | "podcast"
+    | "direct_answer_node"
+    | "simple_search_node"
+    | "domain_knowledge_node"
+    | "department_node";
   role: MessageRole;
   isStreaming?: boolean;
   content: string;
