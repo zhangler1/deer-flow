@@ -42,6 +42,28 @@ logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes')
 
 
+def _get_path_description(path: str) -> str:
+    """获取路径描述"""
+    descriptions = {
+        "direct_answer": "直接回答，不走检索",
+        "simple_search": "简单检索，单次查询",
+        "deep_research": "深度研究，多轮分析",
+        "domain_knowledge": "领域知识，专业知识库"
+    }
+    return descriptions.get(path, "未知路径")
+
+
+def _get_complexity_description(complexity: str) -> str:
+    """获取复杂度描述"""
+    descriptions = {
+        "simple": "简单通用",
+        "medium": "适中专业",
+        "complex": "复杂分散",
+        "expert": "专家集中"
+    }
+    return descriptions.get(complexity, "未知复杂度")
+
+
 @tool
 def handoff_to_planner(
     research_topic: Annotated[str, "要移交的研究任务主题"],
@@ -98,10 +120,29 @@ def router_node(
         f"理由: {route_decision.reasoning}"
     )
     
-    # 更新状态
+    # 🆕 构造分类信息，输出到前端
+    classification_message = (
+        f"---\n"
+        f"**🔀 智能路由分类结果**\n\n"
+        f"- **路由路径**: `{route_decision.path}` ({_get_path_description(route_decision.path)})\n"
+        f"- **问题复杂度**: `{route_decision.complexity}` ({_get_complexity_description(route_decision.complexity)})\n"
+        f"- **是否检索**: {'✅ 是' if route_decision.needs_search else '❌ 否'}\n"
+        f"- **置信度**: `{route_decision.confidence:.2%}`\n"
+        f"- **分类理由**: {route_decision.reasoning}\n"
+        f"\n---\n"
+    )
+    
+    # 更新状态（包含分类信息消息）
+    from langchain_core.messages import AIMessage
     state_update = {
         "query_complexity": route_decision.complexity,
         "routing_path": route_decision.path,
+        "messages": [
+            AIMessage(
+                content=classification_message,
+                name="router"
+            )
+        ]
     }
     
     duration = time.time() - start_time
@@ -374,6 +415,7 @@ def domain_knowledge_node(
 """
         
         scene_code = ""
+        classification_info = ""  # 用于存储分类信息，添加到输出前缀
         try:
             llm_cls = get_llm_by_type("basic")
             classification_start = time.time()
@@ -392,6 +434,17 @@ def domain_knowledge_node(
             scene_code = str(parsed_cls.get("scene_code", "")).strip()
             confidence = parsed_cls.get("confidence", 0.0)
             reason = parsed_cls.get("reason", "N/A")
+            
+            # 🆕 构造分类信息（将添加到最终输出的开头）
+            classification_info = (
+                f"---\n"
+                f"**📊 问题分类结果**\n\n"
+                f"- 场景代码: `{scene_code}`\n"
+                f"- 置信度: `{confidence:.2%}`\n"
+                f"- 分类理由: {reason}\n"
+                f"- 分类耗时: `{classification_duration:.2f}秒`\n"
+                f"\n---\n\n"
+            )
             
             # 🆕 添加：记录解析后的分类结果
             enhanced_logger.logger.info(
@@ -449,11 +502,19 @@ def domain_knowledge_node(
             enhanced_logger.logger.info(
                 f"✅ NODE_EXIT | domain_knowledge(jxchat) | 完成 | 耗时: {duration:.2f}s"
             )
-            # 不添加 messages，让 LangGraph 自动捕获响应（避免双重输出）
-            # jxChat 的响应已经通过 final_report 保存
+            
+            # 🆕 将分类信息通过 messages 输出到前端（这样可以实时看到）
+            from langchain_core.messages import AIMessage
+            final_output = classification_info + final_text if classification_info else final_text
             return Command(
                 update={
-                    "final_report": final_text,
+                    "messages": [
+                        AIMessage(
+                            content=final_output,
+                            name="domain_knowledge_node"
+                        )
+                    ],
+                    "final_report": final_output,
                 },
                 goto="__end__"
             )
@@ -767,8 +828,8 @@ def planner_node(
                 
                 return Command(
                     update={
-                        "messages": [AIMessage(content=full_response, name="planner")],
                         "current_plan": new_plan,
+                        # 不添加 messages，让 LangGraph 自动捕获流式响应（避免双重输出）
                     },
                     goto="human_feedback",
                 )
@@ -779,8 +840,8 @@ def planner_node(
                 
                 return Command(
                     update={
-                        "messages": [AIMessage(content=full_response, name="planner")],
                         "current_plan": new_plan,
+                        # 不添加 messages，让 LangGraph 自动捕获流式响应（避免双重输出）
                     },
                     goto="reporter",
                 )
@@ -799,8 +860,8 @@ def planner_node(
     
     return Command(
         update={
-            "messages": [AIMessage(content=full_response, name="planner")],
             "current_plan": full_response,
+            # 不添加 messages，让 LangGraph 自动捕获流式响应（避免双重输出）
         },
         goto="human_feedback",
     )

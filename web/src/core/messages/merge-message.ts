@@ -101,5 +101,6 @@ function mergeToolCallResultMessage(
 
 function mergeInterruptMessage(message: Message, event: InterruptEvent) {
   message.isStreaming = false;
+  message.finishReason = "interrupt";  // 设置 finishReason 为 interrupt
   message.options = event.data.options;
 }
