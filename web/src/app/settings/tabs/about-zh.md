@@ -1,4 +1,4 @@
-# 🦌 [关于 DeerFlow](https://github.com/bytedance/deer-flow)
+# 💡 [关于 DeerFlow](https://github.com/bytedance/deer-flow)
 
 > **源于开源，回馈开源**
 

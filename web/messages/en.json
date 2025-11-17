@@ -88,7 +88,7 @@
     },
     "welcome": {
       "greeting": "👋 Hello, there!",
-      "description": "Welcome to 🦌 DeerFlow, a deep research assistant built on cutting-edge language models, helps you search on web, browse information, and handle complex tasks."
+      "description": "Welcome to 💡 DeerFlow, a deep research assistant built on cutting-edge language models, helps you search on web, browse information, and handle complex tasks."
     },
     "conversationStarters": [
       "How many times taller is the Eiffel Tower than the tallest building in the world?",
