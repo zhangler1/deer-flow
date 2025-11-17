@@ -54,7 +54,7 @@ class ChatRequest(BaseModel):
         None, description="The repository ID for custom search engine"
     )
     auto_accepted_plan: Optional[bool] = Field(
-        False, description="Whether to automatically accept the plan"
+        True, description="Whether to automatically accept the plan"
     )
     interrupt_feedback: Optional[str] = Field(
         None, description="Interrupt feedback from the user on the plan"
