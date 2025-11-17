@@ -184,10 +184,10 @@ def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal[
             f"✅ NODE_EXIT | direct_answer | 节点执行完成 | 总耗时: {duration:.2f}s"
         )
         
+        # 不添加 messages，让 LangGraph 自动捕获 LLM 的流式响应（避免双重输出）
         return Command(
             update={
                 "final_report": answer,
-                "messages": [AIMessage(content=answer, name="direct_answer_assistant")]
             },
             goto="__end__"
         )
@@ -288,10 +288,10 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
             f"✅ NODE_EXIT | simple_search | 节点执行完成 | 总耗时: {duration:.2f}s"
         )
         
+        # 不添加 messages，让 LangGraph 自动捕获 LLM 的流式响应（避免双重输出）
         return Command(
             update={
                 "final_report": answer,
-                "messages": [AIMessage(content=answer, name="simple_search_assistant")]
             },
             goto="__end__"
         )
@@ -376,10 +376,29 @@ def domain_knowledge_node(
         scene_code = ""
         try:
             llm_cls = get_llm_by_type("basic")
+            classification_start = time.time()
             resp_cls = llm_cls.invoke([{"role": "user", "content": classification_prompt}])
+            classification_duration = time.time() - classification_start
+            
             raw_content_cls = resp_cls.content if hasattr(resp_cls, 'content') else str(resp_cls)
+            
+            # 🆕 添加：记录分类模型的原始输出
+            enhanced_logger.logger.info(
+                f"🎯 CLASSIFICATION_LLM_OUTPUT | 分类模型响应 | 耗时: {classification_duration:.2f}s\n"
+                f"{'='*80}\n{raw_content_cls}\n{'='*80}"
+            )
+            
             parsed_cls = json.loads(repair_json_output(str(raw_content_cls)))
             scene_code = str(parsed_cls.get("scene_code", "")).strip()
+            confidence = parsed_cls.get("confidence", 0.0)
+            reason = parsed_cls.get("reason", "N/A")
+            
+            # 🆕 添加：记录解析后的分类结果
+            enhanced_logger.logger.info(
+                f"✅ CLASSIFICATION_RESULT | scene_code: '{scene_code}' | "
+                f"置信度: {confidence} | 理由: {reason}"
+            )
+            
             if not scene_code or (allowed_codes and scene_code not in allowed_codes):
                 enhanced_logger.logger.warning(f"⚠️ CODE_VALIDATION | 非候选或空code: '{scene_code}'，使用兜底SXZSWD")
                 scene_code = "SXZSWD"
@@ -430,10 +449,11 @@ def domain_knowledge_node(
             enhanced_logger.logger.info(
                 f"✅ NODE_EXIT | domain_knowledge(jxchat) | 完成 | 耗时: {duration:.2f}s"
             )
+            # 不添加 messages，让 LangGraph 自动捕获响应（避免双重输出）
+            # jxChat 的响应已经通过 final_report 保存
             return Command(
                 update={
                     "final_report": final_text,
-                    "messages": [AIMessage(content=final_text, name="domain_knowledge_assistant")]
                 },
                 goto="__end__"
             )
@@ -528,10 +548,10 @@ def department_node(
             f"✅ NODE_EXIT | department | 部门专用处理完成 | 总耗时: {duration:.2f}s"
         )
         
+        # 不添加 messages，让 LangGraph 自动捕获 LLM 的流式响应（避免双重输出）
         return Command(
             update={
                 "final_report": output,
-                "messages": [AIMessage(content=output, name=f"{dept_config['name']}_assistant")]
             },
             goto="__end__"
         )
