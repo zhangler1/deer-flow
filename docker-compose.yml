@@ -3,7 +3,7 @@ services:
     # build:
     #   context: .
     #   dockerfile: Dockerfile
-    image: deer-flow-backend:1014
+    image: deer-flow-backend:1117
     container_name: deer-flow-backend
     # Remove the ports section to not expose to host
     env_file:
