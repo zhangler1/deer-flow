@@ -1272,12 +1272,20 @@ async def _execute_agent_step(
     enhanced_logger.logger.info("="*80)
     enhanced_logger.logger.info(f"🤖 AGENT_INVOKE_PREPARE | {agent_name} | 准备调用LLM")
     enhanced_logger.logger.info(f"📋 输入消息内容 (前200字): {agent_input['messages'][0].content[:200]}...")
+    
+    # 注意：create_react_agent返回的是编译后的图对象，不直接暴露tools属性
+    # 但工具已经通过create_agent函数绑定到LLM上
+    # 我们可以通过检查agent的其他属性来确认
     if hasattr(agent, 'tools'):
         tool_names = [getattr(t, 'name', 'unknown') for t in agent.tools]
-        enhanced_logger.logger.info(f"🔧 Agent绑定的工具列表: {tool_names}")
-        enhanced_logger.logger.info(f"🔧 工具总数: {len(agent.tools)}")
+        enhanced_logger.logger.info(f"🔧 Agent.tools属性存在: {tool_names} (共{len(agent.tools)}个)")
+    elif hasattr(agent, 'nodes'):
+        enhanced_logger.logger.info(f"🔧 Agent类型: LangGraph编译图 (这是正常的)")
+        enhanced_logger.logger.info(f"🔧 工具已通过create_react_agent绑定到LLM")
     else:
-        enhanced_logger.logger.warning(f"⚠️  Agent没有tools属性！")
+        enhanced_logger.logger.warning(f"⚠️  Agent对象类型异常: {type(agent)}")
+        enhanced_logger.logger.warning(f"   Agent属性: {dir(agent)[:10]}...")
+    
     enhanced_logger.logger.info("="*80)
 
     # 为研究智能体添加引用提醒
