@@ -1268,6 +1268,18 @@ async def _execute_agent_step(
         ]
     }
 
+    # 🆕 添加详细的工具调用前日志
+    enhanced_logger.logger.info("="*80)
+    enhanced_logger.logger.info(f"🤖 AGENT_INVOKE_PREPARE | {agent_name} | 准备调用LLM")
+    enhanced_logger.logger.info(f"📋 输入消息内容 (前200字): {agent_input['messages'][0].content[:200]}...")
+    if hasattr(agent, 'tools'):
+        tool_names = [getattr(t, 'name', 'unknown') for t in agent.tools]
+        enhanced_logger.logger.info(f"🔧 Agent绑定的工具列表: {tool_names}")
+        enhanced_logger.logger.info(f"🔧 工具总数: {len(agent.tools)}")
+    else:
+        enhanced_logger.logger.warning(f"⚠️  Agent没有tools属性！")
+    enhanced_logger.logger.info("="*80)
+
     # 为研究智能体添加引用提醒
     if agent_name == "researcher":
         if state.get("resources"):
@@ -1317,14 +1329,52 @@ async def _execute_agent_step(
     
     # 记录Agent执行过程
     agent_exec_start_time = time.time()
-    enhanced_logger.logger.info(f"🤖 AGENT_INVOKE | {agent_name} | 开始智能体执行 | 递归限制: {recursion_limit}")
+    enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | 递归限制: {recursion_limit}")
     
     result = await agent.ainvoke(
         input=agent_input, config={"recursion_limit": recursion_limit}
     )
     
     agent_exec_duration = time.time() - agent_exec_start_time
-    enhanced_logger.logger.info(f"✅ AGENT_COMPLETE | {agent_name} | 智能体执行完成 | 耗时: {agent_exec_duration:.2f}s")
+    enhanced_logger.logger.info(f"✅ AGENT_INVOKED | {agent_name} | LLM调用完成 | 耗时: {agent_exec_duration:.2f}s")
+    
+    # 🆕 添加详细的响应分析日志
+    if isinstance(result, dict):
+        messages = result.get("messages", [])
+        enhanced_logger.logger.info(f"📨 AGENT_RESPONSE | {agent_name} | 返回消息数: {len(messages)}")
+        
+        # 检查是否有工具调用
+        tool_calls_found = False
+        tool_call_count = 0
+        for msg_idx, msg in enumerate(messages):
+            if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                tool_calls_found = True
+                tool_call_count += len(msg.tool_calls)
+                enhanced_logger.logger.info(f"🔧 TOOL_CALLS_DETECTED | {agent_name} | 消息[{msg_idx}]中的工具调用数: {len(msg.tool_calls)}")
+                for tc_idx, tc in enumerate(msg.tool_calls):
+                    tool_name = tc.get('name', 'unknown') if isinstance(tc, dict) else getattr(tc, 'name', 'unknown')
+                    tool_args = tc.get('args', {}) if isinstance(tc, dict) else getattr(tc, 'args', {})
+                    # 只打印参数的摘要，避免日志过长
+                    args_summary = str(tool_args)[:100] + '...' if len(str(tool_args)) > 100 else str(tool_args)
+                    enhanced_logger.logger.info(f"   ⚙️  工具调用[{tc_idx}]: {tool_name} | 参数: {args_summary}")
+        
+        if not tool_calls_found:
+            enhanced_logger.logger.warning(f"⚠️  NO_TOOL_CALLS | {agent_name} | LLM没有调用任何工具！")
+            enhanced_logger.logger.warning(f"   ❌ 这是一个问题！{agent_name}应该调用工具进行搜索。")
+            enhanced_logger.logger.warning(f"   可能原因:")
+            enhanced_logger.logger.warning(f"      1) Prompt指令不够强制")
+            enhanced_logger.logger.warning(f"      2) LLM选择直接回答")
+            enhanced_logger.logger.warning(f"      3) LLM模型不支持function calling")
+            # 打印LLM的实际响应内容
+            for i, msg in enumerate(messages):
+                content = getattr(msg, 'content', '')
+                if content:
+                    content_preview = content[:300] + '...' if len(content) > 300 else content
+                    enhanced_logger.logger.warning(f"   📄 LLM直接响应[{i}]: {content_preview}")
+        else:
+            enhanced_logger.logger.info(f"✅ TOOL_CALLS_SUCCESS | {agent_name} | 共检测到 {tool_call_count} 个工具调用")
+    else:
+        enhanced_logger.logger.warning(f"⚠️  UNEXPECTED_RESULT_TYPE | {agent_name} | result类型: {type(result)}")
 
     # Process the result
     response_content = result["messages"][-1].content
