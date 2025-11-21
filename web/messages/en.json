@@ -139,6 +139,10 @@
       "errorGeneratingPodcast": "Error when generating podcast. Please try again.",
       "downloadPodcast": "Download podcast"
     },
+    "search": {
+      "searching": "Searching",
+      "repository": "Repository"
+    },
     "messages": {
       "replaying": "Replaying",
       "replayDescription": "DeerFlow is now replaying the conversation...",

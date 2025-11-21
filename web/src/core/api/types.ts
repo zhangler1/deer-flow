@@ -76,9 +76,20 @@ export interface InterruptEvent
     }
   > {}
 
+export interface SearchStatusEvent
+  extends GenericEvent<
+    "search_status",
+    {
+      query: string;
+      repository?: string;
+      status: "started" | "completed";
+    }
+  > {}
+
 export type ChatEvent =
   | MessageChunkEvent
   | ToolCallsEvent
   | ToolCallChunksEvent
   | ToolCallResultEvent
-  | InterruptEvent;
+  | InterruptEvent
+  | SearchStatusEvent;

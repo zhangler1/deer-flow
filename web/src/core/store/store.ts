@@ -26,6 +26,7 @@ export const useStore = create<{
   researchActivityIds: Map<string, string[]>;
   ongoingResearchId: string | null;
   openResearchId: string | null;
+  searchStatus: { query: string; repository?: string } | null;
 
   appendMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
@@ -33,6 +34,7 @@ export const useStore = create<{
   openResearch: (researchId: string | null) => void;
   closeResearch: () => void;
   setOngoingResearch: (researchId: string | null) => void;
+  setSearchStatus: (status: { query: string; repository?: string } | null) => void;
 }>((set) => ({
   responding: false,
   threadId: THREAD_ID,
@@ -44,6 +46,7 @@ export const useStore = create<{
   researchActivityIds: new Map<string, string[]>(),
   ongoingResearchId: null,
   openResearchId: null,
+  searchStatus: null,
 
   appendMessage(message: Message) {
     set((state) => ({
@@ -71,6 +74,9 @@ export const useStore = create<{
   },
   setOngoingResearch(researchId: string | null) {
     set({ ongoingResearchId: researchId });
+  },
+  setSearchStatus(status: { query: string; repository?: string } | null) {
+    set({ searchStatus: status });
   },
 }));
 
@@ -123,6 +129,20 @@ export async function sendMessage(
   try {
     for await (const event of stream) {
       const { type, data } = event;
+      
+      // Handle search status events
+      if (type === "search_status") {
+        if (data.status === "started") {
+          useStore.getState().setSearchStatus({
+            query: data.query,
+            repository: data.repository,
+          });
+        } else if (data.status === "completed") {
+          useStore.getState().setSearchStatus(null);
+        }
+        continue;
+      }
+      
       messageId = data.id;
       let message: Message | undefined;
       if (type === "tool_call_result") {

@@ -62,6 +62,7 @@ from src.tools.custom_search import get_available_repositories
 from src.graph.checkpoint import chat_stream_message
 from src.utils.json_utils import sanitize_args
 from src.utils.enhanced_logger import get_enhanced_logger, setup_enhanced_logging
+from src.config.custom_search import get_custom_search_config
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,9 @@ logger = logging.getLogger(__name__)
 log_file = os.getenv('LOG_FILE')  # 例如: logs/deer-flow.log
 setup_enhanced_logging(level=logging.INFO, enable_colors=True, log_file=log_file)
 enhanced_logger = get_enhanced_logger("deer-flow.api")
+
+# Track active tool calls for search status
+_active_search_calls: Dict[str, Dict[str, str]] = {}
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
 
@@ -292,6 +296,21 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
     if isinstance(message_chunk, ToolMessage):
         # Tool Message - Return the result of the tool call
         event_stream_message["tool_call_id"] = message_chunk.tool_call_id
+        
+        # Check if this is a web_search tool completing and emit search_status completed event
+        if message_chunk.tool_call_id in _active_search_calls:
+            search_info = _active_search_calls.pop(message_chunk.tool_call_id)
+            search_event = {
+                "thread_id": thread_id,
+                "agent": agent_name,
+                "id": message_chunk.id,
+                "role": "assistant",
+                "query": search_info.get("query", ""),
+                "repository": search_info.get("repository"),
+                "status": "completed",
+            }
+            yield _make_event("search_status", search_event)
+        
         yield _make_event("tool_call_result", event_stream_message)
     elif isinstance(message_chunk, (AIMessageChunk, AIMessage)):
         # AI Message - Raw message tokens (support both AIMessageChunk and AIMessage)
@@ -301,6 +320,46 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
                 message_chunk.tool_call_chunks
             )
+            
+            # Check if this is a web_search tool call and emit search_status event
+            for tool_call in message_chunk.tool_calls:
+                if tool_call.get("name") == "web_search":
+                    # Extract query and repository from tool call args
+                    args = tool_call.get("args", {})
+                    query = args.get("query", "")
+                    repository_id = args.get("repository_id", "")
+                    
+                    # Get repository name from config if available
+                    repository_name = None
+                    if repository_id:
+                        try:
+                            custom_search_config = get_custom_search_config()
+                            repo_config = custom_search_config.get_repository(repository_id)
+                            if repo_config:
+                                repository_name = repo_config.name
+                        except Exception:
+                            pass
+                    
+                    # Track this search call
+                    tool_call_id = tool_call.get("id", "")
+                    if tool_call_id:
+                        _active_search_calls[tool_call_id] = {
+                            "query": query,
+                            "repository": repository_name or repository_id,
+                        }
+                    
+                    # Emit search started event
+                    search_event = {
+                        "thread_id": thread_id,
+                        "agent": agent_name,
+                        "id": message_chunk.id,
+                        "role": "assistant",
+                        "query": query,
+                        "repository": repository_name or repository_id if repository_id else None,
+                        "status": "started",
+                    }
+                    yield _make_event("search_status", search_event)
+            
             yield _make_event("tool_calls", event_stream_message)
         elif hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
             # AI Message - Tool Call Chunks

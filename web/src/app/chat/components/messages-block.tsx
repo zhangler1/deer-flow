@@ -25,6 +25,7 @@ import { cn } from "~/lib/utils";
 import { ConversationStarter } from "./conversation-starter";
 import { InputBox } from "./input-box";
 import { MessageListView } from "./message-list-view";
+import { SearchStatusBar } from "./search-status-bar";
 import { Welcome } from "./welcome";
 
 export function MessagesBlock({ className }: { className?: string }) {
@@ -100,14 +101,17 @@ export function MessagesBlock({ className }: { className?: string }) {
               onSend={handleSend}
             />
           )}
-          <InputBox
-            className="h-full w-full"
-            responding={responding}
-            feedback={feedback}
-            onSend={handleSend}
-            onCancel={handleCancel}
-            onRemoveFeedback={handleRemoveFeedback}
-          />
+          <div className="flex flex-col gap-2 h-full w-full">
+            <SearchStatusBar className="w-full" />
+            <InputBox
+              className="flex-1 w-full"
+              responding={responding}
+              feedback={feedback}
+              onSend={handleSend}
+              onCancel={handleCancel}
+              onRemoveFeedback={handleRemoveFeedback}
+            />
+          </div>
         </div>
       ) : (
         <>
