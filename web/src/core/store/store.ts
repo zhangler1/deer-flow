@@ -126,6 +126,22 @@ export async function sendMessage(
 
   setResponding(true);
   let messageId: string | undefined;
+  // Batch UI updates to reduce re-render frequency during streaming
+  const pending = new Map<string, Message>();
+  let flushTimer: number | null = null;
+  const flushNow = () => {
+    if (pending.size) {
+      useStore.getState().updateMessages(Array.from(pending.values()));
+      pending.clear();
+    }
+  };
+  const scheduleFlush = () => {
+    if (flushTimer != null) return;
+    flushTimer = window.setTimeout(() => {
+      flushNow();
+      flushTimer = null;
+    }, 100);
+  };
   try {
     for await (const event of stream) {
       const { type, data } = event;
@@ -165,7 +181,9 @@ export async function sendMessage(
       message ??= getMessage(messageId);
       if (message) {
         message = mergeMessage(message, event);
-        updateMessage(message);
+        // Batch the updates to reduce CPU usage
+        pending.set(message.id, message);
+        scheduleFlush();
       }
     }
   } catch {
@@ -179,8 +197,12 @@ export async function sendMessage(
         useStore.getState().updateMessage(message);
       }
     }
+    // Ensure any pending updates are flushed on error
+    flushNow();
     useStore.getState().setOngoingResearch(null);
   } finally {
+    // Flush any remaining batched updates before finishing
+    flushNow();
     setResponding(false);
   }
 }

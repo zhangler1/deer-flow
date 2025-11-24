@@ -174,7 +174,7 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
         {pageResults && (
           <ul className="mt-2 flex flex-wrap gap-4">
             {searching &&
-              [...Array(6)].map((_, i) => (
+              [...Array(3)].map((_, i) => (
                 <li
                   key={`search-result-${i}`}
                   className="flex h-40 w-40 gap-2 rounded-md text-sm"
@@ -187,6 +187,7 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
               ))}
             {pageResults
               .filter((result) => result.type === "page")
+              .slice(0, 3)
               .map((searchResult, i) => (
                 <motion.li
                   key={`search-result-${i}`}
