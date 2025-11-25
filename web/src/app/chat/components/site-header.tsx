@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTranslations } from 'next-intl';
 
 import { LanguageSwitcher } from "~/components/deer-flow/language-switcher";
+import { ThemeToggle } from "~/components/deer-flow/theme-toggle";
 import { NumberTicker } from "~/components/magicui/number-ticker";
 import { Button } from "~/components/ui/button";
 import { env } from "~/env";
@@ -22,6 +23,7 @@ export function SiteHeader() {
         </div>
         <div className="relative flex items-center gap-2">
           <LanguageSwitcher />
+          <ThemeToggle />
           <div
             className="pointer-events-none absolute inset-0 z-0 h-full w-full rounded-full opacity-60 blur-2xl"
             style={{

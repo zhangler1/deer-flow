@@ -51,6 +51,16 @@ export function ThemeToggle() {
             Dark
           </span>
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("sunset")}>
+          <Sun className="mr-2 h-4 w-4" />
+          <span
+            className={cn(
+              theme === "sunset" ? "font-bold" : "text-muted-foreground",
+            )}
+          >
+            Sunset
+          </span>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme("system")}>
           <Monitor className="mr-2 h-4 w-4" />
           <span
