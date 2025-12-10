@@ -23,6 +23,7 @@ from src.tools import (
     get_retriever_tool,
     get_web_search_tool,
     python_repl_tool,
+    crawl_tool,
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
@@ -1529,13 +1530,27 @@ async def researcher_node(
     enhanced_logger.logger.info(f"🔍 RESEARCH_INIT | 开始研究步骤: {current_step_title}")
     
     # 配置工具
-    tools = [get_web_search_tool(configurable.max_search_results, configurable.search_engine, configurable.custom_search_repository)]
+    tools = [
+        get_web_search_tool(
+            configurable.max_search_results,
+            configurable.search_engine,
+            configurable.custom_search_repository
+        ),
+        crawl_tool  # 添加网页爬取工具
+    ]
+    
     retriever_tool = get_retriever_tool(state.get("resources", []))
     if retriever_tool:
         tools.insert(0, retriever_tool)
-        enhanced_logger.logger.info(f"🔧 TOOLS_READY | 研究工具配置完成 | 工具数: {len(tools)} | 包含本地检索: 是")
+        enhanced_logger.logger.info(
+            f"🔧 TOOLS_READY | 研究工具配置完成 | "
+            f"工具数: {len(tools)} | 包含本地检索: 是 | 包含网页爬取: 是"
+        )
     else:
-        enhanced_logger.logger.info(f"🔧 TOOLS_READY | 研究工具配置完成 | 工具数: {len(tools)} | 包含本地检索: 否")
+        enhanced_logger.logger.info(
+            f"🔧 TOOLS_READY | 研究工具配置完成 | "
+            f"工具数: {len(tools)} | 包含本地检索: 否 | 包含网页爬取: 是"
+        )
     
     logger.info(f"Researcher tools: {tools}")
     
