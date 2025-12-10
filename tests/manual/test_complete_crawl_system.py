@@ -7,9 +7,13 @@
 测试所有新增功能：URL验证、重试机制、缓存、批量处理、智能截断
 """
 
+from src.crawler.article import Article
 import sys
 import os
+import asyncio
 from pathlib import Path
+from types import CoroutineType
+from typing import Any
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent.parent
@@ -79,7 +83,7 @@ def test_url_validation():
 # ====================================================================================
 # 测试2: 重试机制
 # ====================================================================================
-def test_retry_mechanism():
+async def test_retry_mechanism():
     """测试重试机制"""
     print_section("测试2: HTTP重试机制")
     
@@ -97,7 +101,7 @@ def test_retry_mechanism():
         print("\n测试正常URL（example.com）...")
         start = time.time()
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = crawler._fetch_with_retry("https://example.com", headers)
+        response = await crawler._fetch_with_retry("https://example.com", headers)
         duration = time.time() - start
         
         print_result(True, f"成功获取响应 | 状态码: {response.status_code} | 耗时: {duration:.2f}s")
@@ -156,7 +160,7 @@ def test_smart_truncate():
 # ====================================================================================
 # 测试4: 缓存机制
 # ====================================================================================
-def test_cache_mechanism():
+async def test_cache_mechanism():
     """测试缓存机制"""
     print_section("测试4: 缓存机制")
     
@@ -169,7 +173,7 @@ def test_cache_mechanism():
     print("第一次爬取（无缓存）...")
     try:
         start1 = time.time()
-        result1 = crawl_tool.invoke({"url": test_url, "use_cache": True})
+        result1 = await crawl_tool.ainvoke({"url": test_url, "use_cache": True})
         duration1 = time.time() - start1
         
         if isinstance(result1, dict):
@@ -177,7 +181,7 @@ def test_cache_mechanism():
             
             print("\n第二次爬取（应该命中缓存）...")
             start2 = time.time()
-            result2 = crawl_tool.invoke({"url": test_url, "use_cache": True})
+            result2 = await crawl_tool.ainvoke({"url": test_url, "use_cache": True})
             duration2 = time.time() - start2
             
             if isinstance(result2, dict):
@@ -205,7 +209,7 @@ def test_cache_mechanism():
 # ====================================================================================
 # 测试5: 批量处理功能
 # ====================================================================================
-def test_batch_crawl():
+async def test_batch_crawl():
     """测试批量爬取功能"""
     print_section("测试5: 批量处理功能")
     
@@ -222,7 +226,7 @@ def test_batch_crawl():
     print("\n开始批量处理...\n")
     
     try:
-        results = batch_crawl_tool.invoke({"urls": test_urls, "use_cache": False})
+        results = await batch_crawl_tool.ainvoke({"urls": test_urls, "use_cache": False})
         
         if isinstance(results, list):
             success_count = 0
@@ -256,7 +260,7 @@ def test_batch_crawl():
 # ====================================================================================
 # 测试6: 完整流程测试
 # ====================================================================================
-def test_complete_workflow():
+async def test_complete_workflow():
     """测试完整的爬取流程"""
     print_section("测试6: 完整工作流程")
     
@@ -272,7 +276,7 @@ def test_complete_workflow():
         print_result(True, "URL验证通过")
         
         print("\n步骤2: 爬取网页...")
-        article = crawler.crawl(test_url)
+        article = await crawler.crawl(test_url)
         
         print_result(True, f"爬取成功")
         print(f"  - 标题: {article.title}")
@@ -298,7 +302,7 @@ def test_complete_workflow():
 # ====================================================================================
 # 主测试流程
 # ====================================================================================
-def run_all_tests():
+async def run_all_tests():
     """运行所有测试"""
     print("\n" + "="*80)
     print("  URL到Markdown完整系统测试")
@@ -319,7 +323,11 @@ def run_all_tests():
     for name, test_func in tests:
         try:
             print(f"\n▶️  正在运行: {name}...")
-            passed = test_func()
+            # 判断是否是异步函数
+            if asyncio.iscoroutinefunction(test_func):
+                passed = await test_func()
+            else:
+                passed = test_func()
             results.append((name, passed))
         except Exception as e:
             print_result(False, f"测试异常: {str(e)}")
@@ -373,6 +381,10 @@ if __name__ == "__main__":
     
     test_func = test_map.get(choice)
     if test_func:
-        test_func()
+        # 判断是否是异步函数
+        if asyncio.iscoroutinefunction(test_func):
+            asyncio.run(test_func())
+        else:
+            test_func()
     else:
         print("❌ 无效选项")
