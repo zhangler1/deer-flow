@@ -68,3 +68,17 @@ CUSTOM_SEARCH:
       channel_id: "0"
   # Default repository to use
   default_repository: "aggregation_search"
+
+# Web crawler configuration
+CRAWLER:
+  # Crawler type: 'deep_research' or 'jina'
+  # - deep_research: 使用内网部署的DeepResearchMdCrawler（推荐）
+  # - jina: 使用外网Jina AI服务
+  type: "deep_research"
+  
+  # Deep Research Crawler settings
+  deep_research:
+    # HTML提取并转换为MD的API地址（一次性完成提取+转换）
+    extract_api_url: "http://localhost:7986/extract_md"
+    # 请求超时时间（秒）
+    timeout: 30

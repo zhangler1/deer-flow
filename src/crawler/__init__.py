@@ -3,7 +3,8 @@
 
 from .article import Article
 from .crawler import Crawler
+from .deep_research_md_crawler import DeepResearchMdCrawler
 from .jina_client import JinaClient
 from .readability_extractor import ReadabilityExtractor
 
-__all__ = ["Article", "Crawler", "JinaClient", "ReadabilityExtractor"]
+__all__ = ["Article", "Crawler", "DeepResearchMdCrawler", "JinaClient", "ReadabilityExtractor"]
