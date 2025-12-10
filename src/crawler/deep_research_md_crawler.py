@@ -8,8 +8,10 @@
 
 import logging
 import os
+import re
 import time
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 from markdownify import markdownify as md
@@ -36,7 +38,9 @@ class DeepResearchMdCrawler:
     def __init__(
         self,
         extract_api_url: Optional[str] = None,
-        timeout: int = 30
+        timeout: int = 30,
+        max_retries: int = 3,
+        retry_delay: float = 1.0
     ):
         """
         初始化深度研究爬虫
@@ -44,37 +48,48 @@ class DeepResearchMdCrawler:
         Args:
             extract_api_url: 内容提取API地址，默认从环境变量读取
             timeout: 请求超时时间（秒）
+            max_retries: 最大重试次数
+            retry_delay: 重试延迟（秒）
         """
         self.extract_api_url = extract_api_url or os.getenv(
             'HTML_EXTRACT_API_URL',
             'http://localhost:7986/extract_md'
         )
         self.timeout = timeout
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
         
         enhanced_logger.logger.info(
             f"🔧 CRAWLER_INIT | DeepResearchMdCrawler初始化 | "
-            f"提取API: {self.extract_api_url} | 超时: {timeout}s"
+            f"提取API: {self.extract_api_url} | 超时: {timeout}s | 重试: {max_retries}次"
         )
         
-    def crawl(self, url: str) -> Article:
+    def crawl(self, url: str, validate_url: bool = True) -> Article:
         """
         爬取网页并转换为Article对象
         
         工作流程：
-        1. 抓取网页HTML
-        2. 调用提取API一次性完成：内容清洗 + MD转换
-        3. 返回Article对象
+        1. URL验证（可选）
+        2. 抓取网页HTML
+        3. 调用提取API一次性完成：内容清洗 + MD转换
+        4. 返回Article对象
         
         Args:
             url: 目标网页URL
+            validate_url: 是否验证URL格式，默认True
             
         Returns:
             Article: 包含标题和Markdown内容的文章对象
             
         Raises:
+            ValueError: URL格式无效
             Exception: 当爬取失败时抛出异常
         """
         start_time = time.time()
+        
+        # Step 0: URL验证
+        if validate_url:
+            self._validate_url(url)
         
         enhanced_logger.logger.info(
             f"🌐 CRAWL_START | 开始爬取网页 | URL: {url}"
@@ -148,8 +163,7 @@ class DeepResearchMdCrawler:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
-            response = requests.get(url, headers=headers, timeout=self.timeout)
-            response.raise_for_status()
+            response = self._fetch_with_retry(url, headers)
             
             html_content = response.text
             duration = time.time() - start_time
@@ -252,5 +266,77 @@ class DeepResearchMdCrawler:
                 f"❌ EXTRACT_AND_CONVERT_ERROR | 提取转换失败 | 错误: {str(e)} | 耗时: {duration:.2f}s"
             )
             raise Exception(f"Failed to extract and convert: {str(e)}")
+    
+    def _validate_url(self, url: str) -> None:
+        """
+        验证URL格式是否有效
+        
+        Args:
+            url: 待验证的URL
+            
+        Raises:
+            ValueError: URL格式无效
+        """
+        try:
+            result = urlparse(url)
+            # 检查scheme和netloc是否存在
+            if not all([result.scheme, result.netloc]):
+                raise ValueError(f"URL格式无效: {url}")
+            
+            # 检查scheme是否为http或https
+            if result.scheme not in ['http', 'https']:
+                raise ValueError(f"URL协议必须是http或https: {url}")
+            
+            enhanced_logger.logger.debug(
+                f"✅ URL_VALIDATION | URL验证通过 | {url}"
+            )
+            
+        except Exception as e:
+            enhanced_logger.logger.error(
+                f"❌ URL_VALIDATION_ERROR | URL验证失败 | {url} | {str(e)}"
+            )
+            raise ValueError(f"无效的URL: {url} - {str(e)}")
+    
+    def _fetch_with_retry(self, url: str, headers: dict) -> requests.Response:
+        """
+        带重试机制的HTTP请求
+        
+        Args:
+            url: 目标URL
+            headers: 请求头
+            
+        Returns:
+            requests.Response: HTTP响应
+            
+        Raises:
+            Exception: 所有重试失败后抛出异常
+        """
+        last_exception: Optional[Exception] = None
+        
+        for attempt in range(self.max_retries):
+            try:
+                enhanced_logger.logger.debug(
+                    f"🔄 HTTP_REQUEST | 尝试 {attempt + 1}/{self.max_retries} | URL: {url}"
+                )
+                
+                response = requests.get(url, headers=headers, timeout=self.timeout)
+                response.raise_for_status()
+                return response
+                
+            except requests.RequestException as e:
+                last_exception = e
+                enhanced_logger.logger.warning(
+                    f"⚠️  HTTP_RETRY | 请求失败，准备重试 | "
+                    f"尝试 {attempt + 1}/{self.max_retries} | 错误: {str(e)}"
+                )
+                
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay * (attempt + 1))  # 指数退避
+        
+        # 所有重试都失败
+        if last_exception:
+            raise last_exception
+        else:
+            raise Exception("未知错误：所有重试均失败")
     
 
