@@ -78,7 +78,7 @@ def _smart_truncate(content: str, max_length: int = 8000) -> tuple[str, bool]:
 
 @tool
 @log_io
-def crawl_tool(
+async def crawl_tool(
     url: Annotated[str, "The url to crawl."],
     use_cache: Annotated[bool, "Whether to use cache. Default True."] = True,
 ) -> Union[Dict, str]:
@@ -124,7 +124,7 @@ def crawl_tool(
     
     try:
         crawler = Crawler()
-        article = crawler.crawl(url)
+        article = await crawler.crawl(url)
         
         # 生成Markdown内容
         markdown_content = article.to_markdown()
@@ -181,7 +181,7 @@ def crawl_tool(
 
 @tool
 @log_io
-def batch_crawl_tool(
+async def batch_crawl_tool(
     urls: Annotated[List[str], "List of URLs to crawl."],
     use_cache: Annotated[bool, "Whether to use cache. Default True."] = True,
 ) -> Union[List[Dict], str]:
@@ -223,7 +223,7 @@ def batch_crawl_tool(
         
         try:
             # 调用单个crawl_tool
-            result = crawl_tool.invoke({"url": url, "use_cache": use_cache})
+            result = await crawl_tool.ainvoke({"url": url, "use_cache": use_cache})
             
             if isinstance(result, dict):
                 results.append(result)

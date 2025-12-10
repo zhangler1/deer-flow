@@ -94,10 +94,10 @@ def test_retry_mechanism():
     
     # 测试正常URL（不应该触发重试）
     try:
-        print("\n测试正常URL（httpbin.org）...")
+        print("\n测试正常URL（example.com）...")
         start = time.time()
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = crawler._fetch_with_retry("https://httpbin.org/delay/1", headers)
+        response = crawler._fetch_with_retry("https://example.com", headers)
         duration = time.time() - start
         
         print_result(True, f"成功获取响应 | 状态码: {response.status_code} | 耗时: {duration:.2f}s")
@@ -105,7 +105,7 @@ def test_retry_mechanism():
         
     except Exception as e:
         print_result(False, f"请求失败: {str(e)}")
-        print("提示: 可能是网络问题或httpbin.org不可用，这是正常的")
+        print("提示: 可能是网络问题，这是正常的")
         return True  # 不因网络问题判定为失败
 
 
@@ -164,7 +164,7 @@ def test_cache_mechanism():
     clear_result = clear_crawl_cache.invoke({})
     print(f"清空缓存: {clear_result}\n")
     
-    test_url = "https://httpbin.org/html"
+    test_url = "https://example.com"
     
     print("第一次爬取（无缓存）...")
     try:
@@ -210,8 +210,8 @@ def test_batch_crawl():
     print_section("测试5: 批量处理功能")
     
     test_urls = [
-        "https://httpbin.org/html",
-        "https://httpbin.org/links/5",
+        "https://example.com",
+        "https://www.baidu.com",
         "https://invalid-domain-that-does-not-exist-12345.com",  # 故意使用无效URL
     ]
     
@@ -260,7 +260,7 @@ def test_complete_workflow():
     """测试完整的爬取流程"""
     print_section("测试6: 完整工作流程")
     
-    test_url = "https://httpbin.org/html"
+    test_url = "https://example.com"
     
     print("测试完整流程: URL验证 -> HTML抓取 -> 内容提取 -> Markdown转换\n")
     

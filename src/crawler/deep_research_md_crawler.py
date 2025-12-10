@@ -13,7 +13,7 @@ import time
 from typing import Optional
 from urllib.parse import urlparse
 
-import requests
+import httpx
 from markdownify import markdownify as md
 
 from src.utils.enhanced_logger import console_print, get_enhanced_logger
@@ -64,7 +64,7 @@ class DeepResearchMdCrawler:
             f"提取API: {self.extract_api_url} | 超时: {timeout}s | 重试: {max_retries}次"
         )
         
-    def crawl(self, url: str, validate_url: bool = True) -> Article:
+    async def crawl(self, url: str, validate_url: bool = True) -> Article:
         """
         爬取网页并转换为Article对象
         
@@ -101,10 +101,10 @@ class DeepResearchMdCrawler:
         
         try:
             # Step 1: 抓取HTML
-            html_content = self._fetch_html(url)
+            html_content = await self._fetch_html(url)
             
             # Step 2+3: 调用提取API一次性完成内容提取和MD转换
-            result = self._extract_and_convert(url, html_content)
+            result = await self._extract_and_convert(url, html_content)
             
             # 创建Article对象
             article = Article(
@@ -139,7 +139,7 @@ class DeepResearchMdCrawler:
             )
             raise
     
-    def _fetch_html(self, url: str) -> str:
+    async def _fetch_html(self, url: str) -> str:
         """
         步骤1: 抓取网页HTML内容
         
@@ -163,7 +163,7 @@ class DeepResearchMdCrawler:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
-            response = self._fetch_with_retry(url, headers)
+            response = await self._fetch_with_retry(url, headers)
             
             html_content = response.text
             duration = time.time() - start_time
@@ -186,7 +186,7 @@ class DeepResearchMdCrawler:
             )
             raise Exception(f"Failed to fetch HTML: {str(e)}")
     
-    def _extract_and_convert(self, url: str, html_content: str) -> dict:
+    async def _extract_and_convert(self, url: str, html_content: str) -> dict:
         """
         步骤2+3: 调用提取API一次性完成内容提取和MD转换
         
@@ -228,13 +228,14 @@ class DeepResearchMdCrawler:
             if '/extract' in api_url and '/extract_md' not in api_url:
                 api_url = api_url.replace('/extract', '/extract_md')
             
-            response = requests.post(
-                api_url,
-                json=payload,
-                headers=headers,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    api_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=self.timeout
+                )
+                response.raise_for_status()
             
             result = response.json()
             
@@ -297,7 +298,7 @@ class DeepResearchMdCrawler:
             )
             raise ValueError(f"无效的URL: {url} - {str(e)}")
     
-    def _fetch_with_retry(self, url: str, headers: dict) -> requests.Response:
+    async def _fetch_with_retry(self, url: str, headers: dict) -> httpx.Response:
         """
         带重试机制的HTTP请求
         
@@ -306,32 +307,34 @@ class DeepResearchMdCrawler:
             headers: 请求头
             
         Returns:
-            requests.Response: HTTP响应
+            httpx.Response: HTTP响应
             
         Raises:
             Exception: 所有重试失败后抛出异常
         """
         last_exception: Optional[Exception] = None
         
-        for attempt in range(self.max_retries):
-            try:
-                enhanced_logger.logger.debug(
-                    f"🔄 HTTP_REQUEST | 尝试 {attempt + 1}/{self.max_retries} | URL: {url}"
-                )
-                
-                response = requests.get(url, headers=headers, timeout=self.timeout)
-                response.raise_for_status()
-                return response
-                
-            except requests.RequestException as e:
-                last_exception = e
-                enhanced_logger.logger.warning(
-                    f"⚠️  HTTP_RETRY | 请求失败，准备重试 | "
-                    f"尝试 {attempt + 1}/{self.max_retries} | 错误: {str(e)}"
-                )
-                
-                if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay * (attempt + 1))  # 指数退避
+        async with httpx.AsyncClient() as client:
+            for attempt in range(self.max_retries):
+                try:
+                    enhanced_logger.logger.debug(
+                        f"🔄 HTTP_REQUEST | 尝试 {attempt + 1}/{self.max_retries} | URL: {url}"
+                    )
+                    
+                    response = await client.get(url, headers=headers, timeout=self.timeout)
+                    response.raise_for_status()
+                    return response
+                    
+                except httpx.HTTPError as e:
+                    last_exception = e
+                    enhanced_logger.logger.warning(
+                        f"⚠️  HTTP_RETRY | 请求失败，准备重试 | "
+                        f"尝试 {attempt + 1}/{self.max_retries} | 错误: {str(e)}"
+                    )
+                    
+                    if attempt < self.max_retries - 1:
+                        import asyncio
+                        await asyncio.sleep(self.retry_delay * (attempt + 1))  # 指数退避
         
         # 所有重试都失败
         if last_exception:

@@ -46,6 +46,8 @@ dependencies = [
     "colorama>=0.4.6",
     "pip>=25.2",
     "pymysql>=1.1.2",
+    "anyio>=4.12.0",
+    "pytest-asyncio>=1.3.0",
 ]
 
 [project.optional-dependencies]

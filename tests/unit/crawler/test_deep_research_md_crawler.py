@@ -6,8 +6,8 @@ DeepResearchMdCrawler单元测试
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-import requests
+from unittest.mock import Mock, patch, MagicMock, AsyncMock
+import httpx
 
 from src.crawler.deep_research_md_crawler import DeepResearchMdCrawler
 from src.crawler.article import Article
@@ -37,16 +37,21 @@ class TestDeepResearchMdCrawler:
         </html>
         """
     
-    @patch('src.crawler.deep_research_md_crawler.requests.get')
-    @patch('src.crawler.deep_research_md_crawler.requests.post')
-    def test_crawl_success(self, mock_post, mock_get):
+    @pytest.mark.asyncio
+    @patch('src.crawler.deep_research_md_crawler.httpx.AsyncClient')
+    async def test_crawl_success(self, mock_client_class):
         """测试成功爬取网页"""
+        # Mock AsyncClient
+        mock_client = MagicMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_client_class.return_value.__aexit__.return_value = AsyncMock()
+        
         # Mock HTTP GET请求（抓取HTML）
         mock_response_get = Mock()
         mock_response_get.text = self.test_html
         mock_response_get.status_code = 200
         mock_response_get.raise_for_status = Mock()
-        mock_get.return_value = mock_response_get
+        mock_client.get = AsyncMock(return_value=mock_response_get)
         
         # Mock HTTP POST请求（提取并转换为MD）
         mock_response_post = Mock()
@@ -57,13 +62,13 @@ class TestDeepResearchMdCrawler:
         }
         mock_response_post.status_code = 200
         mock_response_post.raise_for_status = Mock()
-        mock_post.return_value = mock_response_post
+        mock_client.post = AsyncMock(return_value=mock_response_post)
         
         # 执行测试
         crawler = DeepResearchMdCrawler(
             extract_api_url='http://localhost:7986/extract_md'
         )
-        article = crawler.crawl(self.test_url)
+        article = await crawler.crawl(self.test_url)
         
         # 验证结果
         assert isinstance(article, Article)
@@ -75,49 +80,60 @@ class TestDeepResearchMdCrawler:
         assert "This is test content" in markdown
         
         # 验证调用
-        mock_get.assert_called_once()
-        mock_post.assert_called_once()
+        assert mock_client.get.await_count == 1
+        assert mock_client.post.await_count == 1
     
-    @patch('src.crawler.deep_research_md_crawler.requests.get')
-    def test_fetch_html_failure(self, mock_get):
+    @pytest.mark.asyncio
+    @patch('src.crawler.deep_research_md_crawler.httpx.AsyncClient')
+    async def test_fetch_html_failure(self, mock_client_class):
         """测试HTML抓取失败"""
+        # Mock AsyncClient
+        mock_client = MagicMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_client_class.return_value.__aexit__.return_value = AsyncMock()
+        
         # Mock HTTP错误
-        mock_get.side_effect = requests.RequestException("Network error")
+        mock_client.get = AsyncMock(side_effect=httpx.HTTPError("Network error"))
         
         # 执行测试
         crawler = DeepResearchMdCrawler()
         
         # 验证抛出异常
         with pytest.raises(Exception) as exc_info:
-            crawler.crawl(self.test_url)
+            await crawler.crawl(self.test_url)
         
         assert "Failed to fetch HTML" in str(exc_info.value)
     
-    @patch('src.crawler.deep_research_md_crawler.requests.get')
-    @patch('src.crawler.deep_research_md_crawler.requests.post')
-    def test_extract_api_failure(self, mock_post, mock_get):
+    @pytest.mark.asyncio
+    @patch('src.crawler.deep_research_md_crawler.httpx.AsyncClient')
+    async def test_extract_api_failure(self, mock_client_class):
         """测试内容提取API失败"""
+        # Mock AsyncClient
+        mock_client = MagicMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_client_class.return_value.__aexit__.return_value = AsyncMock()
+        
         # Mock成功的HTML抓取
         mock_response_get = Mock()
         mock_response_get.text = self.test_html
         mock_response_get.raise_for_status = Mock()
-        mock_get.return_value = mock_response_get
+        mock_client.get = AsyncMock(return_value=mock_response_get)
         
         # Mock提取API失败
-        mock_post.side_effect = requests.RequestException("API error")
+        mock_client.post = AsyncMock(side_effect=httpx.HTTPError("API error"))
         
         # 执行测试
         crawler = DeepResearchMdCrawler()
         
         # 验证抛出异常
         with pytest.raises(Exception) as exc_info:
-            crawler.crawl(self.test_url)
+            await crawler.crawl(self.test_url)
         
         assert "Failed to extract and convert" in str(exc_info.value)
     
-    @patch('src.crawler.deep_research_md_crawler.requests.get')
-    @patch('src.crawler.deep_research_md_crawler.requests.post')
-    def test_title_extraction(self, mock_post, mock_get):
+    @pytest.mark.asyncio
+    @patch('src.crawler.deep_research_md_crawler.httpx.AsyncClient')
+    async def test_title_extraction(self, mock_client_class):
         """测试标题提取功能"""
         # 测试不同的标题场景
         test_cases = [
@@ -131,11 +147,16 @@ class TestDeepResearchMdCrawler:
         ]
         
         for html, expected_title, expected_md in test_cases:
+            # Mock AsyncClient
+            mock_client = MagicMock()
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+            mock_client_class.return_value.__aexit__.return_value = AsyncMock()
+            
             # Mock HTML抓取
             mock_response_get = Mock()
             mock_response_get.text = html
             mock_response_get.raise_for_status = Mock()
-            mock_get.return_value = mock_response_get
+            mock_client.get = AsyncMock(return_value=mock_response_get)
             
             # Mock内容提取，返回标题和Markdown
             mock_response_post = Mock()
@@ -145,11 +166,11 @@ class TestDeepResearchMdCrawler:
                 'html': html
             }
             mock_response_post.raise_for_status = Mock()
-            mock_post.return_value = mock_response_post
+            mock_client.post = AsyncMock(return_value=mock_response_post)
             
             # 执行测试
             crawler = DeepResearchMdCrawler()
-            article = crawler.crawl(self.test_url)
+            article = await crawler.crawl(self.test_url)
             
             # 验证标题直接来自接口
             assert article.title == expected_title
@@ -169,15 +190,20 @@ class TestDeepResearchMdCrawler:
         assert crawler2.extract_api_url == 'http://custom:8080/api/extract_md'
         assert crawler2.timeout == 60
     
-    @patch('src.crawler.deep_research_md_crawler.requests.get')
-    @patch('src.crawler.deep_research_md_crawler.requests.post')
-    def test_logging_coverage(self, mock_post, mock_get):
+    @pytest.mark.asyncio
+    @patch('src.crawler.deep_research_md_crawler.httpx.AsyncClient')
+    async def test_logging_coverage(self, mock_client_class):
         """测试日志记录覆盖"""
+        # Mock AsyncClient
+        mock_client = MagicMock()
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_client_class.return_value.__aexit__.return_value = AsyncMock()
+        
         # Mock成功响应
         mock_response_get = Mock()
         mock_response_get.text = self.test_html
         mock_response_get.raise_for_status = Mock()
-        mock_get.return_value = mock_response_get
+        mock_client.get = AsyncMock(return_value=mock_response_get)
         
         mock_response_post = Mock()
         mock_response_post.json.return_value = {
@@ -186,11 +212,11 @@ class TestDeepResearchMdCrawler:
             'html': self.test_extracted_html
         }
         mock_response_post.raise_for_status = Mock()
-        mock_post.return_value = mock_response_post
+        mock_client.post = AsyncMock(return_value=mock_response_post)
         
         # 执行测试（验证不抛出异常）
         crawler = DeepResearchMdCrawler()
-        article = crawler.crawl(self.test_url)
+        article = await crawler.crawl(self.test_url)
         
         # 验证基本功能正常
         assert article is not None

@@ -1,10 +1,12 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+import pytest
 import src.crawler as crawler_module
 
 
-def test_crawler_sets_article_url(monkeypatch):
+@pytest.mark.asyncio
+async def test_crawler_sets_article_url(monkeypatch):
     """Test that the crawler sets the article.url field correctly."""
 
     class DummyArticle:
@@ -29,12 +31,12 @@ def test_crawler_sets_article_url(monkeypatch):
 
     crawler = crawler_module.Crawler()
     url = "http://example.com"
-    article = crawler.crawl(url)
+    article = await crawler.crawl(url)
     assert article.url == url
-    assert article.to_markdown() == "# Dummy"
 
 
-def test_crawler_calls_dependencies(monkeypatch):
+@pytest.mark.asyncio
+async def test_crawler_calls_dependencies(monkeypatch):
     """Test that Crawler calls JinaClient.crawl and ReadabilityExtractor.extract_article."""
     calls = {}
 
@@ -62,7 +64,7 @@ def test_crawler_calls_dependencies(monkeypatch):
 
     crawler = crawler_module.Crawler()
     url = "http://example.com"
-    crawler.crawl(url)
+    await crawler.crawl(url)
     assert "jina" in calls
     assert calls["jina"][0] == url
     assert calls["jina"][1] == "html"

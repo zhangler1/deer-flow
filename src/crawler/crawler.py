@@ -27,11 +27,11 @@ class Crawler:
         
         self.use_deep_research = use_deep_research
     
-    def crawl(self, url: str) -> Article:
+    async def crawl(self, url: str) -> Article:
         if self.use_deep_research:
             # 使用新的DeepResearchMdCrawler（内网部署）
             crawler = DeepResearchMdCrawler()
-            return crawler.crawl(url)
+            return await crawler.crawl(url)
         else:
             # 使用原有的JinaClient方式（外网依赖）
             # To help LLMs better understand content, we extract clean
