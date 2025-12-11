@@ -49,6 +49,7 @@ def _get_path_description(path: str) -> str:
     descriptions = {
         "direct_answer": "直接回答，不走检索",
         "simple_search": "简单检索，单次查询",
+        "iterative_research": "迭代研究，自主深挖",
         "deep_research": "深度研究，多轮分析",
     }
     return descriptions.get(path, "未知路径")
@@ -77,13 +78,14 @@ def handoff_to_planner(
 
 def router_node(
     state: State, config: RunnableConfig
-) -> Command[Literal["direct_answer_node", "simple_search_node", "coordinator"]]:
+) -> Command[Literal["direct_answer_node", "simple_search_node", "iterative_research_node", "coordinator"]]:
     """
     智能路由节点，分析用户请求并决定处理路径
     
     根据用户查询和部门信息，自动选择最优处理路径：
     - direct_answer_node: 直接回答，通用知识（不走检索）
     - simple_search_node: 简单检索，主流业务（单次检索）
+    - iterative_research_node: 迭代研究，单问题深挖（自主迭代）
     - coordinator: 深度研究路径（多轮检索研究）
     """
     start_time = time.time()
@@ -155,6 +157,8 @@ def router_node(
         return Command(update=state_update, goto="direct_answer_node")
     elif route_decision.path == "simple_search":
         return Command(update=state_update, goto="simple_search_node")
+    elif route_decision.path == "iterative_research":
+        return Command(update=state_update, goto="iterative_research_node")
     else:  # deep_research
         return Command(update=state_update, goto="coordinator")
 
@@ -349,6 +353,191 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
             goto="__end__"
         )
 
+
+def iterative_research_node(state: State, config: RunnableConfig) -> Command[Literal["__end__", "iterative_research_node"]]:
+    """
+    迭代深度研究节点 - 针对单个问题进行多轮自主深入研究
+    
+    工作流程：
+    1. 组织检索词
+    2. 执行检索（web_search + crawl_tool + domain_fin_search）
+    3. 分析信息并回答
+    4. 判断是否足够回答用户问题
+    5. 如果不足，针对未解决问题继续下一轮迭代（最多5轮）
+    """
+    start_time = time.time()
+    iteration_count = state.get("iteration_count", 0)
+    enhanced_logger.logger.info(
+        f"🔄 NODE_ENTRY | iterative_research | 开始迭代研究 | 第{iteration_count + 1}轮"
+    )
+    
+    configurable = Configuration.from_runnable_config(config)
+    query = state.get("research_topic") or (
+        state["messages"][-1].content if state.get("messages") else ""
+    )
+    iteration_history = state.get("iteration_history", [])
+    
+    enhanced_logger.logger.info(
+        f"❓ ITERATIVE_RESEARCH_QUERY | '{query}' | 历史轮次: {len(iteration_history)}"
+    )
+    
+    # 设置最大迭代次数
+    MAX_ITERATIONS = 5
+    
+    try:
+        # 创建带有工具的 Agent
+        tools = [
+            get_web_search_tool(
+                max_search_results=5,  # 迭代研究需要更多结果
+                engine=configurable.search_engine,
+                repository_id=configurable.custom_search_repository
+            ),
+            crawl_tool,  # 网页爬取工具
+            domain_fin_search,  # 金融知识库检索工具
+        ]
+        
+        # 准备模板变量
+        state_with_history = dict(state)
+        state_with_history['iteration_history'] = "\n\n".join([
+            f"### 第{i+1}轮研究\n{h.get('summary', '')}"
+            for i, h in enumerate(iteration_history)
+        ]) if iteration_history else None
+        
+        # 使用 Prompt 模板
+        try:
+            messages_for_llm = apply_prompt_template(
+                "iterative_research",
+                state_with_history,
+                configurable
+            )
+        except Exception as e:
+            logger.warning(f"应用Prompt模板失败，使用备用方案: {e}")
+            # 备用方案：简单提示词
+            history_text = state_with_history.get('iteration_history', '')
+            messages_for_llm = [
+                {"role": "user", "content": f"""你是一个迭代研究助手。请针对以下问题进行深入研究：
+
+问题：{query}
+
+{("历史研究：" + str(history_text)) if history_text else "这是第1轮研究"}
+
+请使用可用工具（web_search, crawl_tool, domain_fin_search）进行研究，并评估是否需要继续迭代。"""}}
+            ]
+        
+        # 创建带工具的 Agent
+        llm = get_llm_by_type("basic")  # 使用基础模型
+        
+        # DEBUG级别：打印LLM输入
+        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+            prompt_str = str(messages_for_llm)
+            enhanced_logger.logger.debug(
+                f"🤖 LLM_INPUT | iterative_research | Prompt长度: {len(prompt_str)}\n"
+                f"{'='*80}\n{prompt_str}\n{'='*80}"
+            )
+        
+        # 创建带工具的 Agent
+        agent_start = time.time()
+        agent = create_agent(
+            agent_name="iterative_researcher",
+            agent_type="research",
+            tools=tools,
+            llm=llm,
+            prompt_template="你是一个专业的迭代研究助手，擅长通过多轮检索和分析深入探索问题。"
+        )
+        agent_duration = time.time() - agent_start
+        
+        enhanced_logger.logger.info(
+            f"🤖 AGENT_CREATED | 工具数: {len(tools)} | 耗时: {agent_duration:.2f}s"
+        )
+        
+        # 执行 Agent
+        invoke_start = time.time()
+        result = agent.invoke({
+            "messages": messages_for_llm
+        })
+        invoke_duration = time.time() - invoke_start
+        
+        # 提取输出
+        answer = ""
+        if isinstance(result, dict) and "messages" in result:
+            last_message = result["messages"][-1]
+            answer = last_message.content if hasattr(last_message, 'content') else str(last_message)
+        else:
+            answer = str(result)
+        
+        # INFO级别：打印LLM最终输出
+        enhanced_logger.logger.info(
+            f"🤖 LLM_OUTPUT | iterative_research | 响应长度: {len(answer)} | LLM耗时: {invoke_duration:.2f}s\n"
+            f"{'='*80}\n{answer}\n{'='*80}"
+        )
+        
+        # 更新迭代历史
+        new_iteration = {
+            "round": iteration_count + 1,
+            "summary": answer[:500] + "..." if len(answer) > 500 else answer,
+            "timestamp": time.time()
+        }
+        updated_history = iteration_history + [new_iteration]
+        
+        # 判断是否需要继续迭代（简单启发式判断）
+        should_continue = False
+        if iteration_count + 1 < MAX_ITERATIONS:
+            # 检查回答中是否有表示需要继续的信号
+            continue_signals = [
+                "需要继续",
+                "下一轮",
+                "继续研究",
+                "还需要",
+                "仍待深入",
+                "continue research",
+                "next iteration",
+                "need more"
+            ]
+            answer_lower = answer.lower()
+            should_continue = any(signal in answer_lower for signal in continue_signals)
+        
+        duration = time.time() - start_time
+        
+        if should_continue:
+            enhanced_logger.logger.info(
+                f"🔄 ITERATION_CONTINUE | 第{iteration_count + 1}轮完成，继续下一轮 | 耗时: {duration:.2f}s"
+            )
+            # 继续下一轮迭代
+            return Command(
+                update={
+                    "iteration_count": iteration_count + 1,
+                    "iteration_history": updated_history,
+                    "messages": [AIMessage(content=answer, name="iterative_researcher")]
+                },
+                goto="iterative_research_node"  # 递归调用自己
+            )
+        else:
+            enhanced_logger.logger.info(
+                f"✅ NODE_EXIT | iterative_research | 研究完成 | 总轮次: {iteration_count + 1} | 总耗时: {duration:.2f}s"
+            )
+            # 研究完成，输出最终报告
+            return Command(
+                update={
+                    "final_report": answer,
+                    "iteration_count": iteration_count + 1,
+                    "iteration_history": updated_history,
+                },
+                goto="__end__"
+            )
+        
+    except Exception as e:
+        logger.error(f"迭代研究处理失败: {e}")
+        enhanced_logger.logger.error(f"❌ ITERATIVE_RESEARCH_ERROR | {str(e)}")
+        
+        # 失败时返回错误信息
+        error_msg = f"抱歉，在迭代研究过程中遇到了错误。\n\n错误信息: {str(e)}"
+        return Command(
+            update={
+                "final_report": error_msg,
+                "messages": [AIMessage(content=error_msg, name="iterative_research_error")]
+            },
+            goto="__end__"
+        )
 
 
 def department_node(
@@ -1412,6 +1601,7 @@ __all__ = [
     "router_node",
     "direct_answer_node",
     "simple_search_node",
+    "iterative_research_node",  # 新增：迭代研究节点
     "department_node",
     
     # 深度研究路径节点

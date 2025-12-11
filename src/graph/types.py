@@ -30,3 +30,7 @@ class State(MessagesState):
     routing_path: str = "auto"  # 路由路径: auto/simple_qa/deep_research/department_specific
     enable_smart_routing: bool = True  # 是否启用智能路由
     department_context: dict = {}  # 部门特定上下文
+    
+    # 迭代研究相关字段
+    iteration_count: int = 0  # 当前迭代轮次
+    iteration_history: list[dict] = []  # 迭代历史记录

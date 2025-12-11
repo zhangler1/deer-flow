@@ -20,8 +20,8 @@ enhanced_logger = get_enhanced_logger('graph.classifier')
 
 class RouteDecision(BaseModel):
     """路由决策模型"""
-    path: Literal["direct_answer", "simple_search", "deep_research"] = Field(
-        description="路由路径: direct_answer(直接回答), simple_search(简单检索), deep_research(深度研究)"
+    path: Literal["direct_answer", "simple_search", "iterative_research", "deep_research"] = Field(
+        description="路由路径: direct_answer(直接回答), simple_search(简单检索), iterative_research(迭代研究), deep_research(深度研究)"
     )
     complexity: Literal["simple", "medium", "complex", "expert"] = Field(
         description="问题复杂度: simple(简单通用), medium(适中专业), complex(复杂分散), expert(专家集中)"
@@ -267,11 +267,18 @@ def _fallback_classification(query: str, department: str = "general", llm_respon
         "产品介绍", "业务流程", "操作步骤"
     ]
     
-    # 深度研究的关键词
+    # 迭代研究的关键词（单个问题的深度探索）
+    iterative_keywords = [
+        "详细说明", "深入了解", "具体介绍", "全面分析",
+        "原理", "机制", "背景", "详情", "解释",
+        "explain in detail", "how does", "what are the details"
+    ]
+    
+    # 深度研究的关键词（多主题对比分析）
     research_keywords = [
-        "分析", "研究", "对比", "比较", "评估", "趋势",
+        "分析", "对比", "比较", "评估", "趋势",
         "影响", "发展", "现状", "未来", 
-        "analyze", "research", "compare", "trend", "impact"
+        "analyze", "compare", "trend", "impact"
     ]
     
     # 领域知识关键词（银行专业）
@@ -317,7 +324,18 @@ def _fallback_classification(query: str, department: str = "general", llm_respon
                 reasoning=f"查询包含专业领域关键词，使用简单检索并可调用金融知识库工具"
             )
     
-    # 检查深度研究
+    # 检查迭代研究（单个问题的深度探索）
+    for keyword in iterative_keywords:
+        if keyword in query_lower:
+            return RouteDecision(
+                path="iterative_research",
+                complexity="complex",
+                needs_search=True,
+                confidence=0.8,
+                reasoning="查询需要深入探索单个主题，使用迭代研究"
+            )
+    
+    # 检查深度研究（多主题对比分析）
     for keyword in research_keywords:
         if keyword in query_lower:
             return RouteDecision(
