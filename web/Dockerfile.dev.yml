@@ -16,8 +16,9 @@ WORKDIR /app
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
 
 # 安装所有依赖（包括开发依赖）
-RUN  npm install -g pnpm 
-RUN pnpm i
+RUN npm install -g pnpm 
+RUN pnpm config set registry https://registry.npmmirror.com/ && \
+    pnpm i
 
 
 # 复制项目文件（实际开发时会被挂载覆盖）
