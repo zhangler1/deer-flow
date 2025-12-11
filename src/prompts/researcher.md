@@ -18,7 +18,6 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 1. **内置工具**：这些工具始终可用：
    - **web_search**：用于执行网络搜索（不是 "web_search_tool"）
    - **crawl_tool**：用于爬取并提取网页的完整内容，将HTML转换为Markdown格式。当你需要深入阅读某个网页的详细信息时使用此工具。
-   - **domain_fin_search**：用于从金融领域知识库检索相关文档。当你需要查询银行产品规则、制度文件、操作手册等内部专业知识时使用此工具。
 
 
 # 步骤

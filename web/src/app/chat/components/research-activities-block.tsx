@@ -7,7 +7,7 @@ import { LRUCache } from "lru-cache";
 import { BookOpenText, FileText, PencilRuler, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { dark } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -269,31 +269,6 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
   // 是否正在爬取
   const isCrawling = toolCall.result === undefined;
   
-  // 流式显示文本动画
-  const [displayedText, setDisplayedText] = useState("");
-  const previewText = crawlResult?.preview ?? "";
-  
-  useEffect(() => {
-    if (!previewText) {
-      setDisplayedText("");
-      return;
-    }
-    
-    let currentIndex = 0;
-    setDisplayedText("");
-    
-    const interval = setInterval(() => {
-      if (currentIndex < previewText.length) {
-        setDisplayedText(previewText.slice(0, currentIndex + 1));
-        currentIndex++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 20); // 每20ms显示一个字符
-    
-    return () => clearInterval(interval);
-  }, [previewText]);
-  
   return (
     <section className="mt-4 pl-4">
       <div>
@@ -326,19 +301,16 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
         </motion.li>
       </ul>
       
-      {/* 显示爬取内容预览（流式动画） */}
-      {displayedText && (
+      {/* 显示爬取内容预览 */}
+      {crawlResult?.preview && (
         <motion.div
           className="mt-3 max-w-[calc(100%-120px)] rounded-md bg-accent/50 px-3 py-2 text-sm text-muted-foreground"
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
         >
           <div className="line-clamp-4">
-            {displayedText}
-            {displayedText.length < previewText.length && (
-              <span className="animate-pulse">▊</span>
-            )}
+            {crawlResult.preview}
           </div>
         </motion.div>
       )}

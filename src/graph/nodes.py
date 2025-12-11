@@ -24,7 +24,6 @@ from src.tools import (
     get_web_search_tool,
     python_repl_tool,
     crawl_tool,
-    domain_fin_search,
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
@@ -360,7 +359,7 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
     
     工作流程：
     1. 组织检索词
-    2. 执行检索（web_search + crawl_tool + domain_fin_search）
+    2. 执行检索（web_search + crawl_tool）
     3. 分析信息并回答
     4. 判断是否足够回答用户问题
     5. 如果不足，针对未解决问题继续下一轮迭代（最多5轮）
@@ -396,7 +395,6 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                 repository_id=configurable.custom_search_repository
             ),
             crawl_tool,  # 网页爬取工具
-            domain_fin_search,  # 金融知识库检索工具
         ]
         
         # 准备模板变量
@@ -424,7 +422,7 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
 
 {("历史研究：" + str(history_text)) if history_text else "这是第1轮研究"}
 
-请使用可用工具（web_search, crawl_tool, domain_fin_search）进行研究，并评估是否需要继续迭代。"""}}
+请使用可用工具（web_search, crawl_tool）进行研究，并评估是否需要继续迭代。"""}}
             ]
         
         # 创建带工具的 Agent
@@ -1553,7 +1551,6 @@ async def researcher_node(
             configurable.custom_search_repository
         ),
         crawl_tool,  # 添加网页爬取工具
-        domain_fin_search,  # 添加金融领域知识库检索工具
     ]
     
     # 注释：local_search_tool 目前未实现，暂时禁用
