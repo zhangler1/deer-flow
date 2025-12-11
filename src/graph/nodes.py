@@ -381,8 +381,11 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         f"❓ ITERATIVE_RESEARCH_QUERY | '{query}' | 历史轮次: {len(iteration_history)}"
     )
     
-    # 设置最大迭代次数
-    MAX_ITERATIONS = 5
+    # 从配置中获取最大迭代次数（优先级：环境变量 > API请求 > 默认5）
+    MAX_ITERATIONS = configurable.max_iteration
+    enhanced_logger.logger.info(
+        f"🔢 ITERATION_CONFIG | 最大迭代次数: {MAX_ITERATIONS} | 当前轮次: {iteration_count + 1}"
+    )
     
     try:
         # 创建带有工具的 Agent

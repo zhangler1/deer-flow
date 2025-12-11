@@ -145,10 +145,21 @@ async def crawl_tool(
             level=logging.INFO
         )
         
+        # 提取内容预览（前300字符作为摘要）
+        content_lines = markdown_content.split('\n')
+        preview_text = ''
+        for line in content_lines:
+            if line.strip() and not line.strip().startswith('#'):
+                preview_text += line.strip() + ' '
+                if len(preview_text) > 300:
+                    break
+        preview_text = preview_text[:300].strip() + '...' if len(preview_text) > 300 else preview_text.strip()
+        
         result = {
             "url": url,
             "title": article.title,
             "content": content_preview,
+            "preview": preview_text,  # 添加预览文本
             "full_length": len(markdown_content),
             "truncated": is_truncated,
             "cached": False,

@@ -47,6 +47,9 @@ class ChatRequest(BaseModel):
     max_search_results: Optional[int] = Field(
         3, description="The maximum number of search results"
     )
+    max_iteration: Optional[int] = Field(
+        5, description="The maximum number of iterations for iterative research"
+    )
     search_engine: Optional[str] = Field(
         "custom_search", description="The search engine to use (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)"
     )
@@ -126,6 +129,7 @@ class SimpleResearchRequest(BaseModel):
     max_plan_iterations: Optional[int] = Field(1, description="最大计划迭代次数")
     max_step_num: Optional[int] = Field(3, description="计划中的最大步骤数")
     max_search_results: Optional[int] = Field(3, description="最大搜索结果数")
+    max_iteration: Optional[int] = Field(5, description="迭代研究的最大迭代次数")
     search_engine: Optional[str] = Field("custom_search", description="搜索引擎 (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)")
     custom_search_repository: Optional[str] = Field(None, description="自定义搜索仓库ID")
     auto_accepted_plan: Optional[bool] = Field(True, description="是否自动接受计划")

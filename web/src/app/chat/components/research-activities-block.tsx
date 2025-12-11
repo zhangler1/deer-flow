@@ -7,7 +7,7 @@ import { LRUCache } from "lru-cache";
 import { BookOpenText, FileText, PencilRuler, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { dark } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -250,12 +250,56 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
     [toolCall.args],
   );
   const title = useMemo(() => __pageCache.get(url), [url]);
+  
+  // 解析爬虫结果，提取预览内容
+  const crawlResult = useMemo(() => {
+    if (!toolCall.result) return null;
+    try {
+      const result = JSON.parse(toolCall.result);
+      return {
+        title: result.title,
+        preview: result.preview,
+        url: result.url,
+      };
+    } catch {
+      return null;
+    }
+  }, [toolCall.result]);
+  
+  // 是否正在爬取
+  const isCrawling = toolCall.result === undefined;
+  
+  // 流式显示文本动画
+  const [displayedText, setDisplayedText] = useState("");
+  const previewText = crawlResult?.preview ?? "";
+  
+  useEffect(() => {
+    if (!previewText) {
+      setDisplayedText("");
+      return;
+    }
+    
+    let currentIndex = 0;
+    setDisplayedText("");
+    
+    const interval = setInterval(() => {
+      if (currentIndex < previewText.length) {
+        setDisplayedText(previewText.slice(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 20); // 每20ms显示一个字符
+    
+    return () => clearInterval(interval);
+  }, [previewText]);
+  
   return (
     <section className="mt-4 pl-4">
       <div>
         <RainbowText
           className="flex items-center text-base font-medium italic"
-          animated={toolCall.result === undefined}
+          animated={isCrawling}
         >
           <BookOpenText size={16} className={"mr-2"} />
           <span>{t("reading")}</span>
@@ -271,16 +315,33 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
             ease: "easeOut",
           }}
         >
-          <FavIcon className="mt-1" url={url} title={title} />
+          <FavIcon className="mt-1" url={url} title={crawlResult?.title ?? title} />
           <a
             className="h-full flex-grow overflow-hidden text-ellipsis whitespace-nowrap"
             href={url}
             target="_blank"
           >
-            {title ?? url}
+            {crawlResult?.title ?? title ?? url}
           </a>
         </motion.li>
       </ul>
+      
+      {/* 显示爬取内容预览（流式动画） */}
+      {displayedText && (
+        <motion.div
+          className="mt-3 max-w-[calc(100%-120px)] rounded-md bg-accent/50 px-3 py-2 text-sm text-muted-foreground"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <div className="line-clamp-4">
+            {displayedText}
+            {displayedText.length < previewText.length && (
+              <span className="animate-pulse">▊</span>
+            )}
+          </div>
+        </motion.div>
+      )}
     </section>
   );
 }
