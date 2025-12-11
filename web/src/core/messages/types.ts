@@ -15,9 +15,7 @@ export interface Message {
     | "podcast"
     | "router"
     | "direct_answer_node"
-    | "simple_search_node"
-    | "domain_knowledge_node"
-    | "department_node";
+    | "simple_search_node";
   role: MessageRole;
   isStreaming?: boolean;
   content: string;

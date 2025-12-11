@@ -40,7 +40,6 @@ class RouteDecision(BaseModel):
 
 def classify_request(
     query: str, 
-    department: str = "general",
     enable_smart_routing: bool = True
 ) -> RouteDecision:
     """
@@ -48,7 +47,6 @@ def classify_request(
     
     Args:
         query: 用户查询内容
-        department: 用户所属部门
         enable_smart_routing: 是否启用智能路由
         
     Returns:
@@ -59,11 +57,11 @@ def classify_request(
     with PerformanceMonitor(
         "分类器整体流程",
         threshold=3.0,  # 整体流程超过3秒会告警
-        metadata={"query_length": len(query), "department": department}
+        metadata={"query_length": len(query)}
     ) as overall_monitor:
         
         enhanced_logger.logger.info(
-            f"🔍 CLASSIFIER_START | 查询: '{query[:50]}...' | 部门: {department}"
+            f"🔍 CLASSIFIER_START | 查询: '{query[:50]}...'"
         )
         
         # 如果未启用智能路由，默认使用简单检索路径
@@ -120,7 +118,7 @@ def classify_request(
             # 🎯 监控结果解析
             with PerformanceMonitor("分类器-结果解析", level=logging.DEBUG):
                 # 手动解析JSON
-                result = _parse_llm_response_to_route_decision(content, query, department)
+                result = _parse_llm_response_to_route_decision(content, query)
             
             # 记录分类结果和性能信息
             enhanced_logger.logger.info(
@@ -137,13 +135,12 @@ def classify_request(
         except Exception as e:
             logger.error(f"分类过程出错: {e}，使用默认路径")
             # 出错时使用保守的默认策略
-            return _fallback_classification(query, department, "")
+            return _fallback_classification(query, "")
 
 
 def _parse_llm_response_to_route_decision(
     content: str, 
-    query: str, 
-    department: str
+    query: str
 ) -> RouteDecision:
     """
     解析LLM返回的JSON字符串为RouteDecision对象
@@ -151,7 +148,6 @@ def _parse_llm_response_to_route_decision(
     Args:
         content: LLM返回的内容（可能包含JSON）
         query: 原始查询
-        department: 部门信息
         
     Returns:
         RouteDecision: 解析后的路由决策
@@ -222,27 +218,26 @@ def _parse_llm_response_to_route_decision(
             return result
         except ValidationError as e:
             enhanced_logger.logger.error(f"❌ Pydantic验证失败: {e}，使用备用方案")
-            return _fallback_classification(query, department, content)
+            return _fallback_classification(query, content)
             
     except json.JSONDecodeError as e:
         enhanced_logger.logger.warning(
             f"⚠️ JSON解析失败: {e}，使用基于规则的备用方案"
         )
-        return _fallback_classification(query, department, content)
+        return _fallback_classification(query, content)
     except Exception as e:
         enhanced_logger.logger.error(
             f"❌ 解析过程出错: {e}，使用备用方案"
         )
-        return _fallback_classification(query, department, content)
+        return _fallback_classification(query, content)
 
 
-def _fallback_classification(query: str, department: str = "general", llm_response: str = "") -> RouteDecision:
+def _fallback_classification(query: str, llm_response: str = "") -> RouteDecision:
     """
     备用分类方法，使用基于规则的启发式策略
     
     Args:
         query: 用户查询
-        department: 用户部门（不再使用）
         llm_response: LLM的响应（如果有）
         
     Returns:

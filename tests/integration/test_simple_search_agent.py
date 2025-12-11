@@ -22,8 +22,7 @@ def mock_state():
         "research_topic": "信用卡如何申请？",
         "messages": [HumanMessage(content="信用卡如何申请？")],
         "locale": "zh-CN",
-        "enable_smart_routing": True,
-        "user_department": "general"
+        "enable_smart_routing": True
     }
 
 
