@@ -1291,18 +1291,20 @@ async def _execute_agent_step(
 
     # 为研究智能体添加引用提醒
     if agent_name == "researcher":
-        if state.get("resources"):
-            resources_info = "**用户提到了以下资源文件：**\n\n"
-            for resource in state.get("resources"):
-                resources_info += f"- {resource.title} ({resource.description})\n"
-
-            agent_input["messages"].append(
-                HumanMessage(
-                    content=resources_info
-                    + "\n\n"
-                    + "您必须使用 **local_search_tool** 从资源文件中检索信息。",
-                )
-            )
+        # 注释：local_search_tool 目前未实现，暂时禁用资源提示
+        # if state.get("resources"):
+        #     resources_info = "**用户提到了以下资源文件：**\n\n"
+        #     for resource in state.get("resources"):
+        #         resources_info += f"- {resource.title} ({resource.description})\n"
+        #
+        #     agent_input["messages"].append(
+        #         HumanMessage(
+        #             content=resources_info
+        #             + "\n\n"
+        #             + "您必须使用 **local_search_tool** 从资源文件中检索信息。",
+        #         )
+        #     )
+        pass
 
         agent_input["messages"].append(
             HumanMessage(
@@ -1539,18 +1541,19 @@ async def researcher_node(
         crawl_tool  # 添加网页爬取工具
     ]
     
-    retriever_tool = get_retriever_tool(state.get("resources", []))
-    if retriever_tool:
-        tools.insert(0, retriever_tool)
-        enhanced_logger.logger.info(
-            f"🔧 TOOLS_READY | 研究工具配置完成 | "
-            f"工具数: {len(tools)} | 包含本地检索: 是 | 包含网页爬取: 是"
-        )
-    else:
-        enhanced_logger.logger.info(
-            f"🔧 TOOLS_READY | 研究工具配置完成 | "
-            f"工具数: {len(tools)} | 包含本地检索: 否 | 包含网页爬取: 是"
-        )
+    # 注释：local_search_tool 目前未实现，暂时禁用
+    # retriever_tool = get_retriever_tool(state.get("resources", []))
+    # if retriever_tool:
+    #     tools.insert(0, retriever_tool)
+    #     enhanced_logger.logger.info(
+    #         f"🔧 TOOLS_READY | 研究工具配置完成 | "
+    #         f"工具数: {len(tools)} | 包含本地检索: 是 | 包含网页爬取: 是"
+    #     )
+    # else:
+    enhanced_logger.logger.info(
+        f"🔧 TOOLS_READY | 研究工具配置完成 | "
+        f"工具数: {len(tools)} | 包含本地检索: 否 | 包含网页爬取: 是"
+    )
     
     logger.info(f"Researcher tools: {tools}")
     
