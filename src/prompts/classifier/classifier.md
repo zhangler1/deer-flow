@@ -46,20 +46,6 @@
 - "研究普惠金融在农村地区的发展现状"
 - "评估开放银行API的安全风险"
 
-## 4. 领域知识 (domain_knowledge)
-适用场景:
-- ✅ 高度专业化的银行内部知识
-- ✅ 特定产品规则、内部流程
-- ✅ 专业术语、监管要求
-- ✅ 知识高度集中但专业性强
-- ✅ 需要特定领域知识库
-
-示例:
-- "交通银行沃德财富卡的积分规则"
-- "理财产品风险评级R3是什么标准?"
-- "SWIFT报文MT103的字段说明"
-- "反洗钱可疑交易监测规则"
-
 ## 分类规则总结
 1. **优先级**: 直接回答 < 简单检索(主流) < 深度研究 < 领域知识
 2. **默认原则**: 有疑问时选择"simple_search"（简单检索）
@@ -72,7 +58,6 @@
    - direct_answer: needs_search = false
    - simple_search: needs_search = true
    - deep_research: needs_search = true
-   - domain_knowledge: needs_search = true
 5. **置信度**: 
    - 0.9-1.0: 非常明确
    - 0.7-0.9: 较为明确

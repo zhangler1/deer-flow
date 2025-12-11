@@ -856,7 +856,7 @@ async def _full_workflow_sse_generator(
     完整工作流SSE生成器：使用完整的 LangGraph 工作流，返回原生SSE格式事件流
     
     功能说明：
-    - 支持智能路由（direct_answer/simple_search/domain_knowledge/deep_research）
+    - 支持智能路由（direct_answer/simple_search/deep_research）
     - 返回原生 SSE 格式事件（event: message_chunk\ndata: {...}\n\n）
     - 与 /api/chat/stream 保持一致
     将 SimpleResearchRequest 参数转换并调用现有的 _astream_workflow_generator
@@ -925,7 +925,7 @@ async def _full_workflow_openai_generator(
     完整工作流OpenAI生成器：使用完整的 LangGraph 工作流，返回OpenAI兼容格式
     
     功能说明：
-    - 支持智能路由（direct_answer/simple_search/domain_knowledge/deep_research）
+    - 支持智能路由（direct_answer/simple_search/deep_research）
     - 返回 OpenAI chat.completion.chunk 格式（data: {...}\n\n）
     - 自动过滤 <think>...</think> 标签内的思考内容
     - 返回所有输出节点的信息（reporter/coordinator/各路径节点）
@@ -995,17 +995,13 @@ async def _full_workflow_openai_generator(
                         # - reporter: 深度研究报告
                         # - coordinator: 深度研究协调/追问
                         # - direct_answer_assistant: 直接回答
-                        # - simple_search_assistant: 简单检索
-                        # - domain_knowledge_assistant: 领域知识
-                        # - department_assistant: 部门专用
+                        # - simple_search_assistant: 简单检絢
                         agent = event_data.get("agent", "")
                         allowed_agents = [
                             "reporter",                    # 深度研究报告
                             "coordinator",                # 深度研究协调
                             "direct_answer_node",         # 直接回答节点
-                            "simple_search_node",         # 简单检索节点
-                            "domain_knowledge_node",      # 领域知识节点
-                            "department_node"              # 部门专用节点
+                            "simple_search_node",         # 简单检絢节点
                         ]
                         if agent not in allowed_agents:
                             enhanced_logger.logger.debug(f"⚠️ FILTERED_AGENT | 过滤非输出agent: {agent}")

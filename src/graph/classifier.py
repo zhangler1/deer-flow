@@ -20,8 +20,8 @@ enhanced_logger = get_enhanced_logger('graph.classifier')
 
 class RouteDecision(BaseModel):
     """路由决策模型"""
-    path: Literal["direct_answer", "simple_search", "deep_research", "domain_knowledge"] = Field(
-        description="路由路径: direct_answer(直接回答), simple_search(简单检索), deep_research(深度研究), domain_knowledge(领域知识)"
+    path: Literal["direct_answer", "simple_search", "deep_research"] = Field(
+        description="路由路径: direct_answer(直接回答), simple_search(简单检索), deep_research(深度研究)"
     )
     complexity: Literal["simple", "medium", "complex", "expert"] = Field(
         description="问题复杂度: simple(简单通用), medium(适中专业), complex(复杂分散), expert(专家集中)"
@@ -194,7 +194,7 @@ def _parse_llm_response_to_route_decision(
                 data[field] = defaults.get(field)
         
         # 验证枚举值
-        valid_paths = ["direct_answer", "simple_search", "deep_research", "domain_knowledge"]
+        valid_paths = ["direct_answer", "simple_search", "deep_research"]
         if data["path"] not in valid_paths:
             enhanced_logger.logger.warning(
                 f"⚠️ 无效的path值: {data['path']}，使用默认值 simple_search"
@@ -306,15 +306,15 @@ def _fallback_classification(query: str, department: str = "general", llm_respon
             reasoning="非银行业务相关的通用知识，使用直接回答"
         )
     
-    # 检查领域知识（高度专业）
+    # 检查领域知识（高度专业）- 改为simple_search
     for keyword in domain_keywords:
         if keyword in query_lower:
             return RouteDecision(
-                path="domain_knowledge",
+                path="simple_search",
                 complexity="expert",
                 needs_search=True,
                 confidence=0.8,
-                reasoning=f"查询包含专业领域关键词，需要专业知识库"
+                reasoning=f"查询包含专业领域关键词，使用简单检索并可调用金融知识库工具"
             )
     
     # 检查深度研究
