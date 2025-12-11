@@ -29,6 +29,6 @@ patch*
 coverage.xml
 coverage/
 
-
+*.md
 #
 uv.lock

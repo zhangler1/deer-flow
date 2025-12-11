@@ -18,7 +18,7 @@ from .nodes import (
     reporter_node,
     research_team_node,
     researcher_node,
-    # 新增的智能路由节点（4种路径）
+    # 新增的智能路由节点（3种路径）
     router_node,
     direct_answer_node,
     simple_search_node,
@@ -135,7 +135,7 @@ def _build_base_graph():
     # 添加智能路由节点（入口节点）
     builder.add_node("router", router_node)
     
-    # 添加4种路径的节点
+    # 添加3种路径的节点
     # 1. 直接回答节点（通用知识，不走检索）
     builder.add_node("direct_answer_node", direct_answer_node)
     
@@ -156,9 +156,6 @@ def _build_base_graph():
     # 暂时注释掉 coder 节点
     # builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
-    
-    # 保留原有部门节点作为兼容（可选）
-    builder.add_node("department_node", department_node)
     
     # 深度研究路径的边（保持不变）
     builder.add_edge("background_investigator", "planner")

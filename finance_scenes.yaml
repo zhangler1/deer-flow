@@ -1,0 +1,143 @@
+# 金融场景智能体配置
+# 定义不同场景下的 spaceCodeList
+
+# API 配置
+api:
+  base_url: "http://12.244.113.82/EUVD.EUVD-ADAPTER.V-1.0/searchKnowledgeStandard.do"
+  timeout: 30  # 超时时间（秒）
+  caller: "sjyh"
+  env: "BASE"
+
+# 场景配置
+scenes:
+  # 默认场景（同时包含银行业务和投资理财）
+  default:
+    name: "默认场景"
+    description: "同时检索银行业务和投资理财相关知识"
+    space_codes:
+      - "SP0000010"
+      - "SP0000001"
+  
+  # 银行业务场景
+  banking:
+    name: "银行业务"
+    description: "银行产品、服务、业务流程等"
+    space_codes:
+      - "SP0000010"
+  
+  # 投资理财场景
+  investment:
+    name: "投资理财"
+    description: "理财产品、投资策略、收益分析等"
+    space_codes:
+      - "SP0000001"
+  
+  # 信贷业务场景
+  credit:
+    name: "信贷业务"
+    description: "贷款产品、信贷政策、风险管理等"
+    space_codes:
+      - "SP0000002"  # 示例代码，需根据实际情况调整
+  
+  # 支付结算场景
+  payment:
+    name: "支付结算"
+    description: "支付方式、转账汇款、结算规则等"
+    space_codes:
+      - "SP0000003"  # 示例代码，需根据实际情况调整
+  
+  # 风险合规场景
+  compliance:
+    name: "风险合规"
+    description: "合规要求、风险控制、监管政策等"
+    space_codes:
+      - "SP0000004"  # 示例代码，需根据实际情况调整
+  
+  # 大宗商品场景（如螺纹钢价格查询）
+  commodity:
+    name: "大宗商品"
+    description: "大宗商品价格、市场分析、交易策略等"
+    space_codes:
+      - "SP0000010"
+
+# 搜索参数配置
+search_params:
+  # 向量检索Top N
+  vector_top_n: 6
+  
+  # 文本检索Top N
+  text_top_n: 6
+  
+  # 相关度阈值
+  threshold: 0.1
+  
+  # QA类型
+  qa_type:
+    - "1"  # 类型1
+    - "0"  # 类型0
+    - "2"  # 类型2
+  
+  # 搜索类型
+  search_type: "0"
+  
+  # 模型选择
+  model: 0
+  
+  # 附件标志
+  attach_flag: 1
+  
+  # 已发布标志
+  published_flag: 0
+  
+  # 删除标志
+  del_flag: 0
+
+# 用户配置（可从环境变量覆盖）
+user:
+  user_code: "9857485"
+  caller: "SXZSWD_JIAOXIN"
+
+# 场景推荐规则（根据关键词自动推荐场景）
+scene_recommendations:
+  # 银行业务相关关键词
+  banking_keywords:
+    - "信用卡"
+    - "储蓄卡"
+    - "开户"
+    - "销户"
+    - "账户"
+    - "存款"
+    - "取款"
+  
+  # 投资理财相关关键词
+  investment_keywords:
+    - "理财"
+    - "基金"
+    - "收益"
+    - "投资"
+    - "财富管理"
+  
+  # 信贷业务相关关键词
+  credit_keywords:
+    - "贷款"
+    - "信贷"
+    - "抵押"
+    - "担保"
+    - "征信"
+  
+  # 支付结算相关关键词
+  payment_keywords:
+    - "转账"
+    - "汇款"
+    - "支付"
+    - "结算"
+    - "清算"
+  
+  # 大宗商品相关关键词
+  commodity_keywords:
+    - "螺纹钢"
+    - "铜"
+    - "铝"
+    - "原油"
+    - "黄金"
+    - "大宗商品"

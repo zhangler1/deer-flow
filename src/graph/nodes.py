@@ -24,6 +24,7 @@ from src.tools import (
     get_web_search_tool,
     python_repl_tool,
     crawl_tool,
+    domain_fin_search,
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
@@ -33,7 +34,7 @@ from src.utils.enhanced_logger import get_enhanced_logger
 from ..config import SELECTED_SEARCH_ENGINE, SearchEngine
 from .types import State
 from .classifier import classify_request
-from .department_agents import create_department_agent, get_department_config
+
 
 import requests
 from SQL.services import SceneMapService
@@ -249,14 +250,15 @@ def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal[
         )
 
 
-def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
+async def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
     """
-    简单检索节点 - 单次搜索并直接回答（主流路径）
+    简单检索节点 - 多轮工具调用搜索并回答（主流路径）
     
-    适用于银行业务的常规问题，通过一次搜索快速提供答案
+    适用于银行业务的常规问题，通过智能体多轮调用工具获取答案
+    类似 search_agent.py 的实现，但使用 LangGraph 框架
     """
     start_time = time.time()
-    enhanced_logger.logger.info("🔄 NODE_ENTRY | simple_search | 开始简单检索处理")
+    enhanced_logger.logger.info("🔄 NODE_ENTRY | simple_search | 开始简单检索处理（多轮工具调用）")
     
     configurable = Configuration.from_runnable_config(config)
     query = state.get("research_topic") or (
@@ -266,64 +268,72 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
     enhanced_logger.logger.info(f"❓ SIMPLE_SEARCH_QUERY | '{query}'")
     
     try:
-        # 单次搜索获取信息（为银行业务优化）
-        search_start = time.time()
-        search_results = get_web_search_tool(
-            max_search_results=3,  # 简单检索只需少量结果
-            engine=configurable.search_engine,
-            repository_id=configurable.custom_search_repository
-        ).invoke(query)
-        search_duration = time.time() - search_start
+        # 配置工具：使用简单检索需要的工具
+        tools = [
+            get_web_search_tool(
+                max_search_results=3,  # 简单检索只需少量结果
+                engine=configurable.search_engine,
+                repository_id=configurable.custom_search_repository
+            ),
+            crawl_tool,  # 添加网页爬取工具
+            domain_fin_search,  # 添加金融领域知识搜索工具（默认场景）
+        ]
         
         enhanced_logger.logger.info(
-            f"🔍 SEARCH_COMPLETE | 结果数: {len(search_results) if isinstance(search_results, list) else '未知'} | "
-            f"耗时: {search_duration:.2f}s"
+            f"🔧 TOOLS_READY | 简单检索工具配置完成 | "
+            f"工具数: {len(tools)} | 包含: web_search, crawl_tool, domain_fin_search"
         )
         
-        # 使用 Prompt 模板（为银行业务场景优化）
-        # 准备模板变量：添加 search_results
-        state_with_search = dict(state)
-        state_with_search['search_results'] = search_results
+        # 创建简单检索智能体（使用 create_agent）
+        agent_start = time.time()
+        agent = create_agent(
+            agent_name="simple_search_assistant",
+            agent_type="researcher",  # 使用 researcher 类型的 LLM 配置
+            tools=tools,
+            prompt_template="simple_search"
+        )
+        agent_create_duration = time.time() - agent_start
+        enhanced_logger.logger.info(f"🤖 AGENT_CREATED | 耗时: {agent_create_duration:.2f}s")
         
-        try:
-            messages_for_llm = apply_prompt_template(
-                "simple_search",
-                state_with_search,
-                configurable
-            )
-        except Exception as e:
-            logger.warning(f"应用Prompt模板失败，使用备用方案: {e}")
-            # 备用方案：简单提示词
-            answer_prompt_fallback = f"""请基于以下搜索结果回答问题（不超过300字）:
-
-问题: {query}
-
-搜索结果: {json.dumps(search_results, ensure_ascii=False, indent=2)}
-"""
-            messages_for_llm = [{"role": "user", "content": answer_prompt_fallback}]
+        # 准备智能体输入
+        agent_input = {
+            "messages": [
+                HumanMessage(
+                    content=f"请回答以下问题（不超过300字）:\n\n{query}"
+                )
+            ]
+        }
         
-        # 生成回答
-        llm_start = time.time()
-        llm = get_llm_by_type("basic")
+        # 调用智能体（多轮工具调用）
+        # 设置递归限制（控制最大工具调用次数）
+        max_llm_calls = 5  # 简单检索限制较小的调用次数
+        enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | 正在调用智能体... | 最大调用次数: {max_llm_calls}")
         
-        # DEBUG级别：打印LLM输入
-        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
-            prompt_str = str(messages_for_llm)
-            enhanced_logger.logger.debug(
-                f"🤖 LLM_INPUT | simple_search | Prompt长度: {len(prompt_str)}\n"
-                f"{'='*80}\n{prompt_str}\n{'='*80}"
-            )
+        agent_exec_start = time.time()
+        result = await agent.ainvoke(
+            input=agent_input,
+            config={"recursion_limit": max_llm_calls}
+        )
+        agent_exec_duration = time.time() - agent_exec_start
+        enhanced_logger.logger.info(f"✅ AGENT_INVOKED | LLM调用完成 | 耗时: {agent_exec_duration:.2f}s")
         
-        response = llm.invoke(messages_for_llm)
-        answer = response.content if hasattr(response, 'content') else str(response)
-        llm_duration = time.time() - llm_start
+        # 提取最终回答
+        if isinstance(result, dict) and "messages" in result:
+            last_message = result["messages"][-1]
+            answer = last_message.content if hasattr(last_message, 'content') else str(last_message)
+        else:
+            answer = str(result)
         
+        # 记录工具调用统计
+        tool_calls_count = 0
+        if isinstance(result, dict) and "messages" in result:
+            for msg in result["messages"]:
+                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                    tool_calls_count += len(msg.tool_calls)
         
-        # DEBUG级别：打印更详细的输出信息
-        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
-            enhanced_logger.logger.debug(
-                f"🤖 LLM_OUTPUT_DETAIL | simple_search | 响应类型: {type(response)} | 完整响应: {response}"
-            )
+        enhanced_logger.logger.info(
+            f"📊 TOOL_CALLS_SUMMARY | 工具调用总次数: {tool_calls_count}"
+        )
         
         duration = time.time() - start_time
         enhanced_logger.logger.info(
@@ -341,6 +351,8 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
     except Exception as e:
         logger.error(f"简单检索处理失败: {e}")
         enhanced_logger.logger.error(f"❌ SIMPLE_SEARCH_ERROR | {str(e)}")
+        import traceback
+        enhanced_logger.logger.error(f"❌ TRACEBACK | {traceback.format_exc()}")
         
         # 失败时返回错误信息
         error_msg = f"抱歉，在处理您的问题时遇到了错误。请尝试重新提问或使用深度研究模式。\n\n错误信息: {str(e)}"
@@ -422,7 +434,7 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
 
 {("历史研究：" + str(history_text)) if history_text else "这是第1轮研究"}
 
-请使用可用工具（web_search, crawl_tool）进行研究，并评估是否需要继续迭代。"""}}
+请使用可用工具（web_search, crawl_tool）进行研究，并评估是否需要继续迭代。"""}
             ]
         
         # 创建带工具的 Agent
@@ -1551,6 +1563,8 @@ async def researcher_node(
             configurable.custom_search_repository
         ),
         crawl_tool,  # 添加网页爬取工具
+        domain_fin_search,  # 添加金融领域知识搜絢工具（默认场景）
+        crawl_tool,  # 添加网页爬取工具
     ]
     
     # 注释：local_search_tool 目前未实现，暂时禁用
@@ -1564,7 +1578,7 @@ async def researcher_node(
     # else:
     enhanced_logger.logger.info(
         f"🔧 TOOLS_READY | 研究工具配置完成 | "
-        f"工具数: {len(tools)} | 包含本地检索: 否 | 包含网页爬取: 是"
+        f"工具数: {len(tools)} | 包含: web_search, crawl_tool, domain_fin_search"
     )
     
     logger.info(f"Researcher tools: {tools}")
