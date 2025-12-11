@@ -25,11 +25,9 @@ class State(MessagesState):
     system_context: str = ""  # 系统背景上下文，各节点在Prompt Template中按需使用（不修改用户消息）
     
     # 智能路由相关字段
-    user_department: str = "general"  # 用户部门
     query_complexity: str = "unknown"  # 查询复杂度: simple/medium/complex
-    routing_path: str = "auto"  # 路由路径: auto/simple_qa/deep_research/department_specific
+    routing_path: str = "auto"  # 路由路径: auto/simple_qa/deep_research
     enable_smart_routing: bool = True  # 是否启用智能路由
-    department_context: dict = {}  # 部门特定上下文
     
     # 迭代研究相关字段
     iteration_count: int = 0  # 当前迭代轮次

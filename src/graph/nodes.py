@@ -82,7 +82,7 @@ def router_node(
     """
     智能路由节点，分析用户请求并决定处理路径
     
-    根据用户查询和部门信息，自动选择最优处理路径：
+    根据用户查询，自动选择最优处理路径：
     - direct_answer_node: 直接回答，通用知识（不走检索）
     - simple_search_node: 简单检索，主流业务（单次检索）
     - iterative_research_node: 迭代研究，单问题深挖（自主迭代）
@@ -98,18 +98,16 @@ def router_node(
     # 确保 user_query 是字符串类型
     if not isinstance(user_query, str):
         user_query = str(user_query)
-    user_department = state.get("user_department", "general")
     enable_smart_routing = state.get("enable_smart_routing", True)
     
     enhanced_logger.logger.info(
-        f"📝 ROUTER_INPUT | 查询: '{user_query[:50]}...' | 部门: {user_department} | "
+        f"📝 ROUTER_INPUT | 查询: '{user_query[:50]}...' | "
         f"智能路由: {'启用' if enable_smart_routing else '禁用'}"
     )
     
     # 调用分类模型
     route_decision = classify_request(
         query=user_query,
-        department=user_department,
         enable_smart_routing=enable_smart_routing
     )
     
@@ -552,106 +550,6 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
             goto="__end__"
         )
 
-
-def department_node(
-    state: State, config: RunnableConfig
-) -> Command[Literal["__end__"]]:
-    """
-    部门专用处理节点
-    
-    根据用户所属部门，使用专用智能体和工具进行处理
-    """
-    start_time = time.time()
-    enhanced_logger.logger.info("🔄 NODE_ENTRY | department | 开始部门专用处理")
-    
-    configurable = Configuration.from_runnable_config(config)
-    department = state.get("user_department", "general")
-    query = state.get("research_topic") or (
-        state["messages"][-1].content if state.get("messages") else ""
-    )
-    resources = state.get("resources", [])
-    
-    enhanced_logger.logger.info(
-        f"🏢 DEPARTMENT_INFO | 部门: {department} | 查询: '{query[:50]}...'"
-    )
-    
-    try:
-        # 获取部门配置
-        dept_config = get_department_config(department)
-        enhanced_logger.logger.info(
-            f"📋 DEPARTMENT_CONFIG | {dept_config['name']} | 描述: {dept_config['description']}"
-        )
-        
-        # 创建部门专用智能体
-        agent_start = time.time()
-        agent = create_department_agent(
-            department=department,
-            search_engine=configurable.search_engine,
-            custom_search_repository=configurable.custom_search_repository,
-            resources=resources
-        )
-        agent_create_duration = time.time() - agent_start
-        
-        enhanced_logger.logger.info(
-            f"🤖 AGENT_CREATED | 耗时: {agent_create_duration:.2f}s"
-        )
-        
-        # DEBUG级别：打印部门智能体输入
-        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
-            enhanced_logger.logger.debug(
-                f"🤖 AGENT_INPUT | department | 部门: {department} | 查询长度: {len(query)}\n"
-                f"{'='*80}\n{query}\n{'='*80}"
-            )
-        
-        # 调用智能体处理请求
-        invoke_start = time.time()
-        result = agent.invoke({
-            "messages": [{"role": "user", "content": query}]
-        })
-        invoke_duration = time.time() - invoke_start
-        
-        # 提取输出
-        output = ""
-        if isinstance(result, dict) and "messages" in result:
-            last_message = result["messages"][-1]
-            output = last_message.content if hasattr(last_message, 'content') else str(last_message)
-        else:
-            output = str(result)
-        
-        # DEBUG级别：打印部门智能体输出
-        if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
-            enhanced_logger.logger.debug(
-                f"🤖 AGENT_OUTPUT | department | 响应长度: {len(output)}\n"
-                f"{'='*80}\n{output}\n{'='*80}"
-            )
-        
-        enhanced_logger.logger.info(
-            f"💬 DEPARTMENT_RESPONSE | 长度: {len(output)} | 处理耗时: {invoke_duration:.2f}s"
-        )
-        
-        duration = time.time() - start_time
-        enhanced_logger.logger.info(
-            f"✅ NODE_EXIT | department | 部门专用处理完成 | 总耗时: {duration:.2f}s"
-        )
-        
-        # 不添加 messages，让 LangGraph 自动捕获 LLM 的流式响应（避免双重输出）
-        return Command(
-            update={
-                "final_report": output,
-            },
-            goto="__end__"
-        )
-        
-    except Exception as e:
-        logger.error(f"部门专用处理失败: {e}")
-        enhanced_logger.logger.error(f"❌ DEPARTMENT_ERROR | {str(e)}")
-        
-        # 失败时回退到简单问答
-        error_msg = f"部门专用处理失败，尝试使用通用方式回答。\n\n错误: {str(e)}"
-        enhanced_logger.logger.warning(f"⚠️ FALLBACK_TO_SIMPLE | {error_msg}")
-        
-        # 调用简单检索逻辑作为后备
-        return simple_search_node(state, config)
 
 
 def background_investigation_node(state: State, config: RunnableConfig):
@@ -1616,7 +1514,6 @@ __all__ = [
     "direct_answer_node",
     "simple_search_node",
     "iterative_research_node",  # 新增：迭代研究节点
-    "department_node",
     
     # 深度研究路径节点
     "coordinator_node",

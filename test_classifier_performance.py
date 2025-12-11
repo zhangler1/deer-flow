@@ -46,7 +46,6 @@ for i, query in enumerate(test_queries, 1):
         try:
             result = classify_request(
                 query=query,
-                department="general",
                 enable_smart_routing=True
             )
             print(f"  → 分类路径: {result.path}")

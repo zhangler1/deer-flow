@@ -23,7 +23,6 @@ from .nodes import (
     direct_answer_node,
     simple_search_node,
     iterative_research_node,  # 新增：迭代研究节点
-    department_node,  # 保留原有部门节点作为兼容
 )
 from .types import State
 
@@ -171,7 +170,6 @@ def _build_base_graph():
     builder.add_edge("direct_answer_node", END)
     builder.add_edge("simple_search_node", END)
     builder.add_edge("iterative_research_node", END)  # 迭代研究节点可能递归，但最终也会结束
-    builder.add_edge("department_node", END)
     
     return builder
 
