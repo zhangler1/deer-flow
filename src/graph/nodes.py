@@ -24,6 +24,7 @@ from src.tools import (
     get_web_search_tool,
     python_repl_tool,
     crawl_tool,
+    domain_fin_search,
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
@@ -49,7 +50,6 @@ def _get_path_description(path: str) -> str:
         "direct_answer": "直接回答，不走检索",
         "simple_search": "简单检索，单次查询",
         "deep_research": "深度研究，多轮分析",
-        "domain_knowledge": "领域知识，专业知识库"
     }
     return descriptions.get(path, "未知路径")
 
@@ -77,7 +77,7 @@ def handoff_to_planner(
 
 def router_node(
     state: State, config: RunnableConfig
-) -> Command[Literal["direct_answer_node", "simple_search_node", "coordinator", "domain_knowledge_node"]]:
+) -> Command[Literal["direct_answer_node", "simple_search_node", "coordinator"]]:
     """
     智能路由节点，分析用户请求并决定处理路径
     
@@ -85,7 +85,6 @@ def router_node(
     - direct_answer_node: 直接回答，通用知识（不走检索）
     - simple_search_node: 简单检索，主流业务（单次检索）
     - coordinator: 深度研究路径（多轮检索研究）
-    - domain_knowledge_node: 领域知识，专业知识库
     """
     start_time = time.time()
     enhanced_logger.logger.info("🔀 NODE_ENTRY | router | 开始智能路由分析")
@@ -156,10 +155,8 @@ def router_node(
         return Command(update=state_update, goto="direct_answer_node")
     elif route_decision.path == "simple_search":
         return Command(update=state_update, goto="simple_search_node")
-    elif route_decision.path == "deep_research":
+    else:  # deep_research
         return Command(update=state_update, goto="coordinator")
-    else:  # domain_knowledge
-        return Command(update=state_update, goto="domain_knowledge_node")
 
 
 def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
@@ -353,181 +350,6 @@ def simple_search_node(state: State, config: RunnableConfig) -> Command[Literal[
         )
 
 
-
-def domain_knowledge_node(
-    state: State, config: RunnableConfig
-) -> Command[Literal["__end__"]]:
-    """
-    领域知识节点 - 使用专业知识库处理高度专业化的银行业务问题
-    
-    适用于高度专业化但知识集中的银行内部知识，如特定产品规则、监管要求等
-    """
-    start_time = time.time()
-    enhanced_logger.logger.info("🔄 NODE_ENTRY | domain_knowledge | 开始领域知识处理")
-    
-    configurable = Configuration.from_runnable_config(config)
-    query = state.get("research_topic") or (
-        state["messages"][-1].content if state.get("messages") else ""
-    )
-    resources = state.get("resources", [])
-    
-    enhanced_logger.logger.info(
-        f"🎯 DOMAIN_KNOWLEDGE_QUERY | 查询: '{query[:50]}...' | 资源数: {len(resources)}"
-    )
-    
-    try:
-        # 新增：金融场景分类并调用外部接口 jxChat（优先执行）
-        try:
-            init_database()
-        except Exception as e:
-            enhanced_logger.logger.warning(f"⚠️ DB_INIT_WARN | 数据库初始化失败，继续执行但可能无场景列表: {e}")
-        
-        fin_scene_tuples = []
-        try:
-            scenes = SceneMapService.get_scene_details(
-                repository='EUVD',
-                exclude_empty_template=False
-            )
-            fin_scene_tuples = [
-                (
-                    s.get('scene_name', ''),
-                    s.get('scene_code', ''),
-                    s.get('description', 'N/A')
-                )
-                for s in scenes
-                if str(s.get('scene_code', '')).startswith('FIN_') or str(s.get('scene_code', '')) == 'SXZSWD'
-            ]
-        except Exception as e:
-            enhanced_logger.logger.warning(f"⚠️ SCENE_FETCH_WARN | 获取金融场景失败: {e}")
-            fin_scene_tuples = []
-        
-        allowed_codes = {t[1] for t in fin_scene_tuples if t[1]}
-        enhanced_logger.logger.info(f"📚 FIN_SCENES | 候选数: {len(allowed_codes)}")
-        
-        classification_prompt = f"""
-你是银行财务领域的场景分类助手。请从候选列表中选择最匹配本问题的场景码（scene_code）。
-
-用户问题：{query}
-候选场景（name|code|desc，最多展示20条）：{json.dumps(fin_scene_tuples[:20], ensure_ascii=False)}
-
-请只输出严格的JSON：{{"scene_code": "<CODE>", "confidence": 0.0, "reason": "简要理由"}}。
-- 必须从候选列表的 code 中选择；若无明确匹配则返回默认 {{"scene_code": "SXZSWD", "confidence": 0.5, "reason": "默认兜底"}}。
-- 不要输出除上述JSON以外的任何额外文本。
-"""
-        
-        scene_code = ""
-        classification_info = ""  # 用于存储分类信息，添加到输出前缀
-        try:
-            llm_cls = get_llm_by_type("basic")
-            classification_start = time.time()
-            resp_cls = llm_cls.invoke([{"role": "user", "content": classification_prompt}])
-            classification_duration = time.time() - classification_start
-            
-            raw_content_cls = resp_cls.content if hasattr(resp_cls, 'content') else str(resp_cls)
-            
-            # 🆕 添加：记录分类模型的原始输出
-            enhanced_logger.logger.info(
-                f"🎯 CLASSIFICATION_LLM_OUTPUT | 分类模型响应 | 耗时: {classification_duration:.2f}s\n"
-                f"{'='*80}\n{raw_content_cls}\n{'='*80}"
-            )
-            
-            parsed_cls = json.loads(repair_json_output(str(raw_content_cls)))
-            scene_code = str(parsed_cls.get("scene_code", "")).strip()
-            confidence = parsed_cls.get("confidence", 0.0)
-            reason = parsed_cls.get("reason", "N/A")
-            
-            # 🆕 构造分类信息（将添加到最终输出的开头）
-            classification_info = (
-                f"---\n"
-                f"**📊 问题分类结果**\n\n"
-                f"- 场景代码: `{scene_code}`\n"
-                f"- 置信度: `{confidence:.2%}`\n"
-                f"- 分类理由: {reason}\n"
-                f"- 分类耗时: `{classification_duration:.2f}秒`\n"
-                f"\n---\n\n"
-            )
-            
-            # 🆕 添加：记录解析后的分类结果
-            enhanced_logger.logger.info(
-                f"✅ CLASSIFICATION_RESULT | scene_code: '{scene_code}' | "
-                f"置信度: {confidence} | 理由: {reason}"
-            )
-            
-            if not scene_code or (allowed_codes and scene_code not in allowed_codes):
-                enhanced_logger.logger.warning(f"⚠️ CODE_VALIDATION | 非候选或空code: '{scene_code}'，使用兜底SXZSWD")
-                scene_code = "SXZSWD"
-        except Exception as e:
-            enhanced_logger.logger.warning(f"⚠️ CLASSIFY_FALLBACK | 分类失败，使用兜底SXZSWD: {e}")
-            scene_code = "SXZSWD"
-        
-        # 调用外部场景码接口（jxChat），并将结果作为本节点输出（SSE由系统统一流式返回）
-        try:
-            url = os.getenv("JXCHAT_URL", "http://localhost:9080/jxChat")
-            headers = {
-                "Accept": "*/*",
-                "Accept-Encoding": "gzip, deflate, br",
-                "Connection": "keep-alive",
-                "Content-Type": "application/json",
-                "User-Agent": os.getenv("JXCHAT_UA", "PostmanRuntime-ApipostRuntime/1.1.0"),
-                "api-key": os.getenv("JXCHAT_API_KEY", "123456789"),
-                "jumpCloud-Env": os.getenv("JXCHAT_ENV", "BASE"),
-            }
-            payload = {
-                "messages": [{"role": "user", "content": query}],
-                "stream": False,
-                "model": os.getenv("JXCHAT_MODEL", "gpt-fire-general"),
-                "flag": False,
-                "scene_code": scene_code,
-                "assistantId": "-1",
-                "muwpUser": {
-                    "muwp_branchID": os.getenv("MUWP_BRANCH_ID", "1000027159"),
-                    "muwp_loginName": os.getenv("MUWP_LOGIN_NAME", "xuew_4"),
-                    "muwp_userCode": os.getenv("MUWP_USER_CODE", "9743616"),
-                    "muwp_userName": os.getenv("MUWP_USER_NAME", "薛巍"),
-                    "muwp_userID": os.getenv("MUWP_USER_ID", "132298"),
-                },
-            }
-            enhanced_logger.logger.info(f"🌐 JXCHAT_REQUEST | URL: {url} | scene_code: {scene_code}")
-            r = requests.post(url, headers=headers, json=payload, timeout=int(os.getenv("JXCHAT_TIMEOUT", "20")))
-            r.raise_for_status()
-            final_text = ""
-            try:
-                data = r.json()
-                final_text = (
-                    data.get("answer") or data.get("data") or data.get("message") or json.dumps(data, ensure_ascii=False)
-                )
-            except Exception:
-                final_text = r.text
-            
-            duration = time.time() - start_time
-            enhanced_logger.logger.info(
-                f"✅ NODE_EXIT | domain_knowledge(jxchat) | 完成 | 耗时: {duration:.2f}s"
-            )
-            
-            # 🆕 将分类信息通过 messages 输出到前端（这样可以实时看到）
-            from langchain_core.messages import AIMessage
-            final_output = classification_info + final_text if classification_info else final_text
-            return Command(
-                update={
-                    "messages": [
-                        AIMessage(
-                            content=final_output,
-                            name="domain_knowledge_node"
-                        )
-                    ],
-                    "final_report": final_output,
-                },
-                goto="__end__"
-            )
-        except Exception as e:
-            enhanced_logger.logger.error(f"❌ JXCHAT_ERROR | {str(e)}")
-            return simple_search_node(state, config)
-
-    except Exception as e:
-        logger.error(f"领域知识处理失败: {e}")
-        enhanced_logger.logger.error(f"❌ DOMAIN_KNOWLEDGE_ERROR | {str(e)}")
-        return simple_search_node(state, config)
-        
 
 def department_node(
     state: State, config: RunnableConfig
@@ -1538,7 +1360,8 @@ async def researcher_node(
             configurable.search_engine,
             configurable.custom_search_repository
         ),
-        crawl_tool  # 添加网页爬取工具
+        crawl_tool,  # 添加网页爬取工具
+        domain_fin_search,  # 添加金融领域知识库检索工具
     ]
     
     # 注释：local_search_tool 目前未实现，暂时禁用
@@ -1589,7 +1412,6 @@ __all__ = [
     "router_node",
     "direct_answer_node",
     "simple_search_node",
-    "domain_knowledge_node",
     "department_node",
     
     # 深度研究路径节点
