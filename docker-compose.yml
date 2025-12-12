@@ -46,7 +46,7 @@ services:
     volumes:
       - ./web/.env.local:/app/web/.env.local:ro
       - ./conf.yaml:/app/conf.yaml:ro
-      - ./web/:/app/
+      - ./web/src:/app/src
     depends_on:
       - backend
     restart: unless-stopped
