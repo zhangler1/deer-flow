@@ -26,13 +26,16 @@ class DomainFinSearchConfig:
     # API 配置
     BASE_URL = "http://12.244.113.82/EUVD.EUVD-ADAPTER.V-1.0/searchKnowledgeStandard.do"
     
-    # 场景映射
+    # 场景映射（子知识库ID - 每次只能查询一个）
     SCENES = {
-        "default": ["SP0000010", "SP0000001"],  # 默认场景
+        "default": ["SP0000010"],  # 默认场景：银行业务
         "banking": ["SP0000010"],  # 银行业务场景
         "investment": ["SP0000001"],  # 投资理财场景
         # 可以根据实际需要添加更多场景
     }
+    
+    # 团队ID配置
+    TEAM_SPACE_CODE = "SP0000010"  # 默认团队ID
     
     # 请求头配置
     HEADERS = {
@@ -54,6 +57,7 @@ class DomainFinSearchConfig:
 def _build_request_body(
     keyword: str,
     space_codes: List[str] = None,
+    team_space_code: str = None,
     user_code: str = "9857485",
     caller: str = "SXZSWD_JIAOXIN",
     vector_top_n: int = 6,
@@ -65,6 +69,9 @@ def _build_request_body(
     if space_codes is None:
         space_codes = DomainFinSearchConfig.SCENES["default"]
     
+    if team_space_code is None:
+        team_space_code = DomainFinSearchConfig.TEAM_SPACE_CODE
+    
     req_body = {
         "REQ_HEAD": {},
         "REQ_BODY": {
@@ -72,10 +79,10 @@ def _build_request_body(
                 "keyword": keyword,
                 "caller": caller,
                 "userCode": user_code,
-                "teamSpaceCodeList": [],
+                "teamSpaceCodeList": [team_space_code],  # 团队ID
                 "domainTagList": [],
                 "searchType": "0",
-                "spaceCodeList": space_codes,
+                "spaceCodeList": space_codes,  # 子知识库ID列表
                 "qaType": ["1", "0", "2"],
                 "customizedTagList": [],
                 "vectorTopN": vector_top_n,
@@ -175,36 +182,52 @@ def call_domain_fin_search(
 
 
 def _extract_knowledge(result: Dict[str, Any]) -> str:
-    """从API响应中提取知识内容"""
+    """从 API 响应中提取知识内容"""
     try:
-        # 根据实际API响应结构提取知识
-        # 这里需要根据真实的API响应格式进行调整
-        
-        if "RSP_BODY" in result and "data" in result["RSP_BODY"]:
-            data = result["RSP_BODY"]["data"]
+        # 根据实际 API 响应结构提取知识
+        if "RSP_BODY" in result:
+            rsp_body = result["RSP_BODY"]
+            result_data = rsp_body.get("result", {})
             
-            # 如果是列表形式的知识条目
-            if isinstance(data, list):
-                knowledge_items = []
-                for item in data:
-                    # 提取标题和内容
-                    title = item.get("title", "")
-                    content = item.get("content", item.get("answer", ""))
-                    score = item.get("score", "")
-                    
-                    if title and content:
-                        knowledge_items.append(
-                            f"【{title}】\n{content}\n(相关度: {score})"
-                        )
-                    elif content:
-                        knowledge_items.append(content)
+            # 提取向量检索结果和文本检絢结果
+            vector_list = result_data.get("vectorGroupList", [])
+            text_list = result_data.get("textGroupList", [])
+            
+            # 合并两种检絢结果
+            all_results = []
+            for item in vector_list + text_list:
+                content = item.get("content", "")
+                score = item.get("score", "")
+                para_title = item.get("paraTitle", "")  # 提取段落标题
                 
-                if knowledge_items:
-                    return "\n\n---\n\n".join(knowledge_items)
+                if content:
+                    all_results.append({
+                        "content": content,
+                        "score": score,
+                        "paraTitle": para_title
+                    })
             
-            # 如果是字典形式
-            elif isinstance(data, dict):
-                return json.dumps(data, ensure_ascii=False, indent=2)
+            # 格式化输出
+            if all_results:
+                knowledge_items = []
+                for idx, item in enumerate(all_results, 1):
+                    content = item["content"]
+                    score = item["score"]
+                    para_title = item["paraTitle"]
+                    
+                    # 如果有标题，显示标题；否则只显示结果编号
+                    if para_title:
+                        knowledge_items.append(
+                            f"【{para_title}】\n{content}\n(相关度: {score})"
+                        )
+                    else:
+                        knowledge_items.append(
+                            f"【结果 {idx}】\n{content}\n(相关度: {score})"
+                        )
+                
+                return "\n\n---\n\n".join(knowledge_items)
+            else:
+                return "未找到相关知识"
         
         # 如果无法提取，返回原始结果
         return json.dumps(result, ensure_ascii=False, indent=2)

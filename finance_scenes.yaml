@@ -15,7 +15,6 @@ scenes:
     name: "默认场景"
     description: "同时检索银行业务和投资理财相关知识"
     space_codes:
-      - "SP0000010"
       - "SP0000001"
   
   # 银行业务场景
