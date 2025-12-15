@@ -304,7 +304,29 @@ async def simple_search_node(state: State, config: RunnableConfig) -> Command[Li
         
         # 调用智能体（多轮工具调用）
         # 设置递归限制（控制最大工具调用次数）
-        max_llm_calls = 5  # 简单检索限制较小的调用次数
+        # 优先使用环境变量 AGENT_RECURSION_LIMIT，否则使用默认值 25
+        default_recursion_limit = 25
+        try:
+            env_value_str = os.getenv("AGENT_RECURSION_LIMIT", str(default_recursion_limit))
+            parsed_limit = int(env_value_str)
+
+            if parsed_limit > 0:
+                max_llm_calls = parsed_limit
+                enhanced_logger.logger.info(f"📊 RECURSION_LIMIT | 从环境变量读取: {max_llm_calls}")
+            else:
+                logger.warning(
+                    f"AGENT_RECURSION_LIMIT 值 '{env_value_str}' (解析为 {parsed_limit}) 不是正数。"
+                    f"使用默认值 {default_recursion_limit}。"
+                )
+                max_llm_calls = default_recursion_limit
+        except ValueError:
+            raw_env_value = os.getenv("AGENT_RECURSION_LIMIT")
+            logger.warning(
+                f"无效的 AGENT_RECURSION_LIMIT 值：'{raw_env_value}'。"
+                f"使用默认值 {default_recursion_limit}。"
+            )
+            max_llm_calls = default_recursion_limit
+            
         enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | 正在调用智能体... | 最大调用次数: {max_llm_calls}")
         
         agent_exec_start = time.time()

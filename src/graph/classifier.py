@@ -4,6 +4,7 @@
 """智能路由分类器模块"""
 
 import json
+import os
 import re
 import logging
 from typing import Literal
@@ -13,6 +14,26 @@ from src.llms.llm import get_llm_by_type
 from src.utils.enhanced_logger import get_enhanced_logger
 from src.prompts.template import env  # 直接导入 Jinja2 环境
 from src.utils.performance_monitor import PerformanceMonitor
+
+# LangFuse 集成 - 直接导入，失败时降级
+LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+
+try:
+    from langfuse.decorators import langfuse_context, observe
+except ImportError:
+    LANGFUSE_ENABLED = False
+    logging.warning("LangFuse not installed. Tracing disabled. Install: pip install langfuse>=3.10.0")
+    
+    # 定义空装饰器和上下文作为降级
+    def observe(func):
+        return func
+    
+    class DummyContext:
+        def update_current_observation(self, **kwargs): pass
+        def update_current_trace(self, **kwargs): pass
+        def score_current_observation(self, **kwargs): pass
+    
+    langfuse_context = DummyContext()
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.classifier')
@@ -38,6 +59,7 @@ class RouteDecision(BaseModel):
     )
 
 
+@observe
 def classify_request(
     query: str, 
     enable_smart_routing: bool = True
@@ -52,6 +74,21 @@ def classify_request(
     Returns:
         RouteDecision: 路由决策结果
     """
+    
+    # LangFuse: 记录分类开始 - 设置更直观的名称
+    langfuse_context.update_current_observation(
+        name=f"🎯 智能路由分类 | {query[:30]}...",  # 显示查询内容前30个字符
+        input={
+            "query": query,
+            "enable_smart_routing": enable_smart_routing,
+            "query_length": len(query)
+        },
+        metadata={
+            "component": "classifier",
+            "type": "routing_decision",
+            "stage": "query_classification"
+        }
+    )
     
     # 🎯 监控整个分类流程
     with PerformanceMonitor(
@@ -93,6 +130,15 @@ def classify_request(
                     f"{'='*80}\n{classification_prompt}\n{'='*80}"
                 )
             
+            # LangFuse: 记录 LLM 输入 prompt
+            langfuse_context.update_current_observation(
+                metadata={
+                    "prompt": classification_prompt,
+                    "prompt_length": len(classification_prompt),
+                    "model_type": "basic"
+                }
+            )
+            
             # 🎯 监控LLM推理（关键性能瓶颈）
             with PerformanceMonitor(
                 "分类器-LLM推理",
@@ -128,6 +174,30 @@ def classify_request(
                 f"理由: {result.reasoning} | "
                 f"总耗时: {overall_monitor.get_duration_formatted()} | "
                 f"LLM耗时: {llm_monitor.get_duration_formatted()}"
+            )
+            
+            # LangFuse: 记录输出结果
+            langfuse_context.update_current_observation(
+                output={
+                    "path": result.path,
+                    "complexity": result.complexity,
+                    "needs_search": result.needs_search,
+                    "confidence": result.confidence,
+                    "reasoning": result.reasoning,
+                    "llm_response": content[:500]  # 只保存前500字符
+                },
+                metadata={
+                    "total_duration": overall_monitor.get_duration(),
+                    "llm_duration": llm_monitor.get_duration(),
+                    "response_length": len(content)
+                }
+            )
+            
+            # 添加质量评分（基于置信度）
+            langfuse_context.score_current_observation(
+                name="classification_confidence",
+                value=result.confidence,
+                comment=f"Path: {result.path}, Complexity: {result.complexity}"
             )
             
             return result
