@@ -1003,6 +1003,7 @@ async def _full_workflow_openai_generator(
                         # - coordinator: 深度研究协调/追问
                         # - direct_answer_assistant: 直接回答
                         # - simple_search_assistant: 简单检索
+                        # - iterative_research_node: 迭代研究节点
                         agent = event_data.get("agent", "")
                         allowed_agents = [
                             "reporter",                    # 深度研究报告
@@ -1013,8 +1014,7 @@ async def _full_workflow_openai_generator(
                         ]
                         if agent not in allowed_agents:
                             enhanced_logger.logger.debug(f"⚠️ FILTERED_AGENT | 过滤非输出agent: {agent}")
-                            continue
-                        
+                            continue                        
                         enhanced_logger.logger.debug(f"✅ PROCESSING_AGENT | 处理agent: {agent} | event_type: {event_type}")
                         
                         if event_type == "message_chunk" and "content" in event_data:
