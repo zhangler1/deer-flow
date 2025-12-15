@@ -116,7 +116,7 @@ services:
       - --max-allowed-packet=64M
     # 健康检查
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$YSQL_ROOT_PASSWORD"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -150,18 +150,129 @@ services:
     
     networks:
       - deer-flow-network
+  postgres:
+    image: postgres:15-alpine
+    container_name: langfuse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: langfuse
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: changeme_langfuse_password  # 生产环境请修改此密码
+    volumes:
+      - langfuse-postgres-data:/var/lib/postgresql/data
+    networks:
+      - deer-flow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ClickHouse 数据库（LangFuse v3 必需）
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    container_name: langfuse-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: langfuse
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: changeme_clickhouse_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - langfuse-clickhouse-data:/var/lib/clickhouse
+    # 添加安全选项以解决 get_mempolicy 权限问题
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    # 如果上面的配置还不够，可以取消下面两行的注释（不推荐生产环境）
+    # cap_add:
+    #   - SYS_NICE
+    #   - NET_ADMIN
+    #   - IPC_LOCK
+    networks:
+      - deer-flow-network
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # LangFuse 主服务
+  langfuse-server:
+    image: langfuse/langfuse:2.74.0
+    container_name: langfuse-server
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # Web UI 端口，避免与 frontend 冲突
+    environment:
+      # ===== 数据库配置 =====
+      DATABASE_URL: postgresql://langfuse:changeme_langfuse_password@postgres:5432/langfuse
+      CLICKHOUSE_URL: http://langfuse:changeme_clickhouse_password@clickhouse:8123/langfuse
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse:changeme_clickhouse_password@clickhouse:9000/langfuse
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: changeme_clickhouse_password
+      # 禁用 ClickHouse 集群模式（单机部署不需要 Zookeeper）
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      
+      # ===== 应用配置 =====
+      # 访问地址（根据实际情况修改，如内网 IP）
+      NEXTAUTH_URL: http://localhost:3001
+      
+      # Next.js 配置
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
+      
+      # 安全密钥（生产环境必须修改为随机字符串）
+      NEXTAUTH_SECRET: changeme-random-secret-key-min-32-chars-abcdef1234567890
+      SALT: changeme-random-salt-min-32-chars-xyz9876543210
+      
+      # ===== 功能配置 =====
+      # 禁用外网功能（适用于离线环境）
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+      
+      # 禁用遥测（不向 LangFuse 官方发送使用数据）
+      TELEMETRY_ENABLED: "false"
+      
+      # 日志级别（可选: debug, info, warn, error）
+      LOG_LEVEL: info
+      
+      # ===== 可选配置 =====
+      # 如需开启注册功能，设置为 true（默认为 false，只能管理员创建用户）
+      # NEXTAUTH_ALLOW_SIGN_UP: "false"
+      
+      # 设置时区
+      TZ: Asia/Shanghai
+      
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - deer-flow-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/public/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 # 数据卷定义
 volumes:
   # MySQL 数据持久化
   mysql-data:
     driver: local
-  
+  langfuse-postgres-data:
+    driver: local
+  langfuse-clickhouse-data:
+    driver: local
   # MySQL 日志
   mysql-logs:
     driver: local
 
-
 networks:
   deer-flow-network:
     driver: bridge
+
+
+
+
