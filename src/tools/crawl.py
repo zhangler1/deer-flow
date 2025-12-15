@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+import os
 import time
 from typing import Annotated, Dict, List, Union, Optional
 
@@ -11,6 +12,15 @@ from src.crawler import Crawler
 from src.utils.enhanced_logger import console_print, get_enhanced_logger
 
 from .decorators import log_io
+
+# LangFuse 集成（如果启用）
+LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+if LANGFUSE_ENABLED:
+    try:
+        from langfuse.decorators import observe, langfuse_context
+    except ImportError:
+        LANGFUSE_ENABLED = False
+        logging.warning("LangFuse is enabled but not installed. Run: pip install langfuse")
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('tools.crawl')
@@ -97,6 +107,19 @@ async def crawl_tool(
     """
     start_time = time.time()
     
+    # LangFuse: 记录输入
+    if LANGFUSE_ENABLED:
+        langfuse_context.update_current_observation(
+            name="web_crawl",
+            input={
+                "url": url,
+                "use_cache": use_cache
+            },
+            metadata={
+                "tool_name": "crawl_tool"
+            }
+        )
+    
     # 检查缓存
     if use_cache and _global_cache.has(url):
         cached_result = _global_cache.get(url)
@@ -111,6 +134,27 @@ async def crawl_tool(
                 f"\033[36m[💾 缓存命中]\033[0m \033[35m{url}\033[0m",
                 level=logging.INFO
             )
+            
+            # LangFuse: 记录缓存命中
+            if LANGFUSE_ENABLED:
+                langfuse_context.update_current_observation(
+                    output={
+                        "status": "cache_hit",
+                        "title": cached_result.get('title'),
+                        "url": url,
+                        "content_length": cached_result.get('full_length', 0)
+                    },
+                    metadata={
+                        "cached": True,
+                        "cache_hit_time": cached_result['cache_hit_time'],
+                        "duration_seconds": cached_result['cache_hit_time']
+                    }
+                )
+                langfuse_context.score_current_observation(
+                    name="cache_efficiency",
+                    value=1.0,
+                    comment="Cache hit - instant response"
+                )
             
             return cached_result
     
@@ -171,6 +215,36 @@ async def crawl_tool(
             _global_cache.set(url, result.copy())
             enhanced_logger.logger.debug(f"💾 CACHE_STORED | 已存入缓存 | URL: {url}")
         
+        # LangFuse: 记录成功结果
+        if LANGFUSE_ENABLED:
+            langfuse_context.update_current_observation(
+                output={
+                    "status": "success",
+                    "title": article.title,
+                    "url": url,
+                    "content_length": len(markdown_content),
+                    "preview": preview_text,
+                    "truncated": is_truncated
+                },
+                metadata={
+                    "duration_seconds": duration,
+                    "full_length": len(markdown_content),
+                    "cached": False,
+                    "cache_stored": use_cache
+                }
+            )
+            
+            # 添加质量评分
+            quality_score = 0.8 if is_truncated else 1.0
+            if len(markdown_content) < 100:
+                quality_score = 0.5  # 内容太少
+            
+            langfuse_context.score_current_observation(
+                name="crawl_quality",
+                value=quality_score,
+                comment=f"Crawled {len(markdown_content)} chars" + (" (truncated)" if is_truncated else "")
+            )
+        
         return result
         
     except BaseException as e:
@@ -185,6 +259,25 @@ async def crawl_tool(
             f"\033[31m[❌ 爬取失败]\033[0m \033[35m{error_msg}\033[0m",
             level=logging.ERROR
         )
+        
+        # LangFuse: 记录错误
+        if LANGFUSE_ENABLED:
+            langfuse_context.update_current_observation(
+                output={
+                    "status": "error",
+                    "error": str(e),
+                    "url": url
+                },
+                metadata={
+                    "duration_seconds": duration,
+                    "error_type": type(e).__name__
+                }
+            )
+            langfuse_context.score_current_observation(
+                name="crawl_quality",
+                value=0.0,
+                comment=f"Crawl failed: {str(e)[:100]}"
+            )
         
         logger.error(error_msg)
         return error_msg

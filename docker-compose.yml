@@ -208,10 +208,12 @@ services:
     environment:
       # ===== 数据库配置 =====
       DATABASE_URL: postgresql://langfuse:changeme_langfuse_password@postgres:5432/langfuse
-      CLICKHOUSE_URL: http://langfuse:changeme_clickhouse_password@clickhouse:8123/langfuse
-      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse:changeme_clickhouse_password@clickhouse:9000/langfuse
+      # ClickHouse 配置（避免参数重复警告）
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
       CLICKHOUSE_USER: langfuse
       CLICKHOUSE_PASSWORD: changeme_clickhouse_password
+      CLICKHOUSE_DATABASE: langfuse
       # 禁用 ClickHouse 集群模式（单机部署不需要 Zookeeper）
       CLICKHOUSE_CLUSTER_ENABLED: "false"
       
@@ -233,6 +235,9 @@ services:
       
       # 禁用遥测（不向 LangFuse 官方发送使用数据）
       TELEMETRY_ENABLED: "false"
+      
+      # 禁用更新检查（离线环境）
+      NEXT_PUBLIC_DISABLE_UPDATE_CHECK: "true"
       
       # 日志级别（可选: debug, info, warn, error）
       LOG_LEVEL: info
