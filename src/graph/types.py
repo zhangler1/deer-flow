@@ -28,6 +28,7 @@ class State(MessagesState):
     query_complexity: str = "unknown"  # 查询复杂度: simple/medium/complex
     routing_path: str = "auto"  # 路由路径: auto/simple_qa/deep_research
     enable_smart_routing: bool = True  # 是否启用智能路由
+    force_routing_path: str = None  # 🐛 调试模式：强制路由路径（可选）
     
     # 迭代研究相关字段
     iteration_count: int = 0  # 当前迭代轮次

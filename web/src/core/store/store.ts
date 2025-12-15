@@ -119,6 +119,7 @@ export async function sendMessage(
       search_engine: settings.searchEngine,
       custom_search_repository: settings.customSearchRepository,
       report_style: settings.reportStyle,
+      force_routing_path: settings.forceRoutingPath, // 🐛 调试模式
       mcp_settings: settings.mcpSettings,
     },
     options,

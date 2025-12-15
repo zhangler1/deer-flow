@@ -47,7 +47,15 @@
       "selectSearchEngine": "Select search engine",
       "customSearchRepository": "Custom Search Repository",
       "customSearchRepositoryDescription": "Select the data repository for custom search engine. Different repositories contain different types of data.",
-      "selectRepository": "Select repository"
+      "selectRepository": "Select repository",
+      "debugMode": "Debug Mode",
+      "forceRoutingPath": "Force Routing Path",
+      "forceRoutingPathDescription": "Bypass smart classifier and force route to specific node. For development/debugging only, use auto routing in production.",
+      "autoRouting": "Auto Routing",
+      "directAnswer": "Direct Answer",
+      "simpleSearch": "Simple Search",
+      "iterativeResearch": "Iterative Research",
+      "deepResearch": "Deep Research"
     },
     "mcp": {
       "title": "MCP Servers",

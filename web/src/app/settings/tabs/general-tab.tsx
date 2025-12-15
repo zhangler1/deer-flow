@@ -50,6 +50,8 @@ const generalFormSchema = z.object({
   enableBackgroundInvestigation: z.boolean(),
   enableDeepThinking: z.boolean(),
   reportStyle: z.enum(["academic", "popular_science", "news", "social_media"]),
+  // 🐛 Debug Mode
+  forceRoutingPath: z.enum(["direct_answer", "simple_search", "iterative_research", "deep_research"]).optional(),
 });
 
 export const GeneralTab: Tab = ({
@@ -271,6 +273,52 @@ export const GeneralTab: Tab = ({
                 )}
               />
             )}
+            {/* 🐛 Debug Mode: Force Routing Path */}
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-sm font-medium mb-3">🐛 {t("debugMode")}</h3>
+              <FormField
+                control={form.control}
+                name="forceRoutingPath"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("forceRoutingPath")}</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value || "auto"}
+                        onValueChange={(value) => {
+                          field.onChange(value === "auto" ? undefined : value);
+                        }}
+                      >
+                        <SelectTrigger className="w-60">
+                          <SelectValue placeholder={t("autoRouting")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">
+                            {t("autoRouting")} (智能分类)
+                          </SelectItem>
+                          <SelectItem value="direct_answer">
+                            📢 {t("directAnswer")} (Direct Answer)
+                          </SelectItem>
+                          <SelectItem value="simple_search">
+                            🔍 {t("simpleSearch")} (Simple Search)
+                          </SelectItem>
+                          <SelectItem value="iterative_research">
+                            🔄 {t("iterativeResearch")} (Iterative Research)
+                          </SelectItem>
+                          <SelectItem value="deep_research">
+                            🔬 {t("deepResearch")} (Deep Research)
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>
+                      {t("forceRoutingPathDescription")}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </form>
         </Form>
       </main>
