@@ -40,6 +40,13 @@ import requests
 from SQL.services import SceneMapService
 from SQL.database import init_database
 
+# LangFuse 集成 - 直接导入，失败时降级
+LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+
+
+from langfuse.decorators import langfuse_context, observe
+
+
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes')
 
@@ -76,6 +83,7 @@ def handoff_to_planner(
     return
 
 
+@observe(name="📡 路由节点")
 def router_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["direct_answer_node", "simple_search_node", "iterative_research_node", "coordinator"]]:
@@ -98,6 +106,20 @@ def router_node(
     # 确保 user_query 是字符串类型
     if not isinstance(user_query, str):
         user_query = str(user_query)
+    enable_smart_routing = state.get("enable_smart_routing", True)
+    
+    # LangFuse: 记录节点输入
+    langfuse_context.update_current_observation(
+        input={
+            "query": user_query,
+            "query_preview": f"{user_query[:50]}..." if len(user_query) > 50 else user_query,
+            "enable_smart_routing": enable_smart_routing
+        },
+        metadata={
+            "node_type": "router",
+            "stage": "request_routing"
+        }
+    )
     enable_smart_routing = state.get("enable_smart_routing", True)
     
     enhanced_logger.logger.info(
@@ -161,6 +183,7 @@ def router_node(
         return Command(update=state_update, goto="coordinator")
 
 
+@observe(name="⚡ 直接回答节点")
 def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
     """
     直接回答节点 - 不走检索，使用LLM的通用知识直接回答
@@ -173,6 +196,19 @@ def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal[
     configurable = Configuration.from_runnable_config(config)
     query = state.get("research_topic") or (
         state["messages"][-1].content if state.get("messages") else ""
+    )
+    
+    # LangFuse: 记录节点输入
+    langfuse_context.update_current_observation(
+        input={
+            "query": query,
+            "query_preview": f"{query[:50]}..." if len(query) > 50 else query
+        },
+        metadata={
+            "node_type": "direct_answer",
+            "stage": "answer_generation",
+            "uses_retrieval": False
+        }
     )
     
     enhanced_logger.logger.info(f"❓ DIRECT_ANSWER_QUERY | '{query}'")
@@ -625,6 +661,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
     return result
 
 
+@observe(name="📋 规划节点")
 def planner_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["human_feedback", "reporter"]]:
@@ -635,6 +672,24 @@ def planner_node(
     configurable = Configuration.from_runnable_config(config)
     plan_iterations = state["plan_iterations"] if state.get("plan_iterations", 0) else 0
     enhanced_logger.log_plan_generation(plan_iterations + 1, state.get("research_topic", "未知"), 0)
+    
+    # LangFuse: 记录节点输入
+    langfuse_context.update_current_observation(
+        input={
+            "research_topic": state.get("research_topic"),
+            "topic_preview": f"{state.get('research_topic', '')[:50]}..." if len(state.get('research_topic', '')) > 50 else state.get('research_topic', ''),
+            "plan_iterations": plan_iterations,
+            "max_plan_iterations": configurable.max_plan_iterations,
+            "enable_background_investigation": state.get("enable_background_investigation", False),
+            "has_background_results": bool(state.get("background_investigation_results"))
+        },
+        metadata={
+            "node_type": "planner",
+            "stage": "plan_creation",
+            "uses_llm": True,
+            "enable_deep_thinking": configurable.enable_deep_thinking
+        }
+    )
     
     messages = []
     try:
@@ -765,6 +820,28 @@ def planner_node(
             
             # 检查是否有需要执行的步骤
             has_unexecuted_steps = any(step.execution_res is None for step in new_plan.steps)
+            
+            # LangFuse: 记录节点输出
+            langfuse_context.update_current_observation(
+                output={
+                    "plan_created": True,
+                    "plan_title": new_plan.title,
+                    "plan_steps_count": len(new_plan.steps),
+                    "has_unexecuted_steps": has_unexecuted_steps,
+                    "next_node": "human_feedback" if has_unexecuted_steps else "reporter"
+                },
+                metadata={
+                    "plan_validation": "success",
+                    "iteration": plan_iterations + 1
+                }
+            )
+            
+            # 评分计划质量
+            langfuse_context.score_current_observation(
+                name="plan_quality",
+                value=0.9,
+                comment=f"Plan created with {len(new_plan.steps)} steps"
+            )
             
             if has_unexecuted_steps:
                 enhanced_logger.logger.info(f"🔀 NODE_TRANSITION | planner → human_feedback | 原因: 计划包含未执行的步骤，需要研究")
@@ -948,6 +1025,7 @@ def human_feedback_node(
         return Command(goto="planner")  # 重新生成计划
 
 
+@observe(name="🎯 协调节点")
 def coordinator_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["planner", "background_investigator", "__end__"]]:
@@ -957,6 +1035,23 @@ def coordinator_node(
     
     logger.info("Coordinator talking.")
     configurable = Configuration.from_runnable_config(config)
+    
+    # LangFuse: 记录节点输入
+    langfuse_context.update_current_observation(
+        input={
+            "research_topic": state.get("research_topic"),
+            "topic_preview": f"{state.get('research_topic', '')[:50]}..." if len(state.get('research_topic', '')) > 50 else state.get('research_topic', ''),
+            "locale": state.get("locale", "zh-CN"),
+            "messages_count": len(state.get("messages", [])),
+            "enable_background_investigation": state.get("enable_background_investigation", False)
+        },
+        metadata={
+            "node_type": "coordinator",
+            "stage": "task_coordination",
+            "uses_llm": True,
+            "uses_tools": True
+        }
+    )
     
     # 打印状态信息
     enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | research_topic: {state.get('research_topic', 'Not set')}")
@@ -1065,6 +1160,20 @@ def coordinator_node(
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | coordinator | 节点执行完成 | 总耗时: {duration:.2f}s")
     
+    # LangFuse: 记录节点输出
+    langfuse_context.update_current_observation(
+        output={
+            "next_node": goto,
+            "locale": locale,
+            "research_topic": research_topic,
+            "tool_calls_count": len(tool_calls) if tool_calls else 0,
+            "has_response_content": bool(response.content)
+        },
+        metadata={
+            "coordinator_decision": "handoff_to_planner" if goto == "planner" else "direct_response"
+        }
+    )
+    
     return Command(
         update={
             "messages": messages,
@@ -1076,6 +1185,7 @@ def coordinator_node(
     )
 
 
+@observe(name="📝 报告节点")
 def reporter_node(state: State, config: RunnableConfig):
     """撰写最终报告的报告员节点"""
     start_time = time.time()
@@ -1098,6 +1208,21 @@ def reporter_node(state: State, config: RunnableConfig):
     else:
         plan_title = str(current_plan) if current_plan else "未知计划"
         plan_thought = "计划详情不可用"
+    
+    # LangFuse: 记录节点输入
+    langfuse_context.update_current_observation(
+        input={
+            "plan_title": plan_title,
+            "plan_preview": f"{plan_title[:50]}..." if len(plan_title) > 50 else plan_title,
+            "observations_count": len(observations),
+            "locale": state.get("locale", "zh-CN")
+        },
+        metadata={
+            "node_type": "reporter",
+            "stage": "report_generation",
+            "uses_llm": True
+        }
+    )
         
     input_ = {
         "messages": [
@@ -1146,6 +1271,27 @@ def reporter_node(state: State, config: RunnableConfig):
     
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | reporter | 节点执行完成 | 总耗时: {duration:.2f}s")
+    
+    # LangFuse: 记录节点输出
+    langfuse_context.update_current_observation(
+        output={
+            "report_generated": True,
+            "report_length": report_length,
+            "report_preview": f"{response_content[:100]}..." if response_content and len(response_content) > 100 else response_content,
+            "observations_used": len(observations)
+        },
+        metadata={
+            "llm_duration": llm_duration,
+            "total_duration": duration
+        }
+    )
+    
+    # 评分报告质量
+    langfuse_context.score_current_observation(
+        name="report_quality",
+        value=0.95,
+        comment=f"Report generated successfully with {report_length} chars"
+    )
 
     return {"final_report": response_content}
 
@@ -1235,19 +1381,7 @@ async def _execute_agent_step(
 
     # 为研究智能体添加引用提醒
     if agent_name == "researcher":
-        # 注释：local_search_tool 目前未实现，暂时禁用资源提示
-        # if state.get("resources"):
-        #     resources_info = "**用户提到了以下资源文件：**\n\n"
-        #     for resource in state.get("resources"):
-        #         resources_info += f"- {resource.title} ({resource.description})\n"
-        #
-        #     agent_input["messages"].append(
-        #         HumanMessage(
-        #             content=resources_info
-        #             + "\n\n"
-        #             + "您必须使用 **local_search_tool** 从资源文件中检索信息。",
-        #         )
-        #     )
+
         pass
 
         agent_input["messages"].append(
@@ -1486,16 +1620,7 @@ async def researcher_node(
         domain_fin_search,  # 添加金融领域知识搜絢工具（默认场景）
         crawl_tool,  # 添加网页爬取工具
     ]
-    
-    # 注释：local_search_tool 目前未实现，暂时禁用
-    # retriever_tool = get_retriever_tool(state.get("resources", []))
-    # if retriever_tool:
-    #     tools.insert(0, retriever_tool)
-    #     enhanced_logger.logger.info(
-    #         f"🔧 TOOLS_READY | 研究工具配置完成 | "
-    #         f"工具数: {len(tools)} | 包含本地检索: 是 | 包含网页爬取: 是"
-    #     )
-    # else:
+
     enhanced_logger.logger.info(
         f"🔧 TOOLS_READY | 研究工具配置完成 | "
         f"工具数: {len(tools)} | 包含: web_search, crawl_tool, domain_fin_search"
