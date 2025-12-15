@@ -143,6 +143,7 @@ async def chat_stream(request: ChatRequest):
             request.report_style or ReportStyle.ACADEMIC,
             request.enable_deep_thinking or False,
             system_context=system_context,  # 从环境变量读取
+            force_routing_path=request.force_routing_path,  # 🐛 调试模式
         ),
         media_type="text/event-stream",
     )
@@ -426,6 +427,7 @@ async def _astream_workflow_generator(
     report_style: ReportStyle,
     enable_deep_thinking: bool,
     system_context: str = "",  # 系统背景上下文
+    force_routing_path: str = None,  # 🐛 调试模式：强制路由路径
 ):
     # Process initial messages
     for message in messages:
@@ -451,6 +453,7 @@ async def _astream_workflow_generator(
         "enable_background_investigation": enable_background_investigation,
         "research_topic": messages[-1]["content"] if messages else "",
         "system_context": system_context,  # 将系统背景传递给工作流
+        "force_routing_path": force_routing_path,  # 🐛 调试模式
     }
 
     if not auto_accepted_plan and interrupt_feedback:
@@ -1006,6 +1009,7 @@ async def _full_workflow_openai_generator(
                             "coordinator",                # 深度研究协调
                             "direct_answer_node",         # 直接回答节点
                             "simple_search_node",         # 简单检索节点
+                            "iterative_research_node"    # 迭代研究节点
                         ]
                         if agent not in allowed_agents:
                             enhanced_logger.logger.debug(f"⚠️ FILTERED_AGENT | 过滤非输出agent: {agent}")

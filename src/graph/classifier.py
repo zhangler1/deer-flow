@@ -59,10 +59,11 @@ class RouteDecision(BaseModel):
     )
 
 
-@observe
+@observe(name="智能路由分类器")
 def classify_request(
     query: str, 
-    enable_smart_routing: bool = True
+    enable_smart_routing: bool = True,
+    force_path: str = None
 ) -> RouteDecision:
     """
     使用LLM对用户请求进行智能分类
@@ -70,6 +71,7 @@ def classify_request(
     Args:
         query: 用户查询内容
         enable_smart_routing: 是否启用智能路由
+        force_path: 强制指定路由路径（调试模式），可选值: "direct_answer", "simple_search", "iterative_research", "deep_research"
         
     Returns:
         RouteDecision: 路由决策结果
@@ -100,6 +102,25 @@ def classify_request(
         enhanced_logger.logger.info(
             f"🔍 CLASSIFIER_START | 查询: '{query[:50]}...'"
         )
+        
+        # 🐛 调试模式：强制路由到指定路径
+        if force_path:
+            valid_paths = ["direct_answer", "simple_search", "iterative_research", "deep_research"]
+            if force_path in valid_paths:
+                enhanced_logger.logger.warning(
+                    f"🐛 DEBUG_MODE | 强制路由到: {force_path} | 跳过智能分类"
+                )
+                return RouteDecision(
+                    path=force_path,
+                    complexity="complex" if force_path in ["iterative_research", "deep_research"] else "medium",
+                    needs_search=force_path != "direct_answer",
+                    confidence=1.0,
+                    reasoning=f"调试模式：强制路由到 {force_path}"
+                )
+            else:
+                enhanced_logger.logger.error(
+                    f"❌ DEBUG_MODE | 无效的force_path值: {force_path}，忽略并继续正常分类"
+                )
         
         # 如果未启用智能路由，默认使用简单检索路径
         if not enable_smart_routing:

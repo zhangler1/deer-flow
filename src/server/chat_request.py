@@ -74,6 +74,9 @@ class ChatRequest(BaseModel):
     enable_deep_thinking: Optional[bool] = Field(
         False, description="Whether to enable deep thinking"
     )
+    force_routing_path: Optional[str] = Field(
+        None, description="🐛 Debug Mode: Force routing to specific path (direct_answer, simple_search, iterative_research, deep_research)"
+    )
 
 
 class TTSRequest(BaseModel):
@@ -138,6 +141,7 @@ class SimpleResearchRequest(BaseModel):
     enable_background_investigation: Optional[bool] = Field(True, description="是否启用背景调研")
     report_style: Optional[ReportStyle] = Field(ReportStyle.ACADEMIC, description="报告风格")
     enable_deep_thinking: Optional[bool] = Field(False, description="是否启用深度思考")
+    force_routing_path: Optional[str] = Field(None, description="🐛 调试模式：强制路由到指定路径 (direct_answer, simple_search, iterative_research, deep_research)")
 
 
 class ChatCompletionMessage(BaseModel):

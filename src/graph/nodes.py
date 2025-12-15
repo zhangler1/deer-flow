@@ -128,9 +128,12 @@ def router_node(
     )
     
     # 调用分类模型
+    # 支持调试模式：从状态中获取 force_routing_path 参数
+    force_routing_path = state.get("force_routing_path", None)
     route_decision = classify_request(
         query=user_query,
-        enable_smart_routing=enable_smart_routing
+        enable_smart_routing=enable_smart_routing,
+        force_path=force_routing_path
     )
     
     # 记录路由决策
@@ -366,7 +369,7 @@ async def simple_search_node(state: State, config: RunnableConfig) -> Command[Li
         enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | 正在调用智能体... | 最大调用次数: {max_llm_calls}")
         
         agent_exec_start = time.time()
-        result = await agent.ainvoke(
+        result = await agent.invoke(
             input=agent_input,
             config={"recursion_limit": max_llm_calls}
         )
@@ -508,10 +511,9 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         agent_start = time.time()
         agent = create_agent(
             agent_name="iterative_researcher",
-            agent_type="research",
+            agent_type="researcher",
             tools=tools,
-            llm=llm,
-            prompt_template="你是一个专业的迭代研究助手，擅长通过多轮检索和分析深入探索问题。"
+            prompt_template="iterative_research"
         )
         agent_duration = time.time() - agent_start
         

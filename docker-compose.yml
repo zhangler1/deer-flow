@@ -45,8 +45,10 @@ services:
       - .env  
     # 挂载环境变量
     volumes:
+      - ./web/messages:/app/messages/
       - ./web/.env.local:/app/web/.env.local:ro
-      - ./web/:/app/
+      - ./conf.yaml:/app/conf.yaml:ro
+      - ./web/src:/app/src
     depends_on:
       - backend
     restart: unless-stopped

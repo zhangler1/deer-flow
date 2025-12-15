@@ -47,7 +47,15 @@
       "selectSearchEngine": "选择搜索引擎",
       "customSearchRepository": "自定义搜索仓库",
       "customSearchRepositoryDescription": "选择自定义搜索引擎使用的数据仓库。不同仓库包含不同类型的数据。",
-      "selectRepository": "选择仓库"
+      "selectRepository": "选择仓库",
+      "debugMode": "调试模式",
+      "forceRoutingPath": "强制路由路径",
+      "forceRoutingPathDescription": "跳过智能分类，直接路由到指定节点。仅用于开发调试，生产环境请使用自动路由。",
+      "autoRouting": "自动路由",
+      "directAnswer": "直接回答",
+      "simpleSearch": "简单检索",
+      "iterativeResearch": "迭代研究",
+      "deepResearch": "深度研究"
     },
     "mcp": {
       "title": "MCP 服务器",
