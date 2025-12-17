@@ -454,8 +454,10 @@ async def _astream_workflow_generator(
         "research_topic": messages[-1]["content"] if messages else "",
         "system_context": system_context,  # 将系统背景传递给工作流
         "force_routing_path": force_routing_path,  # 🐛 调试模式
+        # 确保迭代研究的状态字段被正确初始化
+        "iteration_count": 0,
+        "iteration_history": [],
     }
-
     if not auto_accepted_plan and interrupt_feedback:
         resume_msg = f"[{interrupt_feedback}]"
         if messages:

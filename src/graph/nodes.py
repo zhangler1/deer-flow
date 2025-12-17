@@ -399,6 +399,12 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         f"🔢 ITERATION_CONFIG | 最大迭代次数: {MAX_ITERATIONS} | 当前轮次: {iteration_count + 1}"
     )
     
+    # 确保 iteration_history 是列表类型
+    if not isinstance(iteration_history, list):
+        iteration_history = []
+        enhanced_logger.logger.warning(
+            "⚠️ ITERATION_HISTORY_TYPE_ERROR | iteration_history 不是列表类型，已重置为空列表"
+        )    
     try:
         # 创建带有工具的 Agent
         tools = [
@@ -490,8 +496,8 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
             "summary": answer[:500] + "..." if len(answer) > 500 else answer,
             "timestamp": time.time()
         }
-        updated_history = iteration_history + [new_iteration]
-        
+        # 确保 updated_history 是基于列表的更新，而不是覆盖
+        updated_history = list(iteration_history) + [new_iteration]        
         # 判断是否需要继续迭代（简单启发式判断）
         should_continue = False
         if iteration_count + 1 < MAX_ITERATIONS:
@@ -520,7 +526,8 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                 update={
                     "iteration_count": iteration_count + 1,
                     "iteration_history": updated_history,
-                    "messages": [AIMessage(content=answer, name="iterative_researcher")]
+                    "messages": [AIMessage(content=answer, name="iterative_researcher")],
+                    "research_topic": query  # 保持研究主题的一致性
                 },
                 goto="iterative_research_node"  # 递归调用自己
             )
@@ -534,6 +541,7 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                     "final_report": answer,
                     "iteration_count": iteration_count + 1,
                     "iteration_history": updated_history,
+                    "research_topic": query  # 保持研究主题的一致性
                 },
                 goto="__end__"
             )
