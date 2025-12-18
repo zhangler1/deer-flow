@@ -156,7 +156,9 @@
       "iterationProcess": "Iteration Process",
       "currentIteration": "Current Iteration",
       "generatingReport": "Generating report...",
-      "noContent": "No content"
+      "noContent": "No content",
+      "iterativeResearchProcess": "Researching",
+      "researchReport": "Research Report"
     },
     "search": {
       "searching": "Searching",

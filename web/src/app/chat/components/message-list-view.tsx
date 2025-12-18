@@ -153,6 +153,122 @@ export function MessageListView({
   );
 }
 
+function MessageBubble({
+  className,
+  message,
+  children,
+}: {
+  className?: string;
+  message: Message;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "group flex w-auto max-w-[90vw] flex-col rounded-2xl px-4 py-3 break-words",
+        message.role === "user" && "bg-brand rounded-ee-none",
+        message.role === "assistant" && "bg-card rounded-es-none",
+        className,
+      )}
+      style={{ wordBreak: "break-all" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function IterativeResearchCard({ message }: { message: Message }) {
+  const t = useTranslations("chat.research");
+  const [isOpen, setIsOpen] = useState(true);
+  const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
+
+  // 当消息完成流式传输时自动折叠
+  React.useEffect(() => {
+    if (!message.isStreaming && !hasAutoCollapsed) {
+      setIsOpen(false);
+      setHasAutoCollapsed(true);
+    }
+  }, [message.isStreaming, hasAutoCollapsed]);
+
+  return (
+    <div className="w-full">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className={cn(
+              "h-auto w-full justify-start rounded-xl border px-6 py-4 text-left transition-all duration-200",
+              "hover:bg-accent hover:text-accent-foreground",
+              message.isStreaming
+                ? "border-primary/20 bg-primary/5 shadow-sm"
+                : "border-border bg-card",
+            )}
+          >
+            <div className="flex w-full items-center gap-3">
+              <Lightbulb
+                size={18}
+                className={cn(
+                  "shrink-0 transition-colors duration-200",
+                  message.isStreaming ? "text-primary" : "text-muted-foreground",
+                )}
+              />
+              <span
+                className={cn(
+                  "leading-none font-semibold transition-colors duration-200",
+                  message.isStreaming ? "text-primary" : "text-foreground",
+                )}
+              >
+                {t("iterativeResearchProcess")}
+              </span>
+              {message.isStreaming && <LoadingAnimation className="ml-2 scale-75" />}
+              <div className="flex-grow" />
+              {isOpen ? (
+                <ChevronDown
+                  size={16}
+                  className="text-muted-foreground transition-transform duration-200"
+                />
+              ) : (
+                <ChevronRight
+                  size={16}
+                  className="text-muted-foreground transition-transform duration-200"
+                />
+              )}
+            </div>
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-up-2 data-[state=open]:slide-down-2 mt-3">
+          <Card
+            className={cn(
+              "transition-all duration-200",
+              message.isStreaming ? "border-primary/20 bg-primary/5" : "border-border",
+            )}
+          >
+            <CardContent>
+              <div className="flex h-40 w-full overflow-y-auto">
+                <ScrollContainer
+                  className="flex h-full w-full flex-col overflow-hidden"
+                  scrollShadow={false}
+                  autoScrollToBottom={message.isStreaming}
+                >
+                  <Markdown
+                    className={cn(
+                      "prose dark:prose-invert max-w-none transition-colors duration-200",
+                      message.isStreaming ? "prose-primary" : "opacity-80",
+                    )}
+                    animated={message.isStreaming}
+                  >
+                    {message.content}
+                  </Markdown>
+                </ScrollContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
 function MessageListItem({
   className,
   messageId,
@@ -206,6 +322,13 @@ function MessageListItem({
         />
       </div>
     );
+  } else if (message.agent === "iterative_research_node") {
+    // 特殊处理迭代研究节点的消息
+    content = (
+      <div className="w-full px-4">
+        <IterativeResearchCard message={message} />
+      </div>
+    );
   } else {
     content = message.content ? (
       <div
@@ -250,30 +373,6 @@ function MessageListItem({
     >
       {content}
     </motion.li>
-  );
-}
-
-function MessageBubble({
-  className,
-  message,
-  children,
-}: {
-  className?: string;
-  message: Message;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "group flex w-auto max-w-[90vw] flex-col rounded-2xl px-4 py-3 break-words",
-        message.role === "user" && "bg-brand rounded-ee-none",
-        message.role === "assistant" && "bg-card rounded-es-none",
-        className,
-      )}
-      style={{ wordBreak: "break-all" }}
-    >
-      {children}
-    </div>
   );
 }
 
