@@ -15,10 +15,10 @@ from src.utils.enhanced_logger import get_enhanced_logger
 from src.prompts.template import env  # 直接导入 Jinja2 环境
 from src.utils.performance_monitor import PerformanceMonitor
 
-# Langfuse 集成 - 简洁降级
+# Langfuse 集成 - v3 模式
 try:
-    from langfuse.decorators import langfuse_context, observe
-    from langfuse import get_client
+    from langfuse import observe, get_client
+    langfuse_context = get_client()  # v3 使用 get_client() 获取客户端
 except ImportError:
     logging.warning("Langfuse not installed. Tracing disabled.")
     
@@ -30,20 +30,15 @@ except ImportError:
             return args[0]
         return decorator
     
-    class langfuse_context:
-        @staticmethod
-        def update_current_observation(**kwargs): pass
-        @staticmethod
-        def update_current_trace(**kwargs): pass
-        @staticmethod
-        def score_current_observation(**kwargs): pass
-    
     class DummyClient:
+        def update_current_observation(self, **kwargs): pass
+        def update_current_trace(self, **kwargs): pass
+        def score_current_observation(self, **kwargs): pass
         def auth_check(self): return False
         def flush(self): pass
     
-    def get_client():
-        return DummyClient()
+    langfuse_context = DummyClient()
+    get_client = lambda: langfuse_context
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.classifier')

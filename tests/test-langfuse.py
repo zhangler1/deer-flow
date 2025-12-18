@@ -1,7 +1,6 @@
 # _verify_langfuse.py_
 import os, time, logging
-from langfuse import get_client
-from langfuse.decorators import langfuse_context, observe
+from langfuse import get_client, observe  # v3 导入方式
 
 # Read from environment variables
 # Ensure these are set in your environment:

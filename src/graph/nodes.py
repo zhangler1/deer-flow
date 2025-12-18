@@ -40,11 +40,27 @@ import requests
 from SQL.services import SceneMapService
 from SQL.database import init_database
 
-# LangFuse 集成 - 直接导入，失败时降级
-LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
-
-
-from langfuse.decorators import langfuse_context, observe
+# Langfuse 集成 - v3 模式
+try:
+    from langfuse import observe, get_client
+    langfuse_context = get_client()  # v3 使用 get_client() 获取客户端
+except ImportError:
+    logging.warning("Langfuse not installed. Tracing disabled.")
+    
+    def observe(*args, **kwargs):
+        def decorator(func):
+            return func
+        # 支持 @observe 和 @observe(...) 两种用法
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            return args[0]
+        return decorator
+    
+    class DummyClient:
+        def update_current_observation(self, **kwargs): pass
+        def update_current_trace(self, **kwargs): pass
+        def score_current_observation(self, **kwargs): pass
+    
+    langfuse_context = DummyClient()
 
 
 logger = logging.getLogger(__name__)
