@@ -40,10 +40,9 @@ import requests
 from SQL.services import SceneMapService
 from SQL.database import init_database
 
-# Langfuse 集成 - v3 模式
+# Langfuse 集成 - v3 模式 (@observe 装饰器会自动捕获输入输出)
 try:
-    from langfuse import observe, get_client
-    langfuse_context = get_client()  # v3 使用 get_client() 获取客户端
+    from langfuse import observe
 except ImportError:
     logging.warning("Langfuse not installed. Tracing disabled.")
     
@@ -54,13 +53,6 @@ except ImportError:
         if len(args) == 1 and callable(args[0]) and not kwargs:
             return args[0]
         return decorator
-    
-    class DummyClient:
-        def update_current_observation(self, **kwargs): pass
-        def update_current_trace(self, **kwargs): pass
-        def score_current_observation(self, **kwargs): pass
-    
-    langfuse_context = DummyClient()
 
 
 logger = logging.getLogger(__name__)
@@ -122,20 +114,6 @@ def router_node(
     # 确保 user_query 是字符串类型
     if not isinstance(user_query, str):
         user_query = str(user_query)
-    enable_smart_routing = state.get("enable_smart_routing", True)
-    
-    # LangFuse: 记录节点输入
-    langfuse_context.update_current_observation(
-        input={
-            "query": user_query,
-            "query_preview": f"{user_query[:50]}..." if len(user_query) > 50 else user_query,
-            "enable_smart_routing": enable_smart_routing
-        },
-        metadata={
-            "node_type": "router",
-            "stage": "request_routing"
-        }
-    )
     enable_smart_routing = state.get("enable_smart_routing", True)
     
     enhanced_logger.logger.info(
@@ -215,19 +193,6 @@ def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal[
     configurable = Configuration.from_runnable_config(config)
     query = state.get("research_topic") or (
         state["messages"][-1].content if state.get("messages") else ""
-    )
-    
-    # LangFuse: 记录节点输入
-    langfuse_context.update_current_observation(
-        input={
-            "query": query,
-            "query_preview": f"{query[:50]}..." if len(query) > 50 else query
-        },
-        metadata={
-            "node_type": "direct_answer",
-            "stage": "answer_generation",
-            "uses_retrieval": False
-        }
     )
     
     enhanced_logger.logger.info(f"❓ DIRECT_ANSWER_QUERY | '{query}'")
@@ -691,24 +656,6 @@ def planner_node(
     plan_iterations = state["plan_iterations"] if state.get("plan_iterations", 0) else 0
     enhanced_logger.log_plan_generation(plan_iterations + 1, state.get("research_topic", "未知"), 0)
     
-    # LangFuse: 记录节点输入
-    langfuse_context.update_current_observation(
-        input={
-            "research_topic": state.get("research_topic"),
-            "topic_preview": f"{state.get('research_topic', '')[:50]}..." if len(state.get('research_topic', '')) > 50 else state.get('research_topic', ''),
-            "plan_iterations": plan_iterations,
-            "max_plan_iterations": configurable.max_plan_iterations,
-            "enable_background_investigation": state.get("enable_background_investigation", False),
-            "has_background_results": bool(state.get("background_investigation_results"))
-        },
-        metadata={
-            "node_type": "planner",
-            "stage": "plan_creation",
-            "uses_llm": True,
-            "enable_deep_thinking": configurable.enable_deep_thinking
-        }
-    )
-    
     messages = []
     try:
         messages = apply_prompt_template("planner", state, configurable)
@@ -838,28 +785,6 @@ def planner_node(
             
             # 检查是否有需要执行的步骤
             has_unexecuted_steps = any(step.execution_res is None for step in new_plan.steps)
-            
-            # LangFuse: 记录节点输出
-            langfuse_context.update_current_observation(
-                output={
-                    "plan_created": True,
-                    "plan_title": new_plan.title,
-                    "plan_steps_count": len(new_plan.steps),
-                    "has_unexecuted_steps": has_unexecuted_steps,
-                    "next_node": "human_feedback" if has_unexecuted_steps else "reporter"
-                },
-                metadata={
-                    "plan_validation": "success",
-                    "iteration": plan_iterations + 1
-                }
-            )
-            
-            # 评分计划质量
-            langfuse_context.score_current_observation(
-                name="plan_quality",
-                value=0.9,
-                comment=f"Plan created with {len(new_plan.steps)} steps"
-            )
             
             if has_unexecuted_steps:
                 enhanced_logger.logger.info(f"🔀 NODE_TRANSITION | planner → human_feedback | 原因: 计划包含未执行的步骤，需要研究")
@@ -1054,23 +979,6 @@ def coordinator_node(
     logger.info("Coordinator talking.")
     configurable = Configuration.from_runnable_config(config)
     
-    # LangFuse: 记录节点输入
-    langfuse_context.update_current_observation(
-        input={
-            "research_topic": state.get("research_topic"),
-            "topic_preview": f"{state.get('research_topic', '')[:50]}..." if len(state.get('research_topic', '')) > 50 else state.get('research_topic', ''),
-            "locale": state.get("locale", "zh-CN"),
-            "messages_count": len(state.get("messages", [])),
-            "enable_background_investigation": state.get("enable_background_investigation", False)
-        },
-        metadata={
-            "node_type": "coordinator",
-            "stage": "task_coordination",
-            "uses_llm": True,
-            "uses_tools": True
-        }
-    )
-    
     # 打印状态信息
     enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | research_topic: {state.get('research_topic', 'Not set')}")
     enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | locale: {state.get('locale', 'Not set')}")
@@ -1178,20 +1086,6 @@ def coordinator_node(
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | coordinator | 节点执行完成 | 总耗时: {duration:.2f}s")
     
-    # LangFuse: 记录节点输出
-    langfuse_context.update_current_observation(
-        output={
-            "next_node": goto,
-            "locale": locale,
-            "research_topic": research_topic,
-            "tool_calls_count": len(tool_calls) if tool_calls else 0,
-            "has_response_content": bool(response.content)
-        },
-        metadata={
-            "coordinator_decision": "handoff_to_planner" if goto == "planner" else "direct_response"
-        }
-    )
-    
     return Command(
         update={
             "messages": messages,
@@ -1226,21 +1120,6 @@ def reporter_node(state: State, config: RunnableConfig):
     else:
         plan_title = str(current_plan) if current_plan else "未知计划"
         plan_thought = "计划详情不可用"
-    
-    # LangFuse: 记录节点输入
-    langfuse_context.update_current_observation(
-        input={
-            "plan_title": plan_title,
-            "plan_preview": f"{plan_title[:50]}..." if len(plan_title) > 50 else plan_title,
-            "observations_count": len(observations),
-            "locale": state.get("locale", "zh-CN")
-        },
-        metadata={
-            "node_type": "reporter",
-            "stage": "report_generation",
-            "uses_llm": True
-        }
-    )
         
     input_ = {
         "messages": [
@@ -1289,27 +1168,6 @@ def reporter_node(state: State, config: RunnableConfig):
     
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | reporter | 节点执行完成 | 总耗时: {duration:.2f}s")
-    
-    # LangFuse: 记录节点输出
-    langfuse_context.update_current_observation(
-        output={
-            "report_generated": True,
-            "report_length": report_length,
-            "report_preview": f"{response_content[:100]}..." if response_content and len(response_content) > 100 else response_content,
-            "observations_used": len(observations)
-        },
-        metadata={
-            "llm_duration": llm_duration,
-            "total_duration": duration
-        }
-    )
-    
-    # 评分报告质量
-    langfuse_context.score_current_observation(
-        name="report_quality",
-        value=0.95,
-        comment=f"Report generated successfully with {report_length} chars"
-    )
 
     return {"final_report": response_content}
 

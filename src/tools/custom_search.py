@@ -23,9 +23,9 @@ LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 # Langfuse 集成 - v3 模式
 LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 
+# Langfuse 集成 - v3 模式 (@observe 装饰器会自动捕获输入输出)
 try:
-    from langfuse import observe, get_client
-    langfuse_context = get_client()  # v3 使用 get_client() 获取客户端
+    from langfuse import observe
 except ImportError:
     LANGFUSE_ENABLED = False
     logging.warning("Langfuse not installed. Tracing disabled.")
@@ -37,13 +37,6 @@ except ImportError:
         if len(args) == 1 and callable(args[0]) and not kwargs:
             return args[0]
         return decorator
-    
-    class DummyClient:
-        def update_current_observation(self, **kwargs): pass
-        def update_current_trace(self, **kwargs): pass
-        def score_current_observation(self, **kwargs): pass
-    
-    langfuse_context = DummyClient()
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('tools.custom_search')
@@ -268,24 +261,6 @@ class CustomSearchTool(BaseTool):
         # 记录检索开始
         repo_name = self._repository_config.name if self._repository_config else "默认仓库"
         
-        # LangFuse: 记录输入和元数据 - 设置更直观的名称
-        langfuse_context.update_current_observation(
-            name=f"🔎 自定义搜索 [{repo_name}] | {query[:30]}...",  # 显示仓库和查询
-            input={
-                "query": query,
-                "repository": repo_name,
-                "repository_id": self._repository_config.repository if self._repository_config else None,
-                "channel_id": self._repository_config.channel_id if self._repository_config else None
-            },
-            metadata={
-                "tool_name": self.name,
-                "api_url": self.api_url,
-                "max_results": self.max_results,
-                "component": "search_tool",
-                "stage": "knowledge_retrieval"
-            }
-        )
-        
         enhanced_logger.logger.info(
             f"🔍 SEARCH_START | custom_search | 开始自定义搜索 | "
             f"仓库: {repo_name} | 查询: '{query}'"
@@ -357,32 +332,6 @@ class CustomSearchTool(BaseTool):
             if repository_id and repository_id != self.repository_id and original_config is not None:
                 self._repository_config = original_config
             
-            # LangFuse: 记录成功输出
-            valid_results = [r for r in results if r.get('title') not in ['未找到相关结果', '搜索错误']]
-            avg_score = sum(r.get('score', 0) for r in valid_results) / len(valid_results) if valid_results else 0.0
-            
-            langfuse_context.update_current_observation(
-                output={
-                    "result_count": len(valid_results),
-                    "results_preview": valid_results[:3],
-                    "status": "success" if valid_results else "empty"
-                },
-                metadata={
-                    "duration_seconds": duration,
-                    "avg_score": avg_score,
-                    "top_sources": [r.get('source', '') for r in valid_results[:5]],
-                    "repository_used": repo_name
-                }
-            )
-            
-            # 添加质量评分
-            quality_score = min(avg_score, 1.0) if avg_score > 0 else 0.0
-            langfuse_context.score_current_observation(
-                name="search_quality",
-                value=quality_score,
-                comment=f"Retrieved {len(valid_results)} documents with avg score {avg_score:.3f}"
-            )
-            
             # 返回结果列表，结果为空时返回提示
             if not results:
                 logger.warning("No search results found")
@@ -410,23 +359,6 @@ class CustomSearchTool(BaseTool):
             console_print(
                 f"\033[31m[❌ 搜索错误] 搜索服务出现错误: {str(e)}\033[0m",
                 level=logging.ERROR
-            )
-            
-            # LangFuse: 记录错误
-            langfuse_context.update_current_observation(
-                output={
-                    "status": "error",
-                    "error": str(e)
-                },
-                metadata={
-                    "duration_seconds": duration,
-                    "error_type": type(e).__name__
-                }
-            )
-            langfuse_context.score_current_observation(
-                name="search_quality",
-                value=0.0,
-                comment=f"Search failed: {str(e)[:100]}"
             )
             
             return [{

@@ -1,6 +1,7 @@
 # _verify_langfuse.py_
-import os, time, logging
-from langfuse import get_client, observe  # v3 导入方式
+import os
+import logging
+from langfuse import observe  # v3 导入方式 - @observe 装饰器自动捕获输入输出
 
 # Read from environment variables
 # Ensure these are set in your environment:
@@ -17,17 +18,11 @@ if not os.getenv("LANGFUSE_SECRET_KEY"):
 
 logging.getLogger("langfuse").setLevel(logging.DEBUG)
 
-# Langfuse 3.x 使用 get_client() 客户端初始化
-lf = get_client()
-print("Auth:", lf.auth_check())
-
-@observe(as_type="chain")  # creates a trace + span
+@observe(name="Demo Function", as_type="chain")  # v3: 装饰器会自动捕获输入输出
 def demo():
+    """v3 中 @observe 装饰器会自动记录一切，无需手动调用任何方法"""
     return "hello"
 
+print("Running demo...")
 demo()
-
-# Important in scripts/serverless
-lf.flush()
-time.sleep(1)
-print("Done")
+print("Done! Check Langfuse dashboard for traces.")
