@@ -503,17 +503,12 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         if iteration_count + 1 < MAX_ITERATIONS:
             # 检查回答中是否有表示需要继续的信号
             continue_signals = [
-                "需要继续",
-                "下一轮",
-                "继续研究",
-                "还需要",
-                "仍待深入",
-                "continue research",
-                "next iteration",
-                "need more"
+                "**是否需要继续研究**: 是"
             ]
             answer_lower = answer.lower()
             should_continue = any(signal in answer_lower for signal in continue_signals)
+            print(f"------------------------ should_continue: {should_continue}")
+            
         
         duration = time.time() - start_time
         
@@ -526,7 +521,7 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                 update={
                     "iteration_count": iteration_count + 1,
                     "iteration_history": updated_history,
-                    "messages": [AIMessage(content=answer, name="iterative_researcher")],
+                    "messages": [AIMessage(content=answer, name="iterative_researcher", agent="iterative_research_node")],
                     "research_topic": query  # 保持研究主题的一致性
                 },
                 goto="iterative_research_node"  # 递归调用自己
@@ -535,15 +530,14 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
             enhanced_logger.logger.info(
                 f"✅ NODE_EXIT | iterative_research | 研究完成 | 总轮次: {iteration_count + 1} | 总耗时: {duration:.2f}s"
             )
-            # 研究完成，输出最终报告
+            # 研究完成，进入报告生成阶段
             return Command(
                 update={
-                    "final_report": answer,
                     "iteration_count": iteration_count + 1,
                     "iteration_history": updated_history,
                     "research_topic": query  # 保持研究主题的一致性
                 },
-                goto="__end__"
+                goto="iterative_reporter_node"
             )
         
     except Exception as e:
@@ -555,11 +549,129 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         return Command(
             update={
                 "final_report": error_msg,
-                "messages": [AIMessage(content=error_msg, name="iterative_research_error")]
+                "messages": [AIMessage(content=error_msg, name="iterative_research_error", agent="iterative_research_node")]
             },
             goto="__end__"
         )
 
+
+def iterative_reporter_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
+    """
+    迭代研究报告员节点 - 专门用于生成迭代研究的最终报告
+    
+    工作流程：
+    1. 收集所有迭代研究的历史记录
+    2. 整合所有研究内容
+    3. 生成最终报告
+    """
+    start_time = time.time()
+    enhanced_logger.logger.info(f"🔄 NODE_ENTRY | iterative_reporter | 开始执行迭代研究报告生成节点")
+    
+    configurable = Configuration.from_runnable_config(config)
+    
+    # 获取迭代研究历史记录
+    iteration_history = state.get("iteration_history", [])
+    research_topic = state.get("research_topic", "")
+    
+    enhanced_logger.logger.info(
+        f"📊 ITERATIVE_REPORT_INIT | 开始生成迭代研究报告 | 研究主题: {research_topic} | 迭代轮次: {len(iteration_history)}"
+    )
+    
+    try:
+        # 准备输入数据
+        input_ = {
+            "messages": [
+                HumanMessage(
+                    content=f"# 迭代研究最终报告生成\n\n## 研究主题\n\n{research_topic}"
+                )
+            ],
+            "locale": state.get("locale", "zh-CN"),  # 默认使用中文
+            "iteration_history": iteration_history,
+            "research_topic": research_topic
+        }
+        
+        # 应用提示词模板
+        invoke_messages = apply_prompt_template("iterative_reporter", input_, configurable)
+        
+        # 添加迭代历史记录
+        if iteration_history:
+            history_content = "\n\n".join([
+                f"### 第{i+1}轮研究\n\n{h.get('summary', '')}"
+                for i, h in enumerate(iteration_history)
+            ])
+            
+            invoke_messages.append(
+                HumanMessage(
+                    content=f"## 迭代研究历史记录\n\n{history_content}",
+                    name="iteration_history"
+                )
+            )
+        
+        # 添加报告格式指导
+        invoke_messages.append(
+            HumanMessage(
+                content=f"重要提示：请按照以下结构组织您的报告：\n\n"
+                       f"1. 研究概要 - 对整个研究过程的总结\n"
+                       f"2. 详细分析 - 按研究轮次组织的详细内容\n"
+                       f"3. 结论 - 最终结论和发现\n"
+                       f"4. 局限性 - 研究的局限性和未来改进方向\n\n"
+                       f"**请用{state.get('locale', 'zh-CN')}语言编写报告。**",
+                name="system"
+            )
+        )
+        
+        logger.debug(f"Current invoke messages: {invoke_messages}")
+        
+        # 记录 reporter 的输入内容
+        logger.info(f"Iterative reporter input: {invoke_messages}")
+        enhanced_logger.logger.info(
+            f"📝 ITERATIVE_REPORTER_INPUT | 输入消息数: {len(invoke_messages)} | 迭代轮次: {len(iteration_history)} | 研究主题: {research_topic}"
+        )
+        
+        # 记录LLM调用过程
+        llm_start_time = time.time()
+        enhanced_logger.logger.info(
+            f"🤖 LLM_INVOKE | iterative_reporter | 开始生成最终报告 | 提示消息数: {len(invoke_messages)}"
+        )
+        
+        response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
+        response_content = response.content
+        
+        llm_duration = time.time() - llm_start_time
+        report_length = len(response_content) if response_content else 0
+        enhanced_logger.logger.info(
+            f"✅ LLM_COMPLETE | iterative_reporter | 报告生成完成 | 报告长度: {report_length} | LLM耗时: {llm_duration:.2f}s"
+        )
+        
+        logger.info(f"iterative reporter response: {response_content}")
+        
+        duration = time.time() - start_time
+        enhanced_logger.logger.info(
+            f"✅ NODE_EXIT | iterative_reporter | 节点执行完成 | 总耗时: {duration:.2f}s"
+        )
+        
+        # 返回最终报告
+        return Command(
+            update={
+                "final_report": response_content,
+                "messages": [AIMessage(content=response_content, name="iterative_reporter", agent="iterative_reporter_node")]
+            },
+            goto="__end__"
+        )
+        
+    except Exception as e:
+        logger.error(f"迭代研究报告生成失败: {e}")
+        enhanced_logger.logger.error(f"❌ ITERATIVE_REPORTER_ERROR | {str(e)}")
+        
+        # 失败时返回错误信息
+        error_msg = f"抱歉，在生成迭代研究报告的过程中遇到了错误。\n\n错误信息: {str(e)}"
+        return Command(
+            update={
+                "final_report": error_msg,
+                "messages": [AIMessage(content=error_msg, name="iterative_reporter_error", agent="iterative_reporter_node")]
+            },
+            goto="__end__"
+        )
 
 
 def background_investigation_node(state: State, config: RunnableConfig):
@@ -1524,6 +1636,7 @@ __all__ = [
     "direct_answer_node",
     "simple_search_node",
     "iterative_research_node",  # 新增：迭代研究节点
+    "iterative_reporter_node",  # 新增：迭代研究报告节点
     
     # 深度研究路径节点
     "coordinator_node",

@@ -108,8 +108,8 @@ export function MessageListView({
           message.agent === "router" ||
           message.agent === "direct_answer_node" ||
           message.agent === "simple_search_node" ||
-          message.agent === "domain_knowledge_node" ||
           message.agent === "iterative_research_node" ||  // 添加迭代研究节点消息显示
+          message.agent === "iterative_reporter_node" ||
           startOfResearch
         )) {
           return null;

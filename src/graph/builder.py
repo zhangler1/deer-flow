@@ -23,6 +23,7 @@ from .nodes import (
     direct_answer_node,
     simple_search_node,
     iterative_research_node,  # 新增：迭代研究节点
+    iterative_reporter_node,  # 新增：迭代研究报告节点
 )
 from .types import State
 
@@ -143,6 +144,7 @@ def _build_base_graph():
     
     # 3. 迭代研究节点（单问题深挖，自主迭代）
     builder.add_node("iterative_research_node", iterative_research_node)
+    builder.add_node("iterative_reporter_node", iterative_reporter_node)
     
     # 4. 深度研究路径（原有的复杂流程，通过coordinator进入）
     # coordinator 是深度研究的入口
@@ -169,7 +171,8 @@ def _build_base_graph():
     # 简单路径节点直接结束
     builder.add_edge("direct_answer_node", END)
     builder.add_edge("simple_search_node", END)
-    builder.add_edge("iterative_research_node", END)  # 迭代研究节点可能递归，但最终也会结束
+    # 迭代研究节点的跳转由节点内部控制，should_continue为false时才进入报告节点
+    builder.add_edge("iterative_reporter_node", END)  # 迭代研究报告节点结束
     
     return builder
 

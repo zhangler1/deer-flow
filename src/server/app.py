@@ -1006,13 +1006,15 @@ async def _full_workflow_openai_generator(
                         # - direct_answer_assistant: 直接回答
                         # - simple_search_assistant: 简单检索
                         # - iterative_research_node: 迭代研究节点
+                        # - iterative_reporter_node: 迭代研究报告节点
                         agent = event_data.get("agent", "")
                         allowed_agents = [
                             "reporter",                    # 深度研究报告
                             "coordinator",                # 深度研究协调
                             "direct_answer_node",         # 直接回答节点
                             "simple_search_node",         # 简单检索节点
-                            "iterative_research_node"    # 迭代研究节点
+                            "iterative_research_node",    # 迭代研究节点
+                            "iterative_reporter_node"     # 迭代研究报告节点
                         ]
                         if agent not in allowed_agents:
                             enhanced_logger.logger.debug(f"⚠️ FILTERED_AGENT | 过滤非输出agent: {agent}")
