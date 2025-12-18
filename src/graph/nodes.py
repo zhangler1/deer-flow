@@ -83,7 +83,7 @@ def handoff_to_planner(
     return
 
 
-@observe(name="📡 路由节点")
+@observe(name="📡 路由节点", as_type="agent")
 def router_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["direct_answer_node", "simple_search_node", "iterative_research_node", "coordinator"]]:
@@ -186,7 +186,7 @@ def router_node(
         return Command(update=state_update, goto="coordinator")
 
 
-@observe(name="⚡ 直接回答节点")
+@observe(name="⚡ 直接回答节点", as_type="agent")
 def direct_answer_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
     """
     直接回答节点 - 不走检索，使用LLM的通用知识直接回答
@@ -663,7 +663,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
     return result
 
 
-@observe(name="📋 规划节点")
+@observe(name="📋 规划节点", as_type="agent")
 def planner_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["human_feedback", "reporter"]]:
@@ -1027,7 +1027,7 @@ def human_feedback_node(
         return Command(goto="planner")  # 重新生成计划
 
 
-@observe(name="🎯 协调节点")
+@observe(name="🎯 协调节点", as_type="agent")
 def coordinator_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["planner", "background_investigator", "__end__"]]:
@@ -1187,7 +1187,7 @@ def coordinator_node(
     )
 
 
-@observe(name="📝 报告节点")
+@observe(name="📝 报告节点", as_type="agent")
 def reporter_node(state: State, config: RunnableConfig):
     """撰写最终报告的报告员节点"""
     start_time = time.time()

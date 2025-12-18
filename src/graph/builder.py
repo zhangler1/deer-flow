@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+import os
 import time
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
@@ -182,14 +183,36 @@ def build_graph_with_memory():
 
     # build state graph
     builder = _build_base_graph()
-    return builder.compile(checkpointer=memory)
+    compiled_graph = builder.compile(checkpointer=memory)
+    
+    # Add Langfuse callback for tracing (只在配置了 PUBLIC_KEY 时启用)
+    try:
+        if os.getenv("LANGFUSE_PUBLIC_KEY"):
+            from langfuse.langchain import CallbackHandler
+            enhanced_logger.logger.info("🔍 LANGFUSE | 已启用 Langfuse 追踪 (with memory)")
+            return compiled_graph.with_config({"callbacks": [CallbackHandler()]})
+    except ImportError:
+        pass
+    
+    return compiled_graph
 
 
 def build_graph():
     """Build and return the agent workflow graph without memory."""
     # build state graph
     builder = _build_base_graph()
-    return builder.compile()
+    compiled_graph = builder.compile()
+    
+    # Add Langfuse callback for tracing (只在配置了 PUBLIC_KEY 时启用)
+    try:
+        if os.getenv("LANGFUSE_PUBLIC_KEY"):
+            from langfuse.langchain import CallbackHandler
+            enhanced_logger.logger.info("🔍 LANGFUSE | 已启用 Langfuse 追踪 (without memory)")
+            return compiled_graph.with_config({"callbacks": [CallbackHandler()]})
+    except ImportError:
+        pass
+    
+    return compiled_graph
 
 
 graph = build_graph()

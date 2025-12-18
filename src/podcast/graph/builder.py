@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+import os
 from langgraph.graph import END, START, StateGraph
 
 from src.podcast.graph.audio_mixer_node import audio_mixer_node
@@ -20,7 +21,18 @@ def build_graph():
     builder.add_edge("script_writer", "tts")
     builder.add_edge("tts", "audio_mixer")
     builder.add_edge("audio_mixer", END)
-    return builder.compile()
+    
+    compiled_graph = builder.compile()
+    
+    # Add Langfuse callback for tracing (只在配置了 PUBLIC_KEY 时启用)
+    try:
+        if os.getenv("LANGFUSE_PUBLIC_KEY"):
+            from langfuse.langchain import CallbackHandler
+            return compiled_graph.with_config({"callbacks": [CallbackHandler()]})
+    except ImportError:
+        pass
+    
+    return compiled_graph
 
 
 workflow = build_graph()

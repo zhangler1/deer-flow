@@ -16,22 +16,38 @@ from .decorators import log_io
 # LangFuse 集成 - 直接导入，失败时降级
 LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 
+# Langfuse 集成 - 简洁降级
+LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+
 try:
     from langfuse.decorators import langfuse_context, observe
+    from langfuse import get_client
 except ImportError:
     LANGFUSE_ENABLED = False
-    logging.warning("LangFuse not installed. Tracing disabled. Install: pip install langfuse>=3.10.0")
+    logging.warning("Langfuse not installed. Tracing disabled.")
     
-    # 定义空装饰器和上下文作为降级
-    def observe(func):
-        return func
+    def observe(*args, **kwargs):
+        def decorator(func):
+            return func
+        # 支持 @observe 和 @observe(...) 两种用法
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            return args[0]
+        return decorator
     
-    class DummyContext:
-        def update_current_observation(self, **kwargs): pass
-        def update_current_trace(self, **kwargs): pass
-        def score_current_observation(self, **kwargs): pass
+    class langfuse_context:
+        @staticmethod
+        def update_current_observation(**kwargs): pass
+        @staticmethod
+        def update_current_trace(**kwargs): pass
+        @staticmethod
+        def score_current_observation(**kwargs): pass
     
-    langfuse_context = DummyContext()
+    class DummyClient:
+        def auth_check(self): return False
+        def flush(self): pass
+    
+    def get_client():
+        return DummyClient()
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('tools.crawl')
@@ -99,7 +115,7 @@ def _smart_truncate(content: str, max_length: int = 8000) -> tuple[str, bool]:
 
 @tool
 @log_io
-@observe
+@observe(as_type="tool")
 async def crawl_tool(
     url: Annotated[str, "The url to crawl."],
     use_cache: Annotated[bool, "Whether to use cache. Default True."] = True,

@@ -1,6 +1,6 @@
 # _verify_langfuse.py_
 import os, time, logging
-from langfuse import Langfuse
+from langfuse import get_client
 from langfuse.decorators import langfuse_context, observe
 
 # Read from environment variables
@@ -18,11 +18,11 @@ if not os.getenv("LANGFUSE_SECRET_KEY"):
 
 logging.getLogger("langfuse").setLevel(logging.DEBUG)
 
-# Langfuse 3.x 使用 Langfuse() 客户端初始化
-lf = Langfuse()
+# Langfuse 3.x 使用 get_client() 客户端初始化
+lf = get_client()
 print("Auth:", lf.auth_check())
 
-@observe  # creates a trace + span
+@observe(as_type="chain")  # creates a trace + span
 def demo():
     return "hello"
 

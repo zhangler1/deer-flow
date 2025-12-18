@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+import os
 from langgraph.graph import END, START, StateGraph
 
 from src.ppt.graph.ppt_composer_node import ppt_composer_node
@@ -17,7 +18,18 @@ def build_graph():
     builder.add_edge(START, "ppt_composer")
     builder.add_edge("ppt_composer", "ppt_generator")
     builder.add_edge("ppt_generator", END)
-    return builder.compile()
+    
+    compiled_graph = builder.compile()
+    
+    # Add Langfuse callback for tracing (只在配置了 PUBLIC_KEY 时启用)
+    try:
+        if os.getenv("LANGFUSE_PUBLIC_KEY"):
+            from langfuse.langchain import CallbackHandler
+            return compiled_graph.with_config({"callbacks": [CallbackHandler()]})
+    except ImportError:
+        pass
+    
+    return compiled_graph
 
 
 workflow = build_graph()
