@@ -651,10 +651,11 @@ def iterative_reporter_node(state: State, config: RunnableConfig) -> Command[Lit
         )
         
         # 返回最终报告
+        # 注意：不添加 messages，让 LangGraph 自动捕获 LLM 的流式响应（避免双重输出）
+        # 如果在 update 中添加消息，前端会收到两份报告：一份来自 LLM 的自动流式输出，一份来自这里的消息
         return Command(
             update={
-                "final_report": response_content,
-                "messages": [AIMessage(content=response_content, name="iterative_reporter", agent="iterative_reporter_node")]
+                "final_report": response_content
             },
             goto="__end__"
         )
@@ -665,6 +666,7 @@ def iterative_reporter_node(state: State, config: RunnableConfig) -> Command[Lit
         
         # 失败时返回错误信息
         error_msg = f"抱歉，在生成迭代研究报告的过程中遇到了错误。\n\n错误信息: {str(e)}"
+        # 只有在失败时才添加消息，成功时让 LangGraph 自动捕获
         return Command(
             update={
                 "final_report": error_msg,

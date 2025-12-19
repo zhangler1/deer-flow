@@ -184,6 +184,9 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
   // 使用专门的选择器获取当前消息的搜索状态，确保每个卡片独立
   const messageSearchStatus = useMessageSearchStatus(message.id);
+  // 监听消息列表的变化
+  const messageIds = useMessageIds();
+  const currentMessageIndex = messageIds.indexOf(message.id);
 
   // 当消息完成流式传输时自动折叠
   React.useEffect(() => {
@@ -192,6 +195,18 @@ function IterativeResearchCard({ message }: { message: Message }) {
       setHasAutoCollapsed(true);
     }
   }, [message.isStreaming, hasAutoCollapsed]);
+
+  // 当有新消息出现时，自动折叠未完成的迭代研究对话框
+  React.useEffect(() => {
+    // 检查是否有后续消息
+    if (currentMessageIndex !== -1 && currentMessageIndex < messageIds.length - 1) {
+      // 如果当前消息还在流式传输中，则折叠它
+      if (message.isStreaming && !hasAutoCollapsed) {
+        setIsOpen(false);
+        setHasAutoCollapsed(true);
+      }
+    }
+  }, [messageIds.length, currentMessageIndex, message.isStreaming, hasAutoCollapsed]);
 
   // 确定显示的文本 - 根据当前消息的特定状态计算
   const displayText = useMemo(() => {
