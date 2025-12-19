@@ -430,6 +430,13 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                 state_with_history,
                 configurable
             )
+
+            messages_for_llm.append(
+                HumanMessage(
+                    content=f"## 迭代研究历史记录\n\n{state_with_history['iteration_history']}",
+                    name="iteration_history"
+                )
+            )
         except Exception as e:
             logger.warning(f"应用Prompt模板失败，使用备用方案: {e}")
             # 备用方案：简单提示词
@@ -446,6 +453,12 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         
         # 创建带工具的 Agent
         llm = get_llm_by_type("basic")  # 使用基础模型
+
+        prompt_str = str(messages_for_llm)
+        enhanced_logger.logger.info(
+                f"🤖 LLM_INPUT | iterative_research | Prompt长度: {len(prompt_str)}\n"
+                f"{'='*80}\n{prompt_str}\n{'='*80}"
+            )
         
         # DEBUG级别：打印LLM输入
         if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
@@ -493,7 +506,8 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         # 更新迭代历史
         new_iteration = {
             "round": iteration_count + 1,
-            "summary": answer[:500] + "..." if len(answer) > 500 else answer,
+            # "summary": answer[:500] + "..." if len(answer) > 500 else answer,
+            "summary": answer,
             "timestamp": time.time()
         }
         # 确保 updated_history 是基于列表的更新，而不是覆盖
@@ -522,7 +536,7 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                 update={
                     "iteration_count": iteration_count + 1,
                     "iteration_history": updated_history,
-                    "messages": [AIMessage(content=answer, name="iterative_researcher", agent="iterative_research_node")],
+                    # "messages": [AIMessage(content=answer, name="iterative_researcher", agent="iterative_research_node")],
                     "research_topic": query  # 保持研究主题的一致性
                 },
                 goto="iterative_research_node"  # 递归调用自己
