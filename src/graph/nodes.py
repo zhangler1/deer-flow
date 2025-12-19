@@ -503,6 +503,7 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         if iteration_count + 1 < MAX_ITERATIONS:
             # 检查回答中是否有表示需要继续的信号
             continue_signals = [
+                "**是否需要继续研究**：是",
                 "**是否需要继续研究**: 是"
             ]
             answer_lower = answer.lower()
