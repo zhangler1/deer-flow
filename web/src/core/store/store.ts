@@ -27,6 +27,8 @@ export const useStore = create<{
   ongoingResearchId: string | null;
   openResearchId: string | null;
   searchStatus: { query: string; repository?: string } | null;
+  // 为每个消息ID维护独立的搜索状态
+  messageSearchStatus: Map<string, { query: string; repository?: string } | null>;
 
   appendMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
@@ -35,6 +37,8 @@ export const useStore = create<{
   closeResearch: () => void;
   setOngoingResearch: (researchId: string | null) => void;
   setSearchStatus: (status: { query: string; repository?: string } | null) => void;
+  // 为特定消息设置搜索状态
+  setMessageSearchStatus: (messageId: string, status: { query: string; repository?: string } | null) => void;
 }>((set) => ({
   responding: false,
   threadId: THREAD_ID,
@@ -47,6 +51,7 @@ export const useStore = create<{
   ongoingResearchId: null,
   openResearchId: null,
   searchStatus: null,
+  messageSearchStatus: new Map<string, { query: string; repository?: string } | null>(),
 
   appendMessage(message: Message) {
     set((state) => ({
@@ -77,6 +82,11 @@ export const useStore = create<{
   },
   setSearchStatus(status: { query: string; repository?: string } | null) {
     set({ searchStatus: status });
+  },
+  setMessageSearchStatus(messageId: string, status: { query: string; repository?: string } | null) {
+    set((state) => ({
+      messageSearchStatus: new Map(state.messageSearchStatus).set(messageId, status),
+    }));
   },
 }));
 
@@ -154,8 +164,19 @@ export async function sendMessage(
             query: data.query,
             repository: data.repository,
           });
+          // 同时为当前消息设置搜索状态
+          if (data.id) {
+            useStore.getState().setMessageSearchStatus(data.id, {
+              query: data.query,
+              repository: data.repository,
+            });
+          }
         } else if (data.status === "completed") {
           useStore.getState().setSearchStatus(null);
+          // 清除当前消息的搜索状态
+          if (data.id) {
+            useStore.getState().setMessageSearchStatus(data.id, null);
+          }
         }
         continue;
       }
@@ -168,7 +189,7 @@ export async function sendMessage(
         message = {
           id: messageId,
           threadId: data.thread_id,
-          agent: data.agent,
+          agent: data.agent as Message["agent"], // 类型断言修复类型不匹配问题
           role: data.role,
           content: "",
           contentChunks: [],
@@ -177,7 +198,10 @@ export async function sendMessage(
           isStreaming: true,
           interruptFeedback,
         };
-        appendMessage(message);
+        // 只有当message不为undefined时才调用appendMessage
+        if (message) {
+          appendMessage(message);
+        }
       }
       message ??= getMessage(messageId);
       if (message) {
@@ -432,6 +456,12 @@ export function useLastFeedbackMessageId() {
     }),
   );
   return waitingForFeedbackMessageId;
+}
+
+export function useMessageSearchStatus(messageId: string | undefined) {
+  return useStore(
+    (state) => messageId ? state.messageSearchStatus.get(messageId) : null,
+  );
 }
 
 export function useToolCalls() {

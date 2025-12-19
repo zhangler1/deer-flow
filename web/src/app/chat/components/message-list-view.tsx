@@ -44,6 +44,7 @@ import {
   useLastInterruptMessage,
   useMessage,
   useMessageIds,
+  useMessageSearchStatus,
   useResearchMessage,
   useStore,
 } from "~/core/store";
@@ -181,6 +182,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const t = useTranslations("chat.research");
   const [isOpen, setIsOpen] = useState(true);
   const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
+  // 使用专门的选择器获取当前消息的搜索状态，确保每个卡片独立
+  const messageSearchStatus = useMessageSearchStatus(message.id);
 
   // 当消息完成流式传输时自动折叠
   React.useEffect(() => {
@@ -189,6 +192,16 @@ function IterativeResearchCard({ message }: { message: Message }) {
       setHasAutoCollapsed(true);
     }
   }, [message.isStreaming, hasAutoCollapsed]);
+
+  // 确定显示的文本 - 根据当前消息的特定状态计算
+  const displayText = useMemo(() => {
+    // 检查当前消息是否正在进行搜索
+    if (messageSearchStatus && message.isStreaming) {
+      return t("searching"); // "正在搜索"
+    }
+    // 默认显示"正在研究"
+    return t("iterativeResearchProcess"); // "正在研究"
+  }, [messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
 
   return (
     <div className="w-full">
@@ -218,7 +231,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
                   message.isStreaming ? "text-primary" : "text-foreground",
                 )}
               >
-                {t("iterativeResearchProcess")}
+                {displayText}
               </span>
               {message.isStreaming && <LoadingAnimation className="ml-2 scale-75" />}
               <div className="flex-grow" />
