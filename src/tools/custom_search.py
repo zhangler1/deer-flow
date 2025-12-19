@@ -236,6 +236,7 @@ class CustomSearchTool(BaseTool):
         # 限制结果数量
         return results[:self.max_results]
     
+
     @observe(as_type="tool")
     def _run(
         self,
@@ -369,6 +370,7 @@ class CustomSearchTool(BaseTool):
                 "score": 0.0
             }]
     
+    @observe(as_type="tool")
     async def _arun(
         self,
         query: str,
