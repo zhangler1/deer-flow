@@ -522,7 +522,7 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
             ]
             answer_lower = answer.lower()
             should_continue = any(signal in answer_lower for signal in continue_signals)
-            print(f"------------------------ should_continue: {should_continue}")
+            enhanced_logger.logger.info(f"------------------------ should_continue: {should_continue}")
             
         
         duration = time.time() - start_time
