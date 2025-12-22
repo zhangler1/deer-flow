@@ -184,6 +184,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
   // 记录是否曾经显示过 searching 状态
   const [hasShownSearching, setHasShownSearching] = useState(false);
+  // 保留所有搜索关键词，即使流式输出结束后
+  const [preservedSearchKeywords, setPreservedSearchKeywords] = useState<string[]>([]);
   // 使用专门的选择器获取当前消息的搜索状态，确保每个卡片独立
   const messageSearchStatus = useMessageSearchStatus(message.id);
   // 监听消息列表的变化
@@ -219,35 +221,66 @@ function IterativeResearchCard({ message }: { message: Message }) {
     }
   }, [messageIds.length, currentMessageIndex, message.isStreaming, hasAutoCollapsed]);
 
-  // 查找当前正在进行的搜索工具调用
-  const activeSearchTool = useMemo(() => {
-    if (!message.toolCalls || !message.isStreaming) return null;
-    // 查找正在流式传输参数的搜索工具（web_search）
-    return message.toolCalls.find(
-      (toolCall) => 
-        toolCall.name === "web_search" && 
-        toolCall.argsChunks && 
-        toolCall.argsChunks.length > 0
+  // 查找所有搜索工具调用
+  const allSearchTools = useMemo(() => {
+    if (!message.toolCalls) return [];
+    // 查找所有搜索工具（web_search）
+    return message.toolCalls.filter(
+      (toolCall) => toolCall.name === "web_search"
     );
-  }, [message.toolCalls, message.isStreaming]);
-
-  // 从 argsChunks 中提取搜索关键字
-  const searchKeywords = useMemo(() => {
-    if (!activeSearchTool?.argsChunks) return "";
-    try {
-      // 尝试解析已有的 args chunks 为 JSON
-      const argsString = activeSearchTool.argsChunks.join("");
-      // 使用正则提取 query 字段的值（可能是不完整的JSON）
-      const queryMatch = argsString.match(/"query"\s*:\s*"([^"]*)"/)
-      if (queryMatch && queryMatch[1]) {
-        return queryMatch[1];
+  }, [message.toolCalls]);
+  
+  // 从所有已完成的搜索工具中提取完整的搜索关键字
+  const completedSearchKeywords = useMemo(() => {
+    if (allSearchTools.length === 0) return [];
+    
+    const keywords: string[] = [];
+    
+    allSearchTools.forEach((toolCall) => {
+      // 只处理已经完成的工具调用（有result或argsChunks已完整）
+      if (!toolCall.args?.query) return;
+      
+      const query = toolCall.args.query as string;
+      if (query && !keywords.includes(query)) {
+        keywords.push(query);
       }
-      // 如果没有匹配到，返回原始字符串（用于显示流式输入过程）
-      return argsString.replace(/[{}"\s]/g, "").replace(/query:/i, "").substring(0, 100);
-    } catch {
-      return "";
+    });
+    
+    return keywords;
+  }, [allSearchTools]);
+  
+  // 获取当前正在流式传输的搜索关键词（用于实时显示）
+  const currentStreamingKeywords = useMemo(() => {
+    if (!message.isStreaming || allSearchTools.length === 0) return [];
+    
+    const keywords: string[] = [];
+    
+    allSearchTools.forEach((toolCall) => {
+      // 只处理正在流式传输的工具调用（有argsChunks但可能还没result）
+      if (!toolCall.argsChunks || toolCall.argsChunks.length === 0) return;
+      
+      try {
+        // 尝试解析已有的 args chunks 为 JSON
+        const argsString = toolCall.argsChunks.join("");
+        // 使用正则提取 query 字段的值（可能是不完整的JSON）
+        const queryMatch = argsString.match(/"query"\s*:\s*"([^"]*)"/);
+        if (queryMatch && queryMatch[1] && !keywords.includes(queryMatch[1])) {
+          keywords.push(queryMatch[1]);
+        }
+      } catch {
+        // 忽略解析错误
+      }
+    });
+    
+    return keywords;
+  }, [allSearchTools, message.isStreaming]);
+  
+  // 保留已完成的搜索关键词
+  React.useEffect(() => {
+    if (completedSearchKeywords.length > 0) {
+      setPreservedSearchKeywords(completedSearchKeywords);
     }
-  }, [activeSearchTool?.argsChunks]);
+  }, [completedSearchKeywords]);
 
   // 确定显示的文本 - 优先显示曾经出现过的 searching 状态
   const displayText = useMemo(() => {
@@ -319,14 +352,14 @@ function IterativeResearchCard({ message }: { message: Message }) {
               >
                 {displayText}
               </span>
-              {searchKeywords && (
+              {(currentStreamingKeywords.length > 0 || preservedSearchKeywords.length > 0) && (
                 <span
                   className={cn(
-                    "ml-2 max-w-[400px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal transition-colors duration-200",
+                    "ml-2 max-w-[500px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal transition-colors duration-200",
                     message.isStreaming ? "text-primary/80" : "text-muted-foreground",
                   )}
                 >
-                  : {searchKeywords}
+                  : {(currentStreamingKeywords.length > 0 ? currentStreamingKeywords : preservedSearchKeywords).join(" | ")}
                 </span>
               )}
               {message.isStreaming && <LoadingAnimation className="ml-2 scale-75" />}
