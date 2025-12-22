@@ -175,6 +175,54 @@ def _get_agent_name(agent, message_metadata):
     return agent_name
 
 
+def _determine_message_tag(agent_name, message_metadata, message_chunk):
+    """Determine the tag for the message based on agent, node, and message type."""
+    langgraph_node = message_metadata.get("langgraph_node", "")
+    
+    # Check for routing phase
+    if agent_name in ("router", "direct_answer_node", "simple_search_node", "domain_knowledge_node"):
+        return "routing"
+    
+    # Check for planning phase
+    if agent_name == "planner" or langgraph_node == "planner":
+        return "planning"
+    
+    # Check for reporting phase
+    if agent_name == "reporter" or langgraph_node == "reporter" or agent_name == "iterative_reporter_node":
+        return "reporting"
+    
+    # Check for iterative research node - default to answering unless tool calls are involved
+    if agent_name == "iterative_research_node":
+        # If there are tool calls or tool call chunks, don't set tag here
+        # (it will be set in _process_message_chunk when handling tool calls)
+        if hasattr(message_chunk, 'tool_calls') and message_chunk.tool_calls:
+            return None  # Will be set to "searching" in tool_calls handling
+        if hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
+            return None  # Will be set to "searching" in tool_call_chunks handling
+        # Check if has reasoning content - indicates analyzing
+        if hasattr(message_chunk, 'additional_kwargs') and message_chunk.additional_kwargs.get("reasoning_content"):
+            return "iterative_answering"
+        # Default to answering for iterative research
+        return "answering"
+    
+    # Check for researcher - could be searching or analyzing
+    if agent_name == "researcher" or langgraph_node == "researcher":
+        # If there are tool calls, tag will be set in tool_calls handling
+        if hasattr(message_chunk, 'tool_calls') and message_chunk.tool_calls:
+            return None
+        if hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
+            return None
+        # Otherwise, it's analyzing/answering
+        return "iterative_answering"
+    
+    # Check for coder
+    if agent_name == "coder" or langgraph_node == "coder":
+        return "answering"
+    
+    # Default - no specific tag
+    return None
+
+
 def _create_event_stream_message(
     message_chunk, message_metadata, thread_id, agent_name
 ):
@@ -201,6 +249,11 @@ def _create_event_stream_message(
         event_stream_message["finish_reason"] = message_chunk.response_metadata.get(
             "finish_reason"
         )
+    
+    # Add tag based on agent and node information
+    tag = _determine_message_tag(agent_name, message_metadata, message_chunk)
+    if tag:
+        event_stream_message["tag"] = tag
 
     return event_stream_message
 
@@ -246,6 +299,7 @@ def _create_interrupt_event(thread_id, event_data):
                 "role": "assistant",
                 "content": content,
                 "finish_reason": "interrupt",
+                "tag": "waiting_for_feedback",  # Add tag for interrupt events
                 "options": [
                     {"text": "Edit plan", "value": "edit_plan"},
                     {"text": "Start research", "value": "accepted"},
@@ -263,6 +317,7 @@ def _create_interrupt_event(thread_id, event_data):
                 "role": "assistant",
                 "content": "Plan ready for review",
                 "finish_reason": "interrupt",
+                "tag": "waiting_for_feedback",  # Add tag for interrupt events
                 "options": [
                     {"text": "Edit plan", "value": "edit_plan"},
                     {"text": "Start research", "value": "accepted"},
@@ -323,6 +378,9 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
                 message_chunk.tool_call_chunks
             )
             
+            # Set tag to searching for tool calls
+            event_stream_message["tag"] = "searching"
+            
             # Check if this is a web_search tool call and emit search_status event
             for tool_call in message_chunk.tool_calls:
                 if tool_call.get("name") == "web_search":
@@ -368,6 +426,20 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
                 message_chunk.tool_call_chunks
             )
+            
+            # Check if any tool_call_chunk is web_search, set tag to searching
+            for chunk in message_chunk.tool_call_chunks:
+                chunk_name = None
+                # Support both object attribute and dict format
+                if isinstance(chunk, dict):
+                    chunk_name = chunk.get("name", "")
+                elif hasattr(chunk, "name"):
+                    chunk_name = getattr(chunk, "name", "")
+                
+                if chunk_name == "web_search":
+                    event_stream_message["tag"] = "searching"
+                    break
+            
             yield _make_event("tool_call_chunks", event_stream_message)
         else:
             # AI Message - Raw message tokens

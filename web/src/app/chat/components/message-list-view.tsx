@@ -188,6 +188,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const messageIds = useMessageIds();
   const currentMessageIndex = messageIds.indexOf(message.id);
 
+  console.log("tag:", message.tag);
+
   // 当消息完成流式传输时自动折叠
   React.useEffect(() => {
     if (!message.isStreaming && !hasAutoCollapsed) {
@@ -238,15 +240,40 @@ function IterativeResearchCard({ message }: { message: Message }) {
     }
   }, [activeSearchTool?.argsChunks]);
 
-  // 确定显示的文本 - 根据当前消息的特定状态计算
+  // 确定显示的文本 - 优先使用 tag，然后使用搜索状态
   const displayText = useMemo(() => {
-    // 检查当前消息是否正在进行搜索
+    // 优先使用 message.tag
+    if (message.tag && message.isStreaming) {
+      switch (message.tag) {
+        case "routing":
+          return t("routing");
+        case "planning":
+          return t("planning");
+        case "searching":
+          return t("searching");
+        case "iterative_answering":
+          return t("iterativeAnswering");
+        case "reporting":
+          return t("reporting");
+        case "waiting_for_feedback":
+          return t("waitingForFeedback");
+        case "error":
+          return t("error");
+        case "answering":
+          return t("answering");
+        default:
+          break;
+      }
+    }
+    
+    // 降级：检查当前消息是否正在进行搜索（从 messageSearchStatus）
     if (messageSearchStatus && message.isStreaming) {
       return t("searching"); // "正在搜索"
     }
+    
     // 默认显示"正在研究"
     return t("iterativeResearchProcess"); // "正在研究"
-  }, [messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
+  }, [message.tag, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
 
   return (
     <div className="w-full">

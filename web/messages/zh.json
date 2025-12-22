@@ -164,7 +164,14 @@
       "finalReport": "最终报告",
       "iterationProcess": "迭代过程",
       "currentIteration": "当前迭代",
-      "generatingReport": "正在生成报告..."
+      "generatingReport": "正在生成报告...",
+      "routing": "路由中",
+      "planning": "规划中",
+      "iterativeAnswering": "分析中",
+      "reporting": "生成报告",
+      "waitingForFeedback": "等待反馈",
+      "error": "错误",
+      "answering": "回答中"
     },
     "search": {
       "searching": "正在搜索",

@@ -23,6 +23,12 @@ export function mergeMessage(message: Message, event: ChatEvent) {
   } else if (event.type === "interrupt") {
     mergeInterruptMessage(message, event);
   }
+  
+  // Update tag if present in event
+  if (event.data.tag) {
+    message.tag = event.data.tag;
+  }
+  
   if (event.data.finish_reason) {
     message.finishReason = event.data.finish_reason;
     message.isStreaming = false;

@@ -159,7 +159,14 @@
       "noContent": "No content",
       "iterativeResearchProcess": "Researching",
       "searching": "Searching",
-      "researchReport": "Research Report"
+      "researchReport": "Research Report",
+      "routing": "Routing",
+      "planning": "Planning",
+      "iterativeAnswering": "Analyzing",
+      "reporting": "Generating Report",
+      "waitingForFeedback": "Waiting for Feedback",
+      "error": "Error",
+      "answering": "Answering"
     },
     "search": {
       "searching": "Searching",
