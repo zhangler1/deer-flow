@@ -182,6 +182,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const t = useTranslations("chat.research");
   const [isOpen, setIsOpen] = useState(true);
   const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
+  // 记录是否曾经显示过 searching 状态
+  const [hasShownSearching, setHasShownSearching] = useState(false);
   // 使用专门的选择器获取当前消息的搜索状态，确保每个卡片独立
   const messageSearchStatus = useMessageSearchStatus(message.id);
   // 监听消息列表的变化
@@ -189,6 +191,13 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const currentMessageIndex = messageIds.indexOf(message.id);
 
   console.log("tag:", message.tag);
+
+  // 监听 tag 变化，一旦出现 searching 就记录下来
+  React.useEffect(() => {
+    if (message.tag === "searching" && !hasShownSearching) {
+      setHasShownSearching(true);
+    }
+  }, [message.tag, hasShownSearching]);
 
   // 当消息完成流式传输时自动折叠
   React.useEffect(() => {
@@ -240,8 +249,13 @@ function IterativeResearchCard({ message }: { message: Message }) {
     }
   }, [activeSearchTool?.argsChunks]);
 
-  // 确定显示的文本 - 优先使用 tag，然后使用搜索状态
+  // 确定显示的文本 - 优先显示曾经出现过的 searching 状态
   const displayText = useMemo(() => {
+    // 如果曾经显示过 searching，一直保持显示 searching
+    if (hasShownSearching) {
+      return t("searching");
+    }
+    
     // 优先使用 message.tag
     if (message.tag && message.isStreaming) {
       switch (message.tag) {
@@ -273,7 +287,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
     
     // 默认显示"正在研究"
     return t("iterativeResearchProcess"); // "正在研究"
-  }, [message.tag, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
+  }, [hasShownSearching, message.tag, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
 
   return (
     <div className="w-full">
