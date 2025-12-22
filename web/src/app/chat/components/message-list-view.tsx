@@ -308,6 +308,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
           return t("error");
         case "answering":
           return t("answering");
+        case "round_progress":
+          return message.roundText || t("iterativeResearchProcess"); // 显示"第X轮研究进展"
         default:
           break;
       }
@@ -320,7 +322,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
     
     // 默认显示"正在研究"
     return t("iterativeResearchProcess"); // "正在研究"
-  }, [hasShownSearching, message.tag, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
+  }, [hasShownSearching, message.tag, message.roundText, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
 
   return (
     <div className="w-full">

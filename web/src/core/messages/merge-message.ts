@@ -29,6 +29,11 @@ export function mergeMessage(message: Message, event: ChatEvent) {
     message.tag = event.data.tag;
   }
   
+  // Update roundText if present in event (for round_progress tag)
+  if (event.data.round_text) {
+    message.roundText = event.data.round_text;
+  }
+  
   if (event.data.finish_reason) {
     message.finishReason = event.data.finish_reason;
     message.isStreaming = false;

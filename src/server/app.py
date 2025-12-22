@@ -7,6 +7,7 @@ import json
 from langchain_core.messages.base import BaseMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 import logging
+import re
 import time
 import uuid
 from typing import Annotated, Any, List, cast, Dict,Optional
@@ -73,6 +74,14 @@ enhanced_logger = get_enhanced_logger("deer-flow.api")
 
 # Track active tool calls for search status
 _active_search_calls: Dict[str, Dict[str, str]] = {}
+
+# Track accumulated content for each message to detect round progress
+# Key: message_id, Value: accumulated content string
+_message_content_buffer: Dict[str, str] = {}
+
+# Track detected round progress for each message
+# Key: message_id, Value: tuple (tag, matched_text)
+_round_progress_detected: Dict[str, tuple] = {}
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
 
@@ -179,6 +188,31 @@ def _determine_message_tag(agent_name, message_metadata, message_chunk):
     """Determine the tag for the message based on agent, node, and message type."""
     langgraph_node = message_metadata.get("langgraph_node", "")
     
+    # Check if round progress has been detected for this message
+    message_id = message_chunk.id
+    if message_id in _round_progress_detected:
+        return _round_progress_detected[message_id]
+    
+    # Accumulate content and check for round progress pattern ("第X轮研究进展")
+    # Only check when content buffer has accumulated at least 30 characters
+    if hasattr(message_chunk, 'content') and message_chunk.content:
+        # Initialize or update content buffer for this message
+        if message_id not in _message_content_buffer:
+            _message_content_buffer[message_id] = ""
+        _message_content_buffer[message_id] += message_chunk.content
+        
+        # Only attempt matching when we have accumulated enough content (>=30 chars)
+        accumulated_content = _message_content_buffer[message_id]
+        if len(accumulated_content) >= 30:
+            round_match = re.search(r'第(\d+)轮研究进展', accumulated_content)
+            if round_match:
+                # Cache the detected result
+                result = ("round_progress", round_match.group(0))
+                _round_progress_detected[message_id] = result
+                # Clear buffer after detection to save memory
+                _message_content_buffer.pop(message_id, None)
+                return result
+    
     # Check for routing phase
     if agent_name in ("router", "direct_answer_node", "simple_search_node", "domain_knowledge_node"):
         return "routing"
@@ -246,14 +280,23 @@ def _create_event_stream_message(
         ]
 
     if message_chunk.response_metadata.get("finish_reason"):
-        event_stream_message["finish_reason"] = message_chunk.response_metadata.get(
-            "finish_reason"
-        )
+        finish_reason = message_chunk.response_metadata.get("finish_reason")
+        event_stream_message["finish_reason"] = finish_reason
+        
+        # Clean up content buffers when message finishes
+        message_id = message_chunk.id
+        _message_content_buffer.pop(message_id, None)
+        _round_progress_detected.pop(message_id, None)
     
     # Add tag based on agent and node information
     tag = _determine_message_tag(agent_name, message_metadata, message_chunk)
     if tag:
-        event_stream_message["tag"] = tag
+        # Check if tag is a tuple (for round_progress with matched text)
+        if isinstance(tag, tuple):
+            event_stream_message["tag"] = tag[0]
+            event_stream_message["round_text"] = tag[1]  # Add the matched "第X轮研究进展" text
+        else:
+            event_stream_message["tag"] = tag
 
     return event_stream_message
 
