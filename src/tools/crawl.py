@@ -100,7 +100,7 @@ def _smart_truncate(content: str, max_length: int = 8000) -> tuple[str, bool]:
 
 @tool
 @log_io
-@observe(as_type="tool")
+@observe(name="爬虫工具",as_type="tool")
 async def crawl_tool(
     url: Annotated[str, "The url to crawl."],
     use_cache: Annotated[bool, "Whether to use cache. Default True."] = True,

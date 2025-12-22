@@ -237,7 +237,7 @@ class CustomSearchTool(BaseTool):
         return results[:self.max_results]
     
 
-    @observe(as_type="tool")
+    @observe(name="行内同步检索",as_type="tool")
     def _run(
         self,
         query: str,
@@ -370,7 +370,7 @@ class CustomSearchTool(BaseTool):
                 "score": 0.0
             }]
     
-    @observe(as_type="tool")
+    @observe(name="行内异步检索",as_type="tool")
     async def _arun(
         self,
         query: str,

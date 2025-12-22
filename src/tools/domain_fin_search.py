@@ -113,7 +113,7 @@ def _build_request_body(
     return req_body
 
 
-@observe(as_type="tool")
+@observe(name="金融领域知识搜索函数API",as_type="tool")
 def call_domain_fin_search(
     keyword: str,
     scene: str = "default",
@@ -254,7 +254,7 @@ def _extract_knowledge(result: Dict[str, Any]) -> str:
 # ===== LangChain Tool 封装 =====
 
 @tool
-@observe(as_type="tool")
+@observe(name="金融领域知识搜索",as_type="tool")
 def domain_fin_search(
     keyword: str,
     scene: str = "default"
