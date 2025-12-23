@@ -364,14 +364,14 @@ function IterativeResearchCard({ message }: { message: Message }) {
     }
   }, [completedCrawlUrls]);
 
-  // 确定显示的文本 - 优先级：round_progress > searching/crawling > 其他状态
+  // 确定显示的文本 - 优先级：round_progress > crawling > searching > 其他状态
   const displayText = useMemo(() => {
     // 最高优先级：如果曾经显示过 round_progress（第X轮研究进展），固定显示该状态
     if (hasShownRoundProgress) {
       return preservedRoundText || t("iterativeResearchProcess");
     }
     
-    // 第二优先级：如果曾经显示过 crawling，一直保持显示 crawling
+    // 第二优先级：如果曾经显示过 crawling，一直保持显示 crawling（crawling 优先级高于 searching）
     if (hasShownCrawling) {
       return t("crawling");
     }
@@ -416,7 +416,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
     
     // 默认显示"正在研究"
     return t("iterativeResearchProcess"); // "正在研究"
-  }, [hasShownRoundProgress, preservedRoundText, hasShownSearching, message.tag, message.roundText, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
+  }, [hasShownRoundProgress, preservedRoundText, hasShownCrawling, hasShownSearching, message.tag, message.roundText, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
 
   return (
     <div className="w-full">
@@ -611,7 +611,7 @@ function MessageListItem({
   
   return (
     <motion.li
-      className="mt-10"
+      className="mt-4"
       key={messageId}
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
