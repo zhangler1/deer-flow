@@ -184,6 +184,10 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
   // 记录是否曾经显示过 searching 状态
   const [hasShownSearching, setHasShownSearching] = useState(false);
+  // 记录是否曾经显示过 round_progress 状态（第X轮研究进展）
+  const [hasShownRoundProgress, setHasShownRoundProgress] = useState(false);
+  // 保留 round_progress 的文本内容
+  const [preservedRoundText, setPreservedRoundText] = useState<string | undefined>();
   // 保留所有搜索关键词，即使流式输出结束后
   const [preservedSearchKeywords, setPreservedSearchKeywords] = useState<string[]>([]);
   // 使用专门的选择器获取当前消息的搜索状态，确保每个卡片独立
@@ -193,6 +197,14 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const currentMessageIndex = messageIds.indexOf(message.id);
 
   console.log("tag:", message.tag);
+
+  // 监听 tag 变化，一旦出现 round_progress 就记录下来（最高优先级）
+  React.useEffect(() => {
+    if (message.tag === "round_progress" && !hasShownRoundProgress) {
+      setHasShownRoundProgress(true);
+      setPreservedRoundText(message.roundText);
+    }
+  }, [message.tag, message.roundText, hasShownRoundProgress]);
 
   // 监听 tag 变化，一旦出现 searching 就记录下来
   React.useEffect(() => {
@@ -282,9 +294,14 @@ function IterativeResearchCard({ message }: { message: Message }) {
     }
   }, [completedSearchKeywords]);
 
-  // 确定显示的文本 - 优先显示曾经出现过的 searching 状态
+  // 确定显示的文本 - 优先级：round_progress > searching > 其他状态
   const displayText = useMemo(() => {
-    // 如果曾经显示过 searching，一直保持显示 searching
+    // 最高优先级：如果曾经显示过 round_progress（第X轮研究进展），固定显示该状态
+    if (hasShownRoundProgress) {
+      return preservedRoundText || t("iterativeResearchProcess");
+    }
+    
+    // 第二优先级：如果曾经显示过 searching，一直保持显示 searching
     if (hasShownSearching) {
       return t("searching");
     }
@@ -322,7 +339,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
     
     // 默认显示"正在研究"
     return t("iterativeResearchProcess"); // "正在研究"
-  }, [hasShownSearching, message.tag, message.roundText, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
+  }, [hasShownRoundProgress, preservedRoundText, hasShownSearching, message.tag, message.roundText, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
 
   return (
     <div className="w-full">
