@@ -421,8 +421,17 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
                 message_chunk.tool_call_chunks
             )
             
-            # Set tag to searching for tool calls
-            event_stream_message["tag"] = "searching"
+            # Set tag based on tool name
+            # Default to searching, but check for specific tool types
+            tag = "searching"  # default for web_search
+            for tool_call in message_chunk.tool_calls:
+                tool_name = tool_call.get("name", "")
+                if tool_name == "crawl_tool":
+                    tag = "crawling"
+                    break
+                elif tool_name == "web_search":
+                    tag = "searching"
+            event_stream_message["tag"] = tag
             
             # Check if this is a web_search tool call and emit search_status event
             for tool_call in message_chunk.tool_calls:
@@ -470,7 +479,7 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
                 message_chunk.tool_call_chunks
             )
             
-            # Check if any tool_call_chunk is web_search, set tag to searching
+            # Check tool_call_chunk name and set tag accordingly
             for chunk in message_chunk.tool_call_chunks:
                 chunk_name = None
                 # Support both object attribute and dict format
@@ -481,6 +490,9 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
                 
                 if chunk_name == "web_search":
                     event_stream_message["tag"] = "searching"
+                    break
+                elif chunk_name == "crawl_tool":
+                    event_stream_message["tag"] = "crawling"
                     break
             
             yield _make_event("tool_call_chunks", event_stream_message)

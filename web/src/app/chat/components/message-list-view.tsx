@@ -184,6 +184,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
   // 记录是否曾经显示过 searching 状态
   const [hasShownSearching, setHasShownSearching] = useState(false);
+  // 记录是否曾经显示过 crawling 状态
+  const [hasShownCrawling, setHasShownCrawling] = useState(false);
   // 记录是否曾经显示过 round_progress 状态（第X轮研究进展）
   const [hasShownRoundProgress, setHasShownRoundProgress] = useState(false);
   // 保留 round_progress 的文本内容
@@ -212,6 +214,13 @@ function IterativeResearchCard({ message }: { message: Message }) {
       setHasShownSearching(true);
     }
   }, [message.tag, hasShownSearching]);
+  
+  // 监听 tag 变化，一旦出现 crawling 就记录下来
+  React.useEffect(() => {
+    if (message.tag === "crawling" && !hasShownCrawling) {
+      setHasShownCrawling(true);
+    }
+  }, [message.tag, hasShownCrawling]);
 
   // 当消息完成流式传输时自动折叠
   React.useEffect(() => {
@@ -242,6 +251,15 @@ function IterativeResearchCard({ message }: { message: Message }) {
     );
   }, [message.toolCalls]);
   
+  // 查找所有爬虫工具调用
+  const allCrawlTools = useMemo(() => {
+    if (!message.toolCalls) return [];
+    // 查找所有爬虫工具（crawl_tool）
+    return message.toolCalls.filter(
+      (toolCall) => toolCall.name === "crawl_tool"
+    );
+  }, [message.toolCalls]);
+  
   // 从所有已完成的搜索工具中提取完整的搜索关键字
   const completedSearchKeywords = useMemo(() => {
     if (allSearchTools.length === 0) return [];
@@ -260,6 +278,25 @@ function IterativeResearchCard({ message }: { message: Message }) {
     
     return keywords;
   }, [allSearchTools]);
+  
+  // 从所有已完成的爬虫工具中提取完整的URL
+  const completedCrawlUrls = useMemo(() => {
+    if (allCrawlTools.length === 0) return [];
+    
+    const urls: string[] = [];
+    
+    allCrawlTools.forEach((toolCall) => {
+      // 只处理已经完成的工具调用
+      if (!toolCall.args?.url) return;
+      
+      const url = toolCall.args.url as string;
+      if (url && !urls.includes(url)) {
+        urls.push(url);
+      }
+    });
+    
+    return urls;
+  }, [allCrawlTools]);
   
   // 获取当前正在流式传输的搜索关键词（用于实时显示）
   const currentStreamingKeywords = useMemo(() => {
@@ -287,21 +324,59 @@ function IterativeResearchCard({ message }: { message: Message }) {
     return keywords;
   }, [allSearchTools, message.isStreaming]);
   
+  // 获取当前正在流式传输的爬虫URL（用于实时显示）
+  const currentStreamingUrls = useMemo(() => {
+    if (!message.isStreaming || allCrawlTools.length === 0) return [];
+    
+    const urls: string[] = [];
+    
+    allCrawlTools.forEach((toolCall) => {
+      // 只处理正在流式传输的工具调用
+      if (!toolCall.argsChunks || toolCall.argsChunks.length === 0) return;
+      
+      try {
+        const argsString = toolCall.argsChunks.join("");
+        // 使用正则提取 url 字段的值
+        const urlMatch = argsString.match(/"url"\s*:\s*"([^"]*)"/);
+        if (urlMatch && urlMatch[1] && !urls.includes(urlMatch[1])) {
+          urls.push(urlMatch[1]);
+        }
+      } catch {
+        // 忽略解析错误
+      }
+    });
+    
+    return urls;
+  }, [allCrawlTools, message.isStreaming]);
+  
   // 保留已完成的搜索关键词
   React.useEffect(() => {
     if (completedSearchKeywords.length > 0) {
       setPreservedSearchKeywords(completedSearchKeywords);
     }
   }, [completedSearchKeywords]);
+  
+  // 保留已完成的爬虫URL
+  const [preservedCrawlUrls, setPreservedCrawlUrls] = useState<string[]>([]);
+  React.useEffect(() => {
+    if (completedCrawlUrls.length > 0) {
+      setPreservedCrawlUrls(completedCrawlUrls);
+    }
+  }, [completedCrawlUrls]);
 
-  // 确定显示的文本 - 优先级：round_progress > searching > 其他状态
+  // 确定显示的文本 - 优先级：round_progress > searching/crawling > 其他状态
   const displayText = useMemo(() => {
     // 最高优先级：如果曾经显示过 round_progress（第X轮研究进展），固定显示该状态
     if (hasShownRoundProgress) {
       return preservedRoundText || t("iterativeResearchProcess");
     }
     
-    // 第二优先级：如果曾经显示过 searching，一直保持显示 searching
+    // 第二优先级：如果曾经显示过 crawling，一直保持显示 crawling
+    if (hasShownCrawling) {
+      return t("crawling");
+    }
+    
+    // 第三优先级：如果曾经显示过 searching，一直保持显示 searching
     if (hasShownSearching) {
       return t("searching");
     }
@@ -315,6 +390,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
           return t("planning");
         case "searching":
           return t("searching");
+        case "crawling":
+          return t("crawling");
         case "iterative_answering":
           return t("iterativeAnswering");
         case "reporting":
@@ -371,6 +448,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
               >
                 {displayText}
               </span>
+              {/* 显示搜索关键词 */}
               {(currentStreamingKeywords.length > 0 || preservedSearchKeywords.length > 0) && (
                 <span
                   className={cn(
@@ -379,6 +457,17 @@ function IterativeResearchCard({ message }: { message: Message }) {
                   )}
                 >
                   : {(currentStreamingKeywords.length > 0 ? currentStreamingKeywords : preservedSearchKeywords).join(" | ")}
+                </span>
+              )}
+              {/* 显示爬虫URL */}
+              {(currentStreamingUrls.length > 0 || preservedCrawlUrls.length > 0) && (
+                <span
+                  className={cn(
+                    "ml-2 max-w-[500px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal transition-colors duration-200",
+                    message.isStreaming ? "text-primary/80" : "text-muted-foreground",
+                  )}
+                >
+                  : {(currentStreamingUrls.length > 0 ? currentStreamingUrls : preservedCrawlUrls).join(" | ")}
                 </span>
               )}
               {message.isStreaming && <LoadingAnimation className="ml-2 scale-75" />}
