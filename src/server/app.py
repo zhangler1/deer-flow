@@ -534,20 +534,15 @@ async def _stream_graph_events(
             subgraphs=True,
         ):
             if isinstance(event_data, dict):
-                # 调试：打印接收到的状态更新
-                logger.info(f"[SSE调试] 状态更新事件 keys: {list(event_data.keys())}")
                 
                 # 1) 中断事件优先处理
                 if "__interrupt__" in event_data:
                     yield _create_interrupt_event(thread_id, event_data)
                     continue
-                logger.info(f"[SSE调试] 状态更新事件内容: {event_data}")
 
                 # 2) 处理迭代研究节点跳转事件（不通过 update.messages，而是独立事件）
                 node_transition = event_data.get("node_transition")
-                logger.info(f"[SSE调试] node_transition 值: {node_transition}")
                 if node_transition:
-                    logger.info(f"[节点跳转] 检测到跳转事件，准备发送 SSE: {node_transition}")
                     # 这里 node_transition 由 iterative_research_node 写入
                     # 结构示例：
                     # {
