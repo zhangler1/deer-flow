@@ -532,12 +532,29 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                 f"🔄 ITERATION_CONTINUE | 第{iteration_count + 1}轮完成，继续下一轮 | 耗时: {duration:.2f}s"
             )
             # 继续下一轮迭代
+            node_transition_data = {
+                "from": "iterative_research_node",
+                "to": "iterative_research_node",
+                "iteration": iteration_count + 1,
+                "reason": "continue",
+            }
+            logger.info(f"[节点跳转] 即将返回 Command，node_transition: {node_transition_data}")
+            
+            # 创建一条特殊消息用于传递节点跳转信息（通过 additional_kwargs）
+            transition_message = AIMessage(
+                content="",  # 空内容，不显示给用户
+                name="node_transition_event",
+                additional_kwargs={
+                    "node_transition": node_transition_data
+                }
+            )
+            
             return Command(
                 update={
                     "iteration_count": iteration_count + 1,
                     "iteration_history": updated_history,
-                    # "messages": [AIMessage(content=answer, name="iterative_researcher", agent="iterative_research_node")],
-                    "research_topic": query  # 保持研究主题的一致性
+                    "messages": [transition_message],  # 只包含跳转事件消息
+                    "research_topic": query,  # 保持研究主题的一致性
                 },
                 goto="iterative_research_node"  # 递归调用自己
             )
@@ -546,11 +563,29 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                 f"✅ NODE_EXIT | iterative_research | 研究完成 | 总轮次: {iteration_count + 1} | 总耗时: {duration:.2f}s"
             )
             # 研究完成，进入报告生成阶段
+            node_transition_data = {
+                "from": "iterative_research_node",
+                "to": "iterative_reporter_node",
+                "iteration": iteration_count + 1,
+                "reason": "finish",
+            }
+            logger.info(f"[节点跳转] 即将返回 Command，node_transition: {node_transition_data}")
+            
+            # 创建一条特殊消息用于传递节点跳转信息（通过 additional_kwargs）
+            transition_message = AIMessage(
+                content="",  # 空内容，不显示给用户
+                name="node_transition_event",
+                additional_kwargs={
+                    "node_transition": node_transition_data
+                }
+            )
+            
             return Command(
                 update={
                     "iteration_count": iteration_count + 1,
                     "iteration_history": updated_history,
-                    "research_topic": query  # 保持研究主题的一致性
+                    "messages": [transition_message],  # 只包含跳转事件消息
+                    "research_topic": query,  # 保持研究主题的一致性
                 },
                 goto="iterative_reporter_node"
             )

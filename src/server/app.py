@@ -389,6 +389,27 @@ def _process_initial_messages(message, thread_id):
 async def _process_message_chunk(message_chunk, message_metadata, thread_id, agent):
     """Process a single message chunk and yield appropriate events."""
     agent_name = _get_agent_name(agent, message_metadata)
+    
+    # 检测是否为节点跳转事件消息
+    if (hasattr(message_chunk, 'name') and message_chunk.name == "node_transition_event" and 
+        hasattr(message_chunk, 'additional_kwargs') and 'node_transition' in message_chunk.additional_kwargs):
+        
+        node_transition = message_chunk.additional_kwargs['node_transition']
+        logger.info(f"[节点跳转] 从消息中检测到跳转事件: {node_transition}")
+        
+        event_payload = {
+            "thread_id": thread_id,
+            "from": node_transition.get("from"),
+            "to": node_transition.get("to"),
+            "iteration": node_transition.get("iteration"),
+            "reason": node_transition.get("reason", ""),
+        }
+        logger.info(f"[SSE调试] 即将发送 node_transition 事件，payload: {event_payload}")
+        sse_event = _make_event("node_transition", event_payload)
+        logger.info(f"[SSE调试] 生成的 SSE 事件内容: {sse_event[:200]}...")
+        yield sse_event
+        return  # 不再处理这条消息
+    
     event_stream_message = _create_event_stream_message(
         message_chunk, message_metadata, thread_id, agent_name
     )
@@ -513,8 +534,47 @@ async def _stream_graph_events(
             subgraphs=True,
         ):
             if isinstance(event_data, dict):
+                # 调试：打印接收到的状态更新
+                logger.info(f"[SSE调试] 状态更新事件 keys: {list(event_data.keys())}")
+                
+                # 1) 中断事件优先处理
                 if "__interrupt__" in event_data:
                     yield _create_interrupt_event(thread_id, event_data)
+                    continue
+                logger.info(f"[SSE调试] 状态更新事件内容: {event_data}")
+
+                # 2) 处理迭代研究节点跳转事件（不通过 update.messages，而是独立事件）
+                node_transition = event_data.get("node_transition")
+                logger.info(f"[SSE调试] node_transition 值: {node_transition}")
+                if node_transition:
+                    logger.info(f"[节点跳转] 检测到跳转事件，准备发送 SSE: {node_transition}")
+                    # 这里 node_transition 由 iterative_research_node 写入
+                    # 结构示例：
+                    # {
+                    #   "from": "iterative_research_node",
+                    #   "to": "iterative_research_node" | "iterative_reporter_node",
+                    #   "iteration": 3,
+                    #   "reason": "continue" | "finish",
+                    # }
+                    iteration = node_transition.get("iteration")
+                    from_node = node_transition.get("from")
+                    to_node = node_transition.get("to")
+                    reason = node_transition.get("reason", "")
+
+                    event_payload = {
+                        "thread_id": thread_id,
+                        "from": from_node,
+                        "to": to_node,
+                        "iteration": iteration,
+                        "reason": reason,
+                    }
+                    logger.info(f"[SSE调试] 即将发送 node_transition 事件，payload: {event_payload}")
+                    # 发送一个独立的 SSE 事件，事件名可自定义，例如 node_transition
+                    sse_event = _make_event("node_transition", event_payload)
+                    logger.info(f"[SSE调试] 生成的 SSE 事件内容: {sse_event[:200]}...")
+                    yield sse_event
+
+                # 其他 update 目前不需要转成事件，直接忽略
                 continue
 
             message_chunk, message_metadata = cast(

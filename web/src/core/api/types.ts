@@ -88,10 +88,22 @@ export interface SearchStatusEvent
     }
   > {}
 
+export interface NodeTransitionEvent {
+  type: "node_transition";
+  data: {
+    thread_id: string;
+    from: string;
+    to: string;
+    iteration: number;
+    reason: string;
+  };
+}
+
 export type ChatEvent =
   | MessageChunkEvent
   | ToolCallsEvent
   | ToolCallChunksEvent
   | ToolCallResultEvent
   | InterruptEvent
-  | SearchStatusEvent;
+  | SearchStatusEvent
+  | NodeTransitionEvent;

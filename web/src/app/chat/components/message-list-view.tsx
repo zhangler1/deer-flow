@@ -198,7 +198,6 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const messageIds = useMessageIds();
   const currentMessageIndex = messageIds.indexOf(message.id);
 
-  console.log("tag:", message.tag);
 
   // 监听 tag 变化，一旦出现 round_progress 就记录下来（最高优先级）
   React.useEffect(() => {

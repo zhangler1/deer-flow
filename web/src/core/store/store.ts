@@ -181,6 +181,17 @@ export async function sendMessage(
         continue;
       }
       
+      // Handle node transition events (迭代研究节点跳转)
+      if (type === "node_transition") {
+        console.log(`[迭代研究节点跳转] 当前迭代轮次: ${data.iteration}`, {
+          from: data.from,
+          to: data.to,
+          reason: data.reason,
+          thread_id: data.thread_id,
+        });
+        continue;
+      }
+      
       messageId = data.id;
       let message: Message | undefined;
       if (type === "tool_call_result") {
