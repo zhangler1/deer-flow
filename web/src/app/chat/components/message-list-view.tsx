@@ -45,6 +45,7 @@ import {
   useMessage,
   useMessageIds,
   useMessageSearchStatus,
+  useMessageDisplayState,
   useResearchMessage,
   useStore,
   useAllIterationRounds,
@@ -364,43 +365,43 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const t = useTranslations("chat.research");
   const [isOpen, setIsOpen] = useState(true);
   const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
-  // 记录是否曾经显示过 searching 状态
-  const [hasShownSearching, setHasShownSearching] = useState(false);
-  // 记录是否曾经显示过 crawling 状态
-  const [hasShownCrawling, setHasShownCrawling] = useState(false);
-  // 记录是否曾经显示过 round_progress 状态（第X轮研究进展）
-  const [hasShownRoundProgress, setHasShownRoundProgress] = useState(false);
-  // 保留 round_progress 的文本内容
-  const [preservedRoundText, setPreservedRoundText] = useState<string | undefined>();
-  // 保留所有搜索关键词，即使流式输出结束后
-  const [preservedSearchKeywords, setPreservedSearchKeywords] = useState<string[]>([]);
+  
+  // 从全局 store 中获取消息的显示状态（用于恢复折叠框状态）
+  const displayState = useMessageDisplayState(message.id);
+  
   // 使用专门的选择器获取当前消息的搜索状态，确保每个卡片独立
   const messageSearchStatus = useMessageSearchStatus(message.id);
   // 监听消息列表的变化
   const messageIds = useMessageIds();
   const currentMessageIndex = messageIds.indexOf(message.id);
 
-  // 监听 tag 变化，一旦出现 round_progress 就记录下来（最高优先级）
+  // 监听 tag 变化，一旦出现 round_progress 就记录到 store（最高优先级）
   React.useEffect(() => {
-    if (message.tag === "round_progress" && !hasShownRoundProgress) {
-      setHasShownRoundProgress(true);
-      setPreservedRoundText(message.roundText);
+    if (message.tag === "round_progress" && !displayState.hasShownRoundProgress) {
+      useStore.getState().updateMessageDisplayState(message.id, {
+        hasShownRoundProgress: true,
+        preservedRoundText: message.roundText,
+      });
     }
-  }, [message.tag, message.roundText, hasShownRoundProgress]);
+  }, [message.tag, message.roundText, message.id, displayState.hasShownRoundProgress]);
 
-  // 监听 tag 变化，一旦出现 searching 就记录下来
+  // 监听 tag 变化，一旦出现 searching 就记录到 store
   React.useEffect(() => {
-    if (message.tag === "searching" && !hasShownSearching) {
-      setHasShownSearching(true);
+    if (message.tag === "searching" && !displayState.hasShownSearching) {
+      useStore.getState().updateMessageDisplayState(message.id, {
+        hasShownSearching: true,
+      });
     }
-  }, [message.tag, hasShownSearching]);
+  }, [message.tag, message.id, displayState.hasShownSearching]);
   
-  // 监听 tag 变化，一旦出现 crawling 就记录下来
+  // 监听 tag 变化，一旦出现 crawling 就记录到 store
   React.useEffect(() => {
-    if (message.tag === "crawling" && !hasShownCrawling) {
-      setHasShownCrawling(true);
+    if (message.tag === "crawling" && !displayState.hasShownCrawling) {
+      useStore.getState().updateMessageDisplayState(message.id, {
+        hasShownCrawling: true,
+      });
     }
-  }, [message.tag, hasShownCrawling]);
+  }, [message.tag, message.id, displayState.hasShownCrawling]);
 
   // 当消息完成流式传输时自动折叠
   React.useEffect(() => {
@@ -529,35 +530,38 @@ function IterativeResearchCard({ message }: { message: Message }) {
     return urls;
   }, [allCrawlTools, message.isStreaming]);
   
-  // 保留已完成的搜索关键词
+  // 保留已完成的搜索关键词到 store
   React.useEffect(() => {
     if (completedSearchKeywords.length > 0) {
-      setPreservedSearchKeywords(completedSearchKeywords);
+      useStore.getState().updateMessageDisplayState(message.id, {
+        preservedSearchKeywords: completedSearchKeywords,
+      });
     }
-  }, [completedSearchKeywords]);
-  
-  // 保留已完成的爬虫URL
-  const [preservedCrawlUrls, setPreservedCrawlUrls] = useState<string[]>([]);
+  }, [completedSearchKeywords, message.id]);
+    
+  // 保留已完成的爬虯URL到 store
   React.useEffect(() => {
     if (completedCrawlUrls.length > 0) {
-      setPreservedCrawlUrls(completedCrawlUrls);
+      useStore.getState().updateMessageDisplayState(message.id, {
+        preservedCrawlUrls: completedCrawlUrls,
+      });
     }
-  }, [completedCrawlUrls]);
+  }, [completedCrawlUrls, message.id]);
 
   // 确定显示的文本 - 优先级：round_progress > crawling > searching > 其他状态
   const displayText = useMemo(() => {
     // 最高优先级：如果曾经显示过 round_progress（第X轮研究进展），固定显示该状态
-    if (hasShownRoundProgress) {
-      return preservedRoundText || t("iterativeResearchProcess");
+    if (displayState.hasShownRoundProgress) {
+      return displayState.preservedRoundText || t("iterativeResearchProcess");
     }
     
     // 第二优先级：如果曾经显示过 crawling，一直保持显示 crawling（crawling 优先级高于 searching）
-    if (hasShownCrawling) {
+    if (displayState.hasShownCrawling) {
       return t("crawling");
     }
     
     // 第三优先级：如果曾经显示过 searching，一直保持显示 searching
-    if (hasShownSearching) {
+    if (displayState.hasShownSearching) {
       return t("searching");
     }
     
@@ -594,10 +598,10 @@ function IterativeResearchCard({ message }: { message: Message }) {
       return t("searching"); // "正在搜索"
     }
     
-    // 默认显示"正在研究"
+    // 默认显示“正在研究”
     return t("iterativeResearchProcess"); // "正在研究"
-  }, [hasShownRoundProgress, preservedRoundText, hasShownCrawling, hasShownSearching, message.tag, message.roundText, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
-
+  }, [displayState.hasShownRoundProgress, displayState.preservedRoundText, displayState.hasShownCrawling, displayState.hasShownSearching, message.tag, message.roundText, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
+  
   return (
     <div className="w-full">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -629,25 +633,25 @@ function IterativeResearchCard({ message }: { message: Message }) {
                 {displayText}
               </span>
               {/* 显示搜索关键词 */}
-              {(currentStreamingKeywords.length > 0 || preservedSearchKeywords.length > 0) && (
+              {(currentStreamingKeywords.length > 0 || displayState.preservedSearchKeywords.length > 0) && (
                 <span
                   className={cn(
                     "ml-2 max-w-[500px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal transition-colors duration-200",
                     message.isStreaming ? "text-primary/80" : "text-muted-foreground",
                   )}
                 >
-                  : {(currentStreamingKeywords.length > 0 ? currentStreamingKeywords : preservedSearchKeywords).join(" | ")}
+                  : {(currentStreamingKeywords.length > 0 ? currentStreamingKeywords : displayState.preservedSearchKeywords).join(" | ")}
                 </span>
               )}
-              {/* 显示爬虫URL */}
-              {(currentStreamingUrls.length > 0 || preservedCrawlUrls.length > 0) && (
+              {/* 显示爬虯URL */}
+              {(currentStreamingUrls.length > 0 || displayState.preservedCrawlUrls.length > 0) && (
                 <span
                   className={cn(
                     "ml-2 max-w-[500px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal transition-colors duration-200",
                     message.isStreaming ? "text-primary/80" : "text-muted-foreground",
                   )}
                 >
-                  : {(currentStreamingUrls.length > 0 ? currentStreamingUrls : preservedCrawlUrls).join(" | ")}
+                  : {(currentStreamingUrls.length > 0 ? currentStreamingUrls : displayState.preservedCrawlUrls).join(" | ")}
                 </span>
               )}
               {message.isStreaming && <LoadingAnimation className="ml-2 scale-75" />}

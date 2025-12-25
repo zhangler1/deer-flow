@@ -32,6 +32,15 @@ export const useStore = create<{
   // 迭代研究轮次管理：记录每个消息所属的轮次和轮次状态
   iterationRounds: Map<string, { iteration: number; messageIds: string[]; collapsed: boolean }>;
   currentIteration: number;
+  // 保存每个消息的状态显示历史（用于在组件卸载后恢复状态文本）
+  messageDisplayStates: Map<string, {
+    hasShownSearching: boolean;
+    hasShownCrawling: boolean;
+    hasShownRoundProgress: boolean;
+    preservedRoundText?: string;
+    preservedSearchKeywords: string[];
+    preservedCrawlUrls: string[];
+  }>;
 
   appendMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
@@ -46,6 +55,15 @@ export const useStore = create<{
   addMessageToCurrentRound: (messageId: string) => void;
   collapseRound: (iteration: number) => void;
   startNewRound: (iteration: number) => void;
+  // 更新消息显示状态
+  updateMessageDisplayState: (messageId: string, state: Partial<{
+    hasShownSearching: boolean;
+    hasShownCrawling: boolean;
+    hasShownRoundProgress: boolean;
+    preservedRoundText?: string;
+    preservedSearchKeywords: string[];
+    preservedCrawlUrls: string[];
+  }>) => void;
 }>((set) => ({
   responding: false,
   threadId: THREAD_ID,
@@ -61,6 +79,7 @@ export const useStore = create<{
   messageSearchStatus: new Map<string, { query: string; repository?: string } | null>(),
   iterationRounds: new Map<string, { iteration: number; messageIds: string[]; collapsed: boolean }>(),
   currentIteration: 0,
+  messageDisplayStates: new Map(),
 
   appendMessage(message: Message) {
     set((state) => ({
@@ -145,6 +164,30 @@ export const useStore = create<{
       };
     });
   },
+  updateMessageDisplayState(messageId: string, stateUpdate: Partial<{
+    hasShownSearching: boolean;
+    hasShownCrawling: boolean;
+    hasShownRoundProgress: boolean;
+    preservedRoundText?: string;
+    preservedSearchKeywords: string[];
+    preservedCrawlUrls: string[];
+  }>) {
+    set((state) => {
+      const currentState = state.messageDisplayStates.get(messageId) || {
+        hasShownSearching: false,
+        hasShownCrawling: false,
+        hasShownRoundProgress: false,
+        preservedSearchKeywords: [],
+        preservedCrawlUrls: [],
+      };
+      const newStates = new Map(state.messageDisplayStates);
+      newStates.set(messageId, {
+        ...currentState,
+        ...stateUpdate,
+      });
+      return { messageDisplayStates: newStates };
+    });
+  },
 }));
 
 export async function sendMessage(
@@ -163,6 +206,7 @@ export async function sendMessage(
   useStore.setState({
     currentIteration: 0,
     iterationRounds: new Map(),
+    // 注意：不清空 messageDisplayStates，保留旧的显示状态
   });
   
   if (content != null) {
@@ -562,6 +606,24 @@ export function useLastFeedbackMessageId() {
 export function useMessageSearchStatus(messageId: string | undefined) {
   return useStore(
     (state) => messageId ? state.messageSearchStatus.get(messageId) : null,
+  );
+}
+
+// 默认的消息显示状态（稳定的引用，避免无限循环）
+const DEFAULT_MESSAGE_DISPLAY_STATE = {
+  hasShownSearching: false,
+  hasShownCrawling: false,
+  hasShownRoundProgress: false,
+  preservedSearchKeywords: [],
+  preservedCrawlUrls: [],
+} as const;
+
+// 获取消息的显示状态（用于恢复折叠框的状态文本）
+export function useMessageDisplayState(messageId: string) {
+  return useStore(
+    useShallow((state) => 
+      state.messageDisplayStates.get(messageId) || DEFAULT_MESSAGE_DISPLAY_STATE
+    ),
   );
 }
 
