@@ -29,6 +29,9 @@ export const useStore = create<{
   searchStatus: { query: string; repository?: string } | null;
   // 为每个消息ID维护独立的搜索状态
   messageSearchStatus: Map<string, { query: string; repository?: string } | null>;
+  // 迭代研究轮次管理：记录每个消息所属的轮次和轮次状态
+  iterationRounds: Map<string, { iteration: number; messageIds: string[]; collapsed: boolean }>;
+  currentIteration: number;
 
   appendMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
@@ -39,6 +42,10 @@ export const useStore = create<{
   setSearchStatus: (status: { query: string; repository?: string } | null) => void;
   // 为特定消息设置搜索状态
   setMessageSearchStatus: (messageId: string, status: { query: string; repository?: string } | null) => void;
+  // 迭代研究轮次管理方法
+  addMessageToCurrentRound: (messageId: string) => void;
+  collapseRound: (iteration: number) => void;
+  startNewRound: (iteration: number) => void;
 }>((set) => ({
   responding: false,
   threadId: THREAD_ID,
@@ -52,6 +59,8 @@ export const useStore = create<{
   openResearchId: null,
   searchStatus: null,
   messageSearchStatus: new Map<string, { query: string; repository?: string } | null>(),
+  iterationRounds: new Map<string, { iteration: number; messageIds: string[]; collapsed: boolean }>(),
+  currentIteration: 0,
 
   appendMessage(message: Message) {
     set((state) => ({
@@ -88,6 +97,54 @@ export const useStore = create<{
       messageSearchStatus: new Map(state.messageSearchStatus).set(messageId, status),
     }));
   },
+  addMessageToCurrentRound(messageId: string) {
+    set((state) => {
+      const currentIteration = state.currentIteration;
+      const key = `round_${currentIteration}`;
+      const currentRound = state.iterationRounds.get(key) || {
+        iteration: currentIteration,
+        messageIds: [],
+        collapsed: false,
+      };
+      
+      if (!currentRound.messageIds.includes(messageId)) {
+        const newRounds = new Map(state.iterationRounds);
+        newRounds.set(key, {
+          ...currentRound,
+          messageIds: [...currentRound.messageIds, messageId],
+        });
+        return { iterationRounds: newRounds };
+      }
+      return {};
+    });
+  },
+  collapseRound(iteration: number) {
+    set((state) => {
+      const key = `round_${iteration}`;
+      const round = state.iterationRounds.get(key);
+      if (round) {
+        const newRounds = new Map(state.iterationRounds);
+        newRounds.set(key, { ...round, collapsed: true });
+        return { iterationRounds: newRounds };
+      }
+      return {};
+    });
+  },
+  startNewRound(iteration: number) {
+    set((state) => {
+      const key = `round_${iteration}`;
+      const newRounds = new Map(state.iterationRounds);
+      newRounds.set(key, {
+        iteration,
+        messageIds: [],
+        collapsed: false,
+      });
+      return {
+        currentIteration: iteration,
+        iterationRounds: newRounds,
+      };
+    });
+  },
 }));
 
 export async function sendMessage(
@@ -101,6 +158,13 @@ export async function sendMessage(
   } = {},
   options: { abortSignal?: AbortSignal } = {},
 ) {
+  // 重置迭代研究轮次状态
+  console.log('[轮次重置] 用户发送新消息，重置迭代研究状态');
+  useStore.setState({
+    currentIteration: 0,
+    iterationRounds: new Map(),
+  });
+  
   if (content != null) {
     appendMessage({
       id: nanoid(),
@@ -189,6 +253,21 @@ export async function sendMessage(
           reason: data.reason,
           thread_id: data.thread_id,
         });
+        
+        // 处理轮次切换逻辑
+        const currentIteration = useStore.getState().currentIteration;
+
+      // 如果是继续迭代（iteration增加了），需要折叠当前轮次并开始新轮次
+        console.log(`[轮次切换] 从第${currentIteration}轮切换到第${data.iteration}轮`);
+        // 折叠当前轮次
+        if (currentIteration > 0) {
+          console.log(`[轮次折叠] 折叠第${currentIteration}轮`);
+          useStore.getState().collapseRound(currentIteration);
+        }
+        // 开始新轮次
+        console.log(`[轮次创建] 创建第${data.iteration}轮研究容器`);
+        useStore.getState().startNewRound(data.iteration);
+        
         continue;
       }
       
@@ -279,6 +358,17 @@ function appendMessage(message: Message) {
     }
     appendResearchActivity(message);
   }
+  
+  // 如果是迭代研究节点的消息，添加到当前轮次
+  if (message.agent === "iterative_research_node") {
+    const currentIteration = useStore.getState().currentIteration;
+    // 如果还没有开始轮次，先开始第1轮
+    if (currentIteration === 0) {
+      useStore.getState().startNewRound(1);
+    }
+    useStore.getState().addMessageToCurrentRound(message.id);
+  }
+  
   useStore.getState().appendMessage(message);
 }
 
@@ -473,6 +563,26 @@ export function useMessageSearchStatus(messageId: string | undefined) {
   return useStore(
     (state) => messageId ? state.messageSearchStatus.get(messageId) : null,
   );
+}
+
+// 获取轮次信息
+export function useIterationRound(iteration: number) {
+  return useStore((state) => state.iterationRounds.get(`round_${iteration}`));
+}
+
+// 获取所有轮次
+export function useAllIterationRounds() {
+  return useStore(
+    useShallow((state) => {
+      const rounds = Array.from(state.iterationRounds.values());
+      return rounds.sort((a, b) => a.iteration - b.iteration);
+    }),
+  );
+}
+
+// 获取当前轮次号
+export function useCurrentIteration() {
+  return useStore((state) => state.currentIteration);
 }
 
 export function useToolCalls() {

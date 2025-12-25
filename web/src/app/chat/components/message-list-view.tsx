@@ -47,6 +47,8 @@ import {
   useMessageSearchStatus,
   useResearchMessage,
   useStore,
+  useAllIterationRounds,
+  useCurrentIteration,
 } from "~/core/store";
 import { parseJSON } from "~/core/utils";
 import { cn } from "~/lib/utils";
@@ -124,6 +126,68 @@ export function MessageListView({
       .filter((item): item is { messageId: string; message: Message; startOfResearch: boolean } => item !== null);
   }, [messageIds, messages, researchIds]);
 
+  // 获取所有轮次信息
+  const allRounds = useAllIterationRounds();
+  
+  // 按轮次组织迭代研究消息
+  const organizedMessages = useMemo(() => {
+    const result: Array<{
+      type: 'round' | 'normal';
+      iteration?: number;
+      messageIds?: string[];
+      collapsed?: boolean;
+      messageId?: string;
+      message?: Message;
+      startOfResearch?: boolean;
+    }> = [];
+    
+    // 创建一个set来跟踪已经在轮次中的消息
+    const messagesInRounds = new Set<string>();
+    
+    // 收集所有轮次中的消息
+    allRounds.forEach(round => {
+      round.messageIds.forEach(id => messagesInRounds.add(id));
+    });
+    
+    // 构建消息索引映射
+    const messageIndexMap = new Map<string, number>();
+    messageIds.forEach((id, index) => {
+      messageIndexMap.set(id, index);
+    });
+    
+    // 遍历所有可见消息，按照原始顺序处理
+    visibleMessages.forEach(item => {
+      // 如果消息在某个轮次中，检查是否需要插入该轮次容器
+      const messageRound = allRounds.find(r => r.messageIds.includes(item.messageId));
+      
+      if (messageRound) {
+        // 检查该轮次容器是否已经添加
+        const roundKey = `round_${messageRound.iteration}`;
+        const alreadyAdded = result.some(r => r.type === 'round' && r.iteration === messageRound.iteration);
+        
+        if (!alreadyAdded) {
+          // 第一次遇到该轮次的消息，添加轮次容器
+          result.push({
+            type: 'round',
+            iteration: messageRound.iteration,
+            messageIds: messageRound.messageIds,
+            collapsed: messageRound.collapsed,
+          });
+        }
+      } else {
+        // 不在轮次中的普通消息，直接添加
+        result.push({
+          type: 'normal',
+          messageId: item.messageId,
+          message: item.message,
+          startOfResearch: item.startOfResearch,
+        });
+      }
+    });
+    
+    return result;
+  }, [visibleMessages, allRounds, messageIds]);
+
   return (
     <ScrollContainer
       className={cn("flex h-full w-full flex-col overflow-hidden", className)}
@@ -132,19 +196,36 @@ export function MessageListView({
       ref={scrollContainerRef}
     >
       <ul className="flex flex-col">
-        {visibleMessages.map(({ messageId, message, startOfResearch }) => (
-          <MessageListItem
-            key={messageId}
-            messageId={messageId}
-            message={message}
-            startOfResearch={startOfResearch}
-            waitForFeedback={waitingForFeedbackMessageId === messageId}
-            interruptMessage={interruptMessage}
-            onFeedback={onFeedback}
-            onSendMessage={onSendMessage}
-            onToggleResearch={handleToggleResearch}
-          />
-        ))}
+        {organizedMessages.map((item, index) => {
+          if (item.type === 'round') {
+            // 渲染轮次容器
+            return (
+              <IterativeResearchRoundContainer
+                key={`round_${item.iteration}`}
+                iteration={item.iteration!}
+                messageIds={item.messageIds!}
+                collapsed={item.collapsed!}
+                onFeedback={onFeedback}
+                onSendMessage={onSendMessage}
+              />
+            );
+          } else {
+            // 渲染普通消息
+            return (
+              <MessageListItem
+                key={item.messageId!}
+                messageId={item.messageId!}
+                message={item.message!}
+                startOfResearch={item.startOfResearch!}
+                waitForFeedback={waitingForFeedbackMessageId === item.messageId}
+                interruptMessage={interruptMessage}
+                onFeedback={onFeedback}
+                onSendMessage={onSendMessage}
+                onToggleResearch={handleToggleResearch}
+              />
+            );
+          }
+        })}
         <div className="flex h-8 w-full shrink-0"></div>
       </ul>
       {responding && (noOngoingResearch || !ongoingResearchIsOpen) && (
@@ -178,6 +259,107 @@ function MessageBubble({
   );
 }
 
+function IterativeResearchRoundContainer({
+  iteration,
+  messageIds,
+  collapsed,
+  onFeedback,
+  onSendMessage,
+}: {
+  iteration: number;
+  messageIds: string[];
+  collapsed: boolean;
+  onFeedback?: (feedback: { option: Option }) => void;
+  onSendMessage?: (
+    message: string,
+    options?: { interruptFeedback?: string },
+  ) => void;
+}) {
+  const t = useTranslations("chat.research");
+  const [isOpen, setIsOpen] = useState(!collapsed);
+  const messages = useStore((state) => state.messages);
+  
+  // 监听collapsed状态变化，自动折叠
+  React.useEffect(() => {
+    if (collapsed) {
+      setIsOpen(false);
+    }
+  }, [collapsed]);
+  
+  // 检查是否有消息还在流式传输
+  const hasStreaming = useMemo(() => {
+    return messageIds.some(id => {
+      const msg = messages.get(id);
+      return msg?.isStreaming;
+    });
+  }, [messageIds, messages]);
+  
+  return (
+    <motion.li
+      className="mt-4"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{ transition: "all 0.2s ease-out" }}
+      transition={{
+        duration: 0.2,
+        ease: "easeOut",
+      }}
+    >
+      <div className="w-full px-4">
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className={cn(
+                "h-auto w-full justify-start rounded-xl border px-6 py-4 text-left transition-all duration-200 mb-3",
+                "hover:bg-accent hover:text-accent-foreground",
+                hasStreaming
+                  ? "border-primary/30 bg-primary/10 shadow-md"
+                  : "border-border bg-card/50",
+              )}
+            >
+              <div className="flex w-full items-center gap-3">
+                <span
+                  className={cn(
+                    "text-lg leading-none font-bold transition-colors duration-200",
+                    hasStreaming ? "text-primary" : "text-foreground",
+                  )}
+                >
+                  第{iteration}轮研究
+                </span>
+                {hasStreaming && <LoadingAnimation className="ml-2 scale-75" />}
+                <div className="flex-grow" />
+                {isOpen ? (
+                  <ChevronDown
+                    size={18}
+                    className="text-muted-foreground transition-transform duration-200"
+                  />
+                ) : (
+                  <ChevronRight
+                    size={18}
+                    className="text-muted-foreground transition-transform duration-200"
+                  />
+                )}
+              </div>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-up-2 data-[state=open]:slide-down-2">
+            <div className="flex flex-col gap-3">
+              {messageIds.map((messageId) => {
+                const message = messages.get(messageId);
+                if (!message) return null;
+                return (
+                  <IterativeResearchCard key={messageId} message={message} />
+                );
+              })}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+    </motion.li>
+  );
+}
+
 function IterativeResearchCard({ message }: { message: Message }) {
   const t = useTranslations("chat.research");
   const [isOpen, setIsOpen] = useState(true);
@@ -197,7 +379,6 @@ function IterativeResearchCard({ message }: { message: Message }) {
   // 监听消息列表的变化
   const messageIds = useMessageIds();
   const currentMessageIndex = messageIds.indexOf(message.id);
-
 
   // 监听 tag 变化，一旦出现 round_progress 就记录下来（最高优先级）
   React.useEffect(() => {

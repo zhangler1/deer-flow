@@ -532,10 +532,13 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                 f"🔄 ITERATION_CONTINUE | 第{iteration_count + 1}轮完成，继续下一轮 | 耗时: {duration:.2f}s"
             )
             # 继续下一轮迭代
+            # iteration_count + 2 表示即将进入的下一轮（例如：第1轮完成后，跳转到第2轮）
+            next_iteration = iteration_count + 2
+            logger.info(f"[轮次跳转] 第{iteration_count + 1}轮完成 → 即将跳转到第{next_iteration}轮")
             node_transition_data = {
                 "from": "iterative_research_node",
                 "to": "iterative_research_node",
-                "iteration": iteration_count + 1,
+                "iteration": next_iteration,
                 "reason": "continue",
             }
             logger.info(f"[节点跳转] 即将返回 Command，node_transition: {node_transition_data}")
@@ -563,10 +566,12 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                 f"✅ NODE_EXIT | iterative_research | 研究完成 | 总轮次: {iteration_count + 1} | 总耗时: {duration:.2f}s"
             )
             # 研究完成，进入报告生成阶段
+            final_iteration = iteration_count + 2
+            logger.info(f"[研究完成] 第{final_iteration - 1}轮完成 → 即将生成最终报告")
             node_transition_data = {
                 "from": "iterative_research_node",
                 "to": "iterative_reporter_node",
-                "iteration": iteration_count + 1,
+                "iteration": final_iteration,
                 "reason": "finish",
             }
             logger.info(f"[节点跳转] 即将返回 Command，node_transition: {node_transition_data}")
