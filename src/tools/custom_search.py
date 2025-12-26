@@ -205,27 +205,19 @@ class CustomSearchTool(BaseTool):
         api_results = rsp_body.get("result", [])
         
         for item in api_results:
-            # 转换为 DeerFlow 标准格式
+            # 转换为 DeerFlow 统一的结构化格式
             result = {
+                # === 核心必需字段 ===
                 "title": item.get("title", "").strip(),
-                "url": item.get("url") or "",  # url可能为None
                 "content": item.get("content", "").strip() or item.get("absContent", "").strip(),
-                "source": item.get("source", ""),
                 "score": float(item.get("score", 0)) if item.get("score") else 0.0,
-                "doc_id": item.get("docId", ""),
-                "repository": item.get("repository", "")
+                "url": item.get("url") or "",  # url可能为None
+                "source": item.get("source", ""),
+                
+                # === 次要可选字段 ===
+                "category": item.get("fullCategoryName", ""),
             }
             
-            # 添加其他可用字段
-            if item.get("createTime"):
-                result["create_time"] = item["createTime"]
-            if item.get("updateTime"):
-                result["update_time"] = item["updateTime"]
-            if item.get("fullCategoryName"):
-                result["category"] = item["fullCategoryName"]
-            if item.get("fullOrgName"):
-                result["organization"] = item["fullOrgName"]
-                
             # 只有当内容不为空时才添加到结果中
             if result["title"] or result["content"]:
                 results.append(result)

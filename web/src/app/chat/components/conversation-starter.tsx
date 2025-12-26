@@ -23,11 +23,12 @@ export function ConversationStarter({
       <div className="pointer-events-none fixed inset-0 flex items-center justify-center">
         <Welcome className="pointer-events-auto mb-15 w-[75%] -translate-y-24" />
       </div>
-      <ul className="flex flex-wrap">
+      {/* 修改为单列布局，4个问题纵向排列 */}
+      <ul className="flex flex-col gap-2 w-full max-w-2xl">
         {questions.map((question, index) => (
           <motion.li
             key={question}
-            className="flex w-1/2 shrink-0 p-2 active:scale-105"
+            className="flex shrink-0 active:scale-[1.02]"
             style={{ transition: "all 0.2s ease-out" }}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
@@ -39,7 +40,7 @@ export function ConversationStarter({
             }}
           >
             <div
-              className="bg-card text-muted-foreground h-full w-full cursor-pointer rounded-2xl border px-4 py-4 opacity-75 transition-all duration-300 hover:opacity-100 hover:shadow-md"
+              className="bg-card text-muted-foreground h-auto w-full cursor-pointer rounded-2xl border px-4 py-2 leading-relaxed opacity-75 transition-all duration-300 hover:opacity-100 hover:shadow-md"
               onClick={() => {
                 onSend?.(question);
               }}

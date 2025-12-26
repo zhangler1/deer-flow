@@ -113,12 +113,17 @@ function ActivityListItem({ messageId }: { messageId: string }) {
 }
 
 const __pageCache = new LRUCache<string, string>({ max: 100 });
+
+// 统一的搜索结果类型（支持 web_search 和 domain_fin_search）
 type SearchResult =
   | {
     type: "page";
     title: string;
     url: string;
     content: string;
+    score?: number;      // 相关度评分（可选）
+    source?: string;     // 来源（可选）
+    category?: string;   // 分类（可选）
   }
   | {
     type: "image";
@@ -134,7 +139,32 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
   const searchResults = useMemo<SearchResult[]>(() => {
     let results: SearchResult[] | undefined = undefined;
     try {
-      results = toolCall.result ? parseJSON(toolCall.result, []) : undefined;
+      const parsed = toolCall.result ? parseJSON(toolCall.result, []) : undefined;
+      if (Array.isArray(parsed)) {
+        // 转换为统一格式，处理旧格式和新格式
+        results = parsed.map((item: any) => {
+          // 如果已经有 type 字段，直接使用
+          if (item.type) {
+            return item;
+          }
+          // 否则根据字段推断类型
+          if (item.image_url) {
+            return item; // 图片类型
+          }
+          // 默认为页面类型（支持统一后的格式）
+          return {
+            type: "page",
+            title: item.title || "",
+            url: item.url || "",
+            content: item.content || "",
+            score: item.score,
+            source: item.source,
+            category: item.category,
+          };
+        });
+      } else {
+        results = [];
+      }
     } catch {
       results = undefined;
     }

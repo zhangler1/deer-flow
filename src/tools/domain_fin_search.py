@@ -119,7 +119,7 @@ def call_domain_fin_search(
     scene: str = "default",
     space_codes: Optional[List[str]] = None,
     timeout: int = 30
-) -> str:
+) -> List[Dict[str, Any]]:
     """
     调用金融领域知识搜索API
     
@@ -130,7 +130,7 @@ def call_domain_fin_search(
         timeout: 超时时间（秒）
     
     Returns:
-        str: API 返回的知识内容
+        List[Dict[str, Any]]: 结构化的搜索结果列表
     """
     try:
         # 确定要使用的场景代码
@@ -174,81 +174,105 @@ def call_domain_fin_search(
         result = response.json()
         logger.info(f"✅ 金融领域知识搜索响应成功 | 状态码: {response.status_code}")
         
-        # 提取知识内容
-        knowledge_content = _extract_knowledge(result)
+        # 提取知识内容，返回结构化列表
+        knowledge_results = _extract_knowledge(result)
         
-        return knowledge_content
+        return knowledge_results
         
     except requests.exceptions.Timeout:
         error_msg = f"金融领域知识搜索请求超时 (>{timeout}s)"
         logger.error(f"❌ {error_msg}")
-        return f"错误: {error_msg}"
+        return [{
+            "title": "搜索错误",
+            "content": error_msg,
+            "score": 0.0,
+            "url": "",
+            "source": "system"
+        }]
         
     except requests.exceptions.RequestException as e:
         error_msg = f"金融领域知识搜索请求失败: {str(e)}"
         logger.error(f"❌ {error_msg}")
-        return f"错误: {error_msg}"
+        return [{
+            "title": "搜索错误",
+            "content": error_msg,
+            "score": 0.0,
+            "url": "",
+            "source": "system"
+        }]
         
     except Exception as e:
         error_msg = f"处理金融领域知识搜索响应时出错: {str(e)}"
         logger.error(f"❌ {error_msg}")
-        return f"错误: {error_msg}"
+        return [{
+            "title": "搜索错误",
+            "content": error_msg,
+            "score": 0.0,
+            "url": "",
+            "source": "system"
+        }]
 
 
-def _extract_knowledge(result: Dict[str, Any]) -> str:
-    """从 API 响应中提取知识内容"""
+def _extract_knowledge(result: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """从 API 响应中提取知识内容，返回结构化列表"""
     try:
         # 根据实际 API 响应结构提取知识
         if "RSP_BODY" in result:
             rsp_body = result["RSP_BODY"]
             result_data = rsp_body.get("result", {})
             
-            # 提取向量检索结果和文本检絢结果
+            # 提取向量检索结果和文本检索结果
             vector_list = result_data.get("vectorGroupList", [])
             text_list = result_data.get("textGroupList", [])
             
-            # 合并两种检絢结果
+            # 合并两种检索结果
             all_results = []
-            for item in vector_list + text_list:
+            for idx, item in enumerate(vector_list + text_list, 1):
                 content = item.get("content", "")
                 score = item.get("score", "")
                 para_title = item.get("paraTitle", "")  # 提取段落标题
                 
                 if content:
+                    # 转换为统一的结构化格式
                     all_results.append({
+                        "title": para_title if para_title else f"结果 {idx}",
                         "content": content,
-                        "score": score,
-                        "paraTitle": para_title
+                        "score": float(score) if score else 0.0,
+                        "url": "",  # 金融知识库通常没有URL
+                        "source": "金融知识库"
                     })
             
-            # 格式化输出
+            # 返回结果列表
             if all_results:
-                knowledge_items = []
-                for idx, item in enumerate(all_results, 1):
-                    content = item["content"]
-                    score = item["score"]
-                    para_title = item["paraTitle"]
-                    
-                    # 如果有标题，显示标题；否则只显示结果编号
-                    if para_title:
-                        knowledge_items.append(
-                            f"【{para_title}】\n{content}\n(相关度: {score})"
-                        )
-                    else:
-                        knowledge_items.append(
-                            f"【结果 {idx}】\n{content}\n(相关度: {score})"
-                        )
-                
-                return "\n\n---\n\n".join(knowledge_items)
+                return all_results
             else:
-                return "未找到相关知识"
+                return [{
+                    "title": "未找到相关知识",
+                    "content": "未能找到与查询相关的金融知识，请尝试使用不同的关键词。",
+                    "score": 0.0,
+                    "url": "",
+                    "source": "system"
+                }]
         
-        # 如果无法提取，返回原始结果
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        # 如果无法提取，返回错误信息
+        logger.warning("无法解析金融知识库响应格式")
+        return [{
+            "title": "解析错误",
+            "content": "响应格式异常，请稍后重试。",
+            "score": 0.0,
+            "url": "",
+            "source": "system"
+        }]
         
     except Exception as e:
         logger.error(f"提取知识内容失败: {e}")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return [{
+            "title": "解析错误",
+            "content": f"处理响应时出错: {str(e)}",
+            "score": 0.0,
+            "url": "",
+            "source": "system"
+        }]
 
 
 # ===== LangChain Tool 封装 =====
@@ -258,7 +282,7 @@ def _extract_knowledge(result: Dict[str, Any]) -> str:
 def domain_fin_search(
     keyword: str,
     scene: str = "default"
-) -> str:
+) -> List[Dict[str, Any]]:
     """
     金融领域知识搜索工具
     
@@ -272,7 +296,12 @@ def domain_fin_search(
             - "investment": 投资理财场景
     
     Returns:
-        str: 金融知识库返回的相关知识内容
+        List[Dict[str, Any]]: 结构化的搜索结果列表，每个结果包含:
+            - title: 段落标题或结果编号
+            - content: 知识内容
+            - score: 相关度评分
+            - url: 链接（通常为空）
+            - source: 来源标识
     
     Examples:
         >>> domain_fin_search("信用卡申请条件", scene="banking")
