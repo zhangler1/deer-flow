@@ -344,8 +344,8 @@ def _create_interrupt_event(thread_id, event_data):
                 "finish_reason": "interrupt",
                 "tag": "waiting_for_feedback",  # Add tag for interrupt events
                 "options": [
-                    {"text": "Edit plan", "value": "edit_plan"},
-                    {"text": "Start research", "value": "accepted"},
+                    {"text": "编辑计划", "value": "edit_plan"},
+                    {"text": "开始研究", "value": "accepted"},
                 ],
             },
         )
@@ -362,8 +362,8 @@ def _create_interrupt_event(thread_id, event_data):
                 "finish_reason": "interrupt",
                 "tag": "waiting_for_feedback",  # Add tag for interrupt events
                 "options": [
-                    {"text": "Edit plan", "value": "edit_plan"},
-                    {"text": "Start research", "value": "accepted"},
+                    {"text": "编辑计划", "value": "edit_plan"},
+                    {"text": "开始研究", "value": "accepted"},
                 ],
             },
         )
@@ -593,21 +593,21 @@ async def _stream_graph_events(
 
 
 async def _astream_workflow_generator(
-    messages: List[dict],
-    thread_id: str,
-    resources: List[Resource],
-    max_plan_iterations: int,
-    max_step_num: int,
-    max_search_results: int,
-    max_iteration: int,
-    search_engine: str,
-    custom_search_repository: str,
-    auto_accepted_plan: bool,
-    interrupt_feedback: str,
-    mcp_settings: dict,
-    enable_background_investigation: bool,
-    report_style: ReportStyle,
-    enable_deep_thinking: bool,
+    messages: List[dict],  # 对话消息列表（OpenAI格式），会被转交到 LangGraph 工作流
+    thread_id: str,  # 会话/线程ID，用于在前后端关联同一轮流式事件
+    resources: List[Resource],  # 研究可用的外部资源（如链接、上下文等）
+    max_plan_iterations: int,  # 规划节点的最大迭代次数
+    max_step_num: int,  # 单个研究计划中允许的最大步骤数
+    max_search_results: int,  # 每次搜索的最大返回条数
+    max_iteration: int,  # 迭代研究节点的最大迭代轮数
+    search_engine: str,  # 选用的搜索引擎（custom_search/tavily/...）
+    custom_search_repository: str,  # 自定义搜索仓库ID（限定检索域）
+    auto_accepted_plan: bool,  # 是否自动接受规划（否则会发起中断等待用户确认）
+    interrupt_feedback: str,  # 用户对规划的中断反馈（用于恢复时合并到输入）
+    mcp_settings: dict,  # MCP 工具的动态配置（服务、工具、环境变量等）
+    enable_background_investigation: bool,  # 是否在规划前先做背景调研
+    report_style: ReportStyle,  # 报告风格（学术/科普/新闻等）
+    enable_deep_thinking: bool,  # 是否启用“深度思考”（切换到 reasoning 模型等）
     system_context: str = "",  # 系统背景上下文
     force_routing_path: str = None,  # 🐛 调试模式：强制路由路径
 ):

@@ -19,7 +19,7 @@ export function SiteHeader() {
       <div className="container flex h-15 items-center justify-between px-3">
         <div className="text-xl font-medium">
           <span className="mr-1 text-2xl">💡</span>
-          <span>Deep Research</span>
+          <span>交心深度研究</span>
         </div>
         <div className="relative flex items-center gap-2">
           <LanguageSwitcher />

@@ -11,6 +11,7 @@ import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
 import type { MCPServerMetadata } from "~/core/mcp";
 import { cn } from "~/lib/utils";
+import { getToolDisplayName } from "~/lib/tool-translations";
 
 import { AddMCPServerDialog } from "../dialogs/add-mcp-server-dialog";
 
@@ -164,7 +165,7 @@ export const MCPTab: Tab = ({ settings, onChange }) => {
                         className="text-muted-foreground border-muted-foreground w-fit rounded-md border px-2"
                       >
                         <Tooltip key={tool.name} title={tool.description}>
-                          <div className="w-fit text-sm">{tool.name}</div>
+                          <div className="w-fit text-sm">{getToolDisplayName(tool.name)}</div>
                         </Tooltip>
                       </li>
                     ))}

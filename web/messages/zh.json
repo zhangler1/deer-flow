@@ -55,7 +55,7 @@
       "directAnswer": "直接回答",
       "simpleSearch": "简单检索",
       "iterativeResearch": "迭代研究",
-      "deepResearch": "深度研究"
+      "deepResearch": "交心深度研究"
     },
     "mcp": {
       "title": "MCP 服务器",
@@ -121,7 +121,7 @@
       "off": "关闭"
     },
     "research": {
-      "deepResearch": "深度研究",
+      "deepResearch": "交心深度研究",
       "researching": "研究中...",
       "generatingReport": "生成报告中...",
       "reportGenerated": "报告已生成",

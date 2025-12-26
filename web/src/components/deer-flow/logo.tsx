@@ -9,7 +9,7 @@ export function Logo() {
       className="opacity-70 transition-opacity duration-300 hover:opacity-100"
       href="/"
     >
-      💡 Deep Research
+      💡 交心深度研究
     </Link>
   );
 }

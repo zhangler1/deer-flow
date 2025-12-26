@@ -30,6 +30,7 @@ import type { ToolCallRuntime } from "~/core/messages";
 import { useMessage, useStore } from "~/core/store";
 import { parseJSON } from "~/core/utils";
 import { cn } from "~/lib/utils";
+import { getToolDisplayText } from "~/lib/tool-translations";
 
 export function ResearchActivitiesBlock({
   className,
@@ -478,7 +479,7 @@ function MCPToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                     className="pr-0.5 text-base font-medium italic"
                     animated={toolCall.result === undefined}
                   >
-                    Running {toolCall.name ? toolCall.name + "()" : "MCP tool"}
+                    正在运行 {toolCall.name ? getToolDisplayText(toolCall.name) : "MCP 工具"}
                   </RainbowText>
                 </div>
               </Tooltip>

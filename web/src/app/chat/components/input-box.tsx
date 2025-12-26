@@ -262,7 +262,7 @@ export function InputBox({
               onClick={handleToggleCustomSearch}
             >
               <Search className="h-4 w-4" />
-              自定义搜索
+              交心搜索
             </Button>
           </Tooltip>
           {/* 自定义搜索仓库选择器 */}

@@ -55,7 +55,7 @@
       "directAnswer": "Direct Answer",
       "simpleSearch": "Simple Search",
       "iterativeResearch": "Iterative Research",
-      "deepResearch": "Deep Research"
+      "deepResearch": "Jiaoxin Deep Research"
     },
     "mcp": {
       "title": "MCP Servers",
@@ -121,7 +121,7 @@
       "off": "Off"
     },
     "research": {
-      "deepResearch": "Deep Research",
+      "deepResearch": "Jiaoxin Deep Research",
       "researching": "Researching...",
       "generatingReport": "Generating report...",
       "reportGenerated": "Report generated",

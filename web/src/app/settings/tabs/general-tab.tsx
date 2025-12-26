@@ -224,7 +224,7 @@ export const GeneralTab: Tab = ({
                           Wikipedia
                         </SelectItem>
                         <SelectItem value="custom_search">
-                          自定义搜索引擎 (推荐)
+                          交心搜索引擎 (推荐)
                         </SelectItem>
                       </SelectContent>
                     </Select>

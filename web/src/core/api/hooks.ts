@@ -29,13 +29,13 @@ export function useReplayMetadata() {
         setError(false);
         setTitle(title ?? null);
         if (title) {
-          document.title = `${title} - Deep Research`;
+          document.title = `${title} - 交心深度研究`;
         }
       })
       .catch(() => {
         setError(true);
         setTitle("Error: the replay is not available.");
-        document.title = "Deep Research";
+        document.title = "交心深度研究";
       })
       .finally(() => {
         isLoading.current = false;
