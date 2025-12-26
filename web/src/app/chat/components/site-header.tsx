@@ -24,26 +24,6 @@ export function SiteHeader() {
         <div className="relative flex items-center gap-2">
           <LanguageSwitcher />
           <ThemeToggle />
-          <div
-            className="pointer-events-none absolute inset-0 z-0 h-full w-full rounded-full opacity-60 blur-2xl"
-            style={{
-              background: "linear-gradient(90deg, #ff80b5 0%, #9089fc 100%)",
-              filter: "blur(32px)",
-            }}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            asChild
-            className="group relative z-10"
-          >
-            <Link href="https://github.com/bytedance/deer-flow" target="_blank">
-              <GitHubLogoIcon className="size-4" />
-              {t('starOnGitHub')}
-              {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY &&
-                env.GITHUB_OAUTH_TOKEN && <StarCounter />}
-            </Link>
-          </Button>
         </div>
       </div>
       <hr className="from-border/0 via-border/70 to-border/0 m-0 h-px w-full border-none bg-gradient-to-r" />

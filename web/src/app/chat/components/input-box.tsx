@@ -3,7 +3,7 @@
 
 import { MagicWandIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, Lightbulb, X, Search } from "lucide-react";
+import { ArrowUp, X, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState } from "react";
 
@@ -26,7 +26,6 @@ import { enhancePrompt } from "~/core/api";
 import { useConfig } from "~/core/api/hooks";
 import type { Option, Resource } from "~/core/messages";
 import {
-  setEnableDeepThinking,
   setEnableBackgroundInvestigation,
   useSettingsStore,
   saveSettings,
@@ -58,9 +57,6 @@ export function InputBox({
   const t = useTranslations("chat.inputBox");
   const tCommon = useTranslations("common");
   const tSettings = useTranslations("settings.general");
-  const enableDeepThinking = useSettingsStore(
-    (state) => state.general.enableDeepThinking,
-  );
   const backgroundInvestigation = useSettingsStore(
     (state) => state.general.enableBackgroundInvestigation,
   );
@@ -288,38 +284,6 @@ export function InputBox({
                   ))}
                 </SelectContent>
               </Select>
-            </Tooltip>
-          )}
-          {config?.models.reasoning?.[0] && (
-            <Tooltip
-              className="max-w-60"
-              title={
-                <div>
-                  <h3 className="mb-2 font-bold">
-                    {t("deepThinkingTooltip.title", {
-                      status: enableDeepThinking ? t("on") : t("off"),
-                    })}
-                  </h3>
-                  <p>
-                    {t("deepThinkingTooltip.description", {
-                      model: config.models.reasoning?.[0] ?? "",
-                    })}
-                  </p>
-                </div>
-              }
-            >
-              <Button
-                className={cn(
-                  "rounded-2xl",
-                  enableDeepThinking && "!border-brand !text-brand",
-                )}
-                variant="outline"
-                onClick={() => {
-                  setEnableDeepThinking(!enableDeepThinking);
-                }}
-              >
-                <Lightbulb /> {t("deepThinking")}
-              </Button>
             </Tooltip>
           )}
 
