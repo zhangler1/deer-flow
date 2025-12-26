@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   general: {
     autoAcceptedPlan: false,
     enableDeepThinking: false,
-    enableBackgroundInvestigation: false,
+    enableBackgroundInvestigation: true,  // 默认开启背景调研
     maxPlanIterations: 1,
     maxStepNum: 3,
     maxSearchResults: 3,
