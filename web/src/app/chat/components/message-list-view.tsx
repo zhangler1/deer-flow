@@ -44,8 +44,12 @@ import {
   useLastInterruptMessage,
   useMessage,
   useMessageIds,
+  useMessageSearchStatus,
+  useMessageDisplayState,
   useResearchMessage,
   useStore,
+  useAllIterationRounds,
+  useCurrentIteration,
 } from "~/core/store";
 import { parseJSON } from "~/core/utils";
 import { cn } from "~/lib/utils";
@@ -108,12 +112,12 @@ export function MessageListView({
           message.agent === "router" ||
           message.agent === "direct_answer_node" ||
           message.agent === "simple_search_node" ||
-          message.agent === "domain_knowledge_node" ||
+          message.agent === "iterative_research_node" ||  // 添加迭代研究节点消息显示
+          message.agent === "iterative_reporter_node" ||
           startOfResearch
         )) {
           return null;
-        }
-        
+        }        
         return {
           messageId,
           message,
@@ -123,6 +127,68 @@ export function MessageListView({
       .filter((item): item is { messageId: string; message: Message; startOfResearch: boolean } => item !== null);
   }, [messageIds, messages, researchIds]);
 
+  // 获取所有轮次信息
+  const allRounds = useAllIterationRounds();
+  
+  // 按轮次组织迭代研究消息
+  const organizedMessages = useMemo(() => {
+    const result: Array<{
+      type: 'round' | 'normal';
+      iteration?: number;
+      messageIds?: string[];
+      collapsed?: boolean;
+      messageId?: string;
+      message?: Message;
+      startOfResearch?: boolean;
+    }> = [];
+    
+    // 创建一个set来跟踪已经在轮次中的消息
+    const messagesInRounds = new Set<string>();
+    
+    // 收集所有轮次中的消息
+    allRounds.forEach(round => {
+      round.messageIds.forEach(id => messagesInRounds.add(id));
+    });
+    
+    // 构建消息索引映射
+    const messageIndexMap = new Map<string, number>();
+    messageIds.forEach((id, index) => {
+      messageIndexMap.set(id, index);
+    });
+    
+    // 遍历所有可见消息，按照原始顺序处理
+    visibleMessages.forEach(item => {
+      // 如果消息在某个轮次中，检查是否需要插入该轮次容器
+      const messageRound = allRounds.find(r => r.messageIds.includes(item.messageId));
+      
+      if (messageRound) {
+        // 检查该轮次容器是否已经添加
+        const roundKey = `round_${messageRound.iteration}`;
+        const alreadyAdded = result.some(r => r.type === 'round' && r.iteration === messageRound.iteration);
+        
+        if (!alreadyAdded) {
+          // 第一次遇到该轮次的消息，添加轮次容器
+          result.push({
+            type: 'round',
+            iteration: messageRound.iteration,
+            messageIds: messageRound.messageIds,
+            collapsed: messageRound.collapsed,
+          });
+        }
+      } else {
+        // 不在轮次中的普通消息，直接添加
+        result.push({
+          type: 'normal',
+          messageId: item.messageId,
+          message: item.message,
+          startOfResearch: item.startOfResearch,
+        });
+      }
+    });
+    
+    return result;
+  }, [visibleMessages, allRounds, messageIds]);
+
   return (
     <ScrollContainer
       className={cn("flex h-full w-full flex-col overflow-hidden", className)}
@@ -131,25 +197,509 @@ export function MessageListView({
       ref={scrollContainerRef}
     >
       <ul className="flex flex-col">
-        {visibleMessages.map(({ messageId, message, startOfResearch }) => (
-          <MessageListItem
-            key={messageId}
-            messageId={messageId}
-            message={message}
-            startOfResearch={startOfResearch}
-            waitForFeedback={waitingForFeedbackMessageId === messageId}
-            interruptMessage={interruptMessage}
-            onFeedback={onFeedback}
-            onSendMessage={onSendMessage}
-            onToggleResearch={handleToggleResearch}
-          />
-        ))}
+        {organizedMessages.map((item, index) => {
+          if (item.type === 'round') {
+            // 渲染轮次容器
+            return (
+              <IterativeResearchRoundContainer
+                key={`round_${item.iteration}`}
+                iteration={item.iteration!}
+                messageIds={item.messageIds!}
+                collapsed={item.collapsed!}
+                onFeedback={onFeedback}
+                onSendMessage={onSendMessage}
+              />
+            );
+          } else {
+            // 渲染普通消息
+            return (
+              <MessageListItem
+                key={item.messageId!}
+                messageId={item.messageId!}
+                message={item.message!}
+                startOfResearch={item.startOfResearch!}
+                waitForFeedback={waitingForFeedbackMessageId === item.messageId}
+                interruptMessage={interruptMessage}
+                onFeedback={onFeedback}
+                onSendMessage={onSendMessage}
+                onToggleResearch={handleToggleResearch}
+              />
+            );
+          }
+        })}
         <div className="flex h-8 w-full shrink-0"></div>
       </ul>
       {responding && (noOngoingResearch || !ongoingResearchIsOpen) && (
         <LoadingAnimation className="ml-4" />
       )}
     </ScrollContainer>
+  );
+}
+
+function MessageBubble({
+  className,
+  message,
+  children,
+}: {
+  className?: string;
+  message: Message;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "group flex w-auto max-w-[90vw] flex-col rounded-2xl px-4 py-3 break-words",
+        message.role === "user" && "bg-brand rounded-ee-none",
+        message.role === "assistant" && "bg-card rounded-es-none",
+        className,
+      )}
+      style={{ wordBreak: "break-all" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function IterativeResearchRoundContainer({
+  iteration,
+  messageIds,
+  collapsed,
+  onFeedback,
+  onSendMessage,
+}: {
+  iteration: number;
+  messageIds: string[];
+  collapsed: boolean;
+  onFeedback?: (feedback: { option: Option }) => void;
+  onSendMessage?: (
+    message: string,
+    options?: { interruptFeedback?: string },
+  ) => void;
+}) {
+  const t = useTranslations("chat.research");
+  const [isOpen, setIsOpen] = useState(!collapsed);
+  const messages = useStore((state) => state.messages);
+  
+  // 监听collapsed状态变化，自动折叠
+  React.useEffect(() => {
+    if (collapsed) {
+      setIsOpen(false);
+    }
+  }, [collapsed]);
+  
+  // 检查是否有消息还在流式传输
+  const hasStreaming = useMemo(() => {
+    return messageIds.some(id => {
+      const msg = messages.get(id);
+      return msg?.isStreaming;
+    });
+  }, [messageIds, messages]);
+  
+  return (
+    <motion.li
+      className="mt-4"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{ transition: "all 0.2s ease-out" }}
+      transition={{
+        duration: 0.2,
+        ease: "easeOut",
+      }}
+    >
+      <div className="w-full px-4">
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className={cn(
+                "h-auto w-full justify-start rounded-xl border px-6 py-4 text-left transition-all duration-200 mb-3",
+                "hover:bg-accent hover:text-accent-foreground",
+                hasStreaming
+                  ? "border-primary/30 bg-primary/10 shadow-md"
+                  : "border-border bg-card/50",
+              )}
+            >
+              <div className="flex w-full items-center gap-3">
+                <span
+                  className={cn(
+                    "text-lg leading-none font-bold transition-colors duration-200",
+                    hasStreaming ? "text-primary" : "text-foreground",
+                  )}
+                >
+                  第{iteration}轮研究
+                </span>
+                {hasStreaming && <LoadingAnimation className="ml-2 scale-75" />}
+                <div className="flex-grow" />
+                {isOpen ? (
+                  <ChevronDown
+                    size={18}
+                    className="text-muted-foreground transition-transform duration-200"
+                  />
+                ) : (
+                  <ChevronRight
+                    size={18}
+                    className="text-muted-foreground transition-transform duration-200"
+                  />
+                )}
+              </div>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-up-2 data-[state=open]:slide-down-2">
+            <div className="flex flex-col gap-3">
+              {messageIds.map((messageId) => {
+                const message = messages.get(messageId);
+                if (!message) return null;
+                return (
+                  <IterativeResearchCard key={messageId} message={message} />
+                );
+              })}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+    </motion.li>
+  );
+}
+
+function IterativeResearchCard({ message }: { message: Message }) {
+  const t = useTranslations("chat.research");
+  const [isOpen, setIsOpen] = useState(true);
+  const [hasAutoCollapsed, setHasAutoCollapsed] = useState(false);
+  
+  // 从全局 store 中获取消息的显示状态（用于恢复折叠框状态）
+  const displayState = useMessageDisplayState(message.id);
+  
+  // 使用专门的选择器获取当前消息的搜索状态，确保每个卡片独立
+  const messageSearchStatus = useMessageSearchStatus(message.id);
+  // 监听消息列表的变化
+  const messageIds = useMessageIds();
+  const currentMessageIndex = messageIds.indexOf(message.id);
+
+  // 监听 tag 变化，一旦出现 round_progress 就记录到 store（最高优先级）
+  React.useEffect(() => {
+    if (message.tag === "round_progress" && !displayState.hasShownRoundProgress) {
+      useStore.getState().updateMessageDisplayState(message.id, {
+        hasShownRoundProgress: true,
+        preservedRoundText: message.roundText,
+      });
+    }
+  }, [message.tag, message.roundText, message.id, displayState.hasShownRoundProgress]);
+
+  // 监听 tag 变化，一旦出现 searching 就记录到 store
+  React.useEffect(() => {
+    if (message.tag === "searching" && !displayState.hasShownSearching) {
+      useStore.getState().updateMessageDisplayState(message.id, {
+        hasShownSearching: true,
+      });
+    }
+  }, [message.tag, message.id, displayState.hasShownSearching]);
+  
+  // 监听 tag 变化，一旦出现 crawling 就记录到 store
+  React.useEffect(() => {
+    if (message.tag === "crawling" && !displayState.hasShownCrawling) {
+      useStore.getState().updateMessageDisplayState(message.id, {
+        hasShownCrawling: true,
+      });
+    }
+  }, [message.tag, message.id, displayState.hasShownCrawling]);
+
+  // 当消息完成流式传输时自动折叠
+  React.useEffect(() => {
+    if (!message.isStreaming && !hasAutoCollapsed) {
+      setIsOpen(false);
+      setHasAutoCollapsed(true);
+    }
+  }, [message.isStreaming, hasAutoCollapsed]);
+
+  // 当有新消息出现时，自动折叠未完成的迭代研究对话框
+  React.useEffect(() => {
+    // 检查是否有后续消息
+    if (currentMessageIndex !== -1 && currentMessageIndex < messageIds.length - 1) {
+      // 如果当前消息还在流式传输中，则折叠它
+      if (message.isStreaming && !hasAutoCollapsed) {
+        setIsOpen(false);
+        setHasAutoCollapsed(true);
+      }
+    }
+  }, [messageIds.length, currentMessageIndex, message.isStreaming, hasAutoCollapsed]);
+
+  // 查找所有搜索工具调用
+  const allSearchTools = useMemo(() => {
+    if (!message.toolCalls) return [];
+    // 查找所有搜索工具（web_search）
+    return message.toolCalls.filter(
+      (toolCall) => toolCall.name === "web_search"
+    );
+  }, [message.toolCalls]);
+  
+  // 查找所有爬虫工具调用
+  const allCrawlTools = useMemo(() => {
+    if (!message.toolCalls) return [];
+    // 查找所有爬虫工具（crawl_tool）
+    return message.toolCalls.filter(
+      (toolCall) => toolCall.name === "crawl_tool"
+    );
+  }, [message.toolCalls]);
+  
+  // 从所有已完成的搜索工具中提取完整的搜索关键字
+  const completedSearchKeywords = useMemo(() => {
+    if (allSearchTools.length === 0) return [];
+    
+    const keywords: string[] = [];
+    
+    allSearchTools.forEach((toolCall) => {
+      // 只处理已经完成的工具调用（有result或argsChunks已完整）
+      if (!toolCall.args?.query) return;
+      
+      const query = toolCall.args.query as string;
+      if (query && !keywords.includes(query)) {
+        keywords.push(query);
+      }
+    });
+    
+    return keywords;
+  }, [allSearchTools]);
+  
+  // 从所有已完成的爬虫工具中提取完整的URL
+  const completedCrawlUrls = useMemo(() => {
+    if (allCrawlTools.length === 0) return [];
+    
+    const urls: string[] = [];
+    
+    allCrawlTools.forEach((toolCall) => {
+      // 只处理已经完成的工具调用
+      if (!toolCall.args?.url) return;
+      
+      const url = toolCall.args.url as string;
+      if (url && !urls.includes(url)) {
+        urls.push(url);
+      }
+    });
+    
+    return urls;
+  }, [allCrawlTools]);
+  
+  // 获取当前正在流式传输的搜索关键词（用于实时显示）
+  const currentStreamingKeywords = useMemo(() => {
+    if (!message.isStreaming || allSearchTools.length === 0) return [];
+    
+    const keywords: string[] = [];
+    
+    allSearchTools.forEach((toolCall) => {
+      // 只处理正在流式传输的工具调用（有argsChunks但可能还没result）
+      if (!toolCall.argsChunks || toolCall.argsChunks.length === 0) return;
+      
+      try {
+        // 尝试解析已有的 args chunks 为 JSON
+        const argsString = toolCall.argsChunks.join("");
+        // 使用正则提取 query 字段的值（可能是不完整的JSON）
+        const queryMatch = argsString.match(/"query"\s*:\s*"([^"]*)"/);
+        if (queryMatch && queryMatch[1] && !keywords.includes(queryMatch[1])) {
+          keywords.push(queryMatch[1]);
+        }
+      } catch {
+        // 忽略解析错误
+      }
+    });
+    
+    return keywords;
+  }, [allSearchTools, message.isStreaming]);
+  
+  // 获取当前正在流式传输的爬虫URL（用于实时显示）
+  const currentStreamingUrls = useMemo(() => {
+    if (!message.isStreaming || allCrawlTools.length === 0) return [];
+    
+    const urls: string[] = [];
+    
+    allCrawlTools.forEach((toolCall) => {
+      // 只处理正在流式传输的工具调用
+      if (!toolCall.argsChunks || toolCall.argsChunks.length === 0) return;
+      
+      try {
+        const argsString = toolCall.argsChunks.join("");
+        // 使用正则提取 url 字段的值
+        const urlMatch = argsString.match(/"url"\s*:\s*"([^"]*)"/);
+        if (urlMatch && urlMatch[1] && !urls.includes(urlMatch[1])) {
+          urls.push(urlMatch[1]);
+        }
+      } catch {
+        // 忽略解析错误
+      }
+    });
+    
+    return urls;
+  }, [allCrawlTools, message.isStreaming]);
+  
+  // 保留已完成的搜索关键词到 store
+  React.useEffect(() => {
+    if (completedSearchKeywords.length > 0) {
+      useStore.getState().updateMessageDisplayState(message.id, {
+        preservedSearchKeywords: completedSearchKeywords,
+      });
+    }
+  }, [completedSearchKeywords, message.id]);
+    
+  // 保留已完成的爬虯URL到 store
+  React.useEffect(() => {
+    if (completedCrawlUrls.length > 0) {
+      useStore.getState().updateMessageDisplayState(message.id, {
+        preservedCrawlUrls: completedCrawlUrls,
+      });
+    }
+  }, [completedCrawlUrls, message.id]);
+
+  // 确定显示的文本 - 优先级：round_progress > crawling > searching > 其他状态
+  const displayText = useMemo(() => {
+    // 最高优先级：如果曾经显示过 round_progress（第X轮研究进展），固定显示该状态
+    if (displayState.hasShownRoundProgress) {
+      return displayState.preservedRoundText || t("iterativeResearchProcess");
+    }
+    
+    // 第二优先级：如果曾经显示过 crawling，一直保持显示 crawling（crawling 优先级高于 searching）
+    if (displayState.hasShownCrawling) {
+      return t("crawling");
+    }
+    
+    // 第三优先级：如果曾经显示过 searching，一直保持显示 searching
+    if (displayState.hasShownSearching) {
+      return t("searching");
+    }
+    
+    // 优先使用 message.tag
+    if (message.tag && message.isStreaming) {
+      switch (message.tag) {
+        case "routing":
+          return t("routing");
+        case "planning":
+          return t("planning");
+        case "searching":
+          return t("searching");
+        case "crawling":
+          return t("crawling");
+        case "iterative_answering":
+          return t("iterativeAnswering");
+        case "reporting":
+          return t("reporting");
+        case "waiting_for_feedback":
+          return t("waitingForFeedback");
+        case "error":
+          return t("error");
+        case "answering":
+          return t("answering");
+        case "round_progress":
+          return message.roundText || t("iterativeResearchProcess"); // 显示"第X轮研究进展"
+        default:
+          break;
+      }
+    }
+    
+    // 降级：检查当前消息是否正在进行搜索（从 messageSearchStatus）
+    if (messageSearchStatus && message.isStreaming) {
+      return t("searching"); // "正在搜索"
+    }
+    
+    // 默认显示“正在研究”
+    return t("iterativeResearchProcess"); // "正在研究"
+  }, [displayState.hasShownRoundProgress, displayState.preservedRoundText, displayState.hasShownCrawling, displayState.hasShownSearching, message.tag, message.roundText, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
+  
+  return (
+    <div className="w-full">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className={cn(
+              "h-auto w-full justify-start rounded-xl border px-6 py-4 text-left transition-all duration-200",
+              "hover:bg-accent hover:text-accent-foreground",
+              message.isStreaming
+                ? "border-primary/20 bg-primary/5 shadow-sm"
+                : "border-border bg-card",
+            )}
+          >
+            <div className="flex w-full items-center gap-3">
+              <Lightbulb
+                size={18}
+                className={cn(
+                  "shrink-0 transition-colors duration-200",
+                  message.isStreaming ? "text-primary" : "text-muted-foreground",
+                )}
+              />
+              <span
+                className={cn(
+                  "leading-none font-semibold transition-colors duration-200",
+                  message.isStreaming ? "text-primary" : "text-foreground",
+                )}
+              >
+                {displayText}
+              </span>
+              {/* 显示搜索关键词 */}
+              {(currentStreamingKeywords.length > 0 || displayState.preservedSearchKeywords.length > 0) && (
+                <span
+                  className={cn(
+                    "ml-2 max-w-[500px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal transition-colors duration-200",
+                    message.isStreaming ? "text-primary/80" : "text-muted-foreground",
+                  )}
+                >
+                  : {(currentStreamingKeywords.length > 0 ? currentStreamingKeywords : displayState.preservedSearchKeywords).join(" | ")}
+                </span>
+              )}
+              {/* 显示爬虯URL */}
+              {(currentStreamingUrls.length > 0 || displayState.preservedCrawlUrls.length > 0) && (
+                <span
+                  className={cn(
+                    "ml-2 max-w-[500px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal transition-colors duration-200",
+                    message.isStreaming ? "text-primary/80" : "text-muted-foreground",
+                  )}
+                >
+                  : {(currentStreamingUrls.length > 0 ? currentStreamingUrls : displayState.preservedCrawlUrls).join(" | ")}
+                </span>
+              )}
+              {message.isStreaming && <LoadingAnimation className="ml-2 scale-75" />}
+              <div className="flex-grow" />
+              {isOpen ? (
+                <ChevronDown
+                  size={16}
+                  className="text-muted-foreground transition-transform duration-200"
+                />
+              ) : (
+                <ChevronRight
+                  size={16}
+                  className="text-muted-foreground transition-transform duration-200"
+                />
+              )}
+            </div>
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-up-2 data-[state=open]:slide-down-2 mt-3">
+          <Card
+            className={cn(
+              "transition-all duration-200",
+              message.isStreaming ? "border-primary/20 bg-primary/5" : "border-border",
+            )}
+          >
+            <CardContent>
+              <div className="flex h-40 w-full overflow-y-auto">
+                <ScrollContainer
+                  className="flex h-full w-full flex-col overflow-hidden"
+                  scrollShadow={false}
+                  autoScrollToBottom={message.isStreaming}
+                >
+                  <Markdown
+                    className={cn(
+                      "prose dark:prose-invert max-w-none transition-colors duration-200",
+                      message.isStreaming ? "prose-primary" : "opacity-80",
+                    )}
+                    animated={message.isStreaming}
+                  >
+                    {message.content}
+                  </Markdown>
+                </ScrollContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
 }
 
@@ -206,6 +756,13 @@ function MessageListItem({
         />
       </div>
     );
+  } else if (message.agent === "iterative_research_node") {
+    // 特殊处理迭代研究节点的消息
+    content = (
+      <div className="w-full px-4">
+        <IterativeResearchCard message={message} />
+      </div>
+    );
   } else {
     content = message.content ? (
       <div
@@ -238,7 +795,7 @@ function MessageListItem({
   
   return (
     <motion.li
-      className="mt-10"
+      className="mt-4"
       key={messageId}
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
@@ -250,30 +807,6 @@ function MessageListItem({
     >
       {content}
     </motion.li>
-  );
-}
-
-function MessageBubble({
-  className,
-  message,
-  children,
-}: {
-  className?: string;
-  message: Message;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "group flex w-auto max-w-[90vw] flex-col rounded-2xl px-4 py-3 break-words",
-        message.role === "user" && "bg-brand rounded-ee-none",
-        message.role === "assistant" && "bg-card rounded-es-none",
-        className,
-      )}
-      style={{ wordBreak: "break-all" }}
-    >
-      {children}
-    </div>
   );
 }
 

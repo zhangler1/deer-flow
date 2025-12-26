@@ -15,7 +15,9 @@ export interface Message {
     | "podcast"
     | "router"
     | "direct_answer_node"
-    | "simple_search_node";
+    | "simple_search_node"
+    | "iterative_research_node"
+    | "iterative_reporter_node";
   role: MessageRole;
   isStreaming?: boolean;
   content: string;
@@ -27,6 +29,8 @@ export interface Message {
   finishReason?: "stop" | "interrupt" | "tool_calls";
   interruptFeedback?: string;
   resources?: Array<Resource>;
+  tag?: "routing" | "planning" | "searching" | "iterative_answering" | "reporting" | "waiting_for_feedback" | "error" | "answering" | "round_progress";
+  roundText?: string;
 }
 
 export interface Option {

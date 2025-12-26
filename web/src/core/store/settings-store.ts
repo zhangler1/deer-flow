@@ -16,7 +16,9 @@ const DEFAULT_SETTINGS: SettingsState = {
     maxStepNum: 3,
     maxSearchResults: 3,
     searchEngine: "custom_search",
+    customSearchRepository: undefined,
     reportStyle: "academic",
+    forceRoutingPath: undefined, // 添加调试模式路由路径设置
   },
   mcp: {
     servers: [],
@@ -34,6 +36,7 @@ export type SettingsState = {
     searchEngine: "tavily" | "duckduckgo" | "brave_search" | "arxiv" | "wikipedia" | "custom_search";
     customSearchRepository?: string;
     reportStyle: "academic" | "popular_science" | "news" | "social_media";
+    forceRoutingPath?: "direct_answer" | "simple_search" | "iterative_research" | "deep_research"; // 限制调试模式路由路径选项
   };
   mcp: {
     servers: MCPServerMetadata[];
@@ -131,6 +134,7 @@ export const getChatStreamSettings = () => {
     searchEngine: general.searchEngine, // 添加搜索引擎设置
     customSearchRepository: general.customSearchRepository, // 添加自定义搜索仓库设置
     mcpSettings,
+    forceRoutingPath: general.forceRoutingPath, // 添加调试模式路由路径设置
   };
 };
 

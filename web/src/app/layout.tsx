@@ -4,7 +4,8 @@
 import "~/styles/globals.css";
 
 import { type Metadata } from "next";
-import { Geist } from "next/font/google";
+// 暂时注释掉 next/font，使用 CSS 中定义的系统字体
+// import { Geist } from "next/font/google";
 import Script from "next/script";
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
@@ -21,10 +22,11 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
-});
+// 暂时注释掉 Geist 字体配置
+// const geist = Geist({
+//   subsets: ["latin"],
+//   variable: "--font-geist-sans",
+// });
 
 export default async function RootLayout({
   children,
@@ -33,7 +35,8 @@ export default async function RootLayout({
   const messages = await getMessages();
   
   return (
-    <html lang={locale} className={`${geist.variable}`} suppressHydrationWarning>
+    // 移除 geist.variable，使用系统默认字体
+    <html lang={locale} suppressHydrationWarning>
       <head>
         {/* Define isSpace function globally to fix markdown-it issues with Next.js + Turbopack
           https://github.com/markdown-it/markdown-it/issues/1082#issuecomment-2749656365 */}

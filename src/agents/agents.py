@@ -25,7 +25,7 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
         logger.info(f"   [{i}] {tool_name}: {tool_desc}")
     logger.info(f"🔧 TOOLS_COUNT | 工具总数: {len(tools)}")
     
-    if not tools:
+    if len(tools) == 0:
         logger.warning(f"⚠️  NO_TOOLS | {agent_name} | 警告：没有工具被传递给Agent！")
     
     llm = get_llm_by_type(AGENT_LLM_MAP[agent_type])

@@ -7,6 +7,7 @@ import json
 from langchain_core.messages.base import BaseMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 import logging
+import re
 import time
 import uuid
 from typing import Annotated, Any, List, cast, Dict,Optional
@@ -73,6 +74,14 @@ enhanced_logger = get_enhanced_logger("deer-flow.api")
 
 # Track active tool calls for search status
 _active_search_calls: Dict[str, Dict[str, str]] = {}
+
+# Track accumulated content for each message to detect round progress
+# Key: message_id, Value: accumulated content string
+_message_content_buffer: Dict[str, str] = {}
+
+# Track detected round progress for each message
+# Key: message_id, Value: tuple (tag, matched_text)
+_round_progress_detected: Dict[str, tuple] = {}
 
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
 
@@ -175,6 +184,79 @@ def _get_agent_name(agent, message_metadata):
     return agent_name
 
 
+def _determine_message_tag(agent_name, message_metadata, message_chunk):
+    """Determine the tag for the message based on agent, node, and message type."""
+    langgraph_node = message_metadata.get("langgraph_node", "")
+    
+    # Check if round progress has been detected for this message
+    message_id = message_chunk.id
+    if message_id in _round_progress_detected:
+        return _round_progress_detected[message_id]
+    
+    # Accumulate content and check for round progress pattern ("第X轮研究进展")
+    # Only check when content buffer has accumulated at least 30 characters
+    if hasattr(message_chunk, 'content') and message_chunk.content:
+        # Initialize or update content buffer for this message
+        if message_id not in _message_content_buffer:
+            _message_content_buffer[message_id] = ""
+        _message_content_buffer[message_id] += message_chunk.content
+        
+        # Only attempt matching when we have accumulated enough content (>=30 chars)
+        accumulated_content = _message_content_buffer[message_id]
+        if len(accumulated_content) >= 30:
+            round_match = re.search(r'第(\d+)轮研究进展', accumulated_content)
+            if round_match:
+                # Cache the detected result
+                result = ("round_progress", round_match.group(0))
+                _round_progress_detected[message_id] = result
+                # Clear buffer after detection to save memory
+                _message_content_buffer.pop(message_id, None)
+                return result
+    
+    # Check for routing phase
+    if agent_name in ("router", "direct_answer_node", "simple_search_node", "domain_knowledge_node"):
+        return "routing"
+    
+    # Check for planning phase
+    if agent_name == "planner" or langgraph_node == "planner":
+        return "planning"
+    
+    # Check for reporting phase
+    if agent_name == "reporter" or langgraph_node == "reporter" or agent_name == "iterative_reporter_node":
+        return "reporting"
+    
+    # Check for iterative research node - default to answering unless tool calls are involved
+    if agent_name == "iterative_research_node":
+        # If there are tool calls or tool call chunks, don't set tag here
+        # (it will be set in _process_message_chunk when handling tool calls)
+        if hasattr(message_chunk, 'tool_calls') and message_chunk.tool_calls:
+            return None  # Will be set to "searching" in tool_calls handling
+        if hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
+            return None  # Will be set to "searching" in tool_call_chunks handling
+        # Check if has reasoning content - indicates analyzing
+        if hasattr(message_chunk, 'additional_kwargs') and message_chunk.additional_kwargs.get("reasoning_content"):
+            return "iterative_answering"
+        # Default to answering for iterative research
+        return "answering"
+    
+    # Check for researcher - could be searching or analyzing
+    if agent_name == "researcher" or langgraph_node == "researcher":
+        # If there are tool calls, tag will be set in tool_calls handling
+        if hasattr(message_chunk, 'tool_calls') and message_chunk.tool_calls:
+            return None
+        if hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
+            return None
+        # Otherwise, it's analyzing/answering
+        return "iterative_answering"
+    
+    # Check for coder
+    if agent_name == "coder" or langgraph_node == "coder":
+        return "answering"
+    
+    # Default - no specific tag
+    return None
+
+
 def _create_event_stream_message(
     message_chunk, message_metadata, thread_id, agent_name
 ):
@@ -198,9 +280,23 @@ def _create_event_stream_message(
         ]
 
     if message_chunk.response_metadata.get("finish_reason"):
-        event_stream_message["finish_reason"] = message_chunk.response_metadata.get(
-            "finish_reason"
-        )
+        finish_reason = message_chunk.response_metadata.get("finish_reason")
+        event_stream_message["finish_reason"] = finish_reason
+        
+        # Clean up content buffers when message finishes
+        message_id = message_chunk.id
+        _message_content_buffer.pop(message_id, None)
+        _round_progress_detected.pop(message_id, None)
+    
+    # Add tag based on agent and node information
+    tag = _determine_message_tag(agent_name, message_metadata, message_chunk)
+    if tag:
+        # Check if tag is a tuple (for round_progress with matched text)
+        if isinstance(tag, tuple):
+            event_stream_message["tag"] = tag[0]
+            event_stream_message["round_text"] = tag[1]  # Add the matched "第X轮研究进展" text
+        else:
+            event_stream_message["tag"] = tag
 
     return event_stream_message
 
@@ -246,6 +342,7 @@ def _create_interrupt_event(thread_id, event_data):
                 "role": "assistant",
                 "content": content,
                 "finish_reason": "interrupt",
+                "tag": "waiting_for_feedback",  # Add tag for interrupt events
                 "options": [
                     {"text": "Edit plan", "value": "edit_plan"},
                     {"text": "Start research", "value": "accepted"},
@@ -263,6 +360,7 @@ def _create_interrupt_event(thread_id, event_data):
                 "role": "assistant",
                 "content": "Plan ready for review",
                 "finish_reason": "interrupt",
+                "tag": "waiting_for_feedback",  # Add tag for interrupt events
                 "options": [
                     {"text": "Edit plan", "value": "edit_plan"},
                     {"text": "Start research", "value": "accepted"},
@@ -291,6 +389,27 @@ def _process_initial_messages(message, thread_id):
 async def _process_message_chunk(message_chunk, message_metadata, thread_id, agent):
     """Process a single message chunk and yield appropriate events."""
     agent_name = _get_agent_name(agent, message_metadata)
+    
+    # 检测是否为节点跳转事件消息
+    if (hasattr(message_chunk, 'name') and message_chunk.name == "node_transition_event" and 
+        hasattr(message_chunk, 'additional_kwargs') and 'node_transition' in message_chunk.additional_kwargs):
+        
+        node_transition = message_chunk.additional_kwargs['node_transition']
+        logger.info(f"[节点跳转] 从消息中检测到跳转事件: {node_transition}")
+        
+        event_payload = {
+            "thread_id": thread_id,
+            "from": node_transition.get("from"),
+            "to": node_transition.get("to"),
+            "iteration": node_transition.get("iteration"),
+            "reason": node_transition.get("reason", ""),
+        }
+        logger.info(f"[SSE调试] 即将发送 node_transition 事件，payload: {event_payload}")
+        sse_event = _make_event("node_transition", event_payload)
+        logger.info(f"[SSE调试] 生成的 SSE 事件内容: {sse_event[:200]}...")
+        yield sse_event
+        return  # 不再处理这条消息
+    
     event_stream_message = _create_event_stream_message(
         message_chunk, message_metadata, thread_id, agent_name
     )
@@ -322,6 +441,18 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
                 message_chunk.tool_call_chunks
             )
+            
+            # Set tag based on tool name
+            # Default to searching, but check for specific tool types
+            tag = "searching"  # default for web_search
+            for tool_call in message_chunk.tool_calls:
+                tool_name = tool_call.get("name", "")
+                if tool_name == "crawl_tool":
+                    tag = "crawling"
+                    break
+                elif tool_name == "web_search":
+                    tag = "searching"
+            event_stream_message["tag"] = tag
             
             # Check if this is a web_search tool call and emit search_status event
             for tool_call in message_chunk.tool_calls:
@@ -368,6 +499,23 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
                 message_chunk.tool_call_chunks
             )
+            
+            # Check tool_call_chunk name and set tag accordingly
+            for chunk in message_chunk.tool_call_chunks:
+                chunk_name = None
+                # Support both object attribute and dict format
+                if isinstance(chunk, dict):
+                    chunk_name = chunk.get("name", "")
+                elif hasattr(chunk, "name"):
+                    chunk_name = getattr(chunk, "name", "")
+                
+                if chunk_name == "web_search":
+                    event_stream_message["tag"] = "searching"
+                    break
+                elif chunk_name == "crawl_tool":
+                    event_stream_message["tag"] = "crawling"
+                    break
+            
             yield _make_event("tool_call_chunks", event_stream_message)
         else:
             # AI Message - Raw message tokens
@@ -386,8 +534,42 @@ async def _stream_graph_events(
             subgraphs=True,
         ):
             if isinstance(event_data, dict):
+                
+                # 1) 中断事件优先处理
                 if "__interrupt__" in event_data:
                     yield _create_interrupt_event(thread_id, event_data)
+                    continue
+
+                # 2) 处理迭代研究节点跳转事件（不通过 update.messages，而是独立事件）
+                node_transition = event_data.get("node_transition")
+                if node_transition:
+                    # 这里 node_transition 由 iterative_research_node 写入
+                    # 结构示例：
+                    # {
+                    #   "from": "iterative_research_node",
+                    #   "to": "iterative_research_node" | "iterative_reporter_node",
+                    #   "iteration": 3,
+                    #   "reason": "continue" | "finish",
+                    # }
+                    iteration = node_transition.get("iteration")
+                    from_node = node_transition.get("from")
+                    to_node = node_transition.get("to")
+                    reason = node_transition.get("reason", "")
+
+                    event_payload = {
+                        "thread_id": thread_id,
+                        "from": from_node,
+                        "to": to_node,
+                        "iteration": iteration,
+                        "reason": reason,
+                    }
+                    logger.info(f"[SSE调试] 即将发送 node_transition 事件，payload: {event_payload}")
+                    # 发送一个独立的 SSE 事件，事件名可自定义，例如 node_transition
+                    sse_event = _make_event("node_transition", event_payload)
+                    logger.info(f"[SSE调试] 生成的 SSE 事件内容: {sse_event[:200]}...")
+                    yield sse_event
+
+                # 其他 update 目前不需要转成事件，直接忽略
                 continue
 
             message_chunk, message_metadata = cast(
@@ -454,8 +636,10 @@ async def _astream_workflow_generator(
         "research_topic": messages[-1]["content"] if messages else "",
         "system_context": system_context,  # 将系统背景传递给工作流
         "force_routing_path": force_routing_path,  # 🐛 调试模式
+        # 确保迭代研究的状态字段被正确初始化
+        "iteration_count": 0,
+        "iteration_history": [],
     }
-
     if not auto_accepted_plan and interrupt_feedback:
         resume_msg = f"[{interrupt_feedback}]"
         if messages:
@@ -1003,18 +1187,20 @@ async def _full_workflow_openai_generator(
                         # - coordinator: 深度研究协调/追问
                         # - direct_answer_assistant: 直接回答
                         # - simple_search_assistant: 简单检索
+                        # - iterative_research_node: 迭代研究节点
+                        # - iterative_reporter_node: 迭代研究报告节点
                         agent = event_data.get("agent", "")
                         allowed_agents = [
                             "reporter",                    # 深度研究报告
                             "coordinator",                # 深度研究协调
                             "direct_answer_node",         # 直接回答节点
                             "simple_search_node",         # 简单检索节点
-                            "iterative_research_node"    # 迭代研究节点
+                            "iterative_research_node",    # 迭代研究节点
+                            "iterative_reporter_node"     # 迭代研究报告节点
                         ]
                         if agent not in allowed_agents:
                             enhanced_logger.logger.debug(f"⚠️ FILTERED_AGENT | 过滤非输出agent: {agent}")
-                            continue
-                        
+                            continue                        
                         enhanced_logger.logger.debug(f"✅ PROCESSING_AGENT | 处理agent: {agent} | event_type: {event_type}")
                         
                         if event_type == "message_chunk" and "content" in event_data:
