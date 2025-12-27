@@ -282,16 +282,17 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
   );
   const title = useMemo(() => __pageCache.get(url), [url]);
   
-  // 解析爬虫结果，提取预览内容
+  // 解析爬虫结果，提取预览内容和摘要
   const crawlResult = useMemo(() => {
     if (!toolCall.result) return null;
     try {
       const result = JSON.parse(toolCall.result);
-      // 如果标题是“未命名文档”，优先使用缓存中的标题
+      // 如果标题是"未命名文档"，优先使用缓存中的标题
       const resultTitle = result.title === '未命名文档' || !result.title ? (title || result.url) : result.title;
       return {
         title: resultTitle,
         preview: result.preview,
+        summary: result.summary,
         url: result.url,
       };
     } catch {
@@ -344,6 +345,20 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
         >
           <div className="line-clamp-3">
             {crawlResult.preview}
+          </div>
+        </motion.div>
+      )}
+      
+      {/* 显示AI摘要（放在文章概括之后）*/}
+      {crawlResult?.summary && (
+        <motion.div
+          className="mt-2 max-w-2xl rounded-md bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-sm border border-blue-200 dark:border-blue-800"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
+        >
+          <div className="text-blue-900 dark:text-blue-100 leading-relaxed">
+            {crawlResult.summary}
           </div>
         </motion.div>
       )}

@@ -261,31 +261,6 @@ export function InputBox({
               交心搜索
             </Button>
           </Tooltip>
-          {/* 自定义搜索仓库选择器 */}
-          {searchEngine === "custom_search" && config?.custom_search_repositories && config.custom_search_repositories.length > 0 && (
-            <Tooltip title={tSettings("customSearchRepositoryDescription")}>
-              <Select 
-                value={customSearchRepository || ""} 
-                onValueChange={handleCustomSearchRepositoryChange}
-              >
-                <SelectTrigger className="w-auto h-8 px-3 gap-2 border-muted text-sm">
-                  <SelectValue placeholder={tSettings("selectRepository")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {config.custom_search_repositories.map((repo) => (
-                    <SelectItem key={repo.id} value={repo.id}>
-                      <div className="flex flex-col items-start">
-                        <span className="text-sm">{repo.name}</span>
-                        <span className="text-xs text-muted-foreground truncate max-w-32">
-                          {repo.description}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Tooltip>
-          )}
 
           <Tooltip
             className="max-w-60"
@@ -318,11 +293,11 @@ export function InputBox({
         <div className="flex shrink-0 items-center gap-2">
           <Tooltip title={t("enhancePrompt")}>
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
               className={cn(
-                "hover:bg-accent h-10 w-10",
-                isEnhancing && "animate-pulse",
+                "h-10 w-10 rounded-2xl",
+                isEnhancing && "!border-brand !text-brand animate-pulse",
               )}
               onClick={handleEnhancePrompt}
               disabled={isEnhancing || currentPrompt.trim() === ""}
@@ -345,7 +320,7 @@ export function InputBox({
             >
               {responding ? (
                 <div className="flex h-10 w-10 items-center justify-center">
-                  <div className="bg-foreground h-4 w-4 rounded-sm opacity-70" />
+                  <div className="bg-foreground h-4 w-4 rounded-sm opacity-70 jiaoxin-stop-square" />
                 </div>
               ) : (
                 <ArrowUp />

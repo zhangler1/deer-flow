@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun, Palette } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Button } from "~/components/ui/button";
@@ -49,6 +49,16 @@ export function ThemeToggle() {
             )}
           >
             Dark
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("jiaoxin")}>
+          <Palette className="mr-2 h-4 w-4" />
+          <span
+            className={cn(
+              theme === "jiaoxin" ? "font-bold" : "text-muted-foreground",
+            )}
+          >
+            交心
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme("sunset")}>

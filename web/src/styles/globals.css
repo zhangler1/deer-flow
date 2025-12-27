@@ -223,12 +223,208 @@
   --brand: #ff7a59;
 }
 
+.theme-jiaoxin {
+  /* 背景色：淡雅的淡紫灰色 */
+  --app-background: rgb(243, 242, 248);
+  --background: rgb(243, 242, 248);
+  --foreground: rgba(30, 30, 40, 0.88);
+  
+  /* 卡片色：纯白卡片在淡紫背景上 */
+  --card: rgb(255, 255, 255);
+  --card-foreground: rgba(30, 30, 40, 0.88);
+  
+  /* 弹出层：与卡片保持一致 */
+  --popover: rgb(255, 255, 255);
+  --popover-foreground: rgba(30, 30, 40, 0.88);
+  
+  /* 主色：交心蓝 */
+  --primary: rgb(2, 101, 220);
+  --primary-foreground: rgb(255, 255, 255);
+  
+  /* 次要色：浅蓝灰色 */
+  --secondary: rgb(228, 235, 245);
+  --secondary-foreground: rgb(2, 101, 220);
+  
+  /* 柔和色：浅蓝紫色 */
+  --muted: rgb(235, 237, 245);
+  --muted-foreground: rgb(100, 110, 135);
+  
+  /* 强调色：浅灰色而不是蓝色，避免影响其他组件 */
+  --accent: rgb(245, 245, 248);
+  --accent-foreground: rgb(30, 30, 40);
+  
+  /* 警告色：温和的红色 */
+  --destructive: rgb(235, 87, 87);
+  
+  /* 边框色：轻微的蓝灰色 */
+  --border: rgba(2, 101, 220, 0.15);
+  
+  /* 输入框边框 */
+  --input: rgba(2, 101, 220, 0.2);
+  
+  /* 聚焦环 */
+  --ring: rgba(2, 101, 220, 0.5);
+  
+  /* 图表色彩：蓝系为主 */
+  --chart-1: rgb(2, 101, 220);
+  --chart-2: rgb(52, 168, 235);
+  --chart-3: rgb(138, 180, 248);
+  --chart-4: rgb(102, 126, 234);
+  --chart-5: rgb(72, 202, 228);
+  
+  /* 侧边栏：纯白色 */
+  --sidebar: rgb(255, 255, 255);
+  --sidebar-foreground: rgba(30, 30, 40, 0.88);
+  --sidebar-primary: rgb(2, 101, 220);
+  --sidebar-primary-foreground: rgb(255, 255, 255);
+  --sidebar-accent: rgb(235, 237, 245);
+  --sidebar-accent-foreground: rgb(2, 101, 220);
+  --sidebar-border: rgba(2, 101, 220, 0.1);
+  --sidebar-ring: rgba(2, 101, 220, 0.3);
+  
+  /* 品牌色：交心蓝 */
+  --brand: rgb(2, 101, 220);
+  
+  /* 编辑器高亮色 */
+  --novel-highlight-default: #ffffff;
+  --novel-highlight-purple: #e8e6f5;
+  --novel-highlight-red: #ffe8e8;
+  --novel-highlight-yellow: #fff8dc;
+  --novel-highlight-blue: #dceeff;
+  --novel-highlight-green: #e8f8e8;
+  --novel-highlight-orange: #fff0e0;
+  --novel-highlight-pink: #ffe8f5;
+  --novel-highlight-gray: #f0f0f2;
+}
+
+.theme-jiaoxin.dark,
+.dark .theme-jiaoxin {
+  /* 深色背景：深蓝灰色 */
+  --app-background: rgb(20, 25, 35);
+  --background: rgb(20, 25, 35);
+  --foreground: rgba(245, 245, 250, 0.95);
+  
+  /* 卡片色：稍深的蓝灰色 */
+  --card: rgb(30, 38, 52);
+  --card-foreground: rgba(245, 245, 250, 0.95);
+  
+  /* 弹出层 */
+  --popover: rgb(30, 38, 52);
+  --popover-foreground: rgba(245, 245, 250, 0.95);
+  
+  /* 主色：明亮的交心蓝 */
+  --primary: rgb(52, 168, 235);
+  --primary-foreground: rgb(255, 255, 255);
+  
+  /* 次要色 */
+  --secondary: rgb(40, 50, 68);
+  --secondary-foreground: rgb(52, 168, 235);
+  
+  /* 柔和色 */
+  --muted: rgb(38, 46, 60);
+  --muted-foreground: rgb(160, 170, 190);
+  
+  /* 强调色：深蓝色 */
+  --accent: rgb(25, 65, 120);
+  --accent-foreground: rgb(138, 200, 255);
+  
+  /* 警告色 */
+  --destructive: rgb(248, 113, 113);
+  
+  /* 边框色 */
+  --border: rgba(52, 168, 235, 0.2);
+  
+  /* 输入框边框 */
+  --input: rgba(52, 168, 235, 0.25);
+  
+  /* 聚焦环 */
+  --ring: rgba(52, 168, 235, 0.6);
+  
+  /* 图表色彩 */
+  --chart-1: rgb(52, 168, 235);
+  --chart-2: rgb(102, 126, 234);
+  --chart-3: rgb(138, 180, 248);
+  --chart-4: rgb(72, 202, 228);
+  --chart-5: rgb(138, 200, 255);
+  
+  /* 侧边栏 */
+  --sidebar: rgb(30, 38, 52);
+  --sidebar-foreground: rgba(245, 245, 250, 0.95);
+  --sidebar-primary: rgb(52, 168, 235);
+  --sidebar-primary-foreground: rgb(255, 255, 255);
+  --sidebar-accent: rgb(38, 46, 60);
+  --sidebar-accent-foreground: rgb(52, 168, 235);
+  --sidebar-border: rgba(52, 168, 235, 0.15);
+  --sidebar-ring: rgba(52, 168, 235, 0.4);
+  
+  /* 品牌色 */
+  --brand: rgb(52, 168, 235);
+  
+  /* 编辑器高亮色 */
+  --novel-highlight-default: #1a1a2e;
+  --novel-highlight-purple: #2d2847;
+  --novel-highlight-red: #3d2020;
+  --novel-highlight-yellow: #3d3520;
+  --novel-highlight-blue: #1a3550;
+  --novel-highlight-green: #1a3d25;
+  --novel-highlight-orange: #3d2a1a;
+  --novel-highlight-pink: #3d1a30;
+  --novel-highlight-gray: #2a2a35;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background-color: var(--app-background);
+  }
+}
+
+@layer components {
+  /* 交心主题 - 只对输入框区域的 outline 按钮应用蓝底白字 */
+  /* 选择输入框容器内的按钮，但排除提示词优化按钮 */
+  .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)),
+  .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)) {
+    background-color: var(--primary) !important;
+    color: var(--primary-foreground) !important;
+    border-color: var(--primary) !important;
+  }
+  
+  .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)):hover,
+  .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):hover {
+    background-color: rgb(1, 85, 185) !important;
+    border-color: rgb(1, 85, 185) !important;
+  }
+  
+  /* 交心主题下停止按钮的方块改为白色 */
+  .theme-jiaoxin .jiaoxin-stop-square {
+    background-color: white !important;
+  }
+  
+  /* 深色模式 */
+  .theme-jiaoxin.dark [class*="bg-card"] button.border:not(:has(.text-brand)),
+  .theme-jiaoxin.dark [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)),
+  .dark .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)),
+  .dark .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)) {
+    background-color: var(--primary) !important;
+    color: var(--primary-foreground) !important;
+    border-color: var(--primary) !important;
+  }
+  
+  .theme-jiaoxin.dark [class*="bg-card"] button.border:not(:has(.text-brand)):hover,
+  .theme-jiaoxin.dark [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):hover,
+  .dark .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)):hover,
+  .dark .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):hover {
+    background-color: rgb(40, 148, 215) !important;
+    border-color: rgb(40, 148, 215) !important;
+  }
+  
+  /* 深色模式下停止按钮的方块也是白色 */
+  .theme-jiaoxin.dark .jiaoxin-stop-square,
+  .dark .theme-jiaoxin .jiaoxin-stop-square {
+    background-color: white !important;
   }
 }
 
