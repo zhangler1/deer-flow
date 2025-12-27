@@ -101,7 +101,7 @@ def _smart_truncate(content: str, max_length: int = 8000) -> tuple[str, bool]:
 @tool
 @log_io
 @observe(name="爬虫工具",as_type="tool")
-async def crawl_tool(
+def crawl_tool(
     url: Annotated[str, "The url to crawl."],
     use_cache: Annotated[bool, "Whether to use cache. Default True."] = True,
 ) -> Union[Dict, str]:
@@ -118,8 +118,30 @@ async def crawl_tool(
     - 提取文章主要信息
     - 为深度研究提供网页数据
     
-    注意: @observe 装饰器会自动捕获输入参数 (url, use_cache) 和返回值
+    注意: 
+    - @observe 装饰器会自动捕获输入参数 (url, use_cache) 和返回值
+    - 内部使用异步爬虫，但对外提供同步接口以兼容LangChain
     """
+    import asyncio
+    
+    # 定义内部异步实现
+    async def _async_crawl():
+        return await _crawl_tool_async(url, use_cache)
+    
+    # 使用 asyncio.run() 同步执行异步函数
+    try:
+        return asyncio.run(_async_crawl())
+    except RuntimeError:
+        # 如果已经在事件循环中，使用当前循环
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(_async_crawl())
+
+
+async def _crawl_tool_async(
+    url: str,
+    use_cache: bool = True,
+) -> Union[Dict, str]:
+    """爬虫工具的内部异步实现"""
     start_time = time.time()
     
     # 检查缓存
@@ -154,8 +176,8 @@ async def crawl_tool(
         # 生成Markdown内容
         markdown_content = article.to_markdown()
         
-        # 智能截断内容（保持结构完整）
-        content_preview, is_truncated = _smart_truncate(markdown_content, max_length=8000)
+        # 智能截断内容（保持结构完整）- 限制在2000字符以提高响应速度
+        content_preview, is_truncated = _smart_truncate(markdown_content, max_length=3000)
         
         duration = time.time() - start_time
         
@@ -170,15 +192,15 @@ async def crawl_tool(
             level=logging.INFO
         )
         
-        # 提取内容预览（前100字符作为摘要）
+        # 提取内容预览（前200字符作为摘要，用于前端展示）
         content_lines = markdown_content.split('\n')
         preview_text = ''
         for line in content_lines:
             if line.strip() and not line.strip().startswith('#'):
                 preview_text += line.strip() + ' '
-                if len(preview_text) > 100:
+                if len(preview_text) > 200:
                     break
-        preview_text = preview_text[:100].strip() + '...' if len(preview_text) > 100 else preview_text.strip()
+        preview_text = preview_text[:200].strip() + '...' if len(preview_text) > 500 else preview_text.strip()
         
         result = {
             "url": url,
@@ -258,8 +280,8 @@ async def batch_crawl_tool(
         )
         
         try:
-            # 调用单个crawl_tool
-            result = await crawl_tool.ainvoke({"url": url, "use_cache": use_cache})
+            # 调用单个crawl_tool（使用invoke方法）
+            result = crawl_tool.invoke({"url": url, "use_cache": use_cache})
             
             if isinstance(result, dict):
                 results.append(result)
