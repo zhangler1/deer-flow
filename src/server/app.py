@@ -247,7 +247,7 @@ def _determine_message_tag(agent_name, message_metadata, message_chunk):
         if hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
             return None
         # Otherwise, it's analyzing/answering
-        return "iterative_answering"
+        return "answering"
     
     # Check for coder
     if agent_name == "coder" or langgraph_node == "coder":

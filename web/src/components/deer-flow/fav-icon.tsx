@@ -3,6 +3,9 @@
 
 import { cn } from "~/lib/utils";
 
+// 默认的 favicon 图标（使用本地静态资源，内网环境友好）
+const DEFAULT_FAVICON = "/images/favicon-standard.png";
+
 export function FavIcon({
   className,
   url,
@@ -16,7 +19,7 @@ export function FavIcon({
   const getFaviconUrl = (urlString: string): string => {
     // 如果 URL 为空或无效，返回默认图标
     if (!urlString || urlString.trim() === "") {
-      return "https://perishablepress.com/wp/wp-content/images/2021/favicon-standard.png";
+      return DEFAULT_FAVICON;
     }
     
     try {
@@ -24,7 +27,7 @@ export function FavIcon({
       return urlObj.origin + "/favicon.ico";
     } catch (error) {
       // URL 无效，返回默认图标
-      return "https://perishablepress.com/wp/wp-content/images/2021/favicon-standard.png";
+      return DEFAULT_FAVICON;
     }
   };
   
@@ -36,8 +39,11 @@ export function FavIcon({
       src={getFaviconUrl(url)}
       alt={title}
       onError={(e) => {
-        e.currentTarget.src =
-          "https://perishablepress.com/wp/wp-content/images/2021/favicon-standard.png";
+        // 加载失败时使用默认图标（内网环境友好）
+        // 避免循环加载：如果已经是默认图标了就不再重试
+        if (e.currentTarget.src.indexOf(DEFAULT_FAVICON) === -1) {
+          e.currentTarget.src = DEFAULT_FAVICON;
+        }
       }}
     />
   );
