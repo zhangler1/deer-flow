@@ -222,7 +222,7 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
               .map((searchResult, i) => (
                 <motion.li
                   key={`search-result-${i}`}
-                  className="text-muted-foreground bg-accent flex max-w-40 gap-2 rounded-md px-2 py-1 text-sm"
+                  className="text-muted-foreground bg-accent flex max-w-xs flex-col gap-2 rounded-md px-3 py-2 text-sm"
                   initial={{ opacity: 0, y: 10, scale: 0.66 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{
@@ -231,14 +231,53 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                     ease: "easeOut",
                   }}
                 >
-                  <FavIcon
-                    className="mt-1"
-                    url={searchResult.url}
-                    title={searchResult.title}
-                  />
-                  <a href={searchResult.url} target="_blank">
-                    {searchResult.title}
-                  </a>
+                  <div className="flex items-start gap-2">
+                    {/* 只有有URL时才显示FavIcon */}
+                    {searchResult.url && (
+                      <FavIcon
+                        className="mt-1 shrink-0"
+                        url={searchResult.url}
+                        title={searchResult.title}
+                      />
+                    )}
+                    {/* 如果有URL就显示为链接，否则显示为纯文本 */}
+                    {searchResult.url ? (
+                      <a 
+                        href={searchResult.url} 
+                        target="_blank"
+                        className="flex-1 hover:underline line-clamp-2"
+                      >
+                        {searchResult.title}
+                      </a>
+                    ) : (
+                      <span className="flex-1 line-clamp-2">
+                        {searchResult.title}
+                      </span>
+                    )}
+                  </div>
+                  {/* 显示评分和来源信息 */}
+                  {(searchResult.score !== undefined || searchResult.source) && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                      {searchResult.score !== undefined && (
+                        <span className="flex items-center gap-1">
+                          <span className="text-yellow-500">⭐</span>
+                          <span>{(searchResult.score * 100).toFixed(0)}%</span>
+                        </span>
+                      )}
+                      {searchResult.source && (
+                        <span className="flex items-center gap-1">
+                          <span>📚</span>
+                          <span>{searchResult.source}</span>
+                        </span>
+                      )}
+                      {searchResult.category && (
+                        <span className="flex items-center gap-1">
+                          <span>🏷️</span>
+                          <span>{searchResult.category}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </motion.li>
               ))}
             {imageResults.map((searchResult, i) => (
