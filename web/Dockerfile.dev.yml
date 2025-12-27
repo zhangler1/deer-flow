@@ -40,3 +40,5 @@ CMD \
     elif [ -f pnpm-lock.yaml ]; then pnpm dev; \
     else echo "Lockfile not found." && exit 1; \
     fi
+
+# docker build --no-cache -t deer-flow-web:latest  -f Dockerfile.dev.yml . 

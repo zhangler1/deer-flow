@@ -289,7 +289,6 @@ export function InputBox({
               <Detective /> {t("investigation")}
             </Button>
           </Tooltip>
-          <ResearchTypeSelector />
           <ReportStyleDialog />
         </div>
         <div className="flex shrink-0 items-center gap-2">
