@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     searchEngine: "custom_search",
     customSearchRepository: undefined,
     reportStyle: "academic",
-    forceRoutingPath: undefined, // 添加调试模式路由路径设置
+    forceRoutingPath: "deep_research", // 调试模式默认路由设置为交心深度研究
   },
   mcp: {
     servers: [],

@@ -81,6 +81,12 @@
       "newsDesc": "Factual, concise, and impartial journalistic style",
       "socialMedia": "Social Media",
       "socialMediaDesc": "Concise, attention-grabbing, and shareable"
+    },
+    "researchType": {
+      "researchType": "Research Type",
+      "chooseDesc": "Select research type to force routing to the corresponding research mode.",
+      "deepResearch": "Deep Research",
+      "iterativeResearch": "Iterative Research"
     }
   },
   "footer": {

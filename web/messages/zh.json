@@ -20,8 +20,8 @@
   },
   "hero": {
     "title": "交心深度研究",
-    "subtitle": "触手可及",
-    "description": "做交行特色的深度研究。凭借边搜边想、自主规划和精读资料，提供即时洞察、全面报告",
+    "subtitle": "让知识触手可及",
+    "description": "做交行特色的深度研究。凭借边搜边想、自主规划和精读资料，提供即时洞察和全面报告",
     "footnote": "相关报告模版持续更新中..."
   },
   "settings": {
@@ -81,6 +81,12 @@
       "newsDesc": "事实、简明、公正的新闻风格",
       "socialMedia": "社交媒体",
       "socialMediaDesc": "简洁有趣，易于传播"
+    },
+    "researchType": {
+      "researchType": "研究类型",
+      "chooseDesc": "选择研究类型以强制路由到对应的研究模式。",
+      "deepResearch": "深度研究",
+      "iterativeResearch": "迭代研究"
     }
   },
   "footer": {
@@ -101,8 +107,7 @@
     "conversationStarters": [
       "深度调研交通银行惠民贷",
       "调研交通银行请休假制度",
-      "生成f1赛车需要哪些关键零部件？",
-      "DeepResearch是什么？"
+      "生成f1赛车需要哪些关键零部件？"
     ],
     "inputBox": {
       "deepThinking": "深度思考",

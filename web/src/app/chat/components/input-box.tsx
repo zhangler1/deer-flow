@@ -12,6 +12,7 @@ import MessageInput, {
   type MessageInputRef,
 } from "~/components/deer-flow/message-input";
 import { ReportStyleDialog } from "~/components/deer-flow/report-style-dialog";
+import { ResearchTypeSelector } from "~/components/deer-flow/research-type-selector";
 import { Tooltip } from "~/components/deer-flow/tooltip";
 import { BorderBeam } from "~/components/magicui/border-beam";
 import { Button } from "~/components/ui/button";
@@ -288,6 +289,7 @@ export function InputBox({
               <Detective /> {t("investigation")}
             </Button>
           </Tooltip>
+          <ResearchTypeSelector />
           <ReportStyleDialog />
         </div>
         <div className="flex shrink-0 items-center gap-2">

@@ -455,3 +455,32 @@ textarea {
 button {
   cursor: pointer;
 }
+
+/* 确保所有 Markdown 内容和消息内容正确换行，防止超长文本溢出 */
+.prose,
+.prose p,
+.prose li,
+.prose td,
+.prose th,
+.prose div {
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* 确保代码块也能正确换行 */
+.prose code,
+.prose pre {
+  max-width: 100%;
+  overflow-x: auto;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 确保表格内容不会溢出 */
+.prose table {
+  max-width: 100%;
+  table-layout: auto;
+  word-break: break-word;
+}

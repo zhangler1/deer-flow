@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { motion } from "framer-motion";
+import { ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { cn } from "~/lib/utils";
@@ -23,12 +24,12 @@ export function ConversationStarter({
       <div className="pointer-events-none fixed inset-0 flex items-center justify-center">
         <Welcome className="pointer-events-auto mb-15 w-[75%] -translate-y-24" />
       </div>
-      {/* 修改为单列布局，4个问题纵向排列 */}
-      <ul className="flex flex-col gap-2 w-full max-w-2xl">
+      {/* 修改为单列布局，4个问题纵向排列，样式类似图片 */}
+      <ul className="flex flex-col gap-3 w-full max-w-2xl">
         {questions.map((question, index) => (
           <motion.li
             key={question}
-            className="flex shrink-0 active:scale-[1.02]"
+            className="flex shrink-0 active:scale-[0.98]"
             style={{ transition: "all 0.2s ease-out" }}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
@@ -40,12 +41,13 @@ export function ConversationStarter({
             }}
           >
             <div
-              className="bg-card text-muted-foreground h-auto w-full cursor-pointer rounded-2xl border px-4 py-2 leading-relaxed opacity-75 transition-all duration-300 hover:opacity-100 hover:shadow-md"
+              className="bg-muted/50 hover:bg-muted/80 text-foreground flex items-center justify-between h-auto w-full cursor-pointer rounded-xl px-4 py-3.5 leading-relaxed transition-all duration-200 hover:shadow-sm group"
               onClick={() => {
                 onSend?.(question);
               }}
             >
-              {question}
+              <span className="flex-1 text-sm">{question}</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0 ml-2" />
             </div>
           </motion.li>
         ))}

@@ -95,7 +95,7 @@ function ActivityListItem({ messageId }: { messageId: string }) {
         if (toolCall.result?.startsWith("Error")) {
           return null;
         }
-        if (toolCall.name === "web_search") {
+        if (toolCall.name === "web_search" || toolCall.name === "domain_fin_search") {
           return <WebSearchToolCall key={toolCall.id} toolCall={toolCall} />;
         } else if (toolCall.name === "crawl_tool") {
           return <CrawlToolCall key={toolCall.id} toolCall={toolCall} />;
