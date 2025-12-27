@@ -263,32 +263,7 @@ export function InputBox({
             </Button>
           </Tooltip>
 
-          <Tooltip
-            className="max-w-60"
-            title={
-              <div>
-                <h3 className="mb-2 font-bold">
-                  {t("investigationTooltip.title", {
-                    status: backgroundInvestigation ? t("on") : t("off"),
-                  })}
-                </h3>
-                <p>{t("investigationTooltip.description")}</p>
-              </div>
-            }
-          >
-            <Button
-              className={cn(
-                "rounded-2xl",
-                backgroundInvestigation && "!border-brand !text-brand",
-              )}
-              variant="outline"
-              onClick={() =>
-                setEnableBackgroundInvestigation(!backgroundInvestigation)
-              }
-            >
-              <Detective /> {t("investigation")}
-            </Button>
-          </Tooltip>
+          <ResearchTypeSelector />
           <ReportStyleDialog />
         </div>
         <div className="flex shrink-0 items-center gap-2">
