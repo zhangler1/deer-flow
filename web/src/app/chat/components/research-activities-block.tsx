@@ -287,15 +287,17 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
     if (!toolCall.result) return null;
     try {
       const result = JSON.parse(toolCall.result);
+      // 如果标题是“未命名文档”，优先使用缓存中的标题
+      const resultTitle = result.title === '未命名文档' || !result.title ? (title || result.url) : result.title;
       return {
-        title: result.title,
+        title: resultTitle,
         preview: result.preview,
         url: result.url,
       };
     } catch {
       return null;
     }
-  }, [toolCall.result]);
+  }, [toolCall.result, title]);
   
   // 是否正在爬取
   const isCrawling = toolCall.result === undefined;
@@ -311,9 +313,9 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
           <span>{t("reading")}</span>
         </RainbowText>
       </div>
-      <ul className="mt-2 flex flex-wrap gap-4">
+      <ul className="mt-2 flex flex-wrap gap-2">
         <motion.li
-          className="text-muted-foreground bg-accent flex h-40 w-40 gap-2 rounded-md px-2 py-1 text-sm"
+          className="text-muted-foreground bg-accent flex h-12 max-w-md gap-2 rounded-md px-2 py-1.5 text-sm items-center"
           initial={{ opacity: 0, y: 10, scale: 0.66 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{
@@ -321,9 +323,9 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
             ease: "easeOut",
           }}
         >
-          <FavIcon className="mt-1" url={url} title={crawlResult?.title ?? title} />
+          <FavIcon className="shrink-0" url={url} title={crawlResult?.title ?? title} />
           <a
-            className="h-full flex-grow overflow-hidden text-ellipsis whitespace-nowrap"
+            className="flex-grow overflow-hidden text-ellipsis whitespace-nowrap hover:underline"
             href={url}
             target="_blank"
           >
@@ -335,12 +337,12 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
       {/* 显示爬取内容预览 */}
       {crawlResult?.preview && (
         <motion.div
-          className="mt-3 max-w-[calc(100%-120px)] rounded-md bg-accent/50 px-3 py-2 text-sm text-muted-foreground"
+          className="mt-2 max-w-2xl rounded-md bg-accent/30 px-3 py-2 text-xs text-muted-foreground border border-accent"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
         >
-          <div className="line-clamp-4">
+          <div className="line-clamp-3">
             {crawlResult.preview}
           </div>
         </motion.div>
@@ -537,3 +539,4 @@ function MCPToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
     </section>
   );
 }
+

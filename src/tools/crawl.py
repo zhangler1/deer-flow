@@ -98,6 +98,56 @@ def _smart_truncate(content: str, max_length: int = 8000) -> tuple[str, bool]:
     return truncated, True
 
 
+def _generate_reading_summary(title: str, content: str, url: str) -> str:
+    """
+    使用 LLM 生成阅读摘要反馈
+    
+    Args:
+        title: 网页标题
+        content: 网页内容（前800字符）
+        url: 网页URL
+        
+    Returns:
+        AI生成的摘要反馈
+    """
+    try:
+        from src.llms.llm import get_llm_by_type
+        
+        # 使用基础模型生成摘要
+        llm = get_llm_by_type("basic")
+        
+        prompt = f"""你刚刚精读了一篇网页文章，请用一句话（40-60字）总结你从这篇文章中了解到了什么。语气要自然、口语化。
+
+标题：{title}
+URL：{url}
+
+内容摘要：
+{content}
+
+”"""
+        
+        response = llm.invoke([{"role": "user", "content": prompt}])
+        
+        # 处理响应内容
+        if hasattr(response, 'content'):
+            content = response.content
+            summary = content.strip() if isinstance(content, str) else str(content).strip()
+        else:
+            summary = str(response).strip()
+        
+        # 限制长度
+        if len(summary) > 150:
+            summary = summary[:147] + "..."
+        
+        enhanced_logger.logger.debug(f"🤖 AI_SUMMARY | {summary}")
+        return summary
+        
+    except Exception as e:
+        enhanced_logger.logger.warning(f"⚠️  SUMMARY_ERROR | 生成摘要失败: {str(e)}")
+        # 如果失败，返回一个简单的默认摘要
+        return f"我已精读了这篇文章：{title}。"
+
+
 @tool
 @log_io
 @observe(name="爬虫工具",as_type="tool")
@@ -105,17 +155,17 @@ def crawl_tool(
     url: Annotated[str, "The url to crawl."],
     use_cache: Annotated[bool, "Whether to use cache. Default True."] = True,
 ) -> Union[Dict, str]:
-    """使用此工具爬取URL并获取Markdown格式的可读内容。
+    """使用此工具精读URL原文并获取Markdown格式的可读内容。
     
     功能特性：
     - 自动URL验证
     - 带重试机制的HTTP请求
     - 智能内容截断（保持Markdown结构）
-    - 缓存机制（避免重复爬取）
+    - 缓存机制（避免重复精读）
     
     适用场景：
-    - 分析特定网页内容
-    - 提取文章主要信息
+    - 深度分析特定网页内容
+    - 精读文章主要信息
     - 为深度研究提供网页数据
     
     注意: 
@@ -162,10 +212,10 @@ async def _crawl_tool_async(
             return cached_result
     
     enhanced_logger.logger.info(
-        f"🔧 CRAWL_TOOL_START | 开始爬取工具 | URL: {url}"
+        f"🔍 READING_TOOL_START | 开始精读原文 | URL: {url}"
     )
     console_print(
-        f"\033[32m[🔍 网页爬取]\033[0m \033[35mURL: {url}\033[0m",
+        f"\033[32m[📚 网页精读]\033[0m \033[35mURL: {url}\033[0m",
         level=logging.INFO
     )
     
@@ -176,21 +226,8 @@ async def _crawl_tool_async(
         # 生成Markdown内容
         markdown_content = article.to_markdown()
         
-        # 智能截断内容（保持结构完整）- 限制在2000字符以提高响应速度
+        # 智能截断内容（保持结构完整）- 限制在3000字符以提高响应速度
         content_preview, is_truncated = _smart_truncate(markdown_content, max_length=3000)
-        
-        duration = time.time() - start_time
-        
-        enhanced_logger.logger.info(
-            f"✅ CRAWL_TOOL_SUCCESS | 爬取完成 | "
-            f"标题: {article.title} | 内容长度: {len(markdown_content)} | "
-            f"截断: {is_truncated} | 耗时: {duration:.2f}s"
-        )
-        console_print(
-            f"\033[32m[✅ 爬取完成]\033[0m \033[35m标题: {article.title} | "
-            f"内容: {len(markdown_content)} 字符 | 耗时: {duration:.2f}s\033[0m",
-            level=logging.INFO
-        )
         
         # 提取内容预览（前200字符作为摘要，用于前端展示）
         content_lines = markdown_content.split('\n')
@@ -202,11 +239,30 @@ async def _crawl_tool_async(
                     break
         preview_text = preview_text[:200].strip() + '...' if len(preview_text) > 500 else preview_text.strip()
         
+        # 生成 AI 摘要反馈（使用内容的前800字符）
+        summary_input = markdown_content[:800] if len(markdown_content) > 800 else markdown_content
+        ai_summary = _generate_reading_summary(article.title, summary_input, url)
+        
+        duration = time.time() - start_time
+        
+        enhanced_logger.logger.info(
+            f"✅ READING_SUCCESS | 精读完成 | "
+            f"标题: {article.title} | 内容长度: {len(markdown_content)} | "
+            f"截断: {is_truncated} | 耗时: {duration:.2f}s\n"
+            f"🤖 摘要: {ai_summary}"
+        )
+        console_print(
+            f"\033[32m[✅ 精读完成]\033[0m \033[35m标题: {article.title}\033[0m\n"
+            f"\033[36m  🤖 {ai_summary}\033[0m",
+            level=logging.INFO
+        )
+        
         result = {
             "url": url,
             "title": article.title,
             "content": content_preview,
             "preview": preview_text,  # 添加预览文本
+            "summary": ai_summary,  # AI 生成的阅读摘要
             "full_length": len(markdown_content),
             "truncated": is_truncated,
             "cached": False,
@@ -225,11 +281,11 @@ async def _crawl_tool_async(
         error_msg = f"Failed to crawl. Error: {repr(e)}"
         
         enhanced_logger.logger.error(
-            f"❌ CRAWL_TOOL_ERROR | 爬取失败 | "
+            f"❌ READING_ERROR | 精读失败 | "
             f"URL: {url} | 错误: {str(e)} | 耗时: {duration:.2f}s"
         )
         console_print(
-            f"\033[31m[❌ 爬取失败]\033[0m \033[35m{error_msg}\033[0m",
+            f"\033[31m[❌ 精读失败]\033[0m \033[35m{error_msg}\033[0m",
             level=logging.ERROR
         )
         
@@ -243,7 +299,7 @@ async def batch_crawl_tool(
     urls: Annotated[List[str], "List of URLs to crawl."],
     use_cache: Annotated[bool, "Whether to use cache. Default True."] = True,
 ) -> Union[List[Dict], str]:
-    """批量爬取多个URL并获取Markdown内容。
+    """批量精读多个URL并获取Markdown内容。
     
     功能特性：
     - 批量处理多个URL
@@ -252,17 +308,17 @@ async def batch_crawl_tool(
     - 支持缓存机制
     
     适用场景：
-    - 批量分析多个网页
+    - 批量深度分析多个网页
     - 收集多个来源的信息
     - 构建知识库
     """
     start_time = time.time()
     
     enhanced_logger.logger.info(
-        f"📦 BATCH_CRAWL_START | 开始批量爬取 | 数量: {len(urls)}"
+        f"📦 BATCH_READING_START | 开始批量精读 | 数量: {len(urls)}"
     )
     console_print(
-        f"\033[32m[📦 批量爬取]\033[0m \033[35m共 {len(urls)} 个URL\033[0m",
+        f"\033[32m[📦 批量精读]\033[0m \033[35m共 {len(urls)} 个URL\033[0m",
         level=logging.INFO
     )
     
@@ -308,7 +364,7 @@ async def batch_crawl_tool(
     duration = time.time() - start_time
     
     enhanced_logger.logger.info(
-        f"✅ BATCH_CRAWL_COMPLETE | 批量爬取完成 | "
+        f"✅ BATCH_READING_COMPLETE | 批量精读完成 | "
         f"成功: {success_count}/{len(urls)} | 缓存命中: {cache_hit_count} | 耗时: {duration:.2f}s"
     )
     console_print(
@@ -322,10 +378,10 @@ async def batch_crawl_tool(
 
 @tool
 def clear_crawl_cache() -> str:
-    """清空爬虫工具的缓存。
+    """清空精读工具的缓存。
     
     适用场景：
-    - 需要重新爬取最新内容
+    - 需要重新精读最新内容
     - 释放内存空间
     """
     count = _global_cache.clear()
@@ -338,4 +394,4 @@ def clear_crawl_cache() -> str:
         level=logging.INFO
     )
     
-    return f"已清空爬虫缓存，共清除 {count} 个缓存项"
+    return f"已清空精读缓存，共清除 {count} 个缓存项"

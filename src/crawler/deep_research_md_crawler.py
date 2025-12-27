@@ -241,8 +241,17 @@ class DeepResearchMdCrawler:
             
             # 解析返回结果
             markdown = result.get('markdown', '')
-            title = result.get('title', '未命名文档')
+            title = result.get('title', '')
             html = result.get('html', result.get('main_html', ''))
+            
+            # 如果标题为空或未命名，尝试从 URL 提取域名作为后备标题
+            if not title or title == '未命名文档':
+                from urllib.parse import urlparse
+                parsed_url = urlparse(url)
+                title = parsed_url.netloc or '未命名文档'
+                enhanced_logger.logger.warning(
+                    f"⚠️  TITLE_FALLBACK | 标题为空，使用域名: {title}"
+                )
             
             duration = time.time() - start_time
             
