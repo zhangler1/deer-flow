@@ -405,6 +405,7 @@ async def simple_search_node(state: State, config: RunnableConfig) -> Command[Li
         )
 
 
+@observe(name="🔄 迭代研究节点", as_type="agent")
 def iterative_research_node(state: State, config: RunnableConfig) -> Command[Literal["__end__", "iterative_research_node"]]:
     """
     迭代深度研究节点 - 针对单个问题进行多轮自主深入研究
@@ -415,6 +416,8 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
     3. 分析信息并回答
     4. 判断是否足够回答用户问题
     5. 如果不足，针对未解决问题继续下一轮迭代（最多5轮）
+    
+    注意: @observe 装饰器会自动捕获输入参数和返回值，无需手动记录
     """
     start_time = time.time()
     iteration_count = state.get("iteration_count", 0)
@@ -649,6 +652,7 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         )
 
 
+@observe(name="📝 迭代研究报告节点", as_type="agent")
 def iterative_reporter_node(state: State, config: RunnableConfig) -> Command[Literal["__end__"]]:
     """
     迭代研究报告员节点 - 专门用于生成迭代研究的最终报告
@@ -657,6 +661,8 @@ def iterative_reporter_node(state: State, config: RunnableConfig) -> Command[Lit
     1. 收集所有迭代研究的历史记录
     2. 整合所有研究内容
     3. 生成最终报告
+    
+    注意: @observe 装饰器会自动捕获输入参数和返回值，无需手动记录
     """
     start_time = time.time()
     enhanced_logger.logger.info(f"🔄 NODE_ENTRY | iterative_reporter | 开始执行迭代研究报告生成节点")
