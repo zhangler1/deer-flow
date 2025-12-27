@@ -69,7 +69,7 @@ class DeepResearchMdCrawler:
         爬取网页并转换为Article对象
         
         工作流程：
-        1. URL验证（可选）
+        1. URL验证和修复（可选）
         2. 抓取网页HTML
         3. 调用提取API一次性完成：内容清洗 + MD转换
         4. 返回Article对象
@@ -87,7 +87,8 @@ class DeepResearchMdCrawler:
         """
         start_time = time.time()
         
-        # Step 0: URL验证
+        # Step 0: URL修复和验证
+        url = self._fix_url(url)  # 自动添加协议前缀
         if validate_url:
             self._validate_url(url)
         
@@ -276,6 +277,34 @@ class DeepResearchMdCrawler:
                 f"❌ EXTRACT_AND_CONVERT_ERROR | 提取转换失败 | 错误: {str(e)} | 耗时: {duration:.2f}s"
             )
             raise Exception(f"Failed to extract and convert: {str(e)}")
+    
+    def _fix_url(self, url: str) -> str:
+        """
+        修复URL，自动添加协议前缀
+        
+        Args:
+            url: 原始URL
+            
+        Returns:
+            str: 修复后的URL
+        """
+        if not url:
+            return url
+        
+        # 去除首尾空格
+        url = url.strip()
+        
+        # 如果URL不以http://或https://开头，自动添加https://
+        if not url.startswith(('http://', 'https://')):
+            enhanced_logger.logger.warning(
+                f"⚠️  URL_FIX | URL缺少协议前缀，自动添加https:// | 原始: {url}"
+            )
+            url = f"https://{url}"
+            enhanced_logger.logger.info(
+                f"✅ URL_FIXED | 修复后: {url}"
+            )
+        
+        return url
     
     def _validate_url(self, url: str) -> None:
         """
