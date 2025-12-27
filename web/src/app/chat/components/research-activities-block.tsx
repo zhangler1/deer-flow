@@ -515,10 +515,10 @@ function MCPToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
   const { resolvedTheme } = useTheme();
   return (
     <section className="mt-4 pl-4">
-      <div className="w-fit overflow-y-auto rounded-md py-0">
+      <div className="w-fit overflow-y-auto rounded-md py-0 mcp-tool-container">
         <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="item-1">
-            <AccordionTrigger>
+          <AccordionItem value="item-1" className="border-0">
+            <AccordionTrigger className="mcp-tool-accordion-trigger">
               <Tooltip title={tool?.description}>
                 <div className="flex items-center font-medium italic">
                   <PencilRuler size={16} className={"mr-2"} />

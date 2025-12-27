@@ -384,18 +384,26 @@
 
 @layer components {
   /* 交心主题 - 只对输入框区域的 outline 按钮应用蓝底白字 */
-  /* 选择输入框容器内的按钮，但排除提示词优化按钮 */
-  .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)),
-  .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)) {
+  /* 选择输入框容器内的按钮，但排除提示词优化按钮、活动页签折叠按钮和 MCP 工具 */
+  .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger),
+  .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger) {
     background-color: var(--primary) !important;
     color: var(--primary-foreground) !important;
     border-color: var(--primary) !important;
   }
   
-  .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)):hover,
-  .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):hover {
+  .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger):hover,
+  .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger):hover {
     background-color: rgb(1, 85, 185) !important;
     border-color: rgb(1, 85, 185) !important;
+  }
+  
+  /* 确保 MCP 工具容器内的按钮不被影响 */
+  .theme-jiaoxin .mcp-tool-container button,
+  .theme-jiaoxin .mcp-tool-accordion-trigger {
+    background-color: transparent !important;
+    color: inherit !important;
+    border-color: transparent !important;
   }
   
   /* 交心主题下停止按钮的方块改为白色 */
@@ -404,21 +412,31 @@
   }
   
   /* 深色模式 */
-  .theme-jiaoxin.dark [class*="bg-card"] button.border:not(:has(.text-brand)),
-  .theme-jiaoxin.dark [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)),
-  .dark .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)),
-  .dark .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)) {
+  .theme-jiaoxin.dark [class*="bg-card"] button.border:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger),
+  .theme-jiaoxin.dark [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger),
+  .dark .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger),
+  .dark .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger) {
     background-color: var(--primary) !important;
     color: var(--primary-foreground) !important;
     border-color: var(--primary) !important;
   }
   
-  .theme-jiaoxin.dark [class*="bg-card"] button.border:not(:has(.text-brand)):hover,
-  .theme-jiaoxin.dark [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):hover,
-  .dark .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)):hover,
-  .dark .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):hover {
+  .theme-jiaoxin.dark [class*="bg-card"] button.border:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger):hover,
+  .theme-jiaoxin.dark [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger):hover,
+  .dark .theme-jiaoxin [class*="bg-card"] button.border:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger):hover,
+  .dark .theme-jiaoxin [class*="bg-card"] button[class*="outline"]:not(:has(.text-brand)):not(.activity-collapse-button):not(.mcp-tool-accordion-trigger):hover {
     background-color: rgb(40, 148, 215) !important;
     border-color: rgb(40, 148, 215) !important;
+  }
+  
+  /* 确保 MCP 工具容器内的按钮不被影响 (深色模式) */
+  .theme-jiaoxin.dark .mcp-tool-container button,
+  .theme-jiaoxin.dark .mcp-tool-accordion-trigger,
+  .dark .theme-jiaoxin .mcp-tool-container button,
+  .dark .theme-jiaoxin .mcp-tool-accordion-trigger {
+    background-color: transparent !important;
+    color: inherit !important;
+    border-color: transparent !important;
   }
   
   /* 深色模式下停止按钮的方块也是白色 */
