@@ -229,6 +229,17 @@ class DeepResearchMdCrawler:
             if '/extract' in api_url and '/extract_md' not in api_url:
                 api_url = api_url.replace('/extract', '/extract_md')
             
+            # 验证 API URL 格式
+            if not api_url.startswith(('http://', 'https://')):
+                enhanced_logger.logger.error(
+                    f"❌ INVALID_API_URL | API URL 缺少协议前缀 | {api_url}"
+                )
+                raise ValueError(f"API URL must start with http:// or https://, got: {api_url}")
+            
+            enhanced_logger.logger.debug(
+                f"🔍 API_URL | 使用API: {api_url}"
+            )
+            
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     api_url,
