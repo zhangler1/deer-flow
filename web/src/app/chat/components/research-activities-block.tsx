@@ -254,34 +254,29 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                         href={searchResult.url} 
                         target="_blank"
                         className="flex-1 hover:underline line-clamp-2"
+                        title={searchResult.title}
                       >
-                        {searchResult.title}
+                        {truncateTitle(searchResult.title)}
                       </a>
                     ) : (
-                      <span className="flex-1 line-clamp-2">
-                        {searchResult.title}
+                      <span className="flex-1 line-clamp-2" title={searchResult.title}>
+                        {truncateTitle(searchResult.title)}
                       </span>
                     )}
                   </div>
-                  {/* 显示评分和来源信息 */}
-                  {(searchResult.score !== undefined || searchResult.source) && (
+                  {/* 显示来源信息（评分已隐藏） */}
+                  {(searchResult.source || searchResult.category) && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
-                      {searchResult.score !== undefined && (
-                        <span className="flex items-center gap-1">
-                          <span className="text-yellow-500">⭐</span>
-                          <span>{(searchResult.score * 100).toFixed(0)}%</span>
-                        </span>
-                      )}
                       {searchResult.source && (
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1" title={searchResult.source}>
                           <span>📚</span>
-                          <span>{searchResult.source}</span>
+                          <span>来源: {truncateTitle(searchResult.source)}</span>
                         </span>
                       )}
                       {searchResult.category && (
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1" title={searchResult.category}>
                           <span>🏷️</span>
-                          <span>{searchResult.category}</span>
+                          <span>分类: {truncateTitle(searchResult.category)}</span>
                         </span>
                       )}
                     </div>
