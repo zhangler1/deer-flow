@@ -289,7 +289,7 @@ async def simple_search_node(state: State, config: RunnableConfig) -> Command[Li
         # 配置工具：使用简单检索需要的工具
         tools = [
             get_web_search_tool(
-                max_search_results=3,  # 简单检索只需少量结果
+                max_search_results=configurable.max_search_results,  # 使用用户配置的检索结果数量
                 engine=configurable.search_engine,
                 repository_id=configurable.custom_search_repository
             ),
@@ -451,7 +451,7 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         # 创建带有工具的 Agent
         tools = [
             get_web_search_tool(
-                max_search_results=5,  # 迭代研究需要更多结果
+                max_search_results=configurable.max_search_results,  # 使用用户配置的检索结果数量
                 engine=configurable.search_engine,
                 repository_id=configurable.custom_search_repository
             ),

@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     enableBackgroundInvestigation: true,  // 默认开启背景调研
     maxPlanIterations: 1,
     maxStepNum: 3,
-    maxSearchResults: 3,
+    maxSearchResults: 2,
     searchEngine: "custom_search",
     customSearchRepository: undefined,
     reportStyle: "academic",
