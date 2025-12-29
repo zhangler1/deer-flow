@@ -44,7 +44,7 @@ export const TOOL_NAME_TRANSLATIONS: Record<string, string> = {
  * @returns 中文名称，如果没有翻译则返回原始名称
  */
 export function getToolDisplayName(toolName: string): string {
-  return TOOL_NAME_TRANSLATIONS[toolName] || toolName;
+  return TOOL_NAME_TRANSLATIONS[toolName] ?? toolName;
 }
 
 /**

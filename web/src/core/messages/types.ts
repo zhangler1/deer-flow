@@ -29,7 +29,7 @@ export interface Message {
   finishReason?: "stop" | "interrupt" | "tool_calls";
   interruptFeedback?: string;
   resources?: Array<Resource>;
-  tag?: "routing" | "planning" | "searching" | "iterative_answering" | "reporting" | "waiting_for_feedback" | "error" | "answering" | "round_progress";
+  tag?: "routing" | "planning" | "searching" | "crawling" | "iterative_answering" | "reporting" | "waiting_for_feedback" | "error" | "answering" | "round_progress";
   roundText?: string;
 }
 

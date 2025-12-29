@@ -30,7 +30,7 @@ interface GenericEvent<T extends string, D extends object> {
     agent: "coordinator" | "planner" | "researcher" | "coder" | "reporter" | "router" | "direct_answer_node" | "simple_search_node" | "domain_knowledge_node";
     role: "user" | "assistant" | "tool";
     finish_reason?: "stop" | "tool_calls" | "interrupt";
-    tag?: "routing" | "planning" | "searching" | "iterative_answering" | "reporting" | "waiting_for_feedback" | "error" | "answering" | "round_progress";
+    tag?: "routing" | "planning" | "searching" | "crawling" | "iterative_answering" | "reporting" | "waiting_for_feedback" | "error" | "answering" | "round_progress";
     round_text?: string;
   } & D;
 }

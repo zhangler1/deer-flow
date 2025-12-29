@@ -120,7 +120,7 @@ export const useStore = create<{
     set((state) => {
       const currentIteration = state.currentIteration;
       const key = `round_${currentIteration}`;
-      const currentRound = state.iterationRounds.get(key) || {
+      const currentRound = state.iterationRounds.get(key) ?? {
         iteration: currentIteration,
         messageIds: [],
         collapsed: false,
@@ -173,7 +173,7 @@ export const useStore = create<{
     preservedCrawlUrls: string[];
   }>) {
     set((state) => {
-      const currentState = state.messageDisplayStates.get(messageId) || {
+      const currentState = state.messageDisplayStates.get(messageId) ?? {
         hasShownSearching: false,
         hasShownCrawling: false,
         hasShownRoundProgress: false,
@@ -614,6 +614,7 @@ const DEFAULT_MESSAGE_DISPLAY_STATE = {
   hasShownSearching: false,
   hasShownCrawling: false,
   hasShownRoundProgress: false,
+  preservedRoundText: undefined,
   preservedSearchKeywords: [],
   preservedCrawlUrls: [],
 } as const;
@@ -622,7 +623,7 @@ const DEFAULT_MESSAGE_DISPLAY_STATE = {
 export function useMessageDisplayState(messageId: string) {
   return useStore(
     useShallow((state) => 
-      state.messageDisplayStates.get(messageId) || DEFAULT_MESSAGE_DISPLAY_STATE
+      state.messageDisplayStates.get(messageId) ?? DEFAULT_MESSAGE_DISPLAY_STATE
     ),
   );
 }

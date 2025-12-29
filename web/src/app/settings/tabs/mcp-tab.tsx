@@ -10,8 +10,8 @@ import { Tooltip } from "~/components/deer-flow/tooltip";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
 import type { MCPServerMetadata } from "~/core/mcp";
-import { cn } from "~/lib/utils";
 import { getToolDisplayName } from "~/lib/tool-translations";
+import { cn } from "~/lib/utils";
 
 import { AddMCPServerDialog } from "../dialogs/add-mcp-server-dialog";
 

@@ -27,9 +27,9 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
-import type { SettingsState } from "~/core/store";
 import { useConfig } from "~/core/api/hooks";
 import type { CustomSearchRepositoryConfig } from "~/core/config";
+import type { SettingsState } from "~/core/store";
 
 import type { Tab } from "./types";
 
@@ -76,7 +76,7 @@ export const GeneralTab: Tab = ({
   
   // 获取可用的自定义搜索仓库选项
   const customSearchRepositories: CustomSearchRepositoryConfig[] = useMemo(
-    () => config?.custom_search_repositories || [],
+    () => config?.custom_search_repositories ?? [],
     [config]
   );
   useEffect(() => {
@@ -136,7 +136,7 @@ export const GeneralTab: Tab = ({
                       defaultValue={field.value}
                       min={1}
                       onChange={(event) =>
-                        field.onChange(parseInt(event.target.value || "0"))
+                        field.onChange(parseInt(event.target.value ?? "0"))
                       }
                     />
                   </FormControl>
@@ -160,7 +160,7 @@ export const GeneralTab: Tab = ({
                       defaultValue={field.value}
                       min={1}
                       onChange={(event) =>
-                        field.onChange(parseInt(event.target.value || "0"))
+                        field.onChange(parseInt(event.target.value ?? "0"))
                       }
                     />
                   </FormControl>
@@ -182,7 +182,7 @@ export const GeneralTab: Tab = ({
                       defaultValue={field.value}
                       min={1}
                       onChange={(event) =>
-                        field.onChange(parseInt(event.target.value || "0"))
+                        field.onChange(parseInt(event.target.value ?? "0"))
                       }
                     />
                   </FormControl>
@@ -284,7 +284,7 @@ export const GeneralTab: Tab = ({
                     <FormLabel>{t("forceRoutingPath")}</FormLabel>
                     <FormControl>
                       <Select
-                        value={field.value || "auto"}
+                        value={field.value ?? "auto"}
                         onValueChange={(value) => {
                           field.onChange(value === "auto" ? undefined : value);
                         }}

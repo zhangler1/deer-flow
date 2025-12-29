@@ -1,8 +1,8 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { Logo } from "~/components/deer-flow/logo";
 import { LanguageSwitcher } from "~/components/deer-flow/language-switcher";
+import { Logo } from "~/components/deer-flow/logo";
 import { ThemeToggle } from "~/components/deer-flow/theme-toggle";
 
 export function SiteHeader() {

@@ -3,17 +3,18 @@
 
 "use client";
 
+import { ChevronLeft } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Suspense } from "react";
-import { ChevronLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
+
+import { Tooltip } from "~/components/deer-flow/tooltip";
+import { Button } from "~/components/ui/button";
 
 import { Logo } from "../../components/deer-flow/logo";
 import { ThemeToggle } from "../../components/deer-flow/theme-toggle";
 import { SettingsDialog } from "../settings/dialogs/settings-dialog";
-import { Button } from "~/components/ui/button";
-import { Tooltip } from "~/components/deer-flow/tooltip";
 
 const Main = dynamic(() => import("./main"), {
   ssr: false,
