@@ -55,9 +55,9 @@ export default function HomePage() {
         </div>
         <div className="flex items-center">
           <ThemeToggle />
-          <Suspense>
+          {/* <Suspense>
             <SettingsDialog />
-          </Suspense>
+          </Suspense> */}
         </div>
       </header>
       <Main />

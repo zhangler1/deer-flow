@@ -24,11 +24,11 @@ const RESEARCH_TYPES = [
     labelKey: "deepResearch",
     icon: Layers,
   },
-  {
-    value: "iterative_research" as const,
-    labelKey: "iterativeResearch",
-    icon: RotateCw,
-  },
+  // {
+  //   value: "iterative_research" as const,
+  //   labelKey: "iterativeResearch",
+  //   icon: RotateCw,
+  // },
 ];
 
 export function ResearchTypeSelector() {
