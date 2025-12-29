@@ -1,25 +1,17 @@
-##### DEPENDENCIES
+##### DEPENDENCIES (离线模式 - 使用预先准备的 node_modules)
 
 FROM node:20-bookworm AS deps
-# 使用 apt-get 而不是 apk (bookworm 是 Debian 系统)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
+# 复制 package.json 和 lockfile（用于验证）
+COPY package.json pnpm-lock.yaml ./
 
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml\* ./
-
-RUN \
-    if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-    elif [ -f package-lock.json ]; then npm ci; \
-    elif [ -f pnpm-lock.yaml ]; then \
-        npm install -g pnpm && \
-        pnpm config set registry https://registry.npmmirror.com/ && \
-        pnpm i --frozen-lockfile; \
-    else echo "Lockfile not found." && exit 1; \
-    fi
+# 🔑 关键：直接复制预先准备好的 node_modules
+# 注意：需要临时修改 .dockerignore 或使用构建参数
+COPY node_modules ./node_modules
 
 ##### BUILDER
 
@@ -27,19 +19,18 @@ FROM node:20-bookworm AS builder
 WORKDIR /app
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# 从 deps 阶段复制 node_modules
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
-
+# 直接构建，不需要安装依赖
 RUN \
     if [ -f yarn.lock ]; then SKIP_ENV_VALIDATION=1 yarn build; \
     elif [ -f package-lock.json ]; then SKIP_ENV_VALIDATION=1 npm run build; \
-    elif [ -f pnpm-lock.yaml ]; then \
-        npm install -g pnpm && \
-        pnpm config set registry https://registry.npmmirror.com/ && \
-        SKIP_ENV_VALIDATION=1 pnpm run build; \
+    elif [ -f pnpm-lock.yaml ]; then SKIP_ENV_VALIDATION=1 pnpm run build; \
     else echo "Lockfile not found." && exit 1; \
     fi
 
@@ -49,7 +40,6 @@ FROM gcr.io/distroless/nodejs20-debian12 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=builder /app/next.config.js ./
@@ -63,6 +53,3 @@ EXPOSE 3000
 ENV PORT=3000
 
 CMD ["server.js"]
-
-
-# docker build . -t deer-flow-front.prd:latest --build-arg NEXT_PUBLIC_API_URL=http://192.168.0.106:8000/api  

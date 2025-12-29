@@ -1,0 +1,62 @@
+##### DEPENDENCIES (使用 pnpm store 离线模式)
+
+FROM node:20-bookworm AS deps
+RUN apt-get update && apt-get install -y --no-cache --no-install-recommends \
+    openssl \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+# 安装 pnpm
+RUN npm install -g pnpm
+
+# 复制 package.json 和 lockfile
+COPY package.json pnpm-lock.yaml ./
+
+# 🔑 方法 1：使用预先准备的 pnpm store
+# 在宿主机上先执行：pnpm store export > pnpm-store.tar.gz
+# COPY pnpm-store.tar.gz /tmp/
+# RUN pnpm store import /tmp/pnpm-store.tar.gz
+
+# 🔑 方法 2：直接复制整个 pnpm store（更简单）
+# 在宿主机上先执行：pnpm store path 找到 store 位置
+COPY .pnpm-store /root/.local/share/pnpm/store
+
+# 离线安装（从本地 store）
+RUN pnpm install --frozen-lockfile --offline --prefer-offline
+
+##### BUILDER
+
+FROM node:20-bookworm AS builder
+WORKDIR /app
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# 安装 pnpm（builder 阶段需要）
+RUN npm install -g pnpm
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+RUN SKIP_ENV_VALIDATION=1 pnpm run build
+
+##### RUNNER
+
+FROM gcr.io/distroless/nodejs20-debian12 AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+COPY --from=builder /app/next.config.js ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
+
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+EXPOSE 3000
+ENV PORT=3000
+
+CMD ["server.js"]
