@@ -29,8 +29,8 @@ import { findMCPTool } from "~/core/mcp";
 import type { ToolCallRuntime } from "~/core/messages";
 import { useMessage, useStore } from "~/core/store";
 import { parseJSON } from "~/core/utils";
-import { getToolDisplayText } from "~/lib/tool-translations";
 import { cn } from "~/lib/utils";
+import { getToolDisplayText } from "~/lib/tool-translations";
 
 export function ResearchActivitiesBlock({
   className,
@@ -114,6 +114,15 @@ function ActivityListItem({ messageId }: { messageId: string }) {
 
 const __pageCache = new LRUCache<string, string>({ max: 100 });
 
+// 截断文本到指定长度（默认20个字符），并清理HTML标签
+function truncateTitle(text: string, maxLength: number = 20): string {
+  if (!text) return '';
+  // 移除 <em> 和 </em> 标签，替换为空格
+  const cleanedText = text.replace(/<\/?em>/g, ' ').trim();
+  if (cleanedText.length <= maxLength) return cleanedText;
+  return cleanedText.slice(0, maxLength) + '...';
+}
+
 // 统一的搜索结果类型（支持 web_search 和 domain_fin_search）
 type SearchResult =
   | {
@@ -142,25 +151,24 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
       const parsed = toolCall.result ? parseJSON(toolCall.result, []) : undefined;
       if (Array.isArray(parsed)) {
         // 转换为统一格式，处理旧格式和新格式
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        results = parsed.map((item: any): SearchResult => {
+        results = parsed.map((item: any) => {
           // 如果已经有 type 字段，直接使用
           if (item.type) {
-            return item as SearchResult;
+            return item;
           }
           // 否则根据字段推断类型
           if (item.image_url) {
-            return item as SearchResult; // 图片类型
+            return item; // 图片类型
           }
           // 默认为页面类型（支持统一后的格式）
           return {
             type: "page",
-            title: (item.title as string | undefined) ?? "",
-            url: (item.url as string | undefined) ?? "",
-            content: (item.content as string | undefined) ?? "",
-            score: item.score as number | undefined,
-            source: item.source as string | undefined,
-            category: item.category as string | undefined,
+            title: item.title || "",
+            url: item.url || "",
+            content: item.content || "",
+            score: item.score,
+            source: item.source,
+            category: item.category,
           };
         });
       } else {
@@ -328,7 +336,7 @@ function CrawlToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
     try {
       const result = JSON.parse(toolCall.result);
       // 如果标题是"未命名文档"，优先使用缓存中的标题
-      const resultTitle = result.title === '未命名文档' || !result.title ? (title ?? result.url) : result.title;
+      const resultTitle = result.title === '未命名文档' || !result.title ? (title || result.url) : result.title;
       return {
         title: resultTitle,
         preview: result.preview,

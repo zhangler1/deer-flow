@@ -252,14 +252,14 @@ export function InputBox({
           <Tooltip title={tSettings("searchEngineDescription")}>
             <Button
               className={cn(
-                "rounded-2xl h-8 px-3 gap-2 text-sm",
+                "h-8 rounded-2xl border px-3 gap-2 text-sm w-auto",
                 searchEngine === "custom_search" && "!border-brand !text-brand",
               )}
               variant="outline"
               onClick={handleToggleCustomSearch}
             >
-              <Search className="h-4 w-4" />
-              交心搜索
+              <Search className="h-4 w-4 shrink-0" />
+              <span className="whitespace-nowrap">交心搜索</span>
             </Button>
           </Tooltip>
 
