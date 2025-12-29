@@ -114,15 +114,6 @@ function ActivityListItem({ messageId }: { messageId: string }) {
 
 const __pageCache = new LRUCache<string, string>({ max: 100 });
 
-// 截断文本到指定长度（默认20个字符），并清理HTML标签
-function truncateTitle(text: string, maxLength: number = 20): string {
-  if (!text) return '';
-  // 移除 <em> 和 </em> 标签，替换为空格
-  const cleanedText = text.replace(/<\/?em>/g, ' ').trim();
-  if (cleanedText.length <= maxLength) return cleanedText;
-  return cleanedText.slice(0, maxLength) + '...';
-}
-
 // 统一的搜索结果类型（支持 web_search 和 domain_fin_search）
 type SearchResult =
   | {
@@ -265,14 +256,14 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                     )}
                   </div>
                   {/* 显示评分和来源信息 */}
-                  {(searchResult.score !== undefined || searchResult.source) && (
+                  {(searchResult.source || searchResult.category) && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
-                      {searchResult.score !== undefined && (
+                      {/* {searchResult.score !== undefined && (
                         <span className="flex items-center gap-1">
                           <span className="text-yellow-500">⭐</span>
                           <span>{(searchResult.score * 100).toFixed(0)}%</span>
                         </span>
-                      )}
+                      )} */}
                       {searchResult.source && (
                         <span className="flex items-center gap-1">
                           <span>📚</span>
