@@ -114,11 +114,13 @@ function ActivityListItem({ messageId }: { messageId: string }) {
 
 const __pageCache = new LRUCache<string, string>({ max: 100 });
 
-// 截断标题到指定长度（默认20个字符）
+// 截断标题到指定长度（默认20个字符），并清理HTML标签
 function truncateTitle(text: string, maxLength: number = 20): string {
   if (!text) return '';
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + '...';
+  // 移除 <em> 和 </em> 标签，替换为空格
+  const cleanedText = text.replace(/<\/?em>/g, ' ').trim();
+  if (cleanedText.length <= maxLength) return cleanedText;
+  return cleanedText.slice(0, maxLength) + '...';
 }
 
 // 统一的搜索结果类型（支持 web_search 和 domain_fin_search）
@@ -254,29 +256,34 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                         href={searchResult.url} 
                         target="_blank"
                         className="flex-1 hover:underline line-clamp-2"
-                        title={searchResult.title}
                       >
-                        {truncateTitle(searchResult.title)}
+                        {searchResult.title}
                       </a>
                     ) : (
-                      <span className="flex-1 line-clamp-2" title={searchResult.title}>
-                        {truncateTitle(searchResult.title)}
+                      <span className="flex-1 line-clamp-2">
+                        {searchResult.title}
                       </span>
                     )}
                   </div>
-                  {/* 显示来源信息（评分已隐藏） */}
-                  {(searchResult.source || searchResult.category) && (
+                  {/* 显示评分和来源信息 */}
+                  {(searchResult.score !== undefined || searchResult.source) && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                      {searchResult.score !== undefined && (
+                        <span className="flex items-center gap-1">
+                          <span className="text-yellow-500">⭐</span>
+                          <span>{(searchResult.score * 100).toFixed(0)}%</span>
+                        </span>
+                      )}
                       {searchResult.source && (
-                        <span className="flex items-center gap-1" title={searchResult.source}>
+                        <span className="flex items-center gap-1">
                           <span>📚</span>
-                          <span>来源: {truncateTitle(searchResult.source)}</span>
+                          <span>{searchResult.source}</span>
                         </span>
                       )}
                       {searchResult.category && (
-                        <span className="flex items-center gap-1" title={searchResult.category}>
+                        <span className="flex items-center gap-1">
                           <span>🏷️</span>
-                          <span>分类: {truncateTitle(searchResult.category)}</span>
+                          <span>{searchResult.category}</span>
                         </span>
                       )}
                     </div>

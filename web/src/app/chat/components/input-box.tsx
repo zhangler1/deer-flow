@@ -248,8 +248,8 @@ export function InputBox({
       </div>
       <div className="flex items-center px-4 py-2">
         <div className="flex grow gap-2">
-          {/* 自定义搜索引擎切换按钮 */}
-          <Tooltip title={tSettings("searchEngineDescription")}>
+          {/* 自定义搜索引擎切换按钮 - 已隐藏 */}
+          {/* <Tooltip title={tSettings("searchEngineDescription")}>
             <Button
               className={cn(
                 "h-8 rounded-2xl border px-3 gap-2 text-sm w-auto",
@@ -261,9 +261,10 @@ export function InputBox({
               <Search className="h-4 w-4 shrink-0" />
               <span className="whitespace-nowrap">交心搜索</span>
             </Button>
-          </Tooltip>
+          </Tooltip> */}
 
-          <ResearchTypeSelector />
+          {/* 研究模型选择器 - 已隐藏 */}
+          {/* <ResearchTypeSelector /> */}
           <ReportStyleDialog />
         </div>
         <div className="flex shrink-0 items-center gap-2">
