@@ -994,11 +994,13 @@ async def simple_research_stream(request: SimpleResearchRequest):
 async def simple_research_stream_openai(request: SimpleResearchRequest):
     """
     OpenAI格式的简化流式研究接口
-    
+
     - 返回OpenAI兼容的SSE流式响应
     - 包含id、object、created、model、choices等OpenAI标准字段
     - 保持与/api/research/simple/stream相同的功能
     - 为需要OpenAI格式的客户端提供兼容性
+    - 🐛 支持调试模式：使用 force_routing_path 参数测试迭代研究等功能
+      可选值：direct_answer, simple_search, iterative_research, deep_research
     """
     # 生成唯一的对话 ID
     conversation_id = generate_conversation_id(model_prefix="deep-research-openai-stream")
@@ -1020,8 +1022,13 @@ async def simple_research_stream_openai(request: SimpleResearchRequest):
         "max_search_results": request.max_search_results,
         "search_engine": request.search_engine,
         "enable_deep_thinking": request.enable_deep_thinking,
-        "format": "openai_compatible"
+        "format": "openai_compatible",
+        "force_routing_path": request.force_routing_path  # 🐛 调试模式：记录强制路由路径
     })
+
+    # 记录是否启用强制路由
+    if request.force_routing_path:
+        enhanced_logger.logger.info(f"🔀 OPENAI_FORCE_ROUTING | conversation_id: {conversation_id} | 路由到: {request.force_routing_path}")
     
     # 使用完整的 LangGraph 工作流（OpenAI 兼容格式）
     return StreamingResponse(
@@ -1071,7 +1078,11 @@ async def _full_workflow_sse_generator(
                 messages.append(msg)
         
         enhanced_logger.logger.info(f"🔄 SIMPLE_RESEARCH_START | {thread_id} | 消息数量: {len(messages)}")
-        
+
+        # 记录是否启用强制路由
+        if request.force_routing_path:
+            enhanced_logger.logger.info(f"🔀 FORCE_ROUTING_ENABLED | 路由到: {request.force_routing_path}")
+
         # 直接调用 _astream_workflow_generator
         async for event in _astream_workflow_generator(
             messages=messages,
@@ -1090,6 +1101,7 @@ async def _full_workflow_sse_generator(
             report_style=request.report_style or ReportStyle.ACADEMIC,
             enable_deep_thinking=request.enable_deep_thinking or False,
             system_context=get_str_env("SYSTEM_CONTEXT", ""),  # 从环境变量读取
+            force_routing_path=request.force_routing_path,  # 🐛 调试模式：支持测试迭代研究
         ):
             yield event
             
@@ -1140,7 +1152,11 @@ async def _full_workflow_openai_generator(
         step_type="openai_stream_initialization",
         agent_name="OpenAI兼容格式输出"  # 格式转换器（非真实Agent，仅用于日志标记）
     )
-    
+
+    # 🐛 记录强制路由路径（调试模式）
+    if request.force_routing_path:
+        enhanced_logger.logger.info(f"🔀 OPENAI_FORCE_ROUTING | thread_id: {thread_id} | 路由到: {request.force_routing_path}")
+
     # 用于累积内容，以便处理跨chunk的<think>标签
     content_buffer = ""
     in_think_tag = False
