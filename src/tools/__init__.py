@@ -10,6 +10,10 @@ from .domain_fin_search import (
     domain_fin_search,
     call_domain_fin_search,
 )
+from .domain_industry_report_search import (
+    industry_report_search,
+    call_industry_report_search,
+)
 
 __all__ = [
     "crawl_tool",
@@ -21,4 +25,6 @@ __all__ = [
     "VolcengineTTS",
     "domain_fin_search",
     "call_domain_fin_search",
+    "industry_report_search",
+    "call_industry_report_search",
 ]
