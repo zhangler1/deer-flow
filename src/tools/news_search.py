@@ -47,7 +47,7 @@ class NewsSearchConfig:
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive",
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": "PostmanRuntime-ApipostRuntime/1.1.0",
     }
 
@@ -175,12 +175,17 @@ def call_news_search(
 
         logger.debug(f"📤 发送请求体: {json.dumps(request_body, ensure_ascii=False, indent=2)}")
 
+        # 将请求体转换为表单数据格式
+        form_data = {
+            "REQ_MESSAGE": json.dumps(request_body, ensure_ascii=False)
+        }
+
         # 发送请求
         response = requests.post(
             NewsSearchConfig.BASE_URL,
             headers=NewsSearchConfig.HEADERS,
             cookies=NewsSearchConfig.COOKIES,
-            json=request_body,
+            data=form_data,
             timeout=timeout
         )
 
