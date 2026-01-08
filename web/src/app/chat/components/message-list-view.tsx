@@ -214,7 +214,7 @@ export function MessageListView({
             // 渲染普通消息
             return (
               <MessageListItem
-                key={item.messageId}
+                key={item.messageId!}
                 messageId={item.messageId!}
                 message={item.message!}
                 startOfResearch={item.startOfResearch!}
@@ -248,12 +248,12 @@ function MessageBubble({
   return (
     <div
       className={cn(
-        "group flex w-auto max-w-[min(90vw,800px)] flex-col rounded-2xl px-4 py-3",
+        "group flex w-auto max-w-[90vw] flex-col rounded-2xl px-4 py-3 break-words",
         message.role === "user" && "bg-brand rounded-ee-none",
         message.role === "assistant" && "bg-card rounded-es-none",
         className,
       )}
-      style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
+      style={{ wordBreak: "break-all" }}
     >
       {children}
     </div>
@@ -493,8 +493,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
         // 尝试解析已有的 args chunks 为 JSON
         const argsString = toolCall.argsChunks.join("");
         // 使用正则提取 query 字段的值（可能是不完整的JSON）
-        const queryMatch = /"query"\s*:\s*"([^"]*)"/.exec(argsString);
-        if (queryMatch?.[1] && !keywords.includes(queryMatch[1])) {
+        const queryMatch = argsString.match(/"query"\s*:\s*"([^"]*)"/);
+        if (queryMatch && queryMatch[1] && !keywords.includes(queryMatch[1])) {
           keywords.push(queryMatch[1]);
         }
       } catch {
@@ -518,8 +518,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
       try {
         const argsString = toolCall.argsChunks.join("");
         // 使用正则提取 url 字段的值
-        const urlMatch = /"url"\s*:\s*"([^"]*)"/.exec(argsString);
-        if (urlMatch?.[1] && !urls.includes(urlMatch[1])) {
+        const urlMatch = argsString.match(/"url"\s*:\s*"([^"]*)"/);
+        if (urlMatch && urlMatch[1] && !urls.includes(urlMatch[1])) {
           urls.push(urlMatch[1]);
         }
       } catch {
@@ -552,7 +552,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const displayText = useMemo(() => {
     // 最高优先级：如果曾经显示过 round_progress（第X轮研究进展），固定显示该状态
     if (displayState.hasShownRoundProgress) {
-      return displayState.preservedRoundText ?? t("iterativeResearchProcess");
+      return displayState.preservedRoundText || t("iterativeResearchProcess");
     }
     
     // 第二优先级：如果曾经显示过 crawling，一直保持显示 crawling（crawling 优先级高于 searching）
@@ -587,7 +587,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
         case "answering":
           return t("answering");
         case "round_progress":
-          return message.roundText ?? t("iterativeResearchProcess"); // 显示"第X轮研究进展"
+          return message.roundText || t("iterativeResearchProcess"); // 显示"第X轮研究进展"
         default:
           break;
       }
@@ -600,7 +600,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
     
     // 默认显示“正在研究”
     return t("iterativeResearchProcess"); // "正在研究"
-  }, [displayState.hasShownRoundProgress, displayState.preservedRoundText, displayState.hasShownCrawling, displayState.hasShownSearching, message.tag, message.roundText, messageSearchStatus, message.isStreaming, t]);
+  }, [displayState.hasShownRoundProgress, displayState.preservedRoundText, displayState.hasShownCrawling, displayState.hasShownSearching, message.tag, message.roundText, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
   
   return (
     <div className="w-full">

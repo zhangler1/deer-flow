@@ -3,7 +3,7 @@
 
 import { MagicWandIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, X, Search } from "lucide-react";
+import { ArrowUp, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState } from "react";
 
@@ -16,20 +16,12 @@ import { ResearchTypeSelector } from "~/components/deer-flow/research-type-selec
 import { Tooltip } from "~/components/deer-flow/tooltip";
 import { BorderBeam } from "~/components/magicui/border-beam";
 import { Button } from "~/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import { enhancePrompt } from "~/core/api";
 import { useConfig } from "~/core/api/hooks";
 import type { Option, Resource } from "~/core/messages";
 import {
   setEnableBackgroundInvestigation,
   useSettingsStore,
-  saveSettings,
 } from "~/core/store";
 import { cn } from "~/lib/utils";
 
@@ -61,12 +53,7 @@ export function InputBox({
   const backgroundInvestigation = useSettingsStore(
     (state) => state.general.enableBackgroundInvestigation,
   );
-  const searchEngine = useSettingsStore(
-    (state) => state.general.searchEngine,
-  );
-  const customSearchRepository = useSettingsStore(
-    (state) => state.general.customSearchRepository,
-  );
+
   const { config, loading } = useConfig();
   const reportStyle = useSettingsStore((state) => state.general.reportStyle);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -77,28 +64,7 @@ export function InputBox({
   const [isEnhanceAnimating, setIsEnhanceAnimating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
 
-  // 切换自定义搜索引擎的处理函数
-  const handleToggleCustomSearch = useCallback(() => {
-    const isCustomSearch = searchEngine === "custom_search";
-    useSettingsStore.setState((state) => ({
-      general: {
-        ...state.general,
-        searchEngine: isCustomSearch ? "custom_search" : "custom_search", // 保持 custom_search
-      },
-    }));
-    saveSettings();
-  }, [searchEngine]);
 
-  // 自定义搜索仓库选择处理函数
-  const handleCustomSearchRepositoryChange = useCallback((repositoryId: string) => {
-    useSettingsStore.setState((state) => ({
-      general: {
-        ...state.general,
-        customSearchRepository: repositoryId,
-      },
-    }));
-    saveSettings();
-  }, []);
 
   const handleSendMessage = useCallback(
     (message: string, resources: Array<Resource>) => {
@@ -248,33 +214,43 @@ export function InputBox({
       </div>
       <div className="flex items-center px-4 py-2">
         <div className="flex grow gap-2">
-          {/* 自定义搜索引擎切换按钮 - 已隐藏 */}
-          {/* <Tooltip title={tSettings("searchEngineDescription")}>
+          <ResearchTypeSelector />
+          <Tooltip
+            className="max-w-60"
+            title={
+              <div>
+                <h3 className="mb-2 font-bold">
+                  {t("investigationTooltip.title", {
+                    status: backgroundInvestigation ? t("on") : t("off"),
+                  })}
+                </h3>
+                <p>{t("investigationTooltip.description")}</p>
+              </div>
+            }
+          >
             <Button
               className={cn(
-                "h-8 rounded-2xl border px-3 gap-2 text-sm w-auto",
-                searchEngine === "custom_search" && "!border-brand !text-brand",
+                "rounded-2xl",
+                backgroundInvestigation && "!border-brand !text-brand",
               )}
               variant="outline"
-              onClick={handleToggleCustomSearch}
+              onClick={() =>
+                setEnableBackgroundInvestigation(!backgroundInvestigation)
+              }
             >
-              <Search className="h-4 w-4 shrink-0" />
-              <span className="whitespace-nowrap">交心搜索</span>
+              <Detective /> {t("investigation")}
             </Button>
-          </Tooltip> */}
-
-          {/* 研究模型选择器 - 已隐藏 */}
-          {/* <ResearchTypeSelector /> */}
+          </Tooltip>
           <ReportStyleDialog />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Tooltip title={t("enhancePrompt")}>
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
               className={cn(
-                "h-10 w-10 rounded-2xl",
-                isEnhancing && "!border-brand !text-brand animate-pulse",
+                "hover:bg-accent h-10 w-10",
+                isEnhancing && "animate-pulse",
               )}
               onClick={handleEnhancePrompt}
               disabled={isEnhancing || currentPrompt.trim() === ""}
@@ -297,7 +273,7 @@ export function InputBox({
             >
               {responding ? (
                 <div className="flex h-10 w-10 items-center justify-center">
-                  <div className="bg-foreground h-4 w-4 rounded-sm opacity-70 jiaoxin-stop-square" />
+                  <div className="bg-foreground h-4 w-4 rounded-sm opacity-70" />
                 </div>
               ) : (
                 <ArrowUp />

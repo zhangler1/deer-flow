@@ -247,7 +247,7 @@ def _determine_message_tag(agent_name, message_metadata, message_chunk):
         if hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
             return None
         # Otherwise, it's analyzing/answering
-        return "answering"
+        return "iterative_answering"
     
     # Check for coder
     if agent_name == "coder" or langgraph_node == "coder":
@@ -448,7 +448,7 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
             for tool_call in message_chunk.tool_calls:
                 tool_name = tool_call.get("name", "")
                 if tool_name == "crawl_tool":
-                    tag = "reading_content"  # 改为 reading_content，前端显示“正在精读原文”
+                    tag = "crawling"
                     break
                 elif tool_name == "web_search":
                     tag = "searching"
@@ -513,7 +513,7 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
                     event_stream_message["tag"] = "searching"
                     break
                 elif chunk_name == "crawl_tool":
-                    event_stream_message["tag"] = "reading_content"  # 改为 reading_content
+                    event_stream_message["tag"] = "crawling"
                     break
             
             yield _make_event("tool_call_chunks", event_stream_message)

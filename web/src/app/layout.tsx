@@ -36,8 +36,7 @@ export default async function RootLayout({
   
   return (
     // 移除 geist.variable，使用系统默认字体
-    // 添加 theme-jiaoxin 类避免主题闪烁
-    <html lang={locale} suppressHydrationWarning className="theme-jiaoxin">
+    <html lang={locale} suppressHydrationWarning>
       <head>
         {/* Define isSpace function globally to fix markdown-it issues with Next.js + Turbopack
           https://github.com/markdown-it/markdown-it/issues/1082#issuecomment-2749656365 */}
