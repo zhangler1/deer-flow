@@ -134,7 +134,7 @@ def call_industry_report_search(
     begin_date_str: str = "",
     end_date_str: str = "",
     page_num: int = 1,
-    page_size: int = 5,
+    page_size: int = 2,
     is_random_query: bool = False,
     timeout: int = 30
 ) -> str:
@@ -280,7 +280,7 @@ def industry_report_search(
     begin_date_str: str = "",
     end_date_str: str = "",
     page_num: int = 1,
-    page_size: int = 5,
+    page_size: int = 2,
     is_random_query: bool = False
 ) -> str:
     """
@@ -294,7 +294,7 @@ def industry_report_search(
         begin_date_str: 开始日期，格式如 "2025-01-01"。如果为空，不限制开始日期。
         end_date_str: 结束日期，格式如 "2025-12-31"。如果为空，不限制结束日期。
         page_num: 页码，从1开始。默认为1。
-        page_size: 每页返回的研报数量。强制为5。
+        page_size: 每页返回的研报数量。强制为2。
         is_random_query: 是否随机查询。默认为False。随机查询可能会返回更多样化的结果。
 
     Returns:
@@ -317,7 +317,7 @@ def industry_report_search(
         begin_date_str=begin_date_str,
         end_date_str=end_date_str,
         page_num=page_num,
-        page_size=page_size,
+        page_size=2,
         is_random_query=is_random_query
     )
 

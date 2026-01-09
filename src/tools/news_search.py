@@ -84,7 +84,7 @@ def _build_request_body(
             "endDateStr": end_date_str,
             "pageNum": page_num,
             "categoryCode": category_code,
-            "pageSize": 2
+            "pageSize": page_size
         }
     }
 
@@ -340,7 +340,7 @@ def news_search(
         begin_date_str=begin_date_str,
         end_date_str=end_date_str,
         page_num=page_num,
-        page_size=page_size,
+        page_size=2,
         sort_type=sort_type
     )
 
