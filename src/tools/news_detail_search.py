@@ -11,6 +11,7 @@
 """
 
 import logging
+import os
 import requests
 import json
 from typing import Optional, Dict, Any
@@ -22,8 +23,8 @@ logger = logging.getLogger(__name__)
 class NewsDetailSearchConfig:
     """新闻详情查询配置"""
 
-    # API 配置
-    BASE_URL = "http://192.168.150.71:8013/IDIS/IDIS-DATA/queryNewsDetail.bocms"
+    # API 配置 - 从环境变量获取
+    BASE_URL = os.getenv("NEWS_DETAIL_API_URL")
 
     # 请求头配置
     HEADERS = {
@@ -129,8 +130,9 @@ def call_news_detail_search(
         }
 
         # 发送请求
+        base_url = os.getenv("NEWS_DETAIL_API_URL")
         response = requests.post(
-            NewsDetailSearchConfig.BASE_URL,
+            base_url,
             headers=NewsDetailSearchConfig.HEADERS,
             cookies=NewsDetailSearchConfig.COOKIES,
             data=form_data,

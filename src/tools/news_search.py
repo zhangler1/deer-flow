@@ -14,6 +14,7 @@
 """
 
 import logging
+import os
 import requests
 import json
 from typing import Optional, List, Dict, Any
@@ -25,8 +26,8 @@ logger = logging.getLogger(__name__)
 class NewsSearchConfig:
     """新闻查询配置"""
 
-    # API 配置
-    BASE_URL = "http://192.168.150.71:8012/IDIS/IDIS-DATA/queryNewsList.bocms"
+    # API 配置 - 从环境变量获取
+    BASE_URL = os.getenv("NEWS_SEARCH_API_URL")
 
     # 新闻类型映射
     CATEGORY_CODES = {
@@ -181,8 +182,9 @@ def call_news_search(
         }
 
         # 发送请求
+        base_url = os.getenv("NEWS_SEARCH_API_URL")
         response = requests.post(
-            NewsSearchConfig.BASE_URL,
+            base_url,
             headers=NewsSearchConfig.HEADERS,
             cookies=NewsSearchConfig.COOKIES,
             data=form_data,

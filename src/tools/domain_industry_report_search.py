@@ -13,6 +13,7 @@
 """
 
 import logging
+import os
 import requests
 import json
 from typing import Optional, List, Dict, Any
@@ -24,8 +25,8 @@ logger = logging.getLogger(__name__)
 class IndustryReportSearchConfig:
     """行业研报查询配置"""
 
-    # API 配置
-    BASE_URL = "http://192.168.150.71:8011/IDIS/IDIS-DATA/queryIndustryReportList.bocms"
+    # API 配置 - 从环境变量获取
+    BASE_URL = os.getenv("INDUSTRY_REPORT_API_URL")
 
     # 请求头配置
     HEADERS = {
@@ -177,8 +178,9 @@ def call_industry_report_search(
         logger.debug(f"📤 发送请求体: {json.dumps(request_body, ensure_ascii=False, indent=2)}")
 
         # 发送请求
+        base_url = os.getenv("INDUSTRY_REPORT_API_URL")
         response = requests.post(
-            IndustryReportSearchConfig.BASE_URL,
+            base_url,
             headers=IndustryReportSearchConfig.HEADERS,
             cookies=IndustryReportSearchConfig.COOKIES,
             data=form_data,
