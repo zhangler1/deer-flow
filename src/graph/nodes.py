@@ -25,6 +25,9 @@ from src.tools import (
     python_repl_tool,
     crawl_tool,
     domain_fin_search,
+    industry_report_search,
+    news_search,
+    news_detail_search
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
@@ -455,7 +458,10 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
                 engine=configurable.search_engine,
                 repository_id=configurable.custom_search_repository
             ),
-            crawl_tool,  # 网页爬取工具
+            industry_report_search,  # 网页爬取工具
+            news_search,
+            crawl_tool,
+            news_detail_search
         ]
         
         # 准备模板变量
