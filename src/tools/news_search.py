@@ -64,7 +64,7 @@ def _build_request_body(
     begin_date_str: str = "",
     end_date_str: str = "",
     page_num: int = 1,
-    page_size: int = 5,
+    page_size: int = 2,
     sort_type: int = 1,
     is_random_query: bool = False,
 ) -> Dict[str, Any]:
@@ -84,7 +84,7 @@ def _build_request_body(
             "endDateStr": end_date_str,
             "pageNum": page_num,
             "categoryCode": category_code,
-            "pageSize": page_size
+            "pageSize": 2
         }
     }
 
@@ -314,7 +314,7 @@ def news_search(
         begin_date_str: 开始日期，格式如 "2020-11-11 00:00:00"。如果为空，不限制开始日期。
         end_date_str: 结束日期，格式如 "2025-11-11 00:00:00"。如果为空，不限制结束日期。
         page_num: 页码，从1开始。默认为1。
-        page_size: 每页返回的新闻数量。默认为5。
+        page_size: 每页返回的新闻数量。强制为2。
         sort_type: 排序方式，1=按热度排序（默认），2=按时间排序。
 
     Returns:
@@ -327,8 +327,7 @@ def news_search(
         >>> news_search(
         ...     category_code="news_macro",
         ...     begin_date_str="2024-01-01 00:00:00",
-        ...     end_date_str="2024-12-31 23:59:59",
-        ...     page_size=10
+        ...     end_date_str="2024-12-31 23:59:59"
         ... )
         >>> # 按时间排序查询行业新闻
         >>> news_search(category_code="news_region", sort_type=2)
