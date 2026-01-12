@@ -504,10 +504,10 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         llm = get_llm_by_type("basic")  # 使用基础模型
 
         prompt_str = str(messages_for_llm)
-        enhanced_logger.logger.info(
-                f"🤖 LLM_INPUT | iterative_research | Prompt长度: {len(prompt_str)}\n"
-                f"{'='*80}\n{prompt_str}\n{'='*80}"
-            )
+        # enhanced_logger.logger.info(
+        #         f"🤖 LLM_INPUT | iterative_research | Prompt长度: {len(prompt_str)}\n"
+        #         f"{'='*80}\n{prompt_str}\n{'='*80}"
+        #     )
         
         # DEBUG级别：打印LLM输入
         if enhanced_logger.logger.isEnabledFor(logging.DEBUG):
