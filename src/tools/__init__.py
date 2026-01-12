@@ -16,6 +16,10 @@ from .domain_industry_report_search import (
 )
 from .news_search import news_search
 from .news_detail_search import news_detail_search
+from .online_search import (
+    online_search_tool,
+    call_online_search,
+)
 
 __all__ = [
     "crawl_tool",
@@ -30,5 +34,7 @@ __all__ = [
     "industry_report_search",
     "call_industry_report_search",
     "news_search",
-    "news_detail_search"
+    "news_detail_search",
+    "online_search_tool",
+    "call_online_search",
 ]

@@ -27,7 +27,8 @@ from src.tools import (
     domain_fin_search,
     industry_report_search,
     news_search,
-    news_detail_search
+    news_detail_search,
+    online_search_tool,
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
@@ -532,60 +533,25 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
         )
         
         # 执行 Agent
-        # 捕获递归限制异常，当达到限制时自动进入报告生成阶段
         invoke_start = time.time()
-        should_continue = False  # 默认不继续迭代
+        result = agent.invoke({
+            "messages": messages_for_llm
+        })
+        invoke_duration = time.time() - invoke_start
         
-        try:
-            result = agent.invoke({
-                "messages": messages_for_llm
-            })
-            invoke_duration = time.time() - invoke_start
-            
-            # 提取输出
-            answer = ""
-            if isinstance(result, dict) and "messages" in result:
-                last_message = result["messages"][-1]
-                answer = last_message.content if hasattr(last_message, 'content') else str(last_message)
-            else:
-                answer = str(result)
-            
-            # INFO级别：打印LLM最终输出
-            enhanced_logger.logger.info(
-                f"🤖 LLM_OUTPUT | iterative_research | 响应长度: {len(answer)} | LLM耗时: {invoke_duration:.2f}s\n"
-                f"{'='*80}\n{answer}\n{'='*80}"
-            )
-            
-            # 判断是否需要继续迭代（简单启发式判断）
-            if iteration_count + 1 < MAX_ITERATIONS:
-                # 检查回答中是否有表示需要继续的信号
-                continue_signals = [
-                    "**是否需要继续研究**：是",
-                    "**是否需要继续研究**: 是"
-                ]
-                answer_lower = str(answer).lower()
-                should_continue = any(signal.lower() in answer_lower for signal in continue_signals)
-                enhanced_logger.logger.info(f"------------------------ should_continue: {should_continue}")
-                
-        except RecursionError as re:
-            # 达到递归限制，记录日志并强制进入报告生成阶段
-            enhanced_logger.logger.warning(
-                f"⚠️ RECURSION_LIMIT_REACHED | iterative_research | "
-                f"第{iteration_count + 1}轮达到递归限制（工具调用次数超过25次），强制进入报告生成阶段"
-            )
-            logger.warning(f"迭代研究达到递归限制: {str(re)}")
-            
-            invoke_duration = time.time() - invoke_start
-            
-            # 创建一个简单的结果，说明情况
-            answer = f"第{iteration_count + 1}轮研究因达到工具调用次数限制（25次）而结束。已收集的信息将用于生成最终报告。"
-            enhanced_logger.logger.info(
-                f"🤖 LLM_OUTPUT | iterative_research | 因递归限制终止 | LLM耗时: {invoke_duration:.2f}s\n"
-                f"{'='*80}\n{answer}\n{'='*80}"
-            )
-            
-            # 强制设置不继续迭代
-            should_continue = False
+        # 提取输出
+        answer = ""
+        if isinstance(result, dict) and "messages" in result:
+            last_message = result["messages"][-1]
+            answer = last_message.content if hasattr(last_message, 'content') else str(last_message)
+        else:
+            answer = str(result)
+        
+        # INFO级别：打印LLM最终输出
+        enhanced_logger.logger.info(
+            f"🤖 LLM_OUTPUT | iterative_research | 响应长度: {len(answer)} | LLM耗时: {invoke_duration:.2f}s\n"
+            f"{'='*80}\n{answer}\n{'='*80}"
+        )
         
         # 更新迭代历史
         new_iteration = {
@@ -595,7 +561,18 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
             "timestamp": time.time()
         }
         # 确保 updated_history 是基于列表的更新，而不是覆盖
-        updated_history = list(iteration_history) + [new_iteration]
+        updated_history = list(iteration_history) + [new_iteration]        
+        # 判断是否需要继续迭代（简单启发式判断）
+        should_continue = False
+        if iteration_count + 1 < MAX_ITERATIONS:
+            # 检查回答中是否有表示需要继续的信号
+            continue_signals = [
+                "**是否需要继续研究**：是",
+                "**是否需要继续研究**: 是"
+            ]
+            answer_lower = answer.lower()
+            should_continue = any(signal in answer_lower for signal in continue_signals)
+            enhanced_logger.logger.info(f"------------------------ should_continue: {should_continue}")
             
         
         duration = time.time() - start_time
