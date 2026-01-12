@@ -95,6 +95,7 @@ def _extract_news_info(news: Dict[str, Any]) -> str:
     """提取单条新闻信息"""
     try:
         title = news.get("title", "无标题")
+        id = news.get("id", "无")
         source = news.get("source", "未知来源")
         publish_time = news.get("publishTime", "N/A")
         category = news.get("category", "")
@@ -105,7 +106,8 @@ def _extract_news_info(news: Dict[str, Any]) -> str:
         authors_str = "、".join(authors) if authors else "未知"
 
         # 构建新闻信息
-        info = f"""标题: {title}
+        info = f"""新闻id: {id}
+标题: {title}
 来源: {source}
 作者: {authors_str}
 发布时间: {publish_time}
