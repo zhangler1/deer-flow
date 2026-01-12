@@ -64,7 +64,7 @@ def _build_request_body(
     begin_date_str: str = "",
     end_date_str: str = "",
     page_num: int = 1,
-    page_size: int = 5,
+    page_size: int = 2,
     sort_type: int = 1,
     is_random_query: bool = False,
 ) -> Dict[str, Any]:
@@ -95,6 +95,7 @@ def _extract_news_info(news: Dict[str, Any]) -> str:
     """提取单条新闻信息"""
     try:
         title = news.get("title", "无标题")
+        id = news.get("id", "无")
         source = news.get("source", "未知来源")
         publish_time = news.get("publishTime", "N/A")
         category = news.get("category", "")
@@ -105,7 +106,8 @@ def _extract_news_info(news: Dict[str, Any]) -> str:
         authors_str = "、".join(authors) if authors else "未知"
 
         # 构建新闻信息
-        info = f"""标题: {title}
+        info = f"""新闻id: {id}
+标题: {title}
 来源: {source}
 作者: {authors_str}
 发布时间: {publish_time}
@@ -314,7 +316,7 @@ def news_search(
         begin_date_str: 开始日期，格式如 "2020-11-11 00:00:00"。如果为空，不限制开始日期。
         end_date_str: 结束日期，格式如 "2025-11-11 00:00:00"。如果为空，不限制结束日期。
         page_num: 页码，从1开始。默认为1。
-        page_size: 每页返回的新闻数量。默认为5。
+        page_size: 每页返回的新闻数量。强制为2。
         sort_type: 排序方式，1=按热度排序（默认），2=按时间排序。
 
     Returns:
@@ -327,8 +329,7 @@ def news_search(
         >>> news_search(
         ...     category_code="news_macro",
         ...     begin_date_str="2024-01-01 00:00:00",
-        ...     end_date_str="2024-12-31 23:59:59",
-        ...     page_size=10
+        ...     end_date_str="2024-12-31 23:59:59"
         ... )
         >>> # 按时间排序查询行业新闻
         >>> news_search(category_code="news_region", sort_type=2)
@@ -341,7 +342,7 @@ def news_search(
         begin_date_str=begin_date_str,
         end_date_str=end_date_str,
         page_num=page_num,
-        page_size=page_size,
+        page_size=2,
         sort_type=sort_type
     )
 
