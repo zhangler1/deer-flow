@@ -27,10 +27,14 @@ def online_search_tool(max_results: int = 10) -> CustomSearchTool:
     Returns:
         CustomSearchTool: 配置好的联网搜索工具实例
     """
-    return CustomSearchTool(
+    tool = CustomSearchTool(
         repository_id="online-search",
         max_results=max_results
     )
+    # 自定义工具名称和描述，让模型能够识别这是互联网搜索工具
+    tool.name = "online_search"
+    tool.description = "搜索互联网公开信息。适用于查询最新新闻、公开资讯、行业动态、学术文献等互联网内容。输入应该是搜索查询字符串。"
+    return tool
 
 
 # 为了保持一致性，也提供一个函数式的调用接口

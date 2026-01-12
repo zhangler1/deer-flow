@@ -97,9 +97,13 @@ class CustomSearchTool(BaseTool):
         # 获取自定义搜索配置
         custom_config = get_custom_search_config()
         
-        # 设置默认repository_id
+        # 设置默认repository_id（仅当没有显式传入时）
+        # 注意：如果通过 kwargs 传入了 repository_id，这里不会覆盖
         if not hasattr(self, 'repository_id') or not self.repository_id:
             self.repository_id = "dynamic_search"
+        
+        # 保存原始的 repository_id，用于错误提示
+        original_repository_id = self.repository_id
         
         # 获取repository配置
         self._repository_config = custom_config.get_repository(self.repository_id)
@@ -107,10 +111,18 @@ class CustomSearchTool(BaseTool):
             # 如果指定的repository不存在，使用默认的
             self._repository_config = custom_config.get_default_repository()
             if self._repository_config:
-                logger.warning(f"Repository '{self.repository_id}' not found, using default '{self._repository_config.repository}'")
+                logger.warning(
+                    f"Repository '{original_repository_id}' not found in configuration. "
+                    f"Using default '{self._repository_config.repository}'. "
+                    f"Please add '{original_repository_id}' to conf.yaml to avoid this warning."
+                )
         
         if not self._repository_config:
-            raise ValueError("No valid repository configuration found")
+            raise ValueError(
+                f"No valid repository configuration found. "
+                f"Repository '{original_repository_id}' does not exist and no default repository is configured. "
+                f"Please check your conf.yaml file."
+            )
         
         # 设置默认用户信息（可以从环境变量获取）
         self.muwp_user = {
