@@ -19,6 +19,12 @@ import json
 from typing import Optional, List, Dict, Any
 from langchain_core.tools import tool
 
+# 导入重排序工具
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from utils.rerank import rerank_objects
+from data.industry_list import INDUSTRY_LIST
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,6 +33,7 @@ class IndustryReportSearchConfig:
 
     # API 配置 - 从环境变量获取
     BASE_URL = os.getenv("INDUSTRY_REPORT_API_URL")
+    REPORT_NUM = os.getenv("INDUSTRY_REPORT_NUM")
 
     # 请求头配置
     HEADERS = {
@@ -58,6 +65,16 @@ def _build_request_body(
 ) -> Dict[str, Any]:
     """构建请求体"""
 
+    # 将字符串类型的行业代码转换为整数类型
+    # 例如: ["3702", "6307"] -> [3702, 6307]
+    industry_codes_int = []
+    if industry_codes:
+        for code in industry_codes:
+            try:
+                industry_codes_int.append(int(code))
+            except (ValueError, TypeError):
+                logger.warning(f"无效的行业代码: {code}，将被忽略")
+
     req_body = {
         "REQ_HEAD": {
             "TRAN_PROCESS": "",
@@ -74,7 +91,7 @@ def _build_request_body(
                 "reservedField1": reserved_field1,
                 "pageSize": 2,
                 "reservedField3": reserved_field3,
-                "industryCodes": industry_codes or [],
+                "industryCodes": industry_codes_int,  # 使用整数列表
                 "reservedField5": reserved_field5
             }
         }
@@ -226,6 +243,70 @@ def call_industry_report_search(
         return f"错误: {error_msg}"
 
 
+def _match_industries_by_keyword(
+    keyword: str,
+    top_k: int = 3
+) -> List[Dict[str, str]]:
+    """
+    根据关键词智能匹配相关行业
+
+    Args:
+        keyword: 搜索关键词
+        top_k: 返回前 K 个最相关的行业
+
+    Returns:
+        List[Dict]: 包含 IndustryId 和 IndustryName 的行业列表
+    """
+    try:
+        # 如果配置了 Rerank API，使用智能匹配
+        if os.getenv("RERANK_API_URL"):
+            logger.info(f"🔄 使用 Rerank 模型智能匹配行业 | 关键词: '{keyword}'")
+
+            # 使用重排序工具找到最相关的行业
+            matched_industries = rerank_objects(
+                query=keyword,
+                objects=INDUSTRY_LIST,
+                text_field="IndustryName",
+                top_k=top_k
+            )
+
+            if matched_industries:
+                # 提取 IndustryId 和 IndustryName
+                result = []
+                for industry in matched_industries:
+                    result.append({
+                        "IndustryId": industry.get("IndustryId"),
+                        "IndustryName": industry.get("IndustryName"),
+                        "relevance_score": industry.get("relevance_score", 0)
+                    })
+                    logger.info(f"  ✓ 匹配行业: {industry.get('IndustryName')} (ID: {industry.get('IndustryId')}, 评分: {industry.get('relevance_score', 0):.4f})")
+
+                return result
+
+        # 降级方案：简单的关键词匹配
+        logger.info(f"🔄 使用关键词匹配算法 | 关键词: '{keyword}'")
+        matched_industries = []
+        for industry in INDUSTRY_LIST:
+            industry_name = industry.get("IndustryName", "")
+            # 检查关键词是否包含在行业名称中，或行业名称包含关键词
+            if keyword in industry_name or industry_name in keyword:
+                matched_industries.append({
+                    "IndustryId": industry.get("IndustryId"),
+                    "IndustryName": industry_name,
+                    "relevance_score": 1.0  # 默认评分
+                })
+                logger.info(f"  ✓ 匹配行业: {industry_name} (ID: {industry.get('IndustryId')})")
+
+                if len(matched_industries) >= top_k:
+                    break
+
+        return matched_industries if matched_industries else []
+
+    except Exception as e:
+        logger.error(f"❌ 行业匹配失败: {e}")
+        return []
+
+
 def _extract_reports(result: Dict[str, Any]) -> str:
     """从API响应中提取研报内容"""
     try:
@@ -247,6 +328,8 @@ def _extract_reports(result: Dict[str, Any]) -> str:
 
             # 构建研报信息摘要
             report_infos = []
+            REPORT_NUM = os.getenv("INDUSTRY_REPORT_NUM")
+            report_list = report_list[:REPORT_NUM]
             for i, report in enumerate(report_list, 1):
                 report_info = _extract_report_info(report)
                 report_infos.append(f"【研报 {i}】\n{report_info}")
@@ -276,6 +359,7 @@ def _extract_reports(result: Dict[str, Any]) -> str:
 
 @tool
 def industry_report_search(
+    keyword: str = "",
     industry_codes: Optional[List[str]] = None,
     begin_date_str: str = "",
     end_date_str: str = "",
@@ -284,34 +368,68 @@ def industry_report_search(
     is_random_query: bool = False
 ) -> str:
     """
-    行业研报查询工具
+    行业研报查询工具 - 支持关键词智能匹配行业
 
-    查询行业研究报告，支持按行业代码、日期范围等条件筛选。
+    【重要】使用指南：
+    1. **必须使用 keyword 参数**：系统会智能匹配最相关的2个行业，并查询这些行业的研报。
+       例如：用户问"人工智能相关研报"，使用 keyword="人工智能"
+
+    2. **禁止直接使用 industry_codes 参数**：让系统自动根据 keyword 匹配最相关的行业。
+       系统会使用 Rerank 模型进行智能匹配，确保查询到最准确的行业研报。
+
+    3. **参数说明**：
+       - keyword: 搜索关键词，使用行业名称或主题词即可
+       - 其他参数为可选参数
+
+    【使用场景】
+    - 用户询问某个行业/主题的研报时，使用该工具
+    - 关键词可以是行业名称（如"中药"、"锂电池"）或主题（如"人工智能"、"新能源"）
+    - 系统会自动匹配最相关的2个行业，无需提供具体行业代码
 
     Args:
-        industry_codes: 行业代码列表，例如 ["3702"] 代表中药行业，["6307"] 代表锂电池行业。
-                       如果为空，则查询所有行业的研报。
-        begin_date_str: 开始日期，格式如 "2025-01-01"。如果为空，不限制开始日期。
-        end_date_str: 结束日期，格式如 "2025-12-31"。如果为空，不限制结束日期。
+        keyword: 【必填】搜索关键词，如 "人工智能"、"新能源"、"中药"、"汽车" 等。
+                 系统会使用 Rerank 模型智能匹配最相关的 2 个行业。
+                 **必须使用此参数**，不要使用 industry_codes 参数。
+        industry_codes: 【内部使用】行业代码列表，由系统自动匹配生成。
+                       大模型不应直接提供此参数，必须使用 keyword 参数。
+        begin_date_str: 开始日期，格式 "2025-01-01"。如果为空，不限制开始日期。
+        end_date_str: 结束日期，格式 "2025-12-31"。如果为空，不限制结束日期。
         page_num: 页码，从1开始。默认为1。
         page_size: 每页返回的研报数量。强制为2。
-        is_random_query: 是否随机查询。默认为False。随机查询可能会返回更多样化的结果。
+        is_random_query: 是否随机查询。默认为False。
 
     Returns:
         str: 研报列表信息，包括标题、机构、作者、发布日期、行业分类等详细信息。
 
     Examples:
-        >>> # 查询中药行业的研报
-        >>> industry_report_search(industry_codes=["3702"])
-        >>> # 查询2025年12月的锂电池行业研报
-        >>> industry_report_search(
-        ...     industry_codes=["6307"],
-        ...     begin_date_str="2025-12-01",
-        ...     end_date_str="2025-12-31"
-        ... )
-        >>> # 随机查询2篇研报
+        >>> # 使用关键词智能匹配（推荐且唯一的方式）
+        >>> industry_report_search(keyword="人工智能")
+        >>> industry_report_search(keyword="新能源汽车")
+        >>> industry_report_search(keyword="中药")
+        >>> industry_report_search(keyword="银行")
+        >>> industry_report_search(keyword="半导体")
+
+        >>> # 带日期范围
+        >>> industry_report_search(keyword="新能源", begin_date_str="2025-01-01", end_date_str="2025-12-31")
+
+        >>> # 随机查询
         >>> industry_report_search(is_random_query=True)
+
+    ⚠️ 重要提示：
+    - 不要直接提供 industry_codes 参数
+    - 不要猜测或提供具体的行业代码
+    - 让系统根据 keyword 自动匹配最相关的行业
     """
+    # 如果提供了关键词但没有提供行业代码，则智能匹配行业
+    if keyword and not industry_codes:
+        matched_industries = _match_industries_by_keyword(keyword, top_k=2)
+        if matched_industries:
+            # 使用匹配到的行业代码
+            industry_codes = [ind["IndustryId"] for ind in matched_industries]
+            logger.info(f"✅ 智能匹配到 {len(matched_industries)} 个相关行业: {[ind['IndustryName'] for ind in matched_industries]}")
+        else:
+            logger.warning(f"⚠️ 未能匹配到相关行业，将查询所有行业的研报")
+
     return call_industry_report_search(
         industry_codes=industry_codes,
         begin_date_str=begin_date_str,
