@@ -23,7 +23,7 @@ from langchain_core.tools import tool
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from utils.rerank import rerank_objects
-from config.industry_list import INDUSTRY_LIST
+from data.industry_list import INDUSTRY_LIST
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,16 @@ def _build_request_body(
 ) -> Dict[str, Any]:
     """构建请求体"""
 
+    # 将字符串类型的行业代码转换为整数类型
+    # 例如: ["3702", "6307"] -> [3702, 6307]
+    industry_codes_int = []
+    if industry_codes:
+        for code in industry_codes:
+            try:
+                industry_codes_int.append(int(code))
+            except (ValueError, TypeError):
+                logger.warning(f"无效的行业代码: {code}，将被忽略")
+
     req_body = {
         "REQ_HEAD": {
             "TRAN_PROCESS": "",
@@ -81,7 +91,7 @@ def _build_request_body(
                 "reservedField1": reserved_field1,
                 "pageSize": 2,
                 "reservedField3": reserved_field3,
-                "industryCodes": industry_codes or [],
+                "industryCodes": industry_codes_int,  # 使用整数列表
                 "reservedField5": reserved_field5
             }
         }
