@@ -13,6 +13,7 @@ from .text_utils import (
 )
 from .enhanced_logger import get_enhanced_logger
 from .json_utils import repair_json_output
+from .rerank import rerank_news, rerank_objects, RerankConfig
 
 __all__ = [
     'remove_think_tags',
@@ -21,4 +22,7 @@ __all__ = [
     'clean_whitespace',
     'get_enhanced_logger',
     'repair_json_output',
+    'rerank_news',
+    'rerank_objects',
+    'RerankConfig',
 ]

@@ -20,6 +20,11 @@ import json
 from typing import Optional, List, Dict, Any
 from langchain_core.tools import tool
 
+# 导入重排序工具
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from utils.rerank import rerank_news
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,13 +34,6 @@ class NewsSearchConfig:
     # API 配置 - 从环境变量获取
     BASE_URL = os.getenv("NEWS_SEARCH_API_URL")
 
-    # 新闻类型映射
-    CATEGORY_CODES = {
-        "news_exclusive": "独家",
-        "news_macro": "宏观",
-        "news_region": "行业",
-        "news_commodity": "大宗"
-    }
 
     # 排序方式映射
     SORT_TYPES = {
@@ -60,7 +58,6 @@ class NewsSearchConfig:
 
 def _build_request_body(
     title: str = "",
-    category_code: str = "news_exclusive",
     begin_date_str: str = "",
     end_date_str: str = "",
     page_num: int = 1,
@@ -83,7 +80,6 @@ def _build_request_body(
             "isRandomQuery": is_random_query,
             "endDateStr": end_date_str,
             "pageNum": page_num,
-            "categoryCode": category_code,
             "pageSize": page_size
         }
     }
@@ -123,7 +119,6 @@ def _extract_news_info(news: Dict[str, Any]) -> str:
 
 def call_news_search(
     title: str = "",
-    category_code: str = "news_exclusive",
     begin_date_str: str = "",
     end_date_str: str = "",
     page_num: int = 1,
@@ -137,7 +132,6 @@ def call_news_search(
 
     Args:
         title: 搜索关键词，可以是任意主题，如 "人工智能"、"新能源"、"政策" 等
-        category_code: 新闻分类代码，可选值: news_exclusive(独家), news_macro(宏观), news_region(行业), news_commodity(大宗)
         begin_date_str: 开始日期，格式如 "2020-11-11 00:00:00"
         end_date_str: 结束日期，格式如 "2025-11-11 00:00:00"
         page_num: 页码，从1开始
@@ -150,16 +144,14 @@ def call_news_search(
         str: API 返回的新闻列表信息
     """
     try:
-        category_name = NewsSearchConfig.CATEGORY_CODES.get(
-            category_code, category_code
-        )
+        
         sort_name = NewsSearchConfig.SORT_TYPES.get(
             sort_type, "未知"
         )
 
         logger.info(
             f"🔰 调用新闻查询 | 关键词: '{title}' | "
-            f"类型: {category_name} | 排序: {sort_name} | "
+            f"排序: {sort_name} | "
             f"日期范围: {begin_date_str} ~ {end_date_str} | "
             f"分页: {page_num}/{page_size}"
         )
@@ -167,7 +159,6 @@ def call_news_search(
         # 构建请求体
         request_body = _build_request_body(
             title=title,
-            category_code=category_code,
             begin_date_str=begin_date_str,
             end_date_str=end_date_str,
             page_num=page_num,
@@ -211,8 +202,8 @@ def call_news_search(
 
         logger.info(f"✅ 新闻查询响应成功 | 状态码: {response.status_code}")
 
-        # 提取新闻内容
-        news_content = _extract_news(result)
+        # 提取新闻内容，传入查询关键词用于重排序
+        news_content = _extract_news(result, query=title)
 
         return news_content
 
@@ -232,7 +223,7 @@ def call_news_search(
         return f"错误: {error_msg}"
 
 
-def _extract_news(result: Dict[str, Any]) -> str:
+def _extract_news(result: Dict[str, Any], query: str = "") -> str:
     """从API响应中提取新闻内容"""
     try:
         # 检查响应状态
@@ -251,6 +242,14 @@ def _extract_news(result: Dict[str, Any]) -> str:
             if not news_list:
                 return f"未找到相关新闻。总记录数: {total}"
 
+            # 如果提供了查询关键词，进行重排序
+            if query and os.getenv("RERANK_API_URL"):
+                try:
+                    logger.info(f"🔄 使用重排序模型对新闻进行重新排序")
+                    news_list = rerank_news(query, news_list, top_k=5)
+                except Exception as e:
+                    logger.warning(f"⚠️ 重排序失败，使用原始排序: {e}")
+
             # 构建新闻信息摘要
             news_infos = []
             for i, news in enumerate(news_list, 1):
@@ -262,11 +261,13 @@ def _extract_news(result: Dict[str, Any]) -> str:
             category_code = rsp_body.get("categoryCode", "")
             category_name = NewsSearchConfig.CATEGORY_CODES.get(
                 category_code, category_code
-            )
+            ) if hasattr(NewsSearchConfig, 'CATEGORY_CODES') else category_code
             sort_type = rsp_body.get("sortType", 1)
             sort_name = NewsSearchConfig.SORT_TYPES.get(sort_type, "未知")
 
-            summary = f"""查询成功！
+            rerank_note = "（已使用AI重排序）" if (query and os.getenv("RERANK_API_URL")) else ""
+
+            summary = f"""查询成功！{rerank_note}
 关键词: {title}
 新闻类型: {category_name}
 排序方式: {sort_name}
@@ -294,7 +295,6 @@ def _extract_news(result: Dict[str, Any]) -> str:
 @tool
 def news_search(
     title: str = "",
-    category_code: str = "news_exclusive",
     begin_date_str: str = "",
     end_date_str: str = "",
     page_num: int = 1,
@@ -308,15 +308,10 @@ def news_search(
 
     Args:
         title: 搜索关键词，可以是任意主题，例如 "人工智能"、"新能源"、"政策"、"股市" 等。如果为空，则查询所有新闻。
-        category_code: 新闻类型代码，可选值:
-            - "news_exclusive": 独家新闻（默认）
-            - "news_macro": 宏观新闻
-            - "news_region": 行业新闻
-            - "news_commodity": 大宗商品新闻
         begin_date_str: 开始日期，格式如 "2020-11-11 00:00:00"。如果为空，不限制开始日期。
         end_date_str: 结束日期，格式如 "2025-11-11 00:00:00"。如果为空，不限制结束日期。
         page_num: 页码，从1开始。默认为1。
-        page_size: 每页返回的新闻数量。强制为2。
+        page_size: 每页返回的新闻数量。强制为20。
         sort_type: 排序方式，1=按热度排序（默认），2=按时间排序。
 
     Returns:
@@ -324,26 +319,22 @@ def news_search(
 
     Examples:
         >>> # 查询人工智能相关新闻
-        >>> news_search(title="人工智能", category_code="news_region", sort_type=1)
+        >>> news_search(title="人工智能", sort_type=1)
         >>> # 查询2024年的宏观新闻
         >>> news_search(
-        ...     category_code="news_macro",
         ...     begin_date_str="2024-01-01 00:00:00",
         ...     end_date_str="2024-12-31 23:59:59"
         ... )
-        >>> # 按时间排序查询行业新闻
-        >>> news_search(category_code="news_region", sort_type=2)
         >>> # 查询新能源相关独家新闻
-        >>> news_search(title="新能源", category_code="news_exclusive")
+        >>> news_search(title="新能源")
     """
     return call_news_search(
         title=title,
-        category_code=category_code,
         begin_date_str=begin_date_str,
         end_date_str=end_date_str,
         page_num=page_num,
-        page_size=2,
-        sort_type=sort_type
+        page_size=20,
+        sort_type=1
     )
 
 
