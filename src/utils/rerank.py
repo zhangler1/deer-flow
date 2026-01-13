@@ -22,9 +22,6 @@ class RerankConfig:
     # Rerank API URL - 从环境变量获取
     RERANK_API_URL = os.getenv("RERANK_API_URL")
 
-    # Rerank API Key - 从环境变量获取
-    RERANK_API_KEY = os.getenv("RERANK_API_KEY")
-
     # 请求超时时间（秒）
     TIMEOUT = 30
 
@@ -33,18 +30,16 @@ def call_rerank_api(
     query: str,
     documents: List[str],
     api_url: Optional[str] = None,
-    api_key: Optional[str] = None,
     top_n: int = 5,
     timeout: int = 30
 ) -> List[Dict[str, Any]]:
     """
-    调用阿里云 Rerank API
+    调用 Qwen3 Rerank API
 
     Args:
         query: 搜索关键词
         documents: 待排序的文档列表
         api_url: API URL（可选，默认使用环境变量配置）
-        api_key: API Key（可选，默认使用环境变量配置）
         top_n: 返回前 N 个结果
         timeout: 超时时间（秒）
 
@@ -54,12 +49,9 @@ def call_rerank_api(
     try:
         # 使用传入的 URL 或默认配置
         url = api_url or RerankConfig.RERANK_API_URL
-        key = api_key or RerankConfig.RERANK_API_KEY
 
         if not url:
             raise ValueError("RERANK_API_URL 未配置")
-        if not key:
-            raise ValueError("RERANK_API_KEY 未配置")
 
         logger.debug(f"📤 调用 Rerank API: {url}")
         logger.debug(f"📤 查询: {query}")
@@ -67,21 +59,20 @@ def call_rerank_api(
 
         # 构建请求头
         headers = {
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Content-type": "application/json",
+            "User-Agent": "PostmanRuntime-ApipostRuntime/1.1.0",
         }
 
-        # 构建请求体（阿里云 Rerank API 格式）
+        # 构建请求体（Qwen3 Rerank API 格式）
         request_body = {
-            "model": "gte-rerank-v2",
-            "input": {
-                "query": query,
-                "documents": documents
-            },
-            "parameters": {
-                "return_documents": True,
-                "top_n": top_n
-            }
+            "query": query,
+            "documents": documents,
+            "top_n": top_n,
+            "return_documents": False,
+            "model_name": "qwen3-reranker-4B"
         }
 
         # 发送请求
@@ -98,15 +89,10 @@ def call_rerank_api(
         # 解析响应
         result = response.json()
 
-        # 提取 rerank 结果
-        if "output" in result and "results" in result["output"]:
-            rerank_results = result["output"]["results"]
+        # 提取 rerank 结果（Qwen3 API 格式）
+        if "results" in result:
+            rerank_results = result["results"]
             logger.info(f"✅ Rerank API 调用成功 | 返回 {len(rerank_results)} 条结果")
-
-            # 记录请求信息
-            if "usage" in result:
-                logger.debug(f"📊 Token 使用: {result['usage']}")
-
             return rerank_results
         else:
             logger.warning(f"Rerank API 响应格式异常: {result}")
@@ -132,7 +118,6 @@ def rerank_news(
     query: str,
     news_list: List[Dict[str, Any]],
     api_url: Optional[str] = None,
-    api_key: Optional[str] = None,
     top_k: int = 5
 ) -> List[Dict[str, Any]]:
     """
@@ -142,7 +127,6 @@ def rerank_news(
         query: 搜索关键词
         news_list: 新闻列表，每条新闻应包含 'title' 字段
         api_url: Rerank API URL（可选，默认使用环境变量配置）
-        api_key: Rerank API Key（可选，默认使用环境变量配置）
         top_k: 返回前 K 条新闻
 
     Returns:
@@ -171,7 +155,6 @@ def rerank_news(
             query=query,
             documents=documents,
             api_url=api_url,
-            api_key=api_key,
             top_n=top_k
         )
 
@@ -210,7 +193,6 @@ def rerank_objects(
     objects: List[Dict[str, Any]],
     text_field: str,
     api_url: Optional[str] = None,
-    api_key: Optional[str] = None,
     top_k: int = 5
 ) -> List[Dict[str, Any]]:
     """
@@ -221,7 +203,6 @@ def rerank_objects(
         objects: 对象列表，每个对象应包含指定的文本字段
         text_field: 用于重排序的字段名（如 "title"、"IndustryName" 等）
         api_url: Rerank API URL（可选，默认使用环境变量配置）
-        api_key: Rerank API Key（可选，默认使用环境变量配置）
         top_k: 返回前 K 个对象
 
     Returns:
@@ -250,7 +231,6 @@ def rerank_objects(
             query=query,
             documents=documents,
             api_url=api_url,
-            api_key=api_key,
             top_n=top_k
         )
 

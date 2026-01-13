@@ -259,7 +259,7 @@ def _match_industries_by_keyword(
     """
     try:
         # 如果配置了 Rerank API，使用智能匹配
-        if os.getenv("RERANK_API_URL") and os.getenv("RERANK_API_KEY"):
+        if os.getenv("RERANK_API_URL"):
             logger.info(f"🔄 使用 Rerank 模型智能匹配行业 | 关键词: '{keyword}'")
 
             # 使用重排序工具找到最相关的行业
