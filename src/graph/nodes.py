@@ -1710,21 +1710,22 @@ async def researcher_node(
     
     enhanced_logger.logger.info(f"🔍 RESEARCH_INIT | 开始研究步骤: {current_step_title}")
     
-    # 配置工具
+    # 配置工具：保留 get_web_search_tool，添加 online_search，移除爬虫和领域检索工具
     tools = [
         get_web_search_tool(
             configurable.max_search_results,
             configurable.search_engine,
             configurable.custom_search_repository
         ),
-        crawl_tool,  # 添加网页爬取工具
-        domain_fin_search,  # 添加金融领域知识搜絢工具（默认场景）
-        crawl_tool,  # 添加网页爬取工具
+        online_search_tool(max_results=configurable.max_search_results),  # 互联网公开信息搜索
+        industry_report_search,  # 行业报告搜索
+        news_search,  # 新闻搜索
+        news_detail_search,  # 新闻详情搜索
     ]
 
     enhanced_logger.logger.info(
         f"🔧 TOOLS_READY | 研究工具配置完成 | "
-        f"工具数: {len(tools)} | 包含: web_search, crawl_tool, domain_fin_search"
+        f"工具数: {len(tools)} | 包含: web_search, online_search, industry_report_search, news_search, news_detail_search"
     )
     
     logger.info(f"Researcher tools: {tools}")
