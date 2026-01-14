@@ -61,7 +61,7 @@ def _build_request_body(
     begin_date_str: str = "",
     end_date_str: str = "",
     page_num: int = 1,
-    page_size: int = 2,
+    page_size: int = 10,
     sort_type: int = 1,
     is_random_query: bool = False,
 ) -> Dict[str, Any]:

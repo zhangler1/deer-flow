@@ -81,19 +81,12 @@ def _build_request_body(
             "TRAN_ID": ""
         },
         "REQ_BODY": {
-            "REQ_BODY": {
-                "endDateStr": end_date_str,
-                "beginDateStr": begin_date_str,
-                "reservedField2": reserved_field2,
-                "reservedField4": reserved_field4,
-                "pageNum": page_num,
-                "isRandomQuery": is_random_query,
-                "reservedField1": reserved_field1,
-                "pageSize": 2,
-                "reservedField3": reserved_field3,
-                "industryCodes": industry_codes_int,  # 使用整数列表
-                "reservedField5": reserved_field5
-            }
+            "endDateStr": end_date_str,
+            "beginDateStr": begin_date_str,
+            "pageNum": page_num,
+            "isRandomQuery": is_random_query,
+            "pageSize": 2,
+            "industryCodes": industry_codes_int  # 使用整数列表
         }
     }
 
@@ -106,8 +99,9 @@ def _extract_report_info(report: Dict[str, Any]) -> str:
         title = report.get("title", "无标题")
         org_name = report.get("orgName", "未知机构")
         publish_date = report.get("publishDate", "N/A")
-        industry_names = report.get("industryNameList", [])
+        industry_names = report.get("industryCodeList", [])
         authors = report.get("authors", [])
+        content = report.get("content", "")
 
         # 构建作者信息
         author_info = []
@@ -136,7 +130,8 @@ def _extract_report_info(report: Dict[str, Any]) -> str:
 作者: {authors_str}
 发布日期: {publish_date}
 行业: {industry_str}
-页数: {page_count}"""
+页数: {page_count}
+内容: {content}"""
         if attach_name:
             info += f"\n附件: {attach_name}"
 
@@ -328,7 +323,7 @@ def _extract_reports(result: Dict[str, Any]) -> str:
 
             # 构建研报信息摘要
             report_infos = []
-            REPORT_NUM = os.getenv("INDUSTRY_REPORT_NUM")
+            REPORT_NUM = int(os.getenv("INDUSTRY_REPORT_NUM"))
             report_list = report_list[:REPORT_NUM]
             for i, report in enumerate(report_list, 1):
                 report_info = _extract_report_info(report)
@@ -392,8 +387,8 @@ def industry_report_search(
                  **必须使用此参数**，不要使用 industry_codes 参数。
         industry_codes: 【内部使用】行业代码列表，由系统自动匹配生成。
                        大模型不应直接提供此参数，必须使用 keyword 参数。
-        begin_date_str: 开始日期，格式 "2025-01-01"。如果为空，不限制开始日期。
-        end_date_str: 结束日期，格式 "2025-12-31"。如果为空，不限制结束日期。
+        begin_date_str: 开始日期，格式 "yyyy-MM-dd HH:mm:ss"。如果为空，不限制开始日期。
+        end_date_str: 结束日期，格式 "yyyy-MM-dd HH:mm:ss"。如果为空，不限制结束日期。
         page_num: 页码，从1开始。默认为1。
         page_size: 每页返回的研报数量。强制为2。
         is_random_query: 是否随机查询。默认为False。
@@ -425,7 +420,7 @@ def industry_report_search(
         matched_industries = _match_industries_by_keyword(keyword, top_k=2)
         if matched_industries:
             # 使用匹配到的行业代码
-            industry_codes = [ind["IndustryId"] for ind in matched_industries]
+            industry_codes = int([ind["IndustryId"] for ind in matched_industries])
             logger.info(f"✅ 智能匹配到 {len(matched_industries)} 个相关行业: {[ind['IndustryName'] for ind in matched_industries]}")
         else:
             logger.warning(f"⚠️ 未能匹配到相关行业，将查询所有行业的研报")
