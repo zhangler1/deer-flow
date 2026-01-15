@@ -40,8 +40,49 @@ export function mergeMessage(message: Message, event: ChatEvent) {
     if (message.toolCalls) {
       message.toolCalls.forEach((toolCall) => {
         if (toolCall.argsChunks?.length) {
-          toolCall.args = JSON.parse(toolCall.argsChunks.join(""));
-          delete toolCall.argsChunks;
+          const joinedArgs = toolCall.argsChunks.join("");
+          try {
+            toolCall.args = JSON.parse(joinedArgs);
+            delete toolCall.argsChunks;
+          } catch (parseError) {
+            console.error("[mergeMessage] Failed to parse tool call args", {
+              toolCallId: toolCall.id,
+              toolCallName: toolCall.name,
+              argsChunks: toolCall.argsChunks,
+              joinedArgs,
+              joinedArgsLength: joinedArgs.length,
+              // 打印前 200 字符和后 200 字符，看问题在哪
+              preview: {
+                first200: joinedArgs.substring(0, 200),
+                last200: joinedArgs.substring(Math.max(0, joinedArgs.length - 200)),
+                position51Context: joinedArgs.substring(Math.max(0, 51 - 30), Math.min(joinedArgs.length, 51 + 30)),
+              },
+              parseError: (parseError as Error).message,
+              stack: (parseError as Error).stack,
+            });
+            // 尝试修复：如果是多个 JSON 对象，只取第一个
+            try {
+              const jsonRegex = /^\s*(\{[^]*?\})/;
+              const firstJsonMatch = jsonRegex.exec(joinedArgs);
+              if (firstJsonMatch?.[1]) {
+                console.warn("[mergeMessage] Attempting to parse first JSON object only", {
+                  original: joinedArgs,
+                  extracted: firstJsonMatch[1],
+                });
+                toolCall.args = JSON.parse(firstJsonMatch[1]);
+                delete toolCall.argsChunks;
+              } else {
+                // 实在解析不了，保留原始字符串
+                console.error("[mergeMessage] Cannot extract valid JSON, keeping raw string");
+                toolCall.args = { __raw__: joinedArgs, __parse_error__: (parseError as Error).message };
+                delete toolCall.argsChunks;
+              }
+            } catch (recoveryError) {
+              console.error("[mergeMessage] Recovery parse also failed", recoveryError);
+              toolCall.args = { __raw__: joinedArgs, __parse_error__: (parseError as Error).message };
+              delete toolCall.argsChunks;
+            }
+          }
         }
       });
     }
