@@ -16,7 +16,23 @@ export async function* fetchStream(
     ...init,
   });
   if (response.status !== 200) {
-    throw new Error(`Failed to fetch from ${url}: ${response.status}`);
+    // 读取响应体的前面部分以便调试
+    let responseBody = "";
+    try {
+      responseBody = await response.text();
+    } catch {
+      responseBody = "<无法读取响应体>";
+    }
+    console.error("[fetchStream] Non-200 response", {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+      bodyPreview: responseBody.substring(0, 500),
+    });
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText}\nURL: ${url}\n响应体预览: ${responseBody.substring(0, 200)}...`
+    );
   }
   // Read from response body, event by event. An event always ends with a '\n\n'.
   const reader = response.body

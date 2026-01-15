@@ -47,23 +47,33 @@ export async function* chatStream(
   ) 
     return yield* chatReplayStream(userMessage, params, options);
   
-  try{
-    const stream = fetchStream(resolveServiceURL("chat/stream"), {
-      body: JSON.stringify({
-        messages: [{ role: "user", content: userMessage }],
-        ...params,
-      }),
-      signal: options.abortSignal,
-    });
-    
-    for await (const event of stream) {
+  const stream = fetchStream(resolveServiceURL("chat/stream"), {
+    body: JSON.stringify({
+      messages: [{ role: "user", content: userMessage }],
+      ...params,
+    }),
+    signal: options.abortSignal,
+  });
+  
+  for await (const event of stream) {
+    try {
       yield {
         type: event.event,
         data: JSON.parse(event.data),
       } as ChatEvent;
+    } catch (parseError) {
+      console.error("[chatStream] Failed to parse SSE event, skipping", {
+        event,
+        error: parseError,
+        rawData: event.data,
+      });
+      // 跳过此事件，继续处理后续事件
+      // 如果想完全中断流，可以取消注释下面的 throw
+      // throw new Error(
+      //   `SSE数据解析失败: ${(parseError as Error).message}\n原始数据: ${event.data?.substring(0, 100)}...`
+      // );
+      continue;
     }
-  }catch(e){
-    console.error(e);
   }
 }
 

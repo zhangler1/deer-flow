@@ -265,6 +265,19 @@ export async function sendMessage(
     for await (const event of stream) {
       const { type, data } = event;
       
+      // 处理后端发来的 error 事件
+      if (type === "error") {
+        const errorMsg = data.error ?? "服务端发生错误";
+        console.error("[sendMessage] Backend error event received", {
+          thread_id: data.thread_id,
+          error: errorMsg,
+          fullData: data,
+        });
+        toast(`后端错误: ${errorMsg}`);
+        // 不 break，继续处理后续事件
+        continue;
+      }
+      
       // Handle search status events
       if (type === "search_status") {
         if (data.status === "started") {
@@ -345,8 +358,15 @@ export async function sendMessage(
         scheduleFlush();
       }
     }
-  } catch {
-    toast("An error occurred while generating the response. Please try again.");
+  } catch (error) {
+    const errMsg = (error as Error).message ?? "未知错误";
+    console.error("[sendMessage] Streaming error caught", {
+      error,
+      message: errMsg,
+      stack: (error as Error).stack,
+      messageId,
+    });
+    toast(`生成回答时出错: ${errMsg}`);
     // Update message status.
     // TODO: const isAborted = (error as Error).name === "AbortError";
     if (messageId != null) {
