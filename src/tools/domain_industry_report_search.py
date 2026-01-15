@@ -417,7 +417,7 @@ def industry_report_search(
     """
     # 如果提供了关键词但没有提供行业代码，则智能匹配行业
     if keyword and not industry_codes:
-        matched_industries = _match_industries_by_keyword(keyword, top_k=2)
+        matched_industries = _match_industries_by_keyword(keyword, top_k=1)
         if matched_industries:
             # 使用匹配到的行业代码
             industry_codes = int([ind["IndustryId"] for ind in matched_industries])
