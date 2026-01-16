@@ -312,7 +312,8 @@ async def simple_search_node(state: State, config: RunnableConfig) -> Command[Li
             agent_name="simple_search_assistant",
             agent_type="researcher",  # 使用 researcher 类型的 LLM 配置
             tools=tools,
-            prompt_template="simple_search"
+            prompt_template="simple_search",
+            configurable=configurable
         )
         agent_create_duration = time.time() - agent_start
         enhanced_logger.logger.info(f"🤖 AGENT_CREATED | 耗时: {agent_create_duration:.2f}s")
@@ -534,7 +535,8 @@ def iterative_research_node(state: State, config: RunnableConfig) -> Command[Lit
             agent_name="iterative_researcher",
             agent_type="researcher",
             tools=tools,
-            prompt_template="iterative_research"
+            prompt_template="iterative_research",
+            configurable=configurable
         )
         agent_duration = time.time() - agent_start
         
@@ -1210,7 +1212,7 @@ def coordinator_node(
     enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | messages数量: {len(state.get('messages', []))}")
     
     try:
-        messages = apply_prompt_template("coordinator", state)
+        messages = apply_prompt_template("coordinator", state, configurable)
         enhanced_logger.logger.info(f"📝 COORDINATOR_PROMPT | 提示模板应用成功 | 消息数: {len(messages)}")
     except Exception as e:
         enhanced_logger.logger.error(f"Failed to apply coordinator template: {e}")
@@ -1665,16 +1667,16 @@ async def _setup_and_execute_agent_step(
                 mcp_tool_count += 1
         
         enhanced_logger.logger.info(f"🔧 MCP_TOOLS_LOADED | {agent_type} | MCP工具加载完成 | 新增工具: {mcp_tool_count} | 总工具数: {len(loaded_tools)}")
-        agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
-        
+        agent = create_agent(agent_type, agent_type, loaded_tools, agent_type, configurable)
+
         setup_duration = time.time() - setup_start_time
         enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | MCP智能体配置完成 | 耗时: {setup_duration:.2f}s")
-        
+
         return await _execute_agent_step(state, agent, agent_type)
     else:
         enhanced_logger.logger.info(f"🔧 DEFAULT_TOOLS | {agent_type} | 使用默认工具 | 工具数: {len(default_tools)}")
         # Use default tools if no MCP servers are configured
-        agent = create_agent(agent_type, agent_type, default_tools, agent_type)
+        agent = create_agent(agent_type, agent_type, default_tools, agent_type, configurable)
         
         setup_duration = time.time() - setup_start_time
         enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | 默认智能体配置完成 | 耗时: {setup_duration:.2f}s")
