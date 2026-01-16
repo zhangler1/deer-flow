@@ -80,7 +80,9 @@
       "news": "新闻",
       "newsDesc": "事实、简明、公正的新闻风格",
       "socialMedia": "社交媒体",
-      "socialMediaDesc": "简洁有趣，易于传播"
+      "socialMediaDesc": "简洁有趣，易于传播",
+      "businessMarketing": "对公营销报告",
+      "businessMarketingDesc": "专业、数据驱动,针对企业客户的分析报告"
     },
     "researchType": {
       "researchType": "研究类型",

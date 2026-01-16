@@ -44,6 +44,12 @@ const REPORT_STYLES = [
     descriptionKey: "socialMediaDesc",
     icon: Users,
   },
+  {
+    value: "business_marketing" as const,
+    labelKey: "businessMarketing",
+    descriptionKey: "businessMarketingDesc",
+    icon: FileText,
+  },
 ];
 
 export function ReportStyleDialog() {
@@ -52,7 +58,7 @@ export function ReportStyleDialog() {
   const currentStyle = useSettingsStore((state) => state.general.reportStyle);
 
   const handleStyleChange = (
-    style: "academic" | "popular_science" | "news" | "social_media",
+    style: "academic" | "popular_science" | "news" | "social_media" | "business_marketing",
   ) => {
     setReportStyle(style);
     setOpen(false);
