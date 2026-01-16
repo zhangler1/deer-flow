@@ -80,7 +80,9 @@
       "news": "News",
       "newsDesc": "Factual, concise, and impartial journalistic style",
       "socialMedia": "Social Media",
-      "socialMediaDesc": "Concise, attention-grabbing, and shareable"
+      "socialMediaDesc": "Concise, attention-grabbing, and shareable",
+      "businessMarketing": "Business Marketing",
+      "businessMarketingDesc": "Professional, data-driven analytical reports for corporate clients"
     },
     "researchType": {
       "researchType": "Research Type",
