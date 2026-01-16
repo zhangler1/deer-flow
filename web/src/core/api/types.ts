@@ -99,6 +99,14 @@ export interface NodeTransitionEvent {
   };
 }
 
+export interface ErrorEvent {
+  type: "error";
+  data: {
+    thread_id: string;
+    error: string;
+  };
+}
+
 export type ChatEvent =
   | MessageChunkEvent
   | ToolCallsEvent
@@ -106,4 +114,5 @@ export type ChatEvent =
   | ToolCallResultEvent
   | InterruptEvent
   | SearchStatusEvent
-  | NodeTransitionEvent;
+  | NodeTransitionEvent
+  | ErrorEvent;
