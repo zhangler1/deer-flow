@@ -104,14 +104,41 @@ def _match_skill_by_query(
         # 降级方案:简单的关键词匹配
         logger.info(f"🔄 使用关键词匹配算法 | 查询: '{query}'")
 
+        best_match = None
+        best_score = 0
+
         for skill in RESEARCH_SKILLS_LIST:
             name = skill.get("name", "")
             description = skill.get("description", "")
 
-            # 检查关键词是否包含在技能名称或描述中
-            if query in name or query in description or name in query:
-                logger.info(f"  ✓ 匹配技能: {name}")
-                return skill
+            # 计算匹配分数
+            score = 0
+            query_lower = query.lower()
+
+            # 精确匹配技能名称
+            if query_lower == name.lower():
+                score = 100
+            # 技能名称包含查询词
+            elif query_lower in name.lower():
+                score = 80
+            # 查询词包含技能名称
+            elif name.lower() in query_lower:
+                score = 70
+            # 描述中包含查询词
+            elif query_lower in description.lower():
+                score = 60
+            # 部分匹配
+            elif any(word in name.lower() for word in query_lower.split()):
+                score = 40
+
+            if score > best_score:
+                best_score = score
+                best_match = skill
+                logger.info(f"  ✓ 潜在匹配: {name} (分数: {score})")
+
+        if best_match:
+            logger.info(f"  ✅ 最佳匹配: {best_match.get('name')} (分数: {best_score})")
+            return best_match
 
         # 如果没有匹配到,返回第一个作为默认
         if RESEARCH_SKILLS_LIST:
