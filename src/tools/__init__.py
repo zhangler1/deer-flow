@@ -21,6 +21,8 @@ from .online_search import (
     call_online_search,
 )
 
+from .research_skill_prompt_search import research_skill_prompt_search
+
 __all__ = [
     "crawl_tool",
     "batch_crawl_tool",
@@ -37,4 +39,5 @@ __all__ = [
     "news_detail_search",
     "online_search_tool",
     "call_online_search",
+    "research_skill_prompt_search",
 ]
