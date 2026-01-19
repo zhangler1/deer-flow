@@ -855,11 +855,9 @@ def background_investigation_node(state: State, config: RunnableConfig):
             )
             result = {"background_investigation_results": None}
     else:
-        enhanced_logger.logger.info(f"🔍 使用{configurable.search_engine}搜索引擎进行背景调研 | 查询: '{query}'")
-        background_investigation_results = get_web_search_tool(
-            max_search_results=configurable.max_search_results, 
-            engine=configurable.search_engine,
-            repository_id=configurable.custom_search_repository
+        enhanced_logger.logger.info(f"🔍 使用online_search进行背景调研 | 查询: '{query}'")
+        background_investigation_results = online_search_tool(
+            max_results=configurable.max_search_results
         ).invoke(query)
         result = {
             "background_investigation_results": json.dumps(
