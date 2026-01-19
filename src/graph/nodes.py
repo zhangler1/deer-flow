@@ -29,6 +29,7 @@ from src.tools import (
     news_search,
     news_detail_search,
     online_search_tool,
+    research_skill_prompt_search
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
@@ -1723,6 +1724,7 @@ async def researcher_node(
         industry_report_search,  # 行业报告搜索
         news_search,  # 新闻搜索
         news_detail_search,  # 新闻详情搜索
+        research_skill_prompt_search
     ]
 
     enhanced_logger.logger.info(
