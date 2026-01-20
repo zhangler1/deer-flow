@@ -214,8 +214,10 @@ export function InputBox({
       </div>
       <div className="flex items-center px-4 py-2">
         <div className="flex grow gap-2">
-          <ResearchTypeSelector />
-          <Tooltip
+          {/* 暂时隐藏研究类型选择器 */}
+          {/* <ResearchTypeSelector /> */}
+          {/* 暂时隐藏背景调研按钮 */}
+          {/* <Tooltip
             className="max-w-60"
             title={
               <div>
@@ -240,7 +242,7 @@ export function InputBox({
             >
               <Detective /> {t("investigation")}
             </Button>
-          </Tooltip>
+          </Tooltip> */}
           <ReportStyleDialog />
         </div>
         <div className="flex shrink-0 items-center gap-2">
