@@ -575,7 +575,11 @@ function MCPToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                     className="pr-0.5 text-base font-medium italic"
                     animated={toolCall.result === undefined}
                   >
-                    正在{toolCall.name ? getToolDisplayText(toolCall.name) : "MCP 工具"}
+                    {toolCall.name === "research_skill_prompt_search" && toolCall.args?.query
+                      ? `正在查看${toolCall.args.query as string}研究策略`
+                      : toolCall.name === "online_search" && toolCall.args?.query
+                      ? `正在外网搜索${toolCall.args.query as string}`
+                      : `正在${toolCall.name ? getToolDisplayText(toolCall.name) : "MCP 工具"}`}
                   </RainbowText>
                 </div>
               </Tooltip>
