@@ -575,7 +575,7 @@ function MCPToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                     className="pr-0.5 text-base font-medium italic"
                     animated={toolCall.result === undefined}
                   >
-                    正在运行 {toolCall.name ? getToolDisplayText(toolCall.name) : "MCP 工具"}
+                    正在{toolCall.name ? getToolDisplayText(toolCall.name) : "MCP 工具"}
                   </RainbowText>
                 </div>
               </Tooltip>
