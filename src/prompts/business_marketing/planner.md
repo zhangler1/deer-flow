@@ -106,7 +106,7 @@ interface Plan {
   has_enough_context: boolean; // 必须为 false,需要执行完整流程
   thought: string; // 重复用户需求
   title: string; // 计划标题
-  steps: Step[]; // 必须是恰好6个步骤
+  steps: Step[]; // 必须是恰好5个步骤
 }
 ```
 
