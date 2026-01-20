@@ -36,9 +36,4 @@ RESEARCH_SKILLS_LIST = [
     "filepath": "src/prompts/business_marketing/research_skills/区域产业政策分析.md",
     "description": "区域宏观经济分析、产业政策解读和产业链分析(综合模块)"
   },
-  {
-    "name": "股权架构分析",
-    "filepath": "src/prompts/business_marketing/research_skills/股权架构分析.md",
-    "description": "企业股权结构、股东信息、控制关系和管理层分析"
-  }
 ]

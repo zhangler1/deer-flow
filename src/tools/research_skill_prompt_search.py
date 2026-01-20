@@ -177,7 +177,7 @@ def research_skill_prompt_search(
 
     Args:
         query: 【必填】用户的需求描述或关键词,系统会智能匹配最相关的提示词。
-               例如: "财务分析"、"商机分析"、"舆情分析"、"股权架构"等
+               例如: "财务分析"、"商机分析"、"舆情分析"等
 
     Returns:
         str: 匹配到的提示词文件的完整内容,可以直接用作系统提示词
@@ -194,10 +194,6 @@ def research_skill_prompt_search(
         >>> # 舆情分析
         >>> research_skill_prompt_search(query="舆情分析")
         >>> research_skill_prompt_search(query="企业声誉怎么样")
-
-        >>> # 股权架构
-        >>> research_skill_prompt_search(query="股权架构")
-        >>> research_skill_prompt_search(query="公司股东信息")
 
     注意事项:
     - 如果没有精确匹配,系统会选择最相关的提示词
