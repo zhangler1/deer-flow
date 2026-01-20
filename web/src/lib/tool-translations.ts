@@ -19,22 +19,25 @@ export const TOOL_NAME_TRANSLATIONS: Record<string, string> = {
   web_search: "网络搜索",
   domain_fin_search: "金融知识库搜索",
   local_search_tool: "本地搜索",
-  
+  online_search: "外网搜索",
+  industry_report_search: "搜索行研报告",
+  research_skill_prompt_search: "匹配提示词",
+
   // 爬虫工具
   crawl_tool: "网页爬取",
   batch_crawl_tool: "批量网页爬取",
-  
+
   // 代码执行工具
   python_repl_tool: "Python 代码执行",
-  
+
   // RAG 工具
   retriever_tool: "知识库检索",
-  
+
   // MCP 工具（示例）
   filesystem_read: "文件系统读取",
   filesystem_write: "文件系统写入",
   github_search: "GitHub 搜索",
-  
+
   // 其他工具可以在这里添加
 };
 
@@ -48,10 +51,10 @@ export function getToolDisplayName(toolName: string): string {
 }
 
 /**
- * 获取工具的显示文本（带括号）
+ * 获取工具的显示文本
  * @param toolName 工具的英文名称
- * @returns 格式化的显示文本，如 "金融知识库搜索()"
+ * @returns 格式化的显示文本，如 "金融知识库搜索"
  */
 export function getToolDisplayText(toolName: string): string {
-  return `${getToolDisplayName(toolName)}()`;
+  return `${getToolDisplayName(toolName)}`;
 }
