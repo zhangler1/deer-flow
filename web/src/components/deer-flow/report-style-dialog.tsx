@@ -20,30 +20,34 @@ import { cn } from "~/lib/utils";
 import { Tooltip } from "./tooltip";
 
 const REPORT_STYLES = [
-  {
-    value: "academic" as const,
-    labelKey: "academic",
-    descriptionKey: "academicDesc",
-    icon: GraduationCap,
-  },
-  {
-    value: "popular_science" as const,
-    labelKey: "popularScience",
-    descriptionKey: "popularScienceDesc",
-    icon: FileText,
-  },
-  {
-    value: "news" as const,
-    labelKey: "news",
-    descriptionKey: "newsDesc",
-    icon: Newspaper,
-  },
-  {
-    value: "social_media" as const,
-    labelKey: "socialMedia",
-    descriptionKey: "socialMediaDesc",
-    icon: Users,
-  },
+  // 暂时隐藏学术风格
+  // {
+  //   value: "academic" as const,
+  //   labelKey: "academic",
+  //   descriptionKey: "academicDesc",
+  //   icon: GraduationCap,
+  // },
+  // 暂时隐藏科普风格
+  // {
+  //   value: "popular_science" as const,
+  //   labelKey: "popularScience",
+  //   descriptionKey: "popularScienceDesc",
+  //   icon: FileText,
+  // },
+  // 暂时隐藏新闻风格
+  // {
+  //   value: "news" as const,
+  //   labelKey: "news",
+  //   descriptionKey: "newsDesc",
+  //   icon: Newspaper,
+  // },
+  // 暂时隐藏社交媒体风格
+  // {
+  //   value: "social_media" as const,
+  //   labelKey: "socialMedia",
+  //   descriptionKey: "socialMediaDesc",
+  //   icon: Users,
+  // },
   {
     value: "business_marketing" as const,
     labelKey: "businessMarketing",
