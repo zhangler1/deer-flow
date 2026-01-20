@@ -213,12 +213,12 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
       </div>
       <div className="pr-4">
         {pageResults && (
-          <ul className="mt-2 flex flex-wrap gap-4">
+          <ul className="mt-2 flex flex-col gap-3">
             {searching &&
               [...Array(3)].map((_, i) => (
                 <li
                   key={`search-result-${i}`}
-                  className="flex h-40 w-40 gap-2 rounded-md text-sm"
+                  className="flex h-20 w-full gap-2 rounded-md text-sm"
                 >
                   <Skeleton
                     className="to-accent h-full w-full rounded-md bg-gradient-to-tl from-slate-400"
@@ -232,7 +232,7 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
               .map((searchResult, i) => (
                 <motion.li
                   key={`search-result-${i}`}
-                  className="text-muted-foreground bg-accent flex max-w-xs flex-col gap-2 rounded-md px-3 py-2 text-sm"
+                  className="text-muted-foreground bg-accent flex w-full flex-row items-center gap-3 rounded-md px-3 py-2 text-sm"
                   initial={{ opacity: 0, y: 10, scale: 0.66 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{
@@ -245,22 +245,22 @@ function WebSearchToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                     {/* 只有有URL时才显示FavIcon */}
                     {searchResult.url && (
                       <FavIcon
-                        className="mt-1 shrink-0"
+                        className="mt-0.5 shrink-0"
                         url={searchResult.url}
                         title={searchResult.title}
                       />
                     )}
                     {/* 如果有URL就显示为链接，否则显示为纯文本 */}
                     {searchResult.url ? (
-                      <a 
-                        href={searchResult.url} 
+                      <a
+                        href={searchResult.url}
                         target="_blank"
-                        className="flex-1 hover:underline line-clamp-2"
+                        className="flex-1 hover:underline line-clamp-1"
                       >
                         {searchResult.title}
                       </a>
                     ) : (
-                      <span className="flex-1 line-clamp-2">
+                      <span className="flex-1 line-clamp-1">
                         {searchResult.title}
                       </span>
                     )}
@@ -578,7 +578,7 @@ function MCPToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                     {toolCall.name === "research_skill_prompt_search" && toolCall.args?.query
                       ? `正在查看${toolCall.args.query as string}研究策略`
                       : toolCall.name === "online_search" && toolCall.args?.query
-                      ? `正在外网搜索${toolCall.args.query as string}`
+                      ? `正在外网搜索：${toolCall.args.query as string}`
                       : `正在${toolCall.name ? getToolDisplayText(toolCall.name) : "MCP 工具"}`}
                   </RainbowText>
                 </div>
