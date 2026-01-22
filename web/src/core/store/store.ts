@@ -248,6 +248,9 @@ export async function sendMessage(
   // Batch UI updates to reduce re-render frequency during streaming
   const pending = new Map<string, Message>();
   let flushTimer: number | null = null;
+  let eventCount = 0;
+  let lastEventTime = Date.now();
+
   const flushNow = () => {
     if (pending.size) {
       useStore.getState().updateMessages(Array.from(pending.values()));
@@ -261,10 +264,24 @@ export async function sendMessage(
       flushTimer = null;
     }, 100);
   };
+
+  console.log("[sendMessage] Starting to process stream...");
+
   try {
     for await (const event of stream) {
       const { type, data } = event;
-      
+      eventCount++;
+      const now = Date.now();
+      const timeSinceLastEvent = now - lastEventTime;
+      lastEventTime = now;
+
+      console.log("[sendMessage] Event received", {
+        eventNumber: eventCount,
+        eventType: type,
+        timeSinceLastEvent: `${timeSinceLastEvent}ms`,
+        hasMessageId: !!messageId,
+      });
+
       // 处理后端发来的 error 事件
       if (type === "error") {
         const errorMsg = data.error ?? "服务端发生错误";
@@ -372,6 +389,7 @@ export async function sendMessage(
       message: errMsg,
       stack: (error as Error).stack,
       messageId,
+      totalEventsProcessed: eventCount,
     });
     toast(`生成回答时出错: ${errMsg}`);
     // Update message status.
@@ -390,6 +408,10 @@ export async function sendMessage(
     // Flush any remaining batched updates before finishing
     flushNow();
     setResponding(false);
+    console.log("[sendMessage] Stream processing ended", {
+      totalEventsProcessed: eventCount,
+      duration: Date.now() - lastEventTime,
+    });
   }
 }
 

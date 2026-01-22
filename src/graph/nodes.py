@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+import asyncio
 import json
 import logging
 import os
@@ -1382,13 +1383,32 @@ def reporter_node(state: State, config: RunnableConfig):
     # 记录LLM调用过程
     llm_start_time = time.time()
     enhanced_logger.logger.info(f"🤖 LLM_INVOKE | reporter | 开始生成最终报告 | 提示消息数: {len(invoke_messages)}")
-    
-    response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
-    response_content = response.content
-    
-    llm_duration = time.time() - llm_start_time
-    report_length = len(response_content) if response_content else 0
-    enhanced_logger.logger.info(f"✅ LLM_COMPLETE | reporter | 报告生成完成 | 报告长度: {report_length} | LLM耗时: {llm_duration:.2f}s")
+
+    try:
+        # 获取 LLM 实例
+        reporter_llm = get_llm_by_type(AGENT_LLM_MAP["reporter"])
+        enhanced_logger.logger.info(f"🔍 LLM_INFO | reporter | 模型类型: {type(reporter_llm).__name__} | 模型名称: {getattr(reporter_llm, 'model_name', 'unknown')}")
+
+        # 记录调用前的状态
+        enhanced_logger.logger.info(f"⏳ LLM_CALL_START | reporter | 准备调用LLM.invoke() | 时间: {time.strftime('%H:%M:%S')}")
+
+        response = reporter_llm.invoke(invoke_messages)
+
+        # 记录调用后的状态
+        llm_call_end_time = time.time()
+        enhanced_logger.logger.info(f"✅ LLM_CALL_END | reporter | LLM调用成功返回 | 时间: {time.strftime('%H:%M:%S')} | 耗时: {llm_call_end_time - llm_start_time:.2f}s")
+
+        response_content = response.content
+
+        llm_duration = time.time() - llm_start_time
+        report_length = len(response_content) if response_content else 0
+        enhanced_logger.logger.info(f"✅ LLM_COMPLETE | reporter | 报告生成完成 | 报告长度: {report_length} | LLM耗时: {llm_duration:.2f}s")
+
+    except Exception as e:
+        llm_duration = time.time() - llm_start_time
+        enhanced_logger.logger.error(f"❌ LLM_ERROR | reporter | LLM调用失败 | 耗时: {llm_duration:.2f}s | 错误类型: {type(e).__name__} | 错误信息: {str(e)}")
+        logger.exception(f"Reporter LLM调用异常: {e}")
+        raise
     
     logger.info(f"reporter response: {response_content}")
     
@@ -1517,17 +1537,58 @@ async def _execute_agent_step(
         recursion_limit = default_recursion_limit
 
     logger.info(f"Agent input: {agent_input}")
-    
+
     # 记录Agent执行过程
     agent_exec_start_time = time.time()
-    enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | 递归限制: {recursion_limit}")
-    
-    result = await agent.ainvoke(
-        input=agent_input, config={"recursion_limit": recursion_limit}
-    )
-    
-    agent_exec_duration = time.time() - agent_exec_start_time
-    enhanced_logger.logger.info(f"✅ AGENT_INVOKED | {agent_name} | LLM调用完成 | 耗时: {agent_exec_duration:.2f}s")
+    enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | 递归限制: {recursion_limit} | 开始时间: {time.strftime('%H:%M:%S')}")
+
+    # 添加定期心跳日志的异步任务
+    async def log_agent_progress():
+        """在agent执行期间定期输出进度日志"""
+        progress_interval = 30  # 每30秒输出一次进度
+        elapsed = 0
+        while True:
+            await asyncio.sleep(progress_interval)
+            elapsed += progress_interval
+            current_duration = time.time() - agent_exec_start_time
+            enhanced_logger.logger.info(
+                f"💓 AGENT_HEARTBEAT | {agent_name} | Agent仍在执行中... | 已耗时: {current_duration:.1f}s | 时间: {time.strftime('%H:%M:%S')}"
+            )
+
+    try:
+        # 启动心跳任务
+        heartbeat_task = asyncio.create_task(log_agent_progress())
+
+        result = await agent.ainvoke(
+            input=agent_input, config={"recursion_limit": recursion_limit}
+        )
+
+        # 取消心跳任务
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
+
+        agent_exec_duration = time.time() - agent_exec_start_time
+        enhanced_logger.logger.info(f"✅ AGENT_INVOKED | {agent_name} | LLM调用成功完成 | 耗时: {agent_exec_duration:.2f}s | 结束时间: {time.strftime('%H:%M:%S')}")
+
+    except Exception as e:
+        # 取消心跳任务
+        if 'heartbeat_task' in locals():
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+
+        agent_exec_duration = time.time() - agent_exec_start_time
+        enhanced_logger.logger.error(
+            f"❌ AGENT_INVOKE_ERROR | {agent_name} | LLM调用失败 | 耗时: {agent_exec_duration:.2f}s | "
+            f"错误类型: {type(e).__name__} | 错误信息: {str(e)} | 时间: {time.strftime('%H:%M:%S')}"
+        )
+        logger.exception(f"Agent {agent_name} LLM调用异常: {e}")
+        raise
     
     # 🆕 添加详细的响应分析日志
     if isinstance(result, dict):

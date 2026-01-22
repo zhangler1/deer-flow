@@ -75,8 +75,12 @@ export async function* fetchStream(
   }
   let buffer = "";
   let lastDataTime = Date.now();
+  let eventCount = 0;
+  let totalBytesReceived = 0;
 
   try {
+    console.log("[fetchStream] Starting to read stream...", { url });
+
     while (true) {
       // 创建带超时的读取 Promise
       const readPromise = reader.read();
@@ -92,15 +96,31 @@ export async function* fetchStream(
       const { done, value } = result;
 
       if (done) {
-        console.log("[fetchStream] Stream completed normally");
+        console.log("[fetchStream] Stream completed normally", {
+          totalEvents: eventCount,
+          totalBytes: totalBytesReceived,
+          duration: Date.now() - lastDataTime,
+        });
         break;
       }
 
       // 更新最后接收数据的时间
-      lastDataTime = Date.now();
+      const now = Date.now();
+      const timeSinceLastData = now - lastDataTime;
+      lastDataTime = now;
+
+      // 记录接收到的数据
+      totalBytesReceived += value.length;
+      console.log("[fetchStream] Data received", {
+        bytes: value.length,
+        totalBytes: totalBytesReceived,
+        timeSinceLastData: `${timeSinceLastData}ms`,
+        preview: value.substring(0, 200),
+      });
 
       // 处理接收到的数据
       buffer += value;
+      let eventsParsedInThisChunk = 0;
       while (true) {
         const index = buffer.indexOf("\n\n");
         if (index === -1) {
@@ -110,8 +130,23 @@ export async function* fetchStream(
         buffer = buffer.slice(index + 2);
         const event = parseEvent(chunk);
         if (event) {
+          eventCount++;
+          eventsParsedInThisChunk++;
+          console.log("[fetchStream] Event parsed", {
+            eventNumber: eventCount,
+            eventType: event.event,
+            dataLength: event.data?.length || 0,
+            dataPreview: event.data?.substring(0, 100),
+          });
           yield event;
         }
+      }
+
+      if (eventsParsedInThisChunk > 0) {
+        console.log("[fetchStream] Events in this chunk", {
+          count: eventsParsedInThisChunk,
+          remainingBufferSize: buffer.length,
+        });
       }
     }
   } catch (error) {
