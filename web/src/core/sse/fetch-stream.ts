@@ -11,18 +11,28 @@ const STREAM_TIMEOUT_MS = 300000;
 
 /**
  * 创建一个超时 Promise，用于检测连接是否超时
+ * 返回一个对象，包含 Promise 和清理函数
  */
-function createTimeoutPromise(timeoutMs: number): Promise<never> {
-  return new Promise((_, reject) => {
-    const timeoutId = setTimeout(() => {
+function createTimeoutPromise(timeoutMs: number): {
+  promise: Promise<never>;
+  cleanup: () => void;
+} {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const promise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
       reject(new Error(`Stream read timeout: No data received for ${timeoutMs}ms`));
     }, timeoutMs);
-
-    // 清理函数，用于在正常读取到数据时取消超时
-    (timeoutId as any).cleanup = () => {
-      clearTimeout(timeoutId);
-    };
   });
+
+  const cleanup = () => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+
+  return { promise, cleanup };
 }
 
 export async function* fetchStream(
@@ -70,15 +80,13 @@ export async function* fetchStream(
     while (true) {
       // 创建带超时的读取 Promise
       const readPromise = reader.read();
-      const timeoutPromise = createTimeoutPromise(STREAM_TIMEOUT_MS);
+      const { promise: timeoutPromise, cleanup: cleanupTimeout } = createTimeoutPromise(STREAM_TIMEOUT_MS);
 
       // 使用 Promise.race 竞争：先返回的胜出
       const result = await Promise.race([readPromise, timeoutPromise]) as ReadableStreamReadResult<string>;
 
       // 清理超时定时器
-      if ('cleanup' in timeoutPromise && typeof timeoutPromise.cleanup === 'function') {
-        timeoutPromise.cleanup();
-      }
+      cleanupTimeout();
 
       // 检查是否读取到数据或流结束
       const { done, value } = result;
