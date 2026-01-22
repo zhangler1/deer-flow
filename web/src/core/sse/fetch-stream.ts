@@ -3,6 +3,28 @@
 
 import { type StreamEvent } from "./StreamEvent";
 
+/**
+ * 超时配置：如果在这个时间内没有收到任何数据，认为连接已断开
+ * 默认 300 秒（5 分钟），考虑到深度研究可能需要较长时间
+ */
+const STREAM_TIMEOUT_MS = 300000;
+
+/**
+ * 创建一个超时 Promise，用于检测连接是否超时
+ */
+function createTimeoutPromise(timeoutMs: number): Promise<never> {
+  return new Promise((_, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`Stream read timeout: No data received for ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    // 清理函数，用于在正常读取到数据时取消超时
+    (timeoutId as any).cleanup = () => {
+      clearTimeout(timeoutId);
+    };
+  });
+}
+
 export async function* fetchStream(
   url: string,
   init: RequestInit,
@@ -42,23 +64,70 @@ export async function* fetchStream(
     throw new Error("Response body is not readable");
   }
   let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    buffer += value;
+  let lastDataTime = Date.now();
+
+  try {
     while (true) {
-      const index = buffer.indexOf("\n\n");
-      if (index === -1) {
+      // 创建带超时的读取 Promise
+      const readPromise = reader.read();
+      const timeoutPromise = createTimeoutPromise(STREAM_TIMEOUT_MS);
+
+      // 使用 Promise.race 竞争：先返回的胜出
+      const result = await Promise.race([readPromise, timeoutPromise]) as ReadableStreamReadResult<string>;
+
+      // 清理超时定时器
+      if ('cleanup' in timeoutPromise && typeof timeoutPromise.cleanup === 'function') {
+        timeoutPromise.cleanup();
+      }
+
+      // 检查是否读取到数据或流结束
+      const { done, value } = result;
+
+      if (done) {
+        console.log("[fetchStream] Stream completed normally");
         break;
       }
-      const chunk = buffer.slice(0, index);
-      buffer = buffer.slice(index + 2);
-      const event = parseEvent(chunk);
-      if (event) {
-        yield event;
+
+      // 更新最后接收数据的时间
+      lastDataTime = Date.now();
+
+      // 处理接收到的数据
+      buffer += value;
+      while (true) {
+        const index = buffer.indexOf("\n\n");
+        if (index === -1) {
+          break;
+        }
+        const chunk = buffer.slice(0, index);
+        buffer = buffer.slice(index + 2);
+        const event = parseEvent(chunk);
+        if (event) {
+          yield event;
+        }
       }
+    }
+  } catch (error) {
+    // 捕获并处理读取错误
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error("[fetchStream] Stream read error", {
+      error,
+      errorMessage: errorMsg,
+      url,
+      timeSinceLastData: Date.now() - lastDataTime,
+    });
+
+    // 重新抛出错误，让上层处理
+    throw new Error(
+      `SSE stream interrupted: ${errorMsg}\n` +
+      `Time since last data: ${Date.now() - lastDataTime}ms\n` +
+      `URL: ${url}`
+    );
+  } finally {
+    // 确保 reader 被正确关闭
+    try {
+      await reader.cancel();
+    } catch (e) {
+      console.warn("[fetchStream] Error canceling reader", e);
     }
   }
 }

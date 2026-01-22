@@ -271,9 +271,16 @@ export async function sendMessage(
         console.error("[sendMessage] Backend error event received", {
           thread_id: data.thread_id,
           error: errorMsg,
+          errorType: typeof data.error,
+          errorLength: data.error?.length,
           fullData: data,
+          allKeys: Object.keys(data),
+          allValues: Object.values(data),
         });
-        toast(`后端错误: ${errorMsg}`);
+        // 只有当确实有错误信息时才显示 toast
+        if (data.error && data.error.length > 0) {
+          toast(`后端错误: ${errorMsg}`);
+        }
         // 不 break，继续处理后续事件
         continue;
       }
