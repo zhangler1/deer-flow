@@ -203,6 +203,7 @@ def _get_llm_type_config_keys() -> dict[str, str]:
         "basic": "BASIC_MODEL",
         "vision": "VISION_MODEL",
         "code": "CODE_MODEL",
+        "reporter_llm": "REPORTER_MODEL",
     }
 
 
