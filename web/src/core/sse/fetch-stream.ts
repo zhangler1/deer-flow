@@ -5,9 +5,10 @@ import { type StreamEvent } from "./StreamEvent";
 
 /**
  * 超时配置：如果在这个时间内没有收到任何数据，认为连接已断开
- * 默认 300 秒（5 分钟），考虑到深度研究可能需要较长时间
+ * 默认 900 秒（15 分钟），考虑到深度研究可能需要较长时间
+ * 需要与后端 LLM 超时配置保持一致
  */
-const STREAM_TIMEOUT_MS = 300000;
+const STREAM_TIMEOUT_MS = 900000;
 
 /**
  * 创建一个超时 Promise，用于检测连接是否超时

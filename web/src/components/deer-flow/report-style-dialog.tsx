@@ -20,13 +20,12 @@ import { cn } from "~/lib/utils";
 import { Tooltip } from "./tooltip";
 
 const REPORT_STYLES = [
-  // 暂时隐藏学术风格
-  // {
-  //   value: "academic" as const,
-  //   labelKey: "academic",
-  //   descriptionKey: "academicDesc",
-  //   icon: GraduationCap,
-  // },
+  {
+    value: "academic" as const,
+    labelKey: "academic",
+    descriptionKey: "academicDesc",
+    icon: GraduationCap,
+  },
   // 暂时隐藏科普风格
   // {
   //   value: "popular_science" as const,

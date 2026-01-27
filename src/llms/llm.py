@@ -21,64 +21,116 @@ from src.utils.enhanced_logger import get_enhanced_logger
 
 class EnhancedLLMWrapper:
     """增弾LLM包装器，用于记录思考过程"""
-    
+
     def __init__(self, llm: BaseChatModel, llm_type: str):
         self.llm = llm
         self.llm_type = llm_type
         self.enhanced_logger = get_enhanced_logger(f'llm.{llm_type}')
-        
+
     def invoke(self, messages, **kwargs):
-        """记录并执行LLM调用"""
-        start_time = time.time()
-        prompt_length = self._calculate_prompt_length(messages)
-        
-        self.enhanced_logger.logger.info(f"🤖 LLM_INVOKE | {self.llm_type} | 开始思考 | 提示长度: {prompt_length}")
-        
-        try:
-            result = self.llm.invoke(messages, **kwargs)
-            duration = time.time() - start_time
-            response_length = len(str(result.content)) if hasattr(result, 'content') else 0
-            
-            self.enhanced_logger.log_llm_thinking(self.llm_type, prompt_length, response_length, duration)
-            
-            # 记录有关思考过程的额外信息
-            if hasattr(result, 'response_metadata'):
-                usage = result.response_metadata.get('usage', {})
-                if usage:
-                    self.enhanced_logger.logger.debug(f"🤖 LLM_USAGE | {self.llm_type} | token使用: {usage}")
-                    
-            return result
-            
-        except Exception as e:
-            duration = time.time() - start_time
-            self.enhanced_logger.logger.error(f"❌ LLM_INVOKE_ERROR | {self.llm_type} | 思考失败: {str(e)} | 耗时: {duration:.2f}s")
-            raise
+        """记录并执行LLM调用，带有自动重试机制"""
+        import asyncio
+        from httpx import RemoteProtocolError, ConnectError, TimeoutException
+
+        max_retries = 2  # 最大重试次数
+        retry_delay = 2.0  # 重试延迟（秒）
+
+        for attempt in range(max_retries + 1):
+            start_time = time.time()
+            prompt_length = self._calculate_prompt_length(messages)
+
+            if attempt == 0:
+                self.enhanced_logger.logger.info(f"🤖 LLM_INVOKE | {self.llm_type} | 开始思考 | 提示长度: {prompt_length}")
+            else:
+                self.enhanced_logger.logger.warning(f"🔄 LLM_RETRY | {self.llm_type} | 第 {attempt} 次重试 | 提示长度: {prompt_length}")
+
+            try:
+                result = self.llm.invoke(messages, **kwargs)
+                duration = time.time() - start_time
+                response_length = len(str(result.content)) if hasattr(result, 'content') else 0
+
+                self.enhanced_logger.log_llm_thinking(self.llm_type, prompt_length, response_length, duration)
+
+                # 记录有关思考过程的额外信息
+                if hasattr(result, 'response_metadata'):
+                    usage = result.response_metadata.get('usage', {})
+                    if usage:
+                        self.enhanced_logger.logger.debug(f"🤖 LLM_USAGE | {self.llm_type} | token使用: {usage}")
+
+                return result
+
+            except (RemoteProtocolError, ConnectError, TimeoutException) as e:
+                duration = time.time() - start_time
+                is_last_attempt = (attempt == max_retries)
+
+                if is_last_attempt:
+                    self.enhanced_logger.logger.error(
+                        f"❌ LLM_INVOKE_ERROR | {self.llm_type} | 网络错误（已达最大重试次数）: {str(e)} | 耗时: {duration:.2f}s"
+                    )
+                    raise
+                else:
+                    self.enhanced_logger.logger.warning(
+                        f"⚠️  LLM_NETWORK_ERROR | {self.llm_type} | 网络错误，将在 {retry_delay}s 后重试: {str(e)}"
+                    )
+                    time.sleep(retry_delay * (attempt + 1))  # 指数退避
+
+            except Exception as e:
+                duration = time.time() - start_time
+                self.enhanced_logger.logger.error(f"❌ LLM_INVOKE_ERROR | {self.llm_type} | 思考失败: {str(e)} | 耗时: {duration:.2f}s")
+                raise
             
     def stream(self, messages, **kwargs):
-        """记录并执行流式LLM调用"""
-        start_time = time.time()
-        prompt_length = self._calculate_prompt_length(messages)
-        
-        self.enhanced_logger.logger.info(f"🤖 LLM_STREAM | {self.llm_type} | 开始流式思考 | 提示长度: {prompt_length}")
-        
-        try:
-            stream = self.llm.stream(messages, **kwargs)
-            chunks_count = 0
-            total_content_length = 0
-            
-            for chunk in stream:
-                chunks_count += 1
-                if hasattr(chunk, 'content') and chunk.content:
-                    total_content_length += len(str(chunk.content))
-                yield chunk
-                
-            duration = time.time() - start_time
-            self.enhanced_logger.logger.info(f"🤖 LLM_STREAM_COMPLETE | {self.llm_type} | 流式思考完成 | 块数: {chunks_count} | 总长度: {total_content_length} | 耗时: {duration:.2f}s")
-            
-        except Exception as e:
-            duration = time.time() - start_time
-            self.enhanced_logger.logger.error(f"❌ LLM_STREAM_ERROR | {self.llm_type} | 流式思考失败: {str(e)} | 耗时: {duration:.2f}s")
-            raise
+        """记录并执行流式LLM调用，带有自动重试机制"""
+        from httpx import RemoteProtocolError, ConnectError, TimeoutException
+
+        max_retries = 2  # 最大重试次数
+        retry_delay = 2.0  # 重试延迟（秒）
+
+        for attempt in range(max_retries + 1):
+            start_time = time.time()
+            prompt_length = self._calculate_prompt_length(messages)
+
+            if attempt == 0:
+                self.enhanced_logger.logger.info(f"🤖 LLM_STREAM | {self.llm_type} | 开始流式思考 | 提示长度: {prompt_length}")
+            else:
+                self.enhanced_logger.logger.warning(f"🔄 LLM_STREAM_RETRY | {self.llm_type} | 流式第 {attempt} 次重试 | 提示长度: {prompt_length}")
+
+            try:
+                stream = self.llm.stream(messages, **kwargs)
+                chunks_count = 0
+                total_content_length = 0
+
+                for chunk in stream:
+                    chunks_count += 1
+                    if hasattr(chunk, 'content') and chunk.content:
+                        total_content_length += len(str(chunk.content))
+                    yield chunk
+
+                duration = time.time() - start_time
+                self.enhanced_logger.logger.info(
+                    f"🤖 LLM_STREAM_COMPLETE | {self.llm_type} | 流式思考完成 | 块数: {chunks_count} | 总长度: {total_content_length} | 耗时: {duration:.2f}s"
+                )
+                return  # 成功完成，退出重试循环
+
+            except (RemoteProtocolError, ConnectError, TimeoutException) as e:
+                duration = time.time() - start_time
+                is_last_attempt = (attempt == max_retries)
+
+                if is_last_attempt:
+                    self.enhanced_logger.logger.error(
+                        f"❌ LLM_STREAM_ERROR | {self.llm_type} | 网络错误（已达最大重试次数）: {str(e)} | 耗时: {duration:.2f}s"
+                    )
+                    raise
+                else:
+                    self.enhanced_logger.logger.warning(
+                        f"⚠️  LLM_STREAM_NETWORK_ERROR | {self.llm_type} | 网络错误，将在 {retry_delay}s 后重试: {str(e)}"
+                    )
+                    time.sleep(retry_delay * (attempt + 1))  # 指数退避
+
+            except Exception as e:
+                duration = time.time() - start_time
+                self.enhanced_logger.logger.error(f"❌ LLM_STREAM_ERROR | {self.llm_type} | 流式思考失败: {str(e)} | 耗时: {duration:.2f}s")
+                raise
             
     def with_structured_output(self, *args, **kwargs):
         """包装结构化输出方法"""
@@ -247,13 +299,37 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
     if "max_retries" not in merged_conf:
         merged_conf["max_retries"] = 3
 
+    # Configure timeout for long-running LLM calls
+    # Set a longer timeout for streaming responses (15 minutes)
+    if "timeout" not in merged_conf:
+        merged_conf["timeout"] = 900.0  # 15 minutes in seconds
+
     # Handle SSL verification settings
     verify_ssl = merged_conf.pop("verify_ssl", True)
 
     # Create custom HTTP client if SSL verification is disabled
     if not verify_ssl:
-        http_client = httpx.Client(verify=False)
-        http_async_client = httpx.AsyncClient(verify=False)
+        # Configure timeout for httpx clients
+        timeout_config = httpx.Timeout(
+            connect=60.0,  # Connection timeout
+            read=900.0,    # Read timeout (15 minutes for streaming)
+            write=60.0,    # Write timeout
+            pool=60.0      # Connection pool timeout
+        )
+        http_client = httpx.Client(verify=False, timeout=timeout_config)
+        http_async_client = httpx.AsyncClient(verify=False, timeout=timeout_config)
+        merged_conf["http_client"] = http_client
+        merged_conf["http_async_client"] = http_async_client
+    else:
+        # Also configure timeout when SSL verification is enabled
+        timeout_config = httpx.Timeout(
+            connect=60.0,
+            read=900.0,    # 15 minutes for streaming
+            write=60.0,
+            pool=60.0
+        )
+        http_client = httpx.Client(timeout=timeout_config)
+        http_async_client = httpx.AsyncClient(timeout=timeout_config)
         merged_conf["http_client"] = http_client
         merged_conf["http_async_client"] = http_async_client
 
