@@ -579,6 +579,10 @@ function MCPToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                       ? `正在查看${toolCall.args.query as string}研究策略`
                       : toolCall.name === "online_search" && toolCall.args?.query
                       ? `正在外网搜索：${toolCall.args.query as string}`
+                      : toolCall.name === "product_search" && toolCall.args?.keyword
+                      ? `正在运行基础产品搜索：「${toolCall.args.keyword as string}」`
+                      : toolCall.name === "product_instance_search" && toolCall.args?.keyword
+                      ? `正在运行产品实例搜索：「${toolCall.args.keyword as string}」`
                       : `正在${toolCall.name ? getToolDisplayText(toolCall.name) : "MCP 工具"}`}
                   </RainbowText>
                 </div>

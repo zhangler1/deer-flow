@@ -22,6 +22,10 @@ export const TOOL_NAME_TRANSLATIONS: Record<string, string> = {
   online_search: "外网搜索",
   industry_report_search: "搜索行研报告",
   research_skill_prompt_search: "匹配提示词",
+  product_search: "基础产品搜索",
+  product_instance_search: "产品实例搜索",
+  news_search: "新闻搜索",
+  news_detail_search: "新闻详情搜索",
 
   // 爬虫工具
   crawl_tool: "网页爬取",
