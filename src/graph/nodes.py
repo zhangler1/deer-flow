@@ -29,6 +29,8 @@ from src.tools import (
     industry_report_search,
     news_search,
     news_detail_search,
+    product_search,
+    product_instance_search,
     online_search_tool,
     research_skill_prompt_search
 )
@@ -1783,12 +1785,14 @@ async def researcher_node(
         industry_report_search,  # 行业报告搜索
         news_search,  # 新闻搜索
         news_detail_search,  # 新闻详情搜索
+        product_search,  # 基础产品搜索
+        product_instance_search,  # 产品实例搜索
         research_skill_prompt_search
     ]
 
     enhanced_logger.logger.info(
         f"🔧 TOOLS_READY | 研究工具配置完成 | "
-        f"工具数: {len(tools)} | 包含: web_search, online_search, industry_report_search, news_search, news_detail_search"
+        f"工具数: {len(tools)} | 包含: web_search, online_search, industry_report_search, news_search, news_detail_search, product_search, product_instance_search"
     )
     
     logger.info(f"Researcher tools: {tools}")

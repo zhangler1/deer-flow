@@ -16,6 +16,8 @@ from .domain_industry_report_search import (
 )
 from .news_search import news_search
 from .news_detail_search import news_detail_search
+from .product_search import product_search
+from .product_instance_search import product_instance_search
 from .online_search import (
     online_search_tool,
     call_online_search,
@@ -37,6 +39,8 @@ __all__ = [
     "call_industry_report_search",
     "news_search",
     "news_detail_search",
+    "product_search",
+    "product_instance_search",
     "online_search_tool",
     "call_online_search",
     "research_skill_prompt_search",
