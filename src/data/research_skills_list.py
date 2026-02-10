@@ -37,6 +37,11 @@ RESEARCH_SKILLS_LIST = [
     "description": "行业产业链结构分析,包括上下游关系、关键产业节点、核心企业和价值分布"
   },
   {
+    "name": "股权架构分析",
+    "filepath": "src/prompts/business_marketing/research_skills/股权架构分析.md",
+    "description": "企业股权结构、股东信息、控制关系和管理层分析"
+  },
+  {
     "name": "财务分析",
     "filepath": "src/prompts/business_marketing/research_skills/财务分析.md",
     "description": "企业财务数据深度分析,包括资产负债表、利润表、现金流量表分析,以及行业对比评估"

@@ -29,7 +29,7 @@ class ProductInstanceSearchConfig:
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive",
-        "Content-Type": "multipart/form-data",
+        # 不要手动设置 Content-Type，让 requests 库自动设置 multipart/form-data 的 boundary
         "User-Agent": "PostmanRuntime-ApipostRuntime/1.1.0",
         "caller": "sjyh",
         "jumpcloud-ENV": "BASE",
