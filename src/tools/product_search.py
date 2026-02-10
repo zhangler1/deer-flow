@@ -22,7 +22,7 @@ class ProductSearchConfig:
     """产品搜索配置"""
 
     # API 配置 - 从环境变量获取
-    BASE_URL = os.getenv("PRODUCT_SEARCH_API_URL", "http://12.244.113.82/EUVD.EUVD-ADAPTER.V-1.0/searchKnowledgeStandard.do")
+    BASE_URL = os.getenv("EUVD_API_URL", "http://12.244.113.82/EUVD.EUVD-ADAPTER.V-1.0/searchKnowledgeStandard.do")
 
     # 请求头配置
     HEADERS = {

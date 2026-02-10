@@ -18,6 +18,14 @@ from .news_search import news_search
 from .news_detail_search import news_detail_search
 from .product_search import product_search
 from .product_instance_search import product_instance_search
+from .business_opportunity_search import (
+    business_opportunity_search,
+    call_business_opportunity_search,
+)
+from .sentiment_search import (
+    sentiment_search,
+    call_sentiment_search,
+)
 from .online_search import (
     online_search_tool,
     call_online_search,
@@ -41,6 +49,10 @@ __all__ = [
     "news_detail_search",
     "product_search",
     "product_instance_search",
+    "business_opportunity_search",
+    "call_business_opportunity_search",
+    "sentiment_search",
+    "call_sentiment_search",
     "online_search_tool",
     "call_online_search",
     "research_skill_prompt_search",
