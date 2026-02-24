@@ -31,6 +31,11 @@ from .online_search import (
     call_online_search,
 )
 
+from .financial_summary import (
+    financial_summary,
+    call_financial_summary,
+)
+
 from .research_skill_prompt_search import research_skill_prompt_search
 
 __all__ = [
@@ -55,5 +60,7 @@ __all__ = [
     "call_sentiment_search",
     "online_search_tool",
     "call_online_search",
+    "financial_summary",
+    "call_financial_summary",
     "research_skill_prompt_search",
 ]

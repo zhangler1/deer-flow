@@ -34,7 +34,8 @@ from src.tools import (
     online_search_tool,
     research_skill_prompt_search,
     business_opportunity_search,
-    sentiment_search
+    sentiment_search,
+    financial_summary
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
@@ -1791,7 +1792,8 @@ async def researcher_node(
         product_instance_search,  # 产品实例搜索
         research_skill_prompt_search,
         business_opportunity_search,
-        sentiment_search
+        sentiment_search,
+        financial_summary
     ]
 
     enhanced_logger.logger.info(
