@@ -9,6 +9,8 @@
 
 import logging
 from typing import Optional, Dict, Any, List
+from datetime import datetime, timedelta
+from dateutil.parser import parse as parse_date
 
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
@@ -33,6 +35,66 @@ from src.llms.llm import get_llm_by_type
 from src.config.agents import LLMType
 
 logger = logging.getLogger(__name__)
+
+
+def _filter_search_results_by_date(
+    search_results: List[Dict[str, Any]],
+    months_threshold: int = 6
+) -> List[Dict[str, Any]]:
+    """
+    根据 createTime 过滤搜索结果，去除早于指定月数的数据
+
+    Args:
+        search_results: 搜索结果列表
+        months_threshold: 月数阈值，默认 6 个月
+
+    Returns:
+        过滤后的搜索结果列表
+    """
+    if not search_results:
+        return search_results
+
+    # 计算阈值日期
+    threshold_date = datetime.now() - timedelta(days=months_threshold * 30)
+
+    filtered_results = []
+    removed_count = 0
+
+    for result in search_results:
+        create_time_str = result.get("createTime", "")
+
+        # 如果没有 createTime，保留该结果
+        if not create_time_str:
+            filtered_results.append(result)
+            continue
+
+        try:
+            # 解析 createTime（格式如 "2025年8月15日"）
+            # 处理中文日期格式
+            create_time_str = create_time_str.replace("年", "-").replace("月", "-").replace("日", "")
+            create_time = parse_date(create_time_str)
+
+            # 检查是否在阈值范围内
+            if create_time >= threshold_date:
+                filtered_results.append(result)
+            else:
+                removed_count += 1
+                logger.debug(
+                    f"过滤掉过时数据: {result.get('title', '无标题')} "
+                    f"(createTime: {create_time_str})"
+                )
+        except Exception as e:
+            # 如果日期解析失败，保留该结果
+            logger.debug(f"无法解析 createTime '{create_time_str}': {e}，保留该结果")
+            filtered_results.append(result)
+
+    if removed_count > 0:
+        logger.info(
+            f"📅 日期过滤完成 | 保留 {len(filtered_results)} 条结果，"
+            f"去除 {removed_count} 条超过 {months_threshold} 个月的数据"
+        )
+
+    return filtered_results
 
 
 def _extract_company_name(query: str) -> str:
@@ -109,12 +171,16 @@ def call_financial_summary(
         )
 
         # 步骤1: 调用联网搜索获取财务信息（使用内部实现的 _online_search）
-        logger.info(f"🔍 步骤 1/2: 调用联网搜索获取 {company_name} 的财务信息")
+        logger.info(f"🔍 步骤 1/3: 调用联网搜索获取 {company_name} 的财务信息")
         search_results = _online_search(query=query, max_results=max_results)
 
         # 检查搜索是否成功
         if not search_results:
             return f"未找到 {company_name} 的相关财务信息。"
+
+        # 步骤2: 过滤掉超过6个月的旧数据
+        logger.info(f"📅 步骤 2/3: 过滤早于6个月前的数据")
+        search_results = _filter_search_results_by_date(search_results, months_threshold=6)
 
         # 格式化搜索结果
         if isinstance(search_results, list):
@@ -129,8 +195,8 @@ def call_financial_summary(
         else:
             search_context = str(search_results)
 
-        # 步骤2: 使用 REPORTER_MODEL 生成财务数据汇总
-        logger.info(f"🤖 步骤 2/2: 使用 REPORTER_MODEL 生成 {company_name} 财务数据汇总")
+        # 步骤3: 使用 REPORTER_MODEL 生成财务数据汇总
+        logger.info(f"🤖 步骤 3/3: 使用 REPORTER_MODEL 生成 {company_name} 财务数据汇总")
 
         # 获取 REPORTER_MODEL
         reporter_llm = get_llm_by_type(LLMType.REPORTER_LLM)
