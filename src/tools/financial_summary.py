@@ -39,14 +39,14 @@ logger = logging.getLogger(__name__)
 
 def _filter_search_results_by_date(
     search_results: List[Dict[str, Any]],
-    months_threshold: int = 6
+    months_threshold: int = 8
 ) -> List[Dict[str, Any]]:
     """
     根据 createTime 过滤搜索结果，去除早于指定月数的数据
 
     Args:
         search_results: 搜索结果列表
-        months_threshold: 月数阈值，默认 6 个月
+        months_threshold: 月数阈值，默认 8 个月
 
     Returns:
         过滤后的搜索结果列表
@@ -180,7 +180,7 @@ def call_financial_summary(
 
         # 步骤2: 过滤掉超过6个月的旧数据
         logger.info(f"📅 步骤 2/3: 过滤早于6个月前的数据")
-        search_results = _filter_search_results_by_date(search_results, months_threshold=6)
+        search_results = _filter_search_results_by_date(search_results, months_threshold=8)
 
         # 格式化搜索结果
         if isinstance(search_results, list):
