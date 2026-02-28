@@ -129,6 +129,26 @@ def _online_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
     Returns:
         搜索结果列表
     """
+    # 根据当前月份决定使用哪一年
+    # 4月及之前使用上一年，5月及之后使用当前年
+    current_date = datetime.now()
+    current_month = current_date.month
+    current_year = current_date.year
+
+    if current_month <= 4:
+        # 1-4月：使用上一年
+        search_year = current_year - 1
+    else:
+        # 5-12月：使用当前年
+        search_year = current_year
+
+    enhanced_query = f"{query} {search_year}"
+
+    logger.info(
+        f"📅 增强查询: '{query}' -> '{enhanced_query}' "
+        f"(当前月份: {current_month}月, 使用年份: {search_year})"
+    )
+
     tool = CustomSearchTool(
         repository_id="online-search",
         max_results=10
@@ -137,8 +157,8 @@ def _online_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
     tool.name = "online_search"
     tool.description = "搜索互联网公开信息。适用于查询最新新闻、公开资讯、行业动态、学术文献等互联网内容。输入应该是搜索查询字符串。"
 
-    # 调用搜索
-    return tool._run(query)
+    # 调用搜索（使用增强后的查询）
+    return tool._run(enhanced_query)
 
 
 @observe(name="财务数据汇总函数API", as_type="tool")
