@@ -361,9 +361,15 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
     # Check if base_url is dashscope endpoint
     if "base_url" in merged_conf and "dashscope." in merged_conf["base_url"]:
         if llm_type == "reasoning":
-            merged_conf["extra_body"] = {"enable_thinking": True}
+            merged_conf["extra_body"] = {
+                "enable_thinking": False,
+                "chat_template_kwargs": {"enable_thinking": False}
+            }
         else:
-            merged_conf["extra_body"] = {"enable_thinking": False}
+            merged_conf["extra_body"] = {
+                "enable_thinking": False,
+                "chat_template_kwargs": {"enable_thinking": False}
+            }
         return ChatDashscope(**merged_conf)
 
     if llm_type == "reasoning":
