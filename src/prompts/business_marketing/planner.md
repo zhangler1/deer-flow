@@ -26,6 +26,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 - **内容**: 企业商机数据（股权质押、专利、中标、分红、资质审批等）、产品推荐、营销建议
 - **数据来源**:
   - 必须首先使用 `business_opportunity_search` 工具查询企业商机数据
+  - 必须使用 `online_search` 工具补充查询企业商机数据
   - 然后使用 `product_search` 工具搜索匹配的产品类型
   - 最后使用 `product_instance_search` 工具检索具体的产品实例
   - **重要：推荐的产品实例必须是 `product_instance_search` 工具返回的结果**
@@ -66,7 +67,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 - **目标**: 深度分析企业财务数据和行业对比
 - **执行**: 由专门的researcher执行"财务分析"技能
 - **内容**: 资产负债分析、盈利能力分析、现金流分析、行业对比、竞争力评估
-- **数据来源**: 联网搜索(online_search)、行业报告搜索(industry_report_search)
+- **数据来源**: 财务总结(financial_summary)
 
 ## 执行机制
 
