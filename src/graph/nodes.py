@@ -1502,11 +1502,11 @@ async def _execute_agent_step(
 
     # 格式化已完成步骤信息
     completed_steps_info = ""
-    if completed_steps:
-        completed_steps_info = "# 已完成的研究步骤\n\n"
-        for i, step in enumerate(completed_steps):
-            completed_steps_info += f"## 已完成步骤 {i + 1}：{step.title}\n\n"
-            completed_steps_info += f"<finding>\n{step.execution_res}\n</finding>\n\n"
+    # if completed_steps:
+    #     completed_steps_info = "# 已完成的研究步骤\n\n"
+    #     for i, step in enumerate(completed_steps):
+    #         completed_steps_info += f"## 已完成步骤 {i + 1}：{step.title}\n\n"
+    #         completed_steps_info += f"<finding>\n{step.execution_res}\n</finding>\n\n"
 
     # 为智能体准备包含已完成步骤信息的输入
     agent_input = {
