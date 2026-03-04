@@ -17,6 +17,7 @@ from langgraph.types import Command, interrupt
 from src.agents import create_agent
 from src.config.agents import AGENT_LLM_MAP
 from src.config.configuration import Configuration
+from src.graph.tool_limit_middleware import ToolCallLimitMiddleware
 from src.llms.llm import get_llm_by_type
 from src.prompts.planner_model import Plan
 from src.prompts.template import apply_prompt_template
@@ -1461,11 +1462,12 @@ def research_team_node(state: State):
 
 
 async def _execute_agent_step(
-    state: State, agent, agent_name: str
+    state: State, agent, agent_name: str, recursion_limit: int = 10
 ) -> Command[Literal["research_team"]]:
     """使用指定智能体执行步骤的辅助函数"""
     step_start_time = time.time()
     enhanced_logger.logger.info(f"🔄 AGENT_STEP_ENTRY | {agent_name} | 开始执行研究步骤")
+    enhanced_logger.logger.info(f"🎛️  RECURSION_LIMIT_PARAM | {agent_name} | 限制: {recursion_limit}")
     
     current_plan = state.get("current_plan")
     plan_title = current_plan.title
@@ -1549,34 +1551,52 @@ async def _execute_agent_step(
             )
         )
 
-    # 调用智能体
-    default_recursion_limit = 25
-    try:
-        env_value_str = os.getenv("AGENT_RECURSION_LIMIT", str(default_recursion_limit))
-        parsed_limit = int(env_value_str)
+    # 🔥 核心：使用中间件检查工具调用次数，如果接近限制则插入提示消息
+    # 不强制停止，只是建议 LLM 停止
+    middleware = ToolCallLimitMiddleware(max_calls=recursion_limit)
 
-        if parsed_limit > 0:
-            recursion_limit = parsed_limit
-            logger.info(f"递归限制设置为：{recursion_limit}")
-        else:
-            logger.warning(
-                f"AGENT_RECURSION_LIMIT 值 '{env_value_str}' (解析为 {parsed_limit}) 不是正数。"
-                f"使用默认值 {default_recursion_limit}。"
-            )
-            recursion_limit = default_recursion_limit
-    except ValueError:
-        raw_env_value = os.getenv("AGENT_RECURSION_LIMIT")
-        logger.warning(
-            f"无效的 AGENT_RECURSION_LIMIT 值：'{raw_env_value}'。"
-            f"使用默认值 {default_recursion_limit}。"
+    # 检查 state 中的消息（历史消息）
+    state_messages = state.get("messages", [])
+    tool_call_count = middleware.count_tool_calls_in_messages(state_messages)
+
+    enhanced_logger.logger.info(f"📊 TOOL_CALL_COUNT | {agent_name} | 当前工具调用: {tool_call_count} | 限制: {recursion_limit}")
+
+    # 如果工具调用次数已经接近限制（>= 80%），在输入中插入提示消息
+    if tool_call_count >= int(recursion_limit * 0.8):
+        enhanced_logger.logger.warning(
+            f"⚠️  TOOL_LIMIT_WARNING | {agent_name} | 工具调用 {tool_call_count}/{recursion_limit} | "
+            f"已达到 80%，将在输入中插入停止建议"
         )
-        recursion_limit = default_recursion_limit
 
+        # 创建停止建议消息
+        stop_advice_msg = HumanMessage(
+            content=(
+                f"\n\n【系统提示 - 工具调用次数提醒】\n\n"
+                f"你已经调用了 {tool_call_count} 次工具，接近最大限制（{recursion_limit} 次）。\n\n"
+                f"**建议你现在停止搜索**：\n\n"
+                f"✅ 请考虑：\n"
+                f"   1. 是否已经收集到足够的信息？\n"
+                f"   2. 是否可以开始输出最终答案了？\n"
+                f"   3. 继续搜索是否真的有价值？\n\n"
+                f"如果信息已经充足，请立即停止调用工具，直接输出最终答案。\n\n"
+                f"如果确实需要更多信息，请谨慎选择最关键的 1-2 个搜索进行。"
+            ),
+            name="tool_limit_advisor"
+        )
+
+        # 将提示消息添加到输入中
+        agent_input["messages"].append(stop_advice_msg)
+        enhanced_logger.logger.info(f"✅ STOP_ADVICE_ADDED | 已在输入中添加停止建议消息")
+
+    # 保持 recursion_limit 不变，不强制停止
+    actual_recursion_limit = recursion_limit
+
+    enhanced_logger.logger.info(f"🎛️  RECURSION_LIMIT | {agent_name} | 递归限制: {actual_recursion_limit} 次 (不强制停止)")
     logger.info(f"Agent input: {agent_input}")
 
     # 记录Agent执行过程
     agent_exec_start_time = time.time()
-    enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | 递归限制: {recursion_limit} | 开始时间: {time.strftime('%H:%M:%S')}")
+    enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | 递归限制: {actual_recursion_limit} | 开始时间: {time.strftime('%H:%M:%S')}")
 
     # 添加定期心跳日志的异步任务
     async def log_agent_progress():
@@ -1596,7 +1616,7 @@ async def _execute_agent_step(
         heartbeat_task = asyncio.create_task(log_agent_progress())
 
         result = await agent.ainvoke(
-            input=agent_input, config={"recursion_limit": recursion_limit}
+            input=agent_input, config={"recursion_limit": actual_recursion_limit}
         )
 
         # 取消心跳任务
@@ -1706,6 +1726,7 @@ async def _setup_and_execute_agent_step(
     config: RunnableConfig,
     agent_type: str,
     default_tools: list,
+    recursion_limit: int = 10,
 ) -> Command[Literal["research_team"]]:
     """设置智能体并使用适当工具执行步骤的辅助函数
 
@@ -1768,16 +1789,16 @@ async def _setup_and_execute_agent_step(
         setup_duration = time.time() - setup_start_time
         enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | MCP智能体配置完成 | 耗时: {setup_duration:.2f}s")
 
-        return await _execute_agent_step(state, agent, agent_type)
+        return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit)
     else:
         enhanced_logger.logger.info(f"🔧 DEFAULT_TOOLS | {agent_type} | 使用默认工具 | 工具数: {len(default_tools)}")
         # Use default tools if no MCP servers are configured
         agent = create_agent(agent_type, agent_type, default_tools, agent_type, configurable)
-        
+
         setup_duration = time.time() - setup_start_time
         enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | 默认智能体配置完成 | 耗时: {setup_duration:.2f}s")
-        
-        return await _execute_agent_step(state, agent, agent_type)
+
+        return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit)
 
 
 async def researcher_node(
@@ -1789,6 +1810,13 @@ async def researcher_node(
     
     logger.info("Researcher node is researching.")
     configurable = Configuration.from_runnable_config(config)
+
+    # 读取 researcher 特定的递归限制配置
+    researcher_limit = getattr(configurable, 'researcher_recursion_limit', None)
+    if researcher_limit is None:
+        # 如果配置中没有，尝试从环境变量读取，默认值改为 5
+        researcher_limit = int(os.environ.get('RESEARCHER_RECURSION_LIMIT', '5'))
+    enhanced_logger.logger.info(f"🎛️  RECURSION_LIMIT_CONFIG | researcher | 配置值: {researcher_limit}")
     
     # 获取当前要执行的步骤信息用于日志
     current_plan = state.get("current_plan")
@@ -1839,6 +1867,7 @@ async def researcher_node(
         config,
         "researcher",
         tools,
+        recursion_limit=researcher_limit,
     )
     
     duration = time.time() - start_time
