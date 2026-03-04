@@ -1421,7 +1421,7 @@ def reporter_node(state: State, config: RunnableConfig):
     if observations:
         try:
             # 创建 examples 目录（如果不存在）
-            examples_dir = "examples"
+            examples_dir = "md_output"
             os.makedirs(examples_dir, exist_ok=True)
 
             # 生成文件名（使用时间戳）
