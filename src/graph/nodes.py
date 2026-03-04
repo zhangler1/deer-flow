@@ -1416,7 +1416,38 @@ def reporter_node(state: State, config: RunnableConfig):
         raise
     
     logger.info(f"reporter response: {response_content}")
-    
+
+    # 保存 observations 为 markdown 文件到 examples 目录
+    if observations:
+        try:
+            # 创建 examples 目录（如果不存在）
+            examples_dir = "examples"
+            os.makedirs(examples_dir, exist_ok=True)
+
+            # 生成文件名（使用时间戳）
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = f"{examples_dir}/research_observations_{timestamp}.md"
+
+            # 构建 markdown 内容
+            md_content = f"# 研究观察结果\n\n"
+            md_content += f"## 研究主题\n\n{plan_title}\n\n"
+            md_content += f"---\n\n"
+
+            # 将每个 observation 单独成段
+            for i, observation in enumerate(observations):
+                md_content += f"{observation}\n\n"
+
+            # 写入文件
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(md_content)
+
+            enhanced_logger.logger.info(f"📄 OBSERVATIONS_SAVED | 观察结果已保存到文件: {filename} | 大小: {len(md_content)} 字节")
+            logger.info(f"Observations saved to: {filename}")
+
+        except Exception as e:
+            enhanced_logger.logger.error(f"❌ SAVE_OBSERVATIONS_FAILED | 保存观察结果失败: {str(e)}")
+            logger.error(f"Failed to save observations: {e}")
+
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | reporter | 节点执行完成 | 总耗时: {duration:.2f}s")
 
