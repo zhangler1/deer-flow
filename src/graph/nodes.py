@@ -1551,35 +1551,50 @@ async def _execute_agent_step(
             )
         )
 
-    # 🔥 核心：使用中间件检查工具调用次数，如果接近限制则插入提示消息
-    # 不强制停止，只是建议 LLM 停止
-    middleware = ToolCallLimitMiddleware(max_calls=recursion_limit)
+    # 🔥 核心：使用中间件检查工具调用次数，如果接近建议限制则插入提示消息
+    # 注意：我们使用软限制（建议值）和硬限制（LangGraph recursion_limit）分离
+    # 软限制：建议 LLM 停止的工具调用次数
+    # 硬限制：LangGraph 的 recursion_limit，设置为一个较大的值作为安全网
+
+    # 软限制：建议 LLM 停止的次数（从 recursion_limit 参数获取）
+    soft_limit = recursion_limit  # 例如：5
+
+    # 硬限制：LangGraph 的实际 recursion_limit，设置为一个较大的值防止报错
+    # 设置为软限制的 10 倍，最少 50
+    hard_limit = max(soft_limit * 10, 50)
+
+    middleware = ToolCallLimitMiddleware(max_calls=soft_limit)
 
     # 检查 state 中的消息（历史消息）
     state_messages = state.get("messages", [])
     tool_call_count = middleware.count_tool_calls_in_messages(state_messages)
 
-    enhanced_logger.logger.info(f"📊 TOOL_CALL_COUNT | {agent_name} | 当前工具调用: {tool_call_count} | 限制: {recursion_limit}")
+    enhanced_logger.logger.info(
+        f"📊 TOOL_CALL_COUNT | {agent_name} | 当前工具调用: {tool_call_count} | "
+        f"软限制(建议): {soft_limit} | 硬限制(LangGraph): {hard_limit}"
+    )
 
-    # 如果工具调用次数已经接近限制（>= 80%），在输入中插入提示消息
-    if tool_call_count >= int(recursion_limit * 0.8):
+    # 如果工具调用次数已经接近软限制（>= 80%），在输入中插入提示消息
+    if tool_call_count >= int(soft_limit * 0.8):
         enhanced_logger.logger.warning(
-            f"⚠️  TOOL_LIMIT_WARNING | {agent_name} | 工具调用 {tool_call_count}/{recursion_limit} | "
-            f"已达到 80%，将在输入中插入停止建议"
+            f"⚠️  TOOL_LIMIT_WARNING | {agent_name} | 工具调用 {tool_call_count}/{soft_limit} | "
+            f"已达到建议限制的 80%，将在输入中插入停止建议"
         )
 
         # 创建停止建议消息
         stop_advice_msg = HumanMessage(
             content=(
-                f"\n\n【系统提示 - 工具调用次数提醒】\n\n"
-                f"你已经调用了 {tool_call_count} 次工具，接近最大限制（{recursion_limit} 次）。\n\n"
-                f"**建议你现在停止搜索**：\n\n"
-                f"✅ 请考虑：\n"
-                f"   1. 是否已经收集到足够的信息？\n"
-                f"   2. 是否可以开始输出最终答案了？\n"
-                f"   3. 继续搜索是否真的有价值？\n\n"
-                f"如果信息已经充足，请立即停止调用工具，直接输出最终答案。\n\n"
-                f"如果确实需要更多信息，请谨慎选择最关键的 1-2 个搜索进行。"
+                f"\n\n【系统提示 - 请完成分析并输出答案】\n\n"
+                f"你已经调用了 {tool_call_count} 次工具，已经收集了足够的信息。\n\n"
+                f"**请立即停止搜索，开始输出最终答案**：\n\n"
+                f"✅ 现在请执行：\n"
+                f"   1. 综合分析已收集的所有搜索结果\n"
+                f"   2. 整理关键信息和数据\n"
+                f"   3. 输出完整、结构化的最终答案\n\n"
+                f"❌ 不要继续操作：\n"
+                f"   - 不要再调用任何搜索工具\n"
+                f"   - 不要获取更多信息\n\n"
+                f"请现在就开始输出你的最终答案。"
             ),
             name="tool_limit_advisor"
         )
@@ -1588,10 +1603,13 @@ async def _execute_agent_step(
         agent_input["messages"].append(stop_advice_msg)
         enhanced_logger.logger.info(f"✅ STOP_ADVICE_ADDED | 已在输入中添加停止建议消息")
 
-    # 保持 recursion_limit 不变，不强制停止
-    actual_recursion_limit = recursion_limit
+    # 使用硬限制作为 LangGraph 的 recursion_limit
+    actual_recursion_limit = hard_limit
 
-    enhanced_logger.logger.info(f"🎛️  RECURSION_LIMIT | {agent_name} | 递归限制: {actual_recursion_limit} 次 (不强制停止)")
+    enhanced_logger.logger.info(
+        f"🎛️  RECURSION_LIMIT | {agent_name} | LangGraph递归限制: {actual_recursion_limit} 次 | "
+        f"软限制(建议): {soft_limit} 次"
+    )
     logger.info(f"Agent input: {agent_input}")
 
     # 记录Agent执行过程
