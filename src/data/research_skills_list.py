@@ -27,9 +27,14 @@ RESEARCH_SKILLS_LIST = [
     "description": "基于舆情数据分析企业声誉风险和潜在影响"
   },
   {
-    "name": "区域宏观分析",
-    "filepath": "src/prompts/business_marketing/research_skills/区域宏观分析.md",
-    "description": "企业所在地区的宏观经济分析,包括经济发展水平、产业结构、区域支持政策等"
+    "name": "区域经济环境分析",
+    "filepath": "src/prompts/business_marketing/research_skills/区域经济环境分析.md",
+    "description": "企业所在地区的宏观经济环境分析,包括经济发展水平、产业结构特征、产业集群分布、发展机遇等"
+  },
+  {
+    "name": "区域支持政策分析",
+    "filepath": "src/prompts/business_marketing/research_skills/区域支持政策分析.md",
+    "description": "企业所在地区的产业支持政策分析,包括产业支持政策、政策红利分析、财税人才土地金融支持等"
   },
   {
     "name": "产业政策分析",
@@ -37,18 +42,38 @@ RESEARCH_SKILLS_LIST = [
     "description": "国家产业政策解读及对银行营销的启示,包括政策支持措施和银行营销建议"
   },
   {
-    "name": "产业及产业节点",
-    "filepath": "src/prompts/business_marketing/research_skills/产业及产业节点.md",
-    "description": "围绕目标企业的产业链结构分析,包括上下游关系、目标企业定位、上下游龙头企业经营状况等"
+    "name": "产业链上游分析",
+    "filepath": "src/prompts/business_marketing/research_skills/产业链上游分析.md",
+    "description": "围绕目标企业的产业链上游分析,包括上游原材料供应商、供应风险分析、上游龙头企业经营状况等"
   },
   {
-    "name": "股权架构分析",
-    "filepath": "src/prompts/business_marketing/research_skills/股权架构分析.md",
-    "description": "企业股权结构、股权架构图、股东信息、控制关系和管理层分析"
+    "name": "产业链中游分析",
+    "filepath": "src/prompts/business_marketing/research_skills/产业链中游分析.md",
+    "description": "围绕目标企业的产业链中游分析,包括中游制造加工环节、竞争格局、中游龙头企业经营状况等"
   },
   {
-    "name": "财务分析",
-    "filepath": "src/prompts/business_marketing/research_skills/财务分析.md",
-    "description": "企业财务数据深度分析,包括资产负债、盈利能力、现金流、运营效率、成长能力分析,与竞争对手对比,以及产业链上下游龙头企业财务分析"
+    "name": "产业链下游分析",
+    "filepath": "src/prompts/business_marketing/research_skills/产业链下游分析.md",
+    "description": "围绕目标企业的产业链下游分析,包括下游应用领域、市场需求、销售渠道、下游龙头企业经营状况等"
+  },
+  {
+    "name": "股权结构分析",
+    "filepath": "src/prompts/business_marketing/research_skills/股权结构分析.md",
+    "description": "企业股权结构分析,包括股权架构图、股东信息、控股股东背景、实际控制人、股权变动等"
+  },
+  {
+    "name": "高管团队分析",
+    "filepath": "src/prompts/business_marketing/research_skills/高管团队分析.md",
+    "description": "企业高管团队分析,包括核心高管介绍、高管背景、团队稳定性、高管持股情况等"
+  },
+  {
+    "name": "财务数据分析",
+    "filepath": "src/prompts/business_marketing/research_skills/财务数据分析.md",
+    "description": "企业财务数据深度分析,包括资产负债、盈利能力、现金流、运营效率、成长能力分析,与竞争对手全面对比"
+  },
+  {
+    "name": "产业链财务分析",
+    "filepath": "src/prompts/business_marketing/research_skills/产业链财务分析.md",
+    "description": "产业链上下游龙头企业财务分析,包括上下游财务状况、产业链地位评估、定价权分析等"
   }
 ]
