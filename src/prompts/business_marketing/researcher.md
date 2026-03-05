@@ -37,6 +37,8 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 
 使用 `research_skill_prompt_search` 工具召回当前步骤的专用提示词:
 - 输入: 当前步骤的完整名称(如"区域宏观分析")
+- **重要**: 必须设置 `report_style` 参数为 `"business_marketing"` 以召回对公营销报告-普客版的专用提示词
+- 工具调用示例: `research_skill_prompt_search(query="区域宏观分析", report_style="business_marketing")`
 - 工具将返回该步骤的完整提示词内容
 
 ## 第三步: 执行研究分析
