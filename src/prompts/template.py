@@ -28,13 +28,19 @@ def _get_prompt_env(report_style: Optional[str] = None) -> Environment:
     Get the appropriate Jinja2 environment based on report style.
 
     Args:
-        report_style: The report style (e.g., 'business_marketing', 'academic', etc.)
+        report_style: The report style (e.g., 'business_marketing', 'jingke', 'academic', etc.)
 
     Returns:
         Jinja2 Environment configured for the appropriate directory
     """
-    if report_style == "business_marketing":
-        style_dir = os.path.join(PROMPTS_DIR, "business_marketing")
+    # Map report styles to their directories
+    style_dirs = {
+        "business_marketing": "business_marketing",
+        "jingke": "jingke",
+    }
+
+    if report_style in style_dirs:
+        style_dir = os.path.join(PROMPTS_DIR, style_dirs[report_style])
         if os.path.exists(style_dir):
             return Environment(
                 loader=FileSystemLoader(style_dir),

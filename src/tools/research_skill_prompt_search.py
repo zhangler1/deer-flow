@@ -18,6 +18,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from utils.rerank import rerank_objects
 from data.research_skills_list import RESEARCH_SKILLS_LIST
+from data.jingke_research_skills_list import JINGKE_RESEARCH_SKILLS_LIST
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +57,26 @@ def _read_prompt_file(filepath: str) -> str:
         return f"错误: 读取提示词文件失败 - {str(e)}"
 
 
+def _get_skills_list(report_style: str = "business_marketing") -> list:
+    """
+    根据报告风格获取相应的研究技能列表
+
+    Args:
+        report_style: 报告风格 (business_marketing 或 jingke)
+
+    Returns:
+        list: 研究技能列表
+    """
+    if report_style == "jingke":
+        return JINGKE_RESEARCH_SKILLS_LIST
+    else:
+        return RESEARCH_SKILLS_LIST
+
+
 def _match_skill_by_query(
     query: str,
-    top_k: int = 1
+    top_k: int = 1,
+    report_style: str = "business_marketing"
 ) -> Optional[dict]:
     """
     根据查询智能匹配最相关的研究技能提示词
@@ -66,19 +84,23 @@ def _match_skill_by_query(
     Args:
         query: 搜索关键词或用户需求描述
         top_k: 返回前 K 个最相关的技能
+        report_style: 报告风格，用于选择相应的技能列表
 
     Returns:
         Optional[dict]: 匹配到的技能信息字典,包含 name, filepath, description 等
     """
+    # 根据报告风格选择技能列表
+    skills_list = _get_skills_list(report_style)
+
     try:
         # 如果配置了 Rerank API,使用智能匹配
         if os.getenv("RERANK_API_URL"):
-            logger.info(f"🔄 使用 Rerank 模型智能匹配研究技能 | 查询: '{query}'")
+            logger.info(f"🔄 使用 Rerank 模型智能匹配研究技能 | 查询: '{query}' | 风格: {report_style}")
 
             # 使用重排序工具找到最相关的技能
             # 组合 name 和 description 字段进行匹配
             enhanced_skills = []
-            for skill in RESEARCH_SKILLS_LIST:
+            for skill in skills_list:
                 enhanced_skill = skill.copy()
                 # 将 name 和 description 组合作为匹配文本
                 enhanced_skill["match_text"] = f"{skill['name']} - {skill.get('description', '')}"
@@ -102,12 +124,12 @@ def _match_skill_by_query(
                 return best_match
 
         # 降级方案:简单的关键词匹配
-        logger.info(f"🔄 使用关键词匹配算法 | 查询: '{query}'")
+        logger.info(f"🔄 使用关键词匹配算法 | 查询: '{query}' | 风格: {report_style}")
 
         best_match = None
         best_score = 0
 
-        for skill in RESEARCH_SKILLS_LIST:
+        for skill in skills_list:
             name = skill.get("name", "")
             description = skill.get("description", "")
 
@@ -141,16 +163,16 @@ def _match_skill_by_query(
             return best_match
 
         # 如果没有匹配到,返回第一个作为默认
-        if RESEARCH_SKILLS_LIST:
-            logger.warning(f"⚠️ 未能匹配到相关技能,使用默认技能: {RESEARCH_SKILLS_LIST[0].get('name')}")
-            return RESEARCH_SKILLS_LIST[0]
+        if skills_list:
+            logger.warning(f"⚠️ 未能匹配到相关技能,使用默认技能: {skills_list[0].get('name')}")
+            return skills_list[0]
 
         return None
 
     except Exception as e:
         logger.error(f"❌ 技能匹配失败: {e}")
         # 发生错误时返回第一个技能
-        if RESEARCH_SKILLS_LIST:
+        if skills_list:
             return RESEARCH_SKILLS_LIST[0]
         return None
 
@@ -159,7 +181,8 @@ def _match_skill_by_query(
 
 @tool
 def research_skill_prompt_search(
-    query: str
+    query: str,
+    report_style: str = "business_marketing"
 ) -> str:
     """
     研究技能提示词查询工具 - 根据用户需求智能匹配最相关的提示词
@@ -178,14 +201,22 @@ def research_skill_prompt_search(
     Args:
         query: 【必填】用户的需求描述或关键词,系统会智能匹配最相关的提示词。
                例如: "财务分析"、"商机分析"、"舆情分析"等
+        report_style: 【可选】报告风格,用于选择对应的研究技能列表。
+                      - "business_marketing": 对公营销报告-普客版(默认)
+                      - "jingke": 对公营销报告-战客版
+                      如果未指定,默认使用 business_marketing。
 
     Returns:
         str: 匹配到的提示词文件的完整内容,可以直接用作系统提示词
 
     Examples:
-        >>> # 财务分析
+        >>> # 对公营销报告-普客版 (默认)
         >>> research_skill_prompt_search(query="财务分析")
-        >>> research_skill_prompt_search(query="分析企业的财务状况")
+        >>> research_skill_prompt_search(query="分析企业的财务状况", report_style="business_marketing")
+
+        >>> # 对公营销报告-战客版
+        >>> research_skill_prompt_search(query="财务分析", report_style="jingke")
+        >>> research_skill_prompt_search(query="商机分析", report_style="jingke")
 
         >>> # 商机分析
         >>> research_skill_prompt_search(query="商机分析")
@@ -199,12 +230,13 @@ def research_skill_prompt_search(
     - 如果没有精确匹配,系统会选择最相关的提示词
     - 返回的提示词内容可以直接用于设置系统提示词
     - 提示词内容包含详细的研究方法和工具使用指南
+    - report_style 必须与当前报告类型保持一致
     """
     try:
-        logger.info(f"🔍 研究技能提示词查询 | 查询: '{query}'")
+        logger.info(f"🔍 研究技能提示词查询 | 查询: '{query}' | 风格: {report_style}")
 
         # 匹配最相关的技能
-        matched_skill = _match_skill_by_query(query, top_k=1)
+        matched_skill = _match_skill_by_query(query, top_k=1, report_style=report_style)
 
         if not matched_skill:
             error_msg = f"未找到相关的研究技能提示词"
