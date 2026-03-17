@@ -7,3 +7,4 @@ class ReportStyle(enum.Enum):
     NEWS = "news"
     SOCIAL_MEDIA = "social_media"
     BUSINESS_MARKETING = "business_marketing"
+    JINGKE = "jingke"  # 对公营销报告-战客版

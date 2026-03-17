@@ -82,7 +82,9 @@
       "socialMedia": "社交媒体",
       "socialMediaDesc": "简洁有趣，易于传播",
       "businessMarketing": "对公营销报告",
-      "businessMarketingDesc": "专业、数据驱动,针对企业客户的分析报告"
+      "businessMarketingDesc": "专业、数据驱动,针对企业客户的分析报告",
+      "jingke": "对公营销报告-战客版",
+      "jingkeDesc": "专业、全面深入,针对战略客户的分析报告"
     },
     "researchType": {
       "researchType": "研究类型",

@@ -82,7 +82,9 @@
       "socialMedia": "Social Media",
       "socialMediaDesc": "Concise, attention-grabbing, and shareable",
       "businessMarketing": "Business Marketing",
-      "businessMarketingDesc": "Professional, data-driven analytical reports for corporate clients"
+      "businessMarketingDesc": "Professional, data-driven analytical reports for corporate clients",
+      "jingke": "Jingke Business Marketing",
+      "jingkeDesc": "Professional, comprehensive in-depth analytical reports for strategic clients"
     },
     "researchType": {
       "researchType": "Research Type",
