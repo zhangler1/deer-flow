@@ -37,6 +37,7 @@ def _get_prompt_env(report_style: Optional[str] = None) -> Environment:
     style_dirs = {
         "business_marketing": "business_marketing",
         "jingke": "jingke",
+        "industry_report": "industry_report",
     }
 
     if report_style in style_dirs:

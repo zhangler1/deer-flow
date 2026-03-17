@@ -35,7 +35,7 @@ export type SettingsState = {
     maxSearchResults: number;
     searchEngine: "tavily" | "duckduckgo" | "brave_search" | "arxiv" | "wikipedia" | "custom_search";
     customSearchRepository?: string;
-    reportStyle: "academic" | "popular_science" | "news" | "social_media" | "business_marketing";
+    reportStyle: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "jingke" | "industry_report";
     forceRoutingPath?: "direct_answer" | "simple_search" | "iterative_research" | "deep_research"; // 限制调试模式路由路径选项
   };
   mcp: {
@@ -139,7 +139,7 @@ export const getChatStreamSettings = () => {
 };
 
 export function setReportStyle(
-  value: "academic" | "popular_science" | "news" | "social_media" | "business_marketing",
+  value: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "jingke" | "industry_report",
 ) {
   useSettingsStore.setState((state) => ({
     general: {
