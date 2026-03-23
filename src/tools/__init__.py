@@ -36,6 +36,11 @@ from .financial_summary import (
     call_financial_summary,
 )
 
+from .report_search import (
+    report_search,
+    call_report_search
+)
+
 from .research_skill_prompt_search import research_skill_prompt_search
 
 __all__ = [
@@ -63,4 +68,5 @@ __all__ = [
     "financial_summary",
     "call_financial_summary",
     "research_skill_prompt_search",
+    "report_search"
 ]

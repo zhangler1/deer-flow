@@ -36,7 +36,8 @@ from src.tools import (
     research_skill_prompt_search,
     business_opportunity_search,
     sentiment_search,
-    financial_summary
+    financial_summary,
+    report_search
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
@@ -1856,21 +1857,22 @@ async def researcher_node(
     
     # 配置工具：保留 get_web_search_tool，添加 online_search，移除爬虫和领域检索工具
     tools = [
-        get_web_search_tool(
-            configurable.max_search_results,
-            configurable.search_engine,
-            configurable.custom_search_repository
-        ),
-        online_search_tool(max_results=configurable.max_search_results),  # 互联网公开信息搜索
-        industry_report_search,  # 行业报告搜索
-        # news_search,  # 新闻搜索
-        # news_detail_search,  # 新闻详情搜索
-        product_search,  # 基础产品搜索
-        product_instance_search,  # 产品实例搜索
-        research_skill_prompt_search,
-        business_opportunity_search,
-        sentiment_search,
-        financial_summary
+        # get_web_search_tool(
+        #     configurable.max_search_results,
+        #     configurable.search_engine,
+        #     configurable.custom_search_repository
+        # ),
+        # online_search_tool(max_results=configurable.max_search_results),  # 互联网公开信息搜索
+        # industry_report_search,  # 行业报告搜索
+        # # news_search,  # 新闻搜索
+        # # news_detail_search,  # 新闻详情搜索
+        # product_search,  # 基础产品搜索
+        # product_instance_search,  # 产品实例搜索
+        # research_skill_prompt_search,
+        # business_opportunity_search,
+        # sentiment_search,
+        # financial_summary,
+        report_search
     ]
 
     enhanced_logger.logger.info(

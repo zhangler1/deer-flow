@@ -6,6 +6,8 @@
 
 通过调用 Rerank API,智能匹配最相关的研究技能提示词。
 支持根据用户输入自动选择最合适的提示词文件。
+
+本文件是对公营销报告 Skill 的核心组件，负责智能召回研究技能提示词。
 """
 
 import logging
@@ -13,13 +15,20 @@ import os
 from typing import Optional
 from langchain_core.tools import tool
 
-# 导入重排序工具
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from utils.rerank import rerank_objects
-from data.research_skills_list import RESEARCH_SKILLS_LIST
-from data.jingke_research_skills_list import JINGKE_RESEARCH_SKILLS_LIST
-from data.industry_research_skills_list import INDUSTRY_REPORT_SKILLS_LIST
+# 导入重排序工具（如果在项目中使用）
+try:
+    import sys
+    # 尝试从项目根目录导入
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+    from utils.rerank import rerank_objects
+    RERANK_AVAILABLE = True
+except ImportError:
+    # 如果无法导入，将在运行时使用降级方案
+    RERANK_AVAILABLE = False
+    rerank_objects = None
+
+# 导入研究技能列表
+from .research_skills_list import RESEARCH_SKILLS_LIST
 
 logger = logging.getLogger(__name__)
 
@@ -63,17 +72,16 @@ def _get_skills_list(report_style: str = "business_marketing") -> list:
     根据报告风格获取相应的研究技能列表
 
     Args:
-        report_style: 报告风格 (business_marketing, jingke 或 industry_report)
+        report_style: 报告风格，本 Skill 仅支持 business_marketing
 
     Returns:
         list: 研究技能列表
     """
-    if report_style == "jingke":
-        return JINGKE_RESEARCH_SKILLS_LIST
-    elif report_style == "industry_report":
-        return INDUSTRY_REPORT_SKILLS_LIST
-    else:
-        return RESEARCH_SKILLS_LIST
+    # 本 Skill 专注于对公营销报告（普客版）
+    if report_style != "business_marketing":
+        logger.warning(f"⚠️ 本 Skill 仅支持 business_marketing 风格，请求的样式为: {report_style}")
+
+    return RESEARCH_SKILLS_LIST
 
 
 def _match_skill_by_query(
@@ -203,28 +211,17 @@ def research_skill_prompt_search(
 
     Args:
         query: 【必填】用户的需求描述或关键词,系统会智能匹配最相关的提示词。
-               例如: "财务分析"、"商机分析"、"舆情分析"、"宏观和行业政策分析"等
-        report_style: 【可选】报告风格,用于选择对应的研究技能列表。
-                      - "business_marketing": 对公营销报告-普客版(默认)
-                      - "jingke": 对公营销报告-战客版
-                      - "industry_report": 行业研报
+               例如: "财务分析"、"商机分析"、"舆情分析"等
+        report_style: 【可选】报告风格,本 Skill 仅支持 "business_marketing"（对公营销报告-普客版）。
                       如果未指定,默认使用 business_marketing。
 
     Returns:
         str: 匹配到的提示词文件的完整内容,可以直接用作系统提示词
 
     Examples:
-        >>> # 对公营销报告-普客版 (默认)
+        >>> # 财务分析
         >>> research_skill_prompt_search(query="财务分析")
-        >>> research_skill_prompt_search(query="分析企业的财务状况", report_style="business_marketing")
-
-        >>> # 对公营销报告-战客版
-        >>> research_skill_prompt_search(query="财务分析", report_style="jingke")
-        >>> research_skill_prompt_search(query="商机分析", report_style="jingke")
-
-        >>> # 行业研报
-        >>> research_skill_prompt_search(query="宏观和行业政策分析", report_style="industry_report")
-        >>> research_skill_prompt_search(query="行业运行情况分析", report_style="industry_report")
+        >>> research_skill_prompt_search(query="分析企业的财务状况")
 
         >>> # 商机分析
         >>> research_skill_prompt_search(query="商机分析")
@@ -234,11 +231,14 @@ def research_skill_prompt_search(
         >>> research_skill_prompt_search(query="舆情分析")
         >>> research_skill_prompt_search(query="企业声誉怎么样")
 
+        >>> # 区域经济环境分析
+        >>> research_skill_prompt_search(query="区域经济环境分析")
+
     注意事项:
     - 如果没有精确匹配,系统会选择最相关的提示词
     - 返回的提示词内容可以直接用于设置系统提示词
     - 提示词内容包含详细的研究方法和工具使用指南
-    - report_style 必须与当前报告类型保持一致
+    - 本 Skill 专注于对公营销报告（普客版）
     """
     try:
         logger.info(f"🔍 研究技能提示词查询 | 查询: '{query}' | 风格: {report_style}")
