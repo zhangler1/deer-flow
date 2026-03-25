@@ -543,8 +543,8 @@ async def _stream_graph_events(
             last_event_time = current_time
 
             # 每10个事件或超过30秒记录一次状态
-            if event_count % 10 == 0 or time_since_last_event > 30:
-                logger.info(f"[STREAM_PROGRESS] thread_id={thread_id} | 事件数: {event_count} | 距离上次事件: {time_since_last_event:.2f}s")
+            # if event_count % 10 == 0 or time_since_last_event > 30:
+            #     logger.info(f"[STREAM_PROGRESS] thread_id={thread_id} | 事件数: {event_count} | 距离上次事件: {time_since_last_event:.2f}s")
 
             if isinstance(event_data, dict):
 

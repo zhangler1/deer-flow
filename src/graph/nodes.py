@@ -1863,6 +1863,7 @@ async def researcher_node(
     if report_style == "industry_report":
         # 行业研报：使用研报知识库搜索
         tools = [
+            research_skill_prompt_search,  # 提示词召回（必需）
             report_search,  # 研报知识库搜索（必需）
         ]
         tool_names = "report_search"
@@ -1870,7 +1871,7 @@ async def researcher_node(
     elif report_style == "business_marketing":
         # 对公营销报告：使用完整的工具链
         tools = [
-            # online_search_tool(max_results=configurable.max_search_results),  # 互联网公开信息搜索（必需）
+            online_search_tool(max_results=configurable.max_search_results),  # 互联网公开信息搜索（必需）
             research_skill_prompt_search,  # 提示词召回（必需）
             business_opportunity_search,  # 商机数据
             sentiment_search,  # 舆情数据
@@ -1883,18 +1884,17 @@ async def researcher_node(
     elif report_style == "business_marketing_client":
         # 默认配置：使用基础搜索工具
         tools = [
+            research_skill_prompt_search,  # 提示词召回（必需）
             online_search_tool(max_results=configurable.max_search_results),
-            report_search,
         ]
-        tool_names = "online_search, report_search"
+        tool_names = "research_skill_prompt_search, online_search"
 
     elif report_style == "academic":
         # 默认配置：使用基础搜索工具
-        tools = [
+        tools = [s
             online_search_tool(max_results=configurable.max_search_results),
-            report_search,
         ]
-        tool_names = "online_search, report_search"
+        tool_names = "online_search"
 
     enhanced_logger.logger.info(
         f"🔧 TOOLS_READY | 研究工具配置完成 | "
