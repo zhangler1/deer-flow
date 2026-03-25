@@ -1854,30 +1854,51 @@ async def researcher_node(
                 break
     
     enhanced_logger.logger.info(f"🔍 RESEARCH_INIT | 开始研究步骤: {current_step_title}")
-    
-    # 配置工具：保留 get_web_search_tool，添加 online_search，移除爬虫和领域检索工具
-    tools = [
-        # get_web_search_tool(
-        #     configurable.max_search_results,
-        #     configurable.search_engine,
-        #     configurable.custom_search_repository
-        # ),
-        # online_search_tool(max_results=configurable.max_search_results),  # 互联网公开信息搜索
-        # industry_report_search,  # 行业报告搜索
-        # # news_search,  # 新闻搜索
-        # # news_detail_search,  # 新闻详情搜索
-        # product_search,  # 基础产品搜索
-        # product_instance_search,  # 产品实例搜索
-        # research_skill_prompt_search,
-        # business_opportunity_search,
-        # sentiment_search,
-        # financial_summary,
-        report_search
-    ]
+
+    # 获取报告风格，默认为行业研报
+    report_style = state.get("report_style", "industry_report")
+    enhanced_logger.logger.info(f"📋 REPORT_STYLE | 当前报告风格: {report_style}")
+
+    # 根据报告风格动态配置工具
+    if report_style == "industry_report":
+        # 行业研报：使用研报知识库搜索
+        tools = [
+            report_search,  # 研报知识库搜索（必需）
+        ]
+        tool_names = "report_search"
+
+    elif report_style == "business_marketing":
+        # 对公营销报告：使用完整的工具链
+        tools = [
+            # online_search_tool(max_results=configurable.max_search_results),  # 互联网公开信息搜索（必需）
+            research_skill_prompt_search,  # 提示词召回（必需）
+            business_opportunity_search,  # 商机数据
+            sentiment_search,  # 舆情数据
+            financial_summary,  # 财务数据
+            # product_search,  # 产品类型搜索
+            product_instance_search,  # 产品实例搜索
+        ]
+        tool_names = "online_search, research_skill_prompt_search, business_opportunity_search, sentiment_search, financial_summary, product_instance_search"
+
+    elif report_style == "business_marketing_client":
+        # 默认配置：使用基础搜索工具
+        tools = [
+            online_search_tool(max_results=configurable.max_search_results),
+            report_search,
+        ]
+        tool_names = "online_search, report_search"
+
+    elif report_style == "academic":
+        # 默认配置：使用基础搜索工具
+        tools = [
+            online_search_tool(max_results=configurable.max_search_results),
+            report_search,
+        ]
+        tool_names = "online_search, report_search"
 
     enhanced_logger.logger.info(
         f"🔧 TOOLS_READY | 研究工具配置完成 | "
-        f"工具数: {len(tools)} | 包含: web_search, online_search, industry_report_search, news_search, news_detail_search, product_search, product_instance_search"
+        f"报告风格: {report_style} | 工具数: {len(tools)} | 包含: {tool_names}"
     )
     
     logger.info(f"Researcher tools: {tools}")

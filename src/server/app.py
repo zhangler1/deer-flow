@@ -661,6 +661,7 @@ async def _astream_workflow_generator(
         # 确保迭代研究的状态字段被正确初始化
         "iteration_count": 0,
         "iteration_history": [],
+        "report_style": report_style.value,  # 将报告风格传递到 state，用于 researcher_node 动态选择工具
     }
     if not auto_accepted_plan and interrupt_feedback:
         resume_msg = f"[{interrupt_feedback}]"
@@ -819,7 +820,7 @@ async def enhance_prompt(request: EnhancePromptRequest):
                     "NEWS": ReportStyle.NEWS,
                     "SOCIAL_MEDIA": ReportStyle.SOCIAL_MEDIA,
                     "BUSINESS_MARKETING": ReportStyle.BUSINESS_MARKETING,
-                    "JINGKE": ReportStyle.JINGKE,
+                    "BUSINESS_MARKETING_CLIENT": ReportStyle.BUSINESS_MARKETING_CLIENT,
                 }
                 report_style = style_mapping.get(
                     request.report_style.upper(), ReportStyle.ACADEMIC
