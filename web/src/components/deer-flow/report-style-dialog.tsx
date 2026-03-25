@@ -54,9 +54,9 @@ const REPORT_STYLES = [
     icon: FileText,
   },
   {
-    value: "jingke" as const,
-    labelKey: "jingke",
-    descriptionKey: "jingkeDesc",
+    value: "business_marketing_client" as const,
+    labelKey: "businessMarketingClient",
+    descriptionKey: "businessMarketingClientDesc",
     icon: Building,
   },
   {
@@ -73,7 +73,7 @@ export function ReportStyleDialog() {
   const currentStyle = useSettingsStore((state) => state.general.reportStyle);
 
   const handleStyleChange = (
-    style: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "jingke" | "industry_report",
+    style: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report",
   ) => {
     setReportStyle(style);
     setOpen(false);

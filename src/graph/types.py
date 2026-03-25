@@ -34,3 +34,6 @@ class State(MessagesState):
     iteration_count: int = 0  # 当前迭代轮次
     iteration_history: list[dict] = []  # 迭代历史记录
     node_transition: dict = None  # 节点跳转信息（用于前端事件流，不进入messages）
+
+    # 报告风格相关字段
+    report_style: str = "industry_report"  # 报告风格: industry_report(行业研报) / business_marketing(对公营销)

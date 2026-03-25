@@ -26,7 +26,7 @@ export async function* chatStream(
     interrupt_feedback?: string;
     enable_deep_thinking?: boolean;
     enable_background_investigation: boolean;
-    report_style?: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "jingke" | "industry_report";
+    report_style?: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report";
     force_routing_path?: "direct_answer" | "simple_search" | "iterative_research" | "deep_research"; // 🐛 调试模式
     mcp_settings?: {
       servers: Record<
