@@ -652,6 +652,33 @@ export function useLastFeedbackMessageId() {
   return waitingForFeedbackMessageId;
 }
 
+/**
+ * 获取指定消息ID对应的中断消息
+ * 用于正确匹配计划消息和其中断消息
+ */
+export function useInterruptMessageFor(messageId: string | undefined) {
+  return useStore(
+    useShallow((state) => {
+      if (!messageId) return null;
+
+      // 找到该消息在messageIds中的索引
+      const messageIndex = state.messageIds.indexOf(messageId);
+      if (messageIndex === -1) return null;
+
+      // 检查下一条消息是否存在且是中断消息
+      const nextMessageId = state.messageIds[messageIndex + 1];
+      if (!nextMessageId) return null;
+
+      const nextMessage = state.messages.get(nextMessageId);
+      if (nextMessage?.finishReason === "interrupt") {
+        return nextMessage;
+      }
+
+      return null;
+    }),
+  );
+}
+
 export function useMessageSearchStatus(messageId: string | undefined) {
   return useStore(
     (state) => messageId ? state.messageSearchStatus.get(messageId) : null,
