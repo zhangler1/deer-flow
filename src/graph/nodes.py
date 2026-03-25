@@ -1891,7 +1891,7 @@ async def researcher_node(
 
     elif report_style == "academic":
         # 默认配置：使用基础搜索工具
-        tools = [s
+        tools = [
             online_search_tool(max_results=configurable.max_search_results),
         ]
         tool_names = "online_search"
