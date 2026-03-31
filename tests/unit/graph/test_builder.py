@@ -42,7 +42,8 @@ def test_continue_to_running_research_team_all_executed(mock_state):
     Plan = mock_state["Plan"]
     steps = [Step(execution_res=True), Step(execution_res=True)]
     state = {"current_plan": Plan(steps=steps)}
-    assert builder_mod.continue_to_running_research_team(state) == "planner"
+    # 所有步骤完成后，直接跳转到 reporter 生成最终报告（业务决策：跳过二次 planner）
+    assert builder_mod.continue_to_running_research_team(state) == "reporter"
 
 
 def test_continue_to_running_research_team_next_researcher(mock_state):
@@ -64,7 +65,8 @@ def test_continue_to_running_research_team_next_coder(mock_state):
         Step(execution_res=None, step_type=builder_mod.StepType.PROCESSING),
     ]
     state = {"current_plan": Plan(steps=steps)}
-    assert builder_mod.continue_to_running_research_team(state) == "coder"
+    # PROCESSING 类型暂时禁用 coder 节点，回退到 planner（业务决策：coder 节点已注释）
+    assert builder_mod.continue_to_running_research_team(state) == "planner"
 
 
 def test_continue_to_running_research_team_next_coder_withresult(mock_state):
@@ -75,7 +77,8 @@ def test_continue_to_running_research_team_next_coder_withresult(mock_state):
         Step(execution_res=True, step_type=builder_mod.StepType.PROCESSING),
     ]
     state = {"current_plan": Plan(steps=steps)}
-    assert builder_mod.continue_to_running_research_team(state) == "planner"
+    # 所有步骤均有结果，视为全部完成，跳转到 reporter（业务决策：所有步骤完成 → reporter）
+    assert builder_mod.continue_to_running_research_team(state) == "reporter"
 
 
 def test_continue_to_running_research_team_default_planner(mock_state):

@@ -95,3 +95,48 @@ CRAWLER:
     extract_api_url: "http://localhost:7986/extract_md"
     # 请求超时时间（秒）
     timeout: 30
+
+# ============================================================================
+# Summarization Configuration (上下文压缩配置)
+# ============================================================================
+# Automatically summarize conversation history when token limits are approached
+# This helps maintain context in long conversations without exceeding model limits
+
+SUMMARIZATION:
+  # 是否启用自动摘要压缩
+  enabled: true
+
+  # 摘要使用的模型（null = 使用默认的 BASIC_MODEL）
+  # 建议使用轻量级模型以节省成本
+  model_name: null
+
+  # 触发条件 - 当满足任一阈值时触发摘要（OR 逻辑）
+  # 可以配置单个或多个触发条件
+  trigger:
+    # Token 数触发：当消息历史达到 15564 tokens 时触发
+    - type: tokens
+      value: 15564
+    # 消息数触发：当消息历史达到 50 条时触发
+    - type: messages
+      value: 50
+    # 百分比触发：当达到模型最大 token 的 80% 时触发
+    # - type: fraction
+    #   value: 0.8
+
+  # 上下文保留策略 - 摘要后保留多少历史
+  keep:
+    # 保留最近 10 条消息
+    type: messages
+    value: 10
+    # 或者保留指定 token 数
+    # type: tokens
+    # value: 3000
+    # 或者保留模型容量的百分比
+    # type: fraction
+    # value: 0.3
+
+  # 准备摘要时的最大 token 数（null = 不限制）
+  trim_tokens_to_summarize: 15564
+
+  # 自定义摘要提示词（null = 使用默认 LangChain 提示词）
+  summary_prompt: null

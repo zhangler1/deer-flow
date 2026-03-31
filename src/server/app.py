@@ -72,6 +72,17 @@ log_file = os.getenv('LOG_FILE')  # 例如: logs/deer-flow.log
 setup_enhanced_logging(level=logging.INFO, enable_colors=True, log_file=log_file)
 enhanced_logger = get_enhanced_logger("deer-flow.api")
 
+# ==============================================================
+# 加载配置（包括 Summarization 配置）
+# ==============================================================
+try:
+    from src.config.loader import load_summarization_config
+    load_summarization_config()
+    logger.info("✅ Summarization configuration loaded successfully")
+except Exception as e:
+    logger.warning(f"⚠️  Failed to load summarization config: {e}")
+# ==============================================================
+
 # Track active tool calls for search status
 _active_search_calls: Dict[str, Dict[str, str]] = {}
 

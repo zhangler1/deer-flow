@@ -1,6 +1,22 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+"""Configuration management module for DeerFlow 1.0"""
+
+from .summarization_config import (
+    SummarizationConfig,
+    get_summarization_config,
+    set_summarization_config,
+    load_summarization_config_from_dict,
+)
+
+__all__ = [
+    "SummarizationConfig",
+    "get_summarization_config",
+    "set_summarization_config",
+    "load_summarization_config_from_dict",
+]
+
 from dotenv import load_dotenv
 
 from .loader import load_yaml_config

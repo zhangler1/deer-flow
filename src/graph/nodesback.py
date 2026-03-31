@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import time
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -1746,6 +1746,7 @@ async def _setup_and_execute_agent_step(
     agent_type: str,
     default_tools: list,
     recursion_limit: int = 10,
+    agent_executor: Any = None,  # 新增：允许传入自定义 agent
 ) -> Command[Literal["research_team"]]:
     """设置智能体并使用适当工具执行步骤的辅助函数
 
@@ -1759,12 +1760,21 @@ async def _setup_and_execute_agent_step(
         config: 可运行配置
         agent_type: 智能体类型（"researcher" 或 "coder"）
         default_tools: 要添加到智能体的默认工具
+        recursion_limit: 递归限制
+        agent_executor: 可选的自定义 agent 执行器（支持 middleware）
 
     返回：
         Command 对象，用于更新状态并转到 research_team
     """
     setup_start_time = time.time()
     enhanced_logger.logger.info(f"🔄 AGENT_SETUP_ENTRY | {agent_type} | 开始配置智能体")
+    
+    # 如果提供了自定义 agent_executor，直接使用（跳过 MCP 配置）
+    if agent_executor is not None:
+        enhanced_logger.logger.info(f"✅ CUSTOM_AGENT | {agent_type} | 使用自定义 agent executor (middleware 支持)")
+        setup_duration = time.time() - setup_start_time
+        enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | 自定义智能体配置完成 | 耗时: {setup_duration:.2f}s")
+        return await _execute_agent_step(state, agent_executor, agent_type, recursion_limit=recursion_limit)
     
     configurable = Configuration.from_runnable_config(config)
     mcp_servers = {}
@@ -1823,11 +1833,11 @@ async def _setup_and_execute_agent_step(
 async def researcher_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["research_team"]]:
-    """执行研究任务的研究员节点"""
+    """执行研究任务的研究员节点（采用 Middleware 架构）"""
     start_time = time.time()
-    enhanced_logger.logger.info(f"🔄 NODE_ENTRY | researcher | 开始执行研究节点")
+    enhanced_logger.logger.info(f"🔄 NODE_ENTRY | researcher | 开始执行研究节点 (Middleware 模式)")
     
-    logger.info("Researcher node is researching.")
+    logger.info("Researcher node is researching (with middleware support).")
     configurable = Configuration.from_runnable_config(config)
 
     # 读取 researcher 特定的递归限制配置
@@ -1903,13 +1913,42 @@ async def researcher_node(
     
     logger.info(f"Researcher tools: {tools}")
     
-    result = await _setup_and_execute_agent_step(
-        state,
-        config,
-        "researcher",
-        tools,
-        recursion_limit=researcher_limit,
+    # ==============================================================
+    # 新方法：尝试使用 Middleware Agent
+    # ==============================================================
+    from src.middlewares.researcher_agent import create_researcher_agent
+    
+    # 创建带有 middleware 的 agent
+    agent = create_researcher_agent(
+        tools=tools,
+        model=None,  # 使用默认 basic model
+        enable_summarization=True,  # 启用摘要中间件
     )
+    
+    # 如果 middleware agent 创建成功，使用它；否则回退到传统方式
+    if agent is not None:
+        enhanced_logger.logger.info("✅ MIDDLEWARE_AGENT | Researcher agent 已启用 middleware 支持")
+        
+        # 执行 agent
+        result = await _setup_and_execute_agent_step(
+            state,
+            config,
+            "researcher",
+            tools,
+            recursion_limit=researcher_limit,
+            agent_executor=agent,  # 使用新创建的 middleware agent
+        )
+    else:
+        enhanced_logger.logger.info("⚠️  FALLBACK_MODE | 使用传统 agent 模式（无 middleware 支持）")
+        
+        # 传统方式：不使用 agent_executor 参数
+        result = await _setup_and_execute_agent_step(
+            state,
+            config,
+            "researcher",
+            tools,
+            recursion_limit=researcher_limit,
+        )
     
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | researcher | 节点执行完成 | 总耗时: {duration:.2f}s")

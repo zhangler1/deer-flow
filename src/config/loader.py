@@ -76,3 +76,15 @@ def load_yaml_config(file_path: str) -> Dict[str, Any]:
     # 将处理后的配置存入缓存
     _config_cache[file_path] = processed_config
     return processed_config
+
+
+def load_summarization_config() -> None:
+    """Load summarization configuration from conf.yaml and initialize the config."""
+    from src.config.summarization_config import load_summarization_config_from_dict
+    
+    config_path = os.path.join(os.getcwd(), "conf.yaml")
+    config = load_yaml_config(config_path)
+    
+    summarization_config = config.get("SUMMARIZATION", {})
+    if summarization_config:
+        load_summarization_config_from_dict(summarization_config)
