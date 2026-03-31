@@ -225,9 +225,10 @@ class CustomSearchTool(BaseTool):
                 "score": float(item.get("score", 0)) if item.get("score") else 0.0,
                 "url": item.get("url") or "",  # url可能为None
                 "source": item.get("source", ""),
-                
+
                 # === 次要可选字段 ===
                 "category": item.get("fullCategoryName", ""),
+                "createTime": item.get("createTime", ""),  # 创建时间
             }
             
             # 只有当内容不为空时才添加到结果中

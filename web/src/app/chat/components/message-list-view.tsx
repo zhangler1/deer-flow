@@ -42,14 +42,13 @@ import {
   openResearch,
   useLastFeedbackMessageId,
   useLastInterruptMessage,
-  useMessage,
+  useInterruptMessageFor,
   useMessageIds,
   useMessageSearchStatus,
   useMessageDisplayState,
   useResearchMessage,
   useStore,
   useAllIterationRounds,
-  useCurrentIteration,
 } from "~/core/store";
 import { parseJSON } from "~/core/utils";
 import { cn } from "~/lib/utils";
@@ -163,9 +162,8 @@ export function MessageListView({
       
       if (messageRound) {
         // 检查该轮次容器是否已经添加
-        const roundKey = `round_${messageRound.iteration}`;
         const alreadyAdded = result.some(r => r.type === 'round' && r.iteration === messageRound.iteration);
-        
+
         if (!alreadyAdded) {
           // 第一次遇到该轮次的消息，添加轮次容器
           result.push({
@@ -197,7 +195,7 @@ export function MessageListView({
       ref={scrollContainerRef}
     >
       <ul className="flex flex-col">
-        {organizedMessages.map((item, index) => {
+        {organizedMessages.map((item, _index) => {
           if (item.type === 'round') {
             // 渲染轮次容器
             return (
@@ -206,18 +204,18 @@ export function MessageListView({
                 iteration={item.iteration!}
                 messageIds={item.messageIds!}
                 collapsed={item.collapsed!}
-                onFeedback={onFeedback}
-                onSendMessage={onSendMessage}
+                _onFeedback={onFeedback}
+                _onSendMessage={onSendMessage}
               />
             );
           } else {
             // 渲染普通消息
             return (
               <MessageListItem
-                key={item.messageId!}
-                messageId={item.messageId!}
-                message={item.message!}
-                startOfResearch={item.startOfResearch!}
+                key={item.messageId}
+                messageId={item.messageId}
+                message={item.message}
+                startOfResearch={item.startOfResearch}
                 waitForFeedback={waitingForFeedbackMessageId === item.messageId}
                 interruptMessage={interruptMessage}
                 onFeedback={onFeedback}
@@ -264,19 +262,18 @@ function IterativeResearchRoundContainer({
   iteration,
   messageIds,
   collapsed,
-  onFeedback,
-  onSendMessage,
+  _onFeedback,
+  _onSendMessage,
 }: {
   iteration: number;
   messageIds: string[];
   collapsed: boolean;
-  onFeedback?: (feedback: { option: Option }) => void;
-  onSendMessage?: (
+  _onFeedback?: (feedback: { option: Option }) => void;
+  _onSendMessage?: (
     message: string,
     options?: { interruptFeedback?: string },
   ) => void;
 }) {
-  const t = useTranslations("chat.research");
   const [isOpen, setIsOpen] = useState(!collapsed);
   const messages = useStore((state) => state.messages);
   
@@ -493,8 +490,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
         // 尝试解析已有的 args chunks 为 JSON
         const argsString = toolCall.argsChunks.join("");
         // 使用正则提取 query 字段的值（可能是不完整的JSON）
-        const queryMatch = argsString.match(/"query"\s*:\s*"([^"]*)"/);
-        if (queryMatch && queryMatch[1] && !keywords.includes(queryMatch[1])) {
+        const queryMatch = /"query"\s*:\s*"([^"]*)"/.exec(argsString);
+        if (queryMatch?.[1] && !keywords.includes(queryMatch[1])) {
           keywords.push(queryMatch[1]);
         }
       } catch {
@@ -518,8 +515,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
       try {
         const argsString = toolCall.argsChunks.join("");
         // 使用正则提取 url 字段的值
-        const urlMatch = argsString.match(/"url"\s*:\s*"([^"]*)"/);
-        if (urlMatch && urlMatch[1] && !urls.includes(urlMatch[1])) {
+        const urlMatch = /"url"\s*:\s*"([^"]*)"/.exec(argsString);
+        if (urlMatch?.[1] && !urls.includes(urlMatch[1])) {
           urls.push(urlMatch[1]);
         }
       } catch {
@@ -552,19 +549,19 @@ function IterativeResearchCard({ message }: { message: Message }) {
   const displayText = useMemo(() => {
     // 最高优先级：如果曾经显示过 round_progress（第X轮研究进展），固定显示该状态
     if (displayState.hasShownRoundProgress) {
-      return displayState.preservedRoundText || t("iterativeResearchProcess");
+      return displayState.preservedRoundText ?? t("iterativeResearchProcess");
     }
-    
+
     // 第二优先级：如果曾经显示过 crawling，一直保持显示 crawling（crawling 优先级高于 searching）
     if (displayState.hasShownCrawling) {
       return t("crawling");
     }
-    
+
     // 第三优先级：如果曾经显示过 searching，一直保持显示 searching
     if (displayState.hasShownSearching) {
       return t("searching");
     }
-    
+
     // 优先使用 message.tag
     if (message.tag && message.isStreaming) {
       switch (message.tag) {
@@ -587,7 +584,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
         case "answering":
           return t("answering");
         case "round_progress":
-          return message.roundText || t("iterativeResearchProcess"); // 显示"第X轮研究进展"
+          return message.roundText ?? t("iterativeResearchProcess"); // 显示"第X轮研究进展"
         default:
           break;
       }
@@ -598,9 +595,9 @@ function IterativeResearchCard({ message }: { message: Message }) {
       return t("searching"); // "正在搜索"
     }
     
-    // 默认显示“正在研究”
+    // 默认显示"正在研究"
     return t("iterativeResearchProcess"); // "正在研究"
-  }, [displayState.hasShownRoundProgress, displayState.preservedRoundText, displayState.hasShownCrawling, displayState.hasShownSearching, message.tag, message.roundText, messageSearchStatus?.query, messageSearchStatus?.repository, message.isStreaming, t]);
+  }, [displayState.hasShownRoundProgress, displayState.preservedRoundText, displayState.hasShownCrawling, displayState.hasShownSearching, message.tag, message.roundText, messageSearchStatus, message.isStreaming, t]);
   
   return (
     <div className="w-full">
@@ -709,7 +706,7 @@ function MessageListItem({
   message,
   startOfResearch,
   waitForFeedback,
-  interruptMessage,
+  interruptMessage: _interruptMessage,
   onFeedback,
   onSendMessage,
   onToggleResearch,
@@ -727,6 +724,9 @@ function MessageListItem({
   ) => void;
   onToggleResearch?: () => void;
 }) {
+  // 为计划消息获取正确的中断消息
+  const specificInterruptMessage = useInterruptMessageFor(messageId);
+
   let content: React.ReactNode;
   
   if (message.agent === "planner") {
@@ -735,7 +735,7 @@ function MessageListItem({
         <PlanCard
           message={message}
           waitForFeedback={waitForFeedback}
-          interruptMessage={interruptMessage}
+          interruptMessage={specificInterruptMessage}
           onFeedback={onFeedback}
           onSendMessage={onSendMessage}
         />

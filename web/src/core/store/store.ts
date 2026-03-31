@@ -248,6 +248,9 @@ export async function sendMessage(
   // Batch UI updates to reduce re-render frequency during streaming
   const pending = new Map<string, Message>();
   let flushTimer: number | null = null;
+  let eventCount = 0;
+  let lastEventTime = Date.now();
+
   const flushNow = () => {
     if (pending.size) {
       useStore.getState().updateMessages(Array.from(pending.values()));
@@ -261,19 +264,40 @@ export async function sendMessage(
       flushTimer = null;
     }, 100);
   };
+
+  console.log("[sendMessage] Starting to process stream...");
+
   try {
     for await (const event of stream) {
       const { type, data } = event;
-      
+      eventCount++;
+      const now = Date.now();
+      const timeSinceLastEvent = now - lastEventTime;
+      lastEventTime = now;
+
+      console.log("[sendMessage] Event received", {
+        eventNumber: eventCount,
+        eventType: type,
+        timeSinceLastEvent: `${timeSinceLastEvent}ms`,
+        hasMessageId: !!messageId,
+      });
+
       // 处理后端发来的 error 事件
       if (type === "error") {
         const errorMsg = data.error ?? "服务端发生错误";
         console.error("[sendMessage] Backend error event received", {
           thread_id: data.thread_id,
           error: errorMsg,
+          errorType: typeof data.error,
+          errorLength: data.error?.length,
           fullData: data,
+          allKeys: Object.keys(data),
+          allValues: Object.values(data),
         });
-        toast(`后端错误: ${errorMsg}`);
+        // 只有当确实有错误信息时才显示 toast
+        if (data.error && data.error.length > 0) {
+          toast(`后端错误: ${errorMsg}`);
+        }
         // 不 break，继续处理后续事件
         continue;
       }
@@ -365,6 +389,7 @@ export async function sendMessage(
       message: errMsg,
       stack: (error as Error).stack,
       messageId,
+      totalEventsProcessed: eventCount,
     });
     toast(`生成回答时出错: ${errMsg}`);
     // Update message status.
@@ -383,6 +408,10 @@ export async function sendMessage(
     // Flush any remaining batched updates before finishing
     flushNow();
     setResponding(false);
+    console.log("[sendMessage] Stream processing ended", {
+      totalEventsProcessed: eventCount,
+      duration: Date.now() - lastEventTime,
+    });
   }
 }
 
@@ -621,6 +650,33 @@ export function useLastFeedbackMessageId() {
     }),
   );
   return waitingForFeedbackMessageId;
+}
+
+/**
+ * 获取指定消息ID对应的中断消息
+ * 用于正确匹配计划消息和其中断消息
+ */
+export function useInterruptMessageFor(messageId: string | undefined) {
+  return useStore(
+    useShallow((state) => {
+      if (!messageId) return null;
+
+      // 找到该消息在messageIds中的索引
+      const messageIndex = state.messageIds.indexOf(messageId);
+      if (messageIndex === -1) return null;
+
+      // 检查下一条消息是否存在且是中断消息
+      const nextMessageId = state.messageIds[messageIndex + 1];
+      if (!nextMessageId) return null;
+
+      const nextMessage = state.messages.get(nextMessageId);
+      if (nextMessage?.finishReason === "interrupt") {
+        return nextMessage;
+      }
+
+      return null;
+    }),
+  );
 }
 
 export function useMessageSearchStatus(messageId: string | undefined) {

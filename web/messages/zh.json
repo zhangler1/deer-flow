@@ -82,7 +82,11 @@
       "socialMedia": "社交媒体",
       "socialMediaDesc": "简洁有趣，易于传播",
       "businessMarketing": "对公营销报告",
-      "businessMarketingDesc": "专业、数据驱动,针对企业客户的分析报告"
+      "businessMarketingDesc": "专业、数据驱动,针对企业客户的分析报告",
+      "businessMarketingClient": "对公营销报告-战客版",
+      "businessMarketingClientDesc": "专业、全面深入,针对战略客户的分析报告",
+      "industryReport": "行业研报",
+      "industryReportDesc": "专业、全面深入，基于20步系统化流程的行业深度分析报告"
     },
     "researchType": {
       "researchType": "研究类型",
@@ -107,8 +111,8 @@
       "description": "欢迎来到 💡 DeerFlow，一个基于前沿语言模型构建的深度研究助手，帮助您搜索网络、浏览信息并处理复杂任务。"
     },
     "conversationStarters": [
-      "深度调研交通银行惠民贷",
-      "调研交通银行请休假制度"
+      "研究宇树科技股份有限公司对公客户营销报告",
+      "研究晶科能源股份有限公司对公客户营销报告"
     ],
     "inputBox": {
       "deepThinking": "深度思考",

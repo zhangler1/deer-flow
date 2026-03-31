@@ -16,10 +16,32 @@ from .domain_industry_report_search import (
 )
 from .news_search import news_search
 from .news_detail_search import news_detail_search
+from .product_search import product_search
+from .product_instance_search import product_instance_search
+from .business_opportunity_search import (
+    business_opportunity_search,
+    call_business_opportunity_search,
+)
+from .sentiment_search import (
+    sentiment_search,
+    call_sentiment_search,
+)
 from .online_search import (
     online_search_tool,
     call_online_search,
 )
+
+from .financial_summary import (
+    financial_summary,
+    call_financial_summary,
+)
+
+from .report_search import (
+    report_search,
+    call_report_search
+)
+
+from .research_skill_prompt_search import research_skill_prompt_search
 
 __all__ = [
     "crawl_tool",
@@ -35,6 +57,16 @@ __all__ = [
     "call_industry_report_search",
     "news_search",
     "news_detail_search",
+    "product_search",
+    "product_instance_search",
+    "business_opportunity_search",
+    "call_business_opportunity_search",
+    "sentiment_search",
+    "call_sentiment_search",
     "online_search_tool",
     "call_online_search",
+    "financial_summary",
+    "call_financial_summary",
+    "research_skill_prompt_search",
+    "report_search"
 ]

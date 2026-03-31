@@ -3,7 +3,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { Check, FileText, Newspaper, Users, GraduationCap } from "lucide-react";
+import { Check, FileText, Newspaper, Users, GraduationCap, Building } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -26,28 +26,43 @@ const REPORT_STYLES = [
     descriptionKey: "academicDesc",
     icon: GraduationCap,
   },
-  {
-    value: "popular_science" as const,
-    labelKey: "popularScience",
-    descriptionKey: "popularScienceDesc",
-    icon: FileText,
-  },
-  {
-    value: "news" as const,
-    labelKey: "news",
-    descriptionKey: "newsDesc",
-    icon: Newspaper,
-  },
-  {
-    value: "social_media" as const,
-    labelKey: "socialMedia",
-    descriptionKey: "socialMediaDesc",
-    icon: Users,
-  },
+  // 暂时隐藏科普风格
+  // {
+  //   value: "popular_science" as const,
+  //   labelKey: "popularScience",
+  //   descriptionKey: "popularScienceDesc",
+  //   icon: FileText,
+  // },
+  // 暂时隐藏新闻风格
+  // {
+  //   value: "news" as const,
+  //   labelKey: "news",
+  //   descriptionKey: "newsDesc",
+  //   icon: Newspaper,
+  // },
+  // 暂时隐藏社交媒体风格
+  // {
+  //   value: "social_media" as const,
+  //   labelKey: "socialMedia",
+  //   descriptionKey: "socialMediaDesc",
+  //   icon: Users,
+  // },
   {
     value: "business_marketing" as const,
     labelKey: "businessMarketing",
     descriptionKey: "businessMarketingDesc",
+    icon: FileText,
+  },
+  {
+    value: "business_marketing_client" as const,
+    labelKey: "businessMarketingClient",
+    descriptionKey: "businessMarketingClientDesc",
+    icon: Building,
+  },
+  {
+    value: "industry_report" as const,
+    labelKey: "industryReport",
+    descriptionKey: "industryReportDesc",
     icon: FileText,
   },
 ];
@@ -58,7 +73,7 @@ export function ReportStyleDialog() {
   const currentStyle = useSettingsStore((state) => state.general.reportStyle);
 
   const handleStyleChange = (
-    style: "academic" | "popular_science" | "news" | "social_media" | "business_marketing",
+    style: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report",
   ) => {
     setReportStyle(style);
     setOpen(false);

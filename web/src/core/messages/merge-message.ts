@@ -45,7 +45,7 @@ export function mergeMessage(message: Message, event: ChatEvent) {
             toolCall.args = JSON.parse(joinedArgs);
             delete toolCall.argsChunks;
           } catch (parseError) {
-            console.error("[mergeMessage] Failed to parse tool call args", {
+            const errorInfo = {
               toolCallId: toolCall.id,
               toolCallName: toolCall.name,
               argsChunks: toolCall.argsChunks,
@@ -55,11 +55,11 @@ export function mergeMessage(message: Message, event: ChatEvent) {
               preview: {
                 first200: joinedArgs.substring(0, 200),
                 last200: joinedArgs.substring(Math.max(0, joinedArgs.length - 200)),
-                position51Context: joinedArgs.substring(Math.max(0, 51 - 30), Math.min(joinedArgs.length, 51 + 30)),
               },
               parseError: (parseError as Error).message,
               stack: (parseError as Error).stack,
-            });
+            };
+            console.error("[mergeMessage] Failed to parse tool call args", errorInfo);
             // 尝试修复：如果是多个 JSON 对象，只取第一个
             try {
               const jsonRegex = /^\s*(\{[^]*?\})/;

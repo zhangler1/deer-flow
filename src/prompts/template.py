@@ -28,13 +28,20 @@ def _get_prompt_env(report_style: Optional[str] = None) -> Environment:
     Get the appropriate Jinja2 environment based on report style.
 
     Args:
-        report_style: The report style (e.g., 'business_marketing', 'academic', etc.)
+        report_style: The report style (e.g., 'business_marketing', 'business_marketing_client', 'academic', etc.)
 
     Returns:
         Jinja2 Environment configured for the appropriate directory
     """
-    if report_style == "business_marketing":
-        style_dir = os.path.join(PROMPTS_DIR, "business_marketing")
+    # Map report styles to their directories
+    style_dirs = {
+        "business_marketing": "business_marketing",
+        "business_marketing_client": "business_marketing_client",
+        "industry_report": "industry_report",
+    }
+
+    if report_style in style_dirs:
+        style_dir = os.path.join(PROMPTS_DIR, style_dirs[report_style])
         if os.path.exists(style_dir):
             return Environment(
                 loader=FileSystemLoader(style_dir),
@@ -79,9 +86,11 @@ def apply_prompt_template(
         List of messages with the system prompt as the first message
     """
     # Convert state to dict for template rendering
+    # Ensure CURRENT_TIME is set correctly
+    state_dict = dict(state) if not isinstance(state, dict) else state
     state_vars = {
-        "CURRENT_TIME": datetime.now().strftime("%a %b %d %Y %H:%M:%S %z"),
-        **state,
+        "CURRENT_TIME": datetime.now().strftime("%Y年%m月%d日"),
+        **state_dict,
     }
 
     # Add configurable variables
@@ -96,6 +105,6 @@ def apply_prompt_template(
     try:
         template = prompt_env.get_template(f"{prompt_name}.md")
         system_prompt = template.render(**state_vars)
-        return [{"role": "system", "content": system_prompt}] + state["messages"]
+        return [{"role": "system", "content": system_prompt}] + state_dict.get("messages", [])
     except Exception as e:
         raise ValueError(f"Error applying template {prompt_name}: {e}")

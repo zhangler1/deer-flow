@@ -526,6 +526,10 @@ async def _stream_graph_events(
     graph_instance, workflow_input, workflow_config, thread_id
 ):
     """Stream events from the graph and process them."""
+    event_count = 0
+    last_event_time = time.time()
+    logger.info(f"[STREAM_START] thread_id={thread_id} | 开始流式传输事件")
+
     try:
         async for agent, _, event_data in graph_instance.astream(
             workflow_input,
@@ -533,10 +537,20 @@ async def _stream_graph_events(
             stream_mode=["messages", "updates"],
             subgraphs=True,
         ):
+            event_count += 1
+            current_time = time.time()
+            time_since_last_event = current_time - last_event_time
+            last_event_time = current_time
+
+            # 每10个事件或超过30秒记录一次状态
+            # if event_count % 10 == 0 or time_since_last_event > 30:
+            #     logger.info(f"[STREAM_PROGRESS] thread_id={thread_id} | 事件数: {event_count} | 距离上次事件: {time_since_last_event:.2f}s")
+
             if isinstance(event_data, dict):
-                
+
                 # 1) 中断事件优先处理
                 if "__interrupt__" in event_data:
+                    logger.info(f"[STREAM_EVENT] thread_id={thread_id} | 事件类型: interrupt | 事件数: {event_count}")
                     yield _create_interrupt_event(thread_id, event_data)
                     continue
 
@@ -563,7 +577,7 @@ async def _stream_graph_events(
                         "iteration": iteration,
                         "reason": reason,
                     }
-                    logger.info(f"[SSE调试] 即将发送 node_transition 事件，payload: {event_payload}")
+                    logger.info(f"[STREAM_EVENT] thread_id={thread_id} | 事件类型: node_transition | 事件数: {event_count} | payload: {event_payload}")
                     # 发送一个独立的 SSE 事件，事件名可自定义，例如 node_transition
                     sse_event = _make_event("node_transition", event_payload)
                     logger.info(f"[SSE调试] 生成的 SSE 事件内容: {sse_event[:200]}...")
@@ -576,12 +590,17 @@ async def _stream_graph_events(
                 tuple[BaseMessage, dict[str, Any]], event_data
             )
 
+            # 记录接收到消息块
+            agent_name = _get_agent_name(agent, message_metadata)
+            logger.debug(f"[STREAM_MESSAGE] thread_id={thread_id} | 事件数: {event_count} | agent: {agent_name} | 内容长度: {len(message_chunk.content) if hasattr(message_chunk, 'content') else 0}")
+
             async for event in _process_message_chunk(
                 message_chunk, message_metadata, thread_id, agent
             ):
                 yield event
+
     except Exception as e:
-        logger.exception("Error during graph execution")
+        logger.exception(f"[STREAM_ERROR] thread_id={thread_id} | 图执行出错 | 已处理事件数: {event_count}")
         yield _make_event(
             "error",
             {
@@ -589,6 +608,9 @@ async def _stream_graph_events(
                 "error": str(e),
             },
         )
+    finally:
+        total_duration = time.time() - last_event_time
+        logger.info(f"[STREAM_END] thread_id={thread_id} | 流式传输结束 | 总事件数: {event_count} | 总耗时: {total_duration:.2f}s")
 
 
 
@@ -639,6 +661,7 @@ async def _astream_workflow_generator(
         # 确保迭代研究的状态字段被正确初始化
         "iteration_count": 0,
         "iteration_history": [],
+        "report_style": report_style.value,  # 将报告风格传递到 state，用于 researcher_node 动态选择工具
     }
     if not auto_accepted_plan and interrupt_feedback:
         resume_msg = f"[{interrupt_feedback}]"
@@ -714,11 +737,30 @@ def _make_event(event_type: str, data: Dict[str, Any]):
         json_data = json.dumps(data, ensure_ascii=False)
 
         finish_reason = data.get("finish_reason", "")
+
+        # 添加详细日志：记录每个 SSE 事件的发送
+        thread_id = data.get("thread_id", "unknown")
+        event_preview = f"{event_type}"
+        if event_type == "message_chunk":
+            agent = data.get("agent", "unknown")
+            content_len = len(data.get("content", ""))
+            event_preview = f"message_chunk(agent={agent}, content_len={content_len})"
+        elif event_type == "tool_calls":
+            agent = data.get("agent", "unknown")
+            tool_count = len(data.get("tool_calls", []))
+            event_preview = f"tool_calls(agent={agent}, count={tool_count})"
+        elif event_type == "tool_call_result":
+            agent = data.get("agent", "unknown")
+            event_preview = f"tool_call_result(agent={agent})"
+
         chat_stream_message(
-            data.get("thread_id", ""),
+            thread_id,
             f"event: {event_type}\ndata: {json_data}\n\n",
             finish_reason,
         )
+
+        # 在发送后立即记录日志
+        logger.debug(f"[SSE_SEND] thread_id={thread_id} | event={event_preview} | data_size={len(json_data)}")
 
         return f"event: {event_type}\ndata: {json_data}\n\n"
     except (TypeError, ValueError) as e:
@@ -777,6 +819,8 @@ async def enhance_prompt(request: EnhancePromptRequest):
                     "POPULAR_SCIENCE": ReportStyle.POPULAR_SCIENCE,
                     "NEWS": ReportStyle.NEWS,
                     "SOCIAL_MEDIA": ReportStyle.SOCIAL_MEDIA,
+                    "BUSINESS_MARKETING": ReportStyle.BUSINESS_MARKETING,
+                    "BUSINESS_MARKETING_CLIENT": ReportStyle.BUSINESS_MARKETING_CLIENT,
                 }
                 report_style = style_mapping.get(
                     request.report_style.upper(), ReportStyle.ACADEMIC

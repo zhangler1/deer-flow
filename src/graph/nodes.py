@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+import asyncio
 import json
 import logging
 import os
@@ -16,6 +17,7 @@ from langgraph.types import Command, interrupt
 from src.agents import create_agent
 from src.config.agents import AGENT_LLM_MAP
 from src.config.configuration import Configuration
+from src.graph.tool_limit_middleware import ToolCallLimitMiddleware
 from src.llms.llm import get_llm_by_type
 from src.prompts.planner_model import Plan
 from src.prompts.template import apply_prompt_template
@@ -28,7 +30,14 @@ from src.tools import (
     industry_report_search,
     news_search,
     news_detail_search,
+    product_search,
+    product_instance_search,
     online_search_tool,
+    research_skill_prompt_search,
+    business_opportunity_search,
+    sentiment_search,
+    financial_summary,
+    report_search
 )
 from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
@@ -854,11 +863,9 @@ def background_investigation_node(state: State, config: RunnableConfig):
             )
             result = {"background_investigation_results": None}
     else:
-        enhanced_logger.logger.info(f"🔍 使用{configurable.search_engine}搜索引擎进行背景调研 | 查询: '{query}'")
-        background_investigation_results = get_web_search_tool(
-            max_search_results=configurable.max_search_results, 
-            engine=configurable.search_engine,
-            repository_id=configurable.custom_search_repository
+        enhanced_logger.logger.info(f"🔍 使用online_search进行背景调研 | 查询: '{query}'")
+        background_investigation_results = online_search_tool(
+            max_results=configurable.max_search_results
         ).invoke(query)
         result = {
             "background_investigation_results": json.dumps(
@@ -1383,16 +1390,66 @@ def reporter_node(state: State, config: RunnableConfig):
     # 记录LLM调用过程
     llm_start_time = time.time()
     enhanced_logger.logger.info(f"🤖 LLM_INVOKE | reporter | 开始生成最终报告 | 提示消息数: {len(invoke_messages)}")
-    
-    response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
-    response_content = response.content
-    
-    llm_duration = time.time() - llm_start_time
-    report_length = len(response_content) if response_content else 0
-    enhanced_logger.logger.info(f"✅ LLM_COMPLETE | reporter | 报告生成完成 | 报告长度: {report_length} | LLM耗时: {llm_duration:.2f}s")
+
+    try:
+        # 获取 LLM 实例
+        reporter_llm = get_llm_by_type(AGENT_LLM_MAP["reporter"])
+        enhanced_logger.logger.info(f"🔍 LLM_INFO | reporter | 模型类型: {type(reporter_llm).__name__} | 模型名称: {getattr(reporter_llm, 'model_name', 'unknown')}")
+
+        # 记录调用前的状态
+        enhanced_logger.logger.info(f"⏳ LLM_CALL_START | reporter | 准备调用LLM.invoke() | 时间: {time.strftime('%H:%M:%S')}")
+
+        response = reporter_llm.invoke(invoke_messages)
+
+        # 记录调用后的状态
+        llm_call_end_time = time.time()
+        enhanced_logger.logger.info(f"✅ LLM_CALL_END | reporter | LLM调用成功返回 | 时间: {time.strftime('%H:%M:%S')} | 耗时: {llm_call_end_time - llm_start_time:.2f}s")
+
+        response_content = response.content
+
+        llm_duration = time.time() - llm_start_time
+        report_length = len(response_content) if response_content else 0
+        enhanced_logger.logger.info(f"✅ LLM_COMPLETE | reporter | 报告生成完成 | 报告长度: {report_length} | LLM耗时: {llm_duration:.2f}s")
+
+    except Exception as e:
+        llm_duration = time.time() - llm_start_time
+        enhanced_logger.logger.error(f"❌ LLM_ERROR | reporter | LLM调用失败 | 耗时: {llm_duration:.2f}s | 错误类型: {type(e).__name__} | 错误信息: {str(e)}")
+        logger.exception(f"Reporter LLM调用异常: {e}")
+        raise
     
     logger.info(f"reporter response: {response_content}")
-    
+
+    # 保存 observations 为 markdown 文件到 examples 目录
+    if observations:
+        try:
+            # 创建 examples 目录（如果不存在）
+            examples_dir = "md_output"
+            os.makedirs(examples_dir, exist_ok=True)
+
+            # 生成文件名（使用时间戳）
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = f"{examples_dir}/research_observations_{timestamp}.md"
+
+            # 构建 markdown 内容
+            md_content = f"# 研究观察结果\n\n"
+            md_content += f"## 研究主题\n\n{plan_title}\n\n"
+            md_content += f"---\n\n"
+
+            # 将每个 observation 单独成段
+            for i, observation in enumerate(observations):
+                md_content += f"{observation}\n\n"
+
+            # 写入文件
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(md_content)
+
+            enhanced_logger.logger.info(f"📄 OBSERVATIONS_SAVED | 观察结果已保存到文件: {filename} | 大小: {len(md_content)} 字节")
+            logger.info(f"Observations saved to: {filename}")
+
+        except Exception as e:
+            enhanced_logger.logger.error(f"❌ SAVE_OBSERVATIONS_FAILED | 保存观察结果失败: {str(e)}")
+            logger.error(f"Failed to save observations: {e}")
+
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | reporter | 节点执行完成 | 总耗时: {duration:.2f}s")
 
@@ -1406,11 +1463,12 @@ def research_team_node(state: State):
 
 
 async def _execute_agent_step(
-    state: State, agent, agent_name: str
+    state: State, agent, agent_name: str, recursion_limit: int = 10
 ) -> Command[Literal["research_team"]]:
     """使用指定智能体执行步骤的辅助函数"""
     step_start_time = time.time()
     enhanced_logger.logger.info(f"🔄 AGENT_STEP_ENTRY | {agent_name} | 开始执行研究步骤")
+    enhanced_logger.logger.info(f"🎛️  RECURSION_LIMIT_PARAM | {agent_name} | 限制: {recursion_limit}")
     
     current_plan = state.get("current_plan")
     plan_title = current_plan.title
@@ -1447,11 +1505,11 @@ async def _execute_agent_step(
 
     # 格式化已完成步骤信息
     completed_steps_info = ""
-    if completed_steps:
-        completed_steps_info = "# 已完成的研究步骤\n\n"
-        for i, step in enumerate(completed_steps):
-            completed_steps_info += f"## 已完成步骤 {i + 1}：{step.title}\n\n"
-            completed_steps_info += f"<finding>\n{step.execution_res}\n</finding>\n\n"
+    # if completed_steps:
+    #     completed_steps_info = "# 已完成的研究步骤\n\n"
+    #     for i, step in enumerate(completed_steps):
+    #         completed_steps_info += f"## 已完成步骤 {i + 1}：{step.title}\n\n"
+    #         completed_steps_info += f"<finding>\n{step.execution_res}\n</finding>\n\n"
 
     # 为智能体准备包含已完成步骤信息的输入
     agent_input = {
@@ -1494,41 +1552,118 @@ async def _execute_agent_step(
             )
         )
 
-    # 调用智能体
-    default_recursion_limit = 25
-    try:
-        env_value_str = os.getenv("AGENT_RECURSION_LIMIT", str(default_recursion_limit))
-        parsed_limit = int(env_value_str)
+    # 🔥 核心：使用中间件检查工具调用次数，如果接近建议限制则插入提示消息
+    # 注意：我们使用软限制（建议值）和硬限制（LangGraph recursion_limit）分离
+    # 软限制：建议 LLM 停止的工具调用次数
+    # 硬限制：LangGraph 的 recursion_limit，设置为一个较大的值作为安全网
 
-        if parsed_limit > 0:
-            recursion_limit = parsed_limit
-            logger.info(f"递归限制设置为：{recursion_limit}")
-        else:
-            logger.warning(
-                f"AGENT_RECURSION_LIMIT 值 '{env_value_str}' (解析为 {parsed_limit}) 不是正数。"
-                f"使用默认值 {default_recursion_limit}。"
-            )
-            recursion_limit = default_recursion_limit
-    except ValueError:
-        raw_env_value = os.getenv("AGENT_RECURSION_LIMIT")
-        logger.warning(
-            f"无效的 AGENT_RECURSION_LIMIT 值：'{raw_env_value}'。"
-            f"使用默认值 {default_recursion_limit}。"
+    # 软限制：建议 LLM 停止的次数（从 recursion_limit 参数获取）
+    soft_limit = recursion_limit  # 例如：5
+
+    # 硬限制：LangGraph 的实际 recursion_limit，设置为一个较大的值防止报错
+    # 设置为软限制的 10 倍，最少 50
+    hard_limit = max(soft_limit * 10, 50)
+
+    middleware = ToolCallLimitMiddleware(max_calls=soft_limit)
+
+    # 检查 state 中的消息（历史消息）
+    state_messages = state.get("messages", [])
+    tool_call_count = middleware.count_tool_calls_in_messages(state_messages)
+
+    enhanced_logger.logger.info(
+        f"📊 TOOL_CALL_COUNT | {agent_name} | 当前工具调用: {tool_call_count} | "
+        f"软限制(建议): {soft_limit} | 硬限制(LangGraph): {hard_limit}"
+    )
+
+    # 如果工具调用次数已经接近软限制（>= 80%），在输入中插入提示消息
+    if tool_call_count >= int(soft_limit * 0.8):
+        enhanced_logger.logger.warning(
+            f"⚠️  TOOL_LIMIT_WARNING | {agent_name} | 工具调用 {tool_call_count}/{soft_limit} | "
+            f"已达到建议限制的 80%，将在输入中插入停止建议"
         )
-        recursion_limit = default_recursion_limit
 
+        # 创建停止建议消息
+        stop_advice_msg = HumanMessage(
+            content=(
+                f"\n\n【系统提示 - 请完成分析并输出答案】\n\n"
+                f"你已经调用了 {tool_call_count} 次工具，已经收集了足够的信息。\n\n"
+                f"**请立即停止搜索，开始输出最终答案**：\n\n"
+                f"✅ 现在请执行：\n"
+                f"   1. 综合分析已收集的所有搜索结果\n"
+                f"   2. 整理关键信息和数据\n"
+                f"   3. 输出完整、结构化的最终答案\n\n"
+                f"❌ 不要继续操作：\n"
+                f"   - 不要再调用任何搜索工具\n"
+                f"   - 不要获取更多信息\n\n"
+                f"请现在就开始输出你的最终答案。"
+            ),
+            name="tool_limit_advisor"
+        )
+
+        # 将提示消息添加到输入中
+        agent_input["messages"].append(stop_advice_msg)
+        enhanced_logger.logger.info(f"✅ STOP_ADVICE_ADDED | 已在输入中添加停止建议消息")
+
+    # 使用硬限制作为 LangGraph 的 recursion_limit
+    actual_recursion_limit = hard_limit
+
+    enhanced_logger.logger.info(
+        f"🎛️  RECURSION_LIMIT | {agent_name} | LangGraph递归限制: {actual_recursion_limit} 次 | "
+        f"软限制(建议): {soft_limit} 次"
+    )
     logger.info(f"Agent input: {agent_input}")
-    
+
     # 记录Agent执行过程
     agent_exec_start_time = time.time()
-    enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | 递归限制: {recursion_limit}")
-    
-    result = await agent.ainvoke(
-        input=agent_input, config={"recursion_limit": recursion_limit}
-    )
-    
-    agent_exec_duration = time.time() - agent_exec_start_time
-    enhanced_logger.logger.info(f"✅ AGENT_INVOKED | {agent_name} | LLM调用完成 | 耗时: {agent_exec_duration:.2f}s")
+    enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | 递归限制: {actual_recursion_limit} | 开始时间: {time.strftime('%H:%M:%S')}")
+
+    # 添加定期心跳日志的异步任务
+    async def log_agent_progress():
+        """在agent执行期间定期输出进度日志"""
+        progress_interval = 30  # 每30秒输出一次进度
+        elapsed = 0
+        while True:
+            await asyncio.sleep(progress_interval)
+            elapsed += progress_interval
+            current_duration = time.time() - agent_exec_start_time
+            enhanced_logger.logger.info(
+                f"💓 AGENT_HEARTBEAT | {agent_name} | Agent仍在执行中... | 已耗时: {current_duration:.1f}s | 时间: {time.strftime('%H:%M:%S')}"
+            )
+
+    try:
+        # 启动心跳任务
+        heartbeat_task = asyncio.create_task(log_agent_progress())
+
+        result = await agent.ainvoke(
+            input=agent_input, config={"recursion_limit": actual_recursion_limit}
+        )
+
+        # 取消心跳任务
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
+
+        agent_exec_duration = time.time() - agent_exec_start_time
+        enhanced_logger.logger.info(f"✅ AGENT_INVOKED | {agent_name} | LLM调用成功完成 | 耗时: {agent_exec_duration:.2f}s | 结束时间: {time.strftime('%H:%M:%S')}")
+
+    except Exception as e:
+        # 取消心跳任务
+        if 'heartbeat_task' in locals():
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+
+        agent_exec_duration = time.time() - agent_exec_start_time
+        enhanced_logger.logger.error(
+            f"❌ AGENT_INVOKE_ERROR | {agent_name} | LLM调用失败 | 耗时: {agent_exec_duration:.2f}s | "
+            f"错误类型: {type(e).__name__} | 错误信息: {str(e)} | 时间: {time.strftime('%H:%M:%S')}"
+        )
+        logger.exception(f"Agent {agent_name} LLM调用异常: {e}")
+        raise
     
     # 🆕 添加详细的响应分析日志
     if isinstance(result, dict):
@@ -1610,6 +1745,7 @@ async def _setup_and_execute_agent_step(
     config: RunnableConfig,
     agent_type: str,
     default_tools: list,
+    recursion_limit: int = 10,
 ) -> Command[Literal["research_team"]]:
     """设置智能体并使用适当工具执行步骤的辅助函数
 
@@ -1672,16 +1808,16 @@ async def _setup_and_execute_agent_step(
         setup_duration = time.time() - setup_start_time
         enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | MCP智能体配置完成 | 耗时: {setup_duration:.2f}s")
 
-        return await _execute_agent_step(state, agent, agent_type)
+        return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit)
     else:
         enhanced_logger.logger.info(f"🔧 DEFAULT_TOOLS | {agent_type} | 使用默认工具 | 工具数: {len(default_tools)}")
         # Use default tools if no MCP servers are configured
         agent = create_agent(agent_type, agent_type, default_tools, agent_type, configurable)
-        
+
         setup_duration = time.time() - setup_start_time
         enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | 默认智能体配置完成 | 耗时: {setup_duration:.2f}s")
-        
-        return await _execute_agent_step(state, agent, agent_type)
+
+        return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit)
 
 
 async def researcher_node(
@@ -1693,6 +1829,13 @@ async def researcher_node(
     
     logger.info("Researcher node is researching.")
     configurable = Configuration.from_runnable_config(config)
+
+    # 读取 researcher 特定的递归限制配置
+    researcher_limit = getattr(configurable, 'researcher_recursion_limit', None)
+    if researcher_limit is None:
+        # 如果配置中没有，尝试从环境变量读取，默认值改为 5
+        researcher_limit = int(os.environ.get('RESEARCHER_RECURSION_LIMIT', '5'))
+    enhanced_logger.logger.info(f"🎛️  RECURSION_LIMIT_CONFIG | researcher | 配置值: {researcher_limit}")
     
     # 获取当前要执行的步骤信息用于日志
     current_plan = state.get("current_plan")
@@ -1711,23 +1854,51 @@ async def researcher_node(
                 break
     
     enhanced_logger.logger.info(f"🔍 RESEARCH_INIT | 开始研究步骤: {current_step_title}")
-    
-    # 配置工具：保留 get_web_search_tool，添加 online_search，移除爬虫和领域检索工具
-    tools = [
-        get_web_search_tool(
-            configurable.max_search_results,
-            configurable.search_engine,
-            configurable.custom_search_repository
-        ),
-        online_search_tool(max_results=configurable.max_search_results),  # 互联网公开信息搜索
-        industry_report_search,  # 行业报告搜索
-        news_search,  # 新闻搜索
-        news_detail_search,  # 新闻详情搜索
-    ]
+
+    # 获取报告风格，默认为行业研报
+    report_style = state.get("report_style", "industry_report")
+    enhanced_logger.logger.info(f"📋 REPORT_STYLE | 当前报告风格: {report_style}")
+
+    # 根据报告风格动态配置工具
+    if report_style == "industry_report":
+        # 行业研报：使用研报知识库搜索
+        tools = [
+            research_skill_prompt_search,  # 提示词召回（必需）
+            report_search,  # 研报知识库搜索（必需）
+        ]
+        tool_names = "report_search"
+
+    elif report_style == "business_marketing":
+        # 对公营销报告：使用完整的工具链
+        tools = [
+            online_search_tool(max_results=configurable.max_search_results),  # 互联网公开信息搜索（必需）
+            research_skill_prompt_search,  # 提示词召回（必需）
+            business_opportunity_search,  # 商机数据
+            sentiment_search,  # 舆情数据
+            financial_summary,  # 财务数据
+            # product_search,  # 产品类型搜索
+            product_instance_search,  # 产品实例搜索
+        ]
+        tool_names = "online_search, research_skill_prompt_search, business_opportunity_search, sentiment_search, financial_summary, product_instance_search"
+
+    elif report_style == "business_marketing_client":
+        # 默认配置：使用基础搜索工具
+        tools = [
+            research_skill_prompt_search,  # 提示词召回（必需）
+            online_search_tool(max_results=configurable.max_search_results),
+        ]
+        tool_names = "research_skill_prompt_search, online_search"
+
+    elif report_style == "academic":
+        # 默认配置：使用基础搜索工具
+        tools = [
+            online_search_tool(max_results=configurable.max_search_results),
+        ]
+        tool_names = "online_search"
 
     enhanced_logger.logger.info(
         f"🔧 TOOLS_READY | 研究工具配置完成 | "
-        f"工具数: {len(tools)} | 包含: web_search, online_search, industry_report_search, news_search, news_detail_search"
+        f"报告风格: {report_style} | 工具数: {len(tools)} | 包含: {tool_names}"
     )
     
     logger.info(f"Researcher tools: {tools}")
@@ -1737,6 +1908,7 @@ async def researcher_node(
         config,
         "researcher",
         tools,
+        recursion_limit=researcher_limit,
     )
     
     duration = time.time() - start_time

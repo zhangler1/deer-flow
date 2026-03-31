@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     maxSearchResults: 2,
     searchEngine: "custom_search",
     customSearchRepository: undefined,
-    reportStyle: "academic",
+    reportStyle: "business_marketing",  // 默认为对公营销报告
     forceRoutingPath: "deep_research", // 调试模式默认路由设置为交心深度研究
   },
   mcp: {
@@ -35,7 +35,7 @@ export type SettingsState = {
     maxSearchResults: number;
     searchEngine: "tavily" | "duckduckgo" | "brave_search" | "arxiv" | "wikipedia" | "custom_search";
     customSearchRepository?: string;
-    reportStyle: "academic" | "popular_science" | "news" | "social_media";
+    reportStyle: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report";
     forceRoutingPath?: "direct_answer" | "simple_search" | "iterative_research" | "deep_research"; // 限制调试模式路由路径选项
   };
   mcp: {
@@ -139,7 +139,7 @@ export const getChatStreamSettings = () => {
 };
 
 export function setReportStyle(
-  value: "academic" | "popular_science" | "news" | "social_media",
+  value: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report",
 ) {
   useSettingsStore.setState((state) => ({
     general: {
