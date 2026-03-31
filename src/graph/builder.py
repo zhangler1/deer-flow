@@ -188,12 +188,15 @@ def build_graph_with_memory():
     builder = _build_base_graph()
     compiled_graph = builder.compile(checkpointer=memory)
     
-    # Add Langfuse callback for tracing (只在配置了 PUBLIC_KEY 时启用)
+    # Add Langfuse callback for tracing (LANGFUSE_ENABLED=true 且配置了 PUBLIC_KEY 时启用)
     try:
-        if os.getenv("LANGFUSE_PUBLIC_KEY"):
+        langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+        if langfuse_enabled and os.getenv("LANGFUSE_PUBLIC_KEY"):
             from langfuse.langchain import CallbackHandler
             enhanced_logger.logger.info("🔍 LANGFUSE | 已启用 Langfuse 追踪 (with memory)")
             return compiled_graph.with_config({"callbacks": [CallbackHandler()]})
+        elif not langfuse_enabled:
+            enhanced_logger.logger.info("🔕 LANGFUSE | Langfuse 追踪已关闭 (LANGFUSE_ENABLED=false)")
     except ImportError:
         pass
     
@@ -206,12 +209,15 @@ def build_graph():
     builder = _build_base_graph()
     compiled_graph = builder.compile()
     
-    # Add Langfuse callback for tracing (只在配置了 PUBLIC_KEY 时启用)
+    # Add Langfuse callback for tracing (LANGFUSE_ENABLED=true 且配置了 PUBLIC_KEY 时启用)
     try:
-        if os.getenv("LANGFUSE_PUBLIC_KEY"):
+        langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+        if langfuse_enabled and os.getenv("LANGFUSE_PUBLIC_KEY"):
             from langfuse.langchain import CallbackHandler
             enhanced_logger.logger.info("🔍 LANGFUSE | 已启用 Langfuse 追踪 (without memory)")
             return compiled_graph.with_config({"callbacks": [CallbackHandler()]})
+        elif not langfuse_enabled:
+            enhanced_logger.logger.info("🔕 LANGFUSE | Langfuse 追踪已关闭 (LANGFUSE_ENABLED=false)")
     except ImportError:
         pass
     

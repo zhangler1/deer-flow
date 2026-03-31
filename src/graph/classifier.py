@@ -15,11 +15,16 @@ from src.utils.enhanced_logger import get_enhanced_logger
 from src.prompts.template import env  # 直接导入 Jinja2 环境
 from src.utils.performance_monitor import PerformanceMonitor
 
-# Langfuse 集成 - v3 模式 (@observe 装饰器会自动捕获输入输出)
+# Langfuse 集成（受 LANGFUSE_ENABLED 开关控制）
+import os
+_langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 try:
-    from langfuse import observe
+    if _langfuse_enabled:
+        from langfuse import observe
+    else:
+        raise ImportError("Langfuse disabled by LANGFUSE_ENABLED=false")
 except ImportError:
-    logging.warning("Langfuse not installed. Tracing disabled.")
+    logging.warning("Langfuse not installed or disabled. Tracing disabled.")
     
     def observe(*args, **kwargs):
         def decorator(func):
