@@ -88,3 +88,15 @@ def load_summarization_config() -> None:
     summarization_config = config.get("SUMMARIZATION", {})
     if summarization_config:
         load_summarization_config_from_dict(summarization_config)
+
+
+def load_tool_compression_config() -> None:
+    """加载工具结果压缩配置从 conf.yaml 并初始化配置。"""
+    from src.config.tool_compression_config import load_tool_compression_config_from_dict
+    
+    config_path = os.path.join(os.getcwd(), "conf.yaml")
+    config = load_yaml_config(config_path)
+    
+    tool_compression_config = config.get("TOOL_RESULT_COMPRESSION", {})
+    if tool_compression_config:
+        load_tool_compression_config_from_dict(tool_compression_config)

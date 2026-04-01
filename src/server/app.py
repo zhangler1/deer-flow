@@ -25,7 +25,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
 from src.config.configuration import get_recursion_limit
-from src.config.loader import get_bool_env, get_str_env
+from src.config.loader import get_bool_env, get_str_env, load_tool_compression_config
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.graph.builder import build_graph_with_memory
@@ -72,16 +72,9 @@ log_file = os.getenv('LOG_FILE')  # 例如: logs/deer-flow.log
 setup_enhanced_logging(level=logging.INFO, enable_colors=True, log_file=log_file)
 enhanced_logger = get_enhanced_logger("deer-flow.api")
 
-# ==============================================================
-# 加载配置（包括 Summarization 配置）
-# ==============================================================
-try:
-    from src.config.loader import load_summarization_config
-    load_summarization_config()
-    logger.info("✅ Summarization configuration loaded successfully")
-except Exception as e:
-    logger.warning(f"⚠️  Failed to load summarization config: {e}")
-# ==============================================================
+# 加载工具结果压缩配置
+load_tool_compression_config()
+enhanced_logger.logger.info("✅ COMPRESSION_CONFIG_LOADED | 工具结果压缩配置已加载")
 
 # Track active tool calls for search status
 _active_search_calls: Dict[str, Dict[str, str]] = {}

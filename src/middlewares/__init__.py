@@ -3,8 +3,12 @@
 
 """Middleware modules for DeerFlow 1.0"""
 
-from .researcher_agent import create_researcher_agent
+from .tool_result_compression import (
+    ToolResultCompressionMiddleware,
+    invoke_with_tool_compression,
+)
 
 __all__ = [
-    "create_researcher_agent",
+    "ToolResultCompressionMiddleware",
+    "invoke_with_tool_compression",
 ]

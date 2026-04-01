@@ -25,6 +25,7 @@ from langgraph.types import Command
 from src.agents import create_agent
 from src.config.configuration import Configuration
 from src.graph.tool_limit_middleware import ToolCallLimitMiddleware
+from src.middlewares.tool_result_compression import ToolResultCompressionMiddleware
 from src.graph.types import State
 from src.utils.enhanced_logger import get_enhanced_logger
 from src.utils.text_utils import remove_think_tags
@@ -132,15 +133,22 @@ async def _execute_agent_step(
             )
         )
 
-    # 🔥 核心：使用中间件检查工具调用次数
+    # 🔥 核心：使用中间件检查工具调用次数和压缩工具结果
     soft_limit = recursion_limit
     hard_limit = max(soft_limit * 10, 50)
 
-    middleware = ToolCallLimitMiddleware(max_calls=soft_limit)
+    # 1. 工具调用限制中间件
+    tool_limit_middleware = ToolCallLimitMiddleware(max_calls=soft_limit)
+    
+    # 2. 工具结果压缩中间件（只对 researcher 启用）
+    tool_compression_middleware = None
+    if agent_name == "researcher":
+        tool_compression_middleware = ToolResultCompressionMiddleware()
+        enhanced_logger.logger.info(f"🗜️  COMPRESSION_ENABLED | {agent_name} | 工具结果压缩中间件已启用")
 
     # 检查 state 中的消息
     state_messages = state.get("messages", [])
-    tool_call_count = middleware.count_tool_calls_in_messages(state_messages)
+    tool_call_count = tool_limit_middleware.count_tool_calls_in_messages(state_messages)
 
     enhanced_logger.logger.info(
         f"📊 TOOL_CALL_COUNT | {agent_name} | 当前工具调用: {tool_call_count} | "
@@ -198,6 +206,20 @@ async def _execute_agent_step(
             )
 
     try:
+        # 应用工具结果压缩（如果启用）
+        if tool_compression_middleware is not None:
+            original_msg_count = len(agent_input["messages"])
+            compressed_messages = tool_compression_middleware.process_messages_before_invoke(
+                agent_input["messages"]
+            )
+            
+            if compressed_messages != agent_input["messages"]:
+                agent_input["messages"] = compressed_messages
+                enhanced_logger.logger.info(
+                    f"🔄 COMPRESSION_APPLIED | {agent_name} | "
+                    f"消息列表已压缩 | 原始: {original_msg_count} 条 → 压缩后: {len(compressed_messages)} 条"
+                )
+        
         # 启动心跳任务
         heartbeat_task = asyncio.create_task(log_agent_progress())
 
