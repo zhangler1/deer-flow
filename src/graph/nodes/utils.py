@@ -142,9 +142,17 @@ async def _execute_agent_step(
     
     # 2. 工具结果压缩中间件（只对 researcher 启用）
     tool_compression_middleware = None
+    compression_llm = None
     if agent_name == "researcher":
-        tool_compression_middleware = ToolResultCompressionMiddleware()
-        enhanced_logger.logger.info(f"🗜️  COMPRESSION_ENABLED | {agent_name} | 工具结果压缩中间件已启用")
+        # 获取用于压缩的 LLM（使用 BASIC_MODEL）
+        from src.llms.llm import get_llm_by_type
+        try:
+            compression_llm = get_llm_by_type("basic")
+        except Exception as e:
+            logger.warning(f"⚠️ 无法获取压缩用 LLM: {e}")
+        
+        tool_compression_middleware = ToolResultCompressionMiddleware(llm=compression_llm)
+        enhanced_logger.logger.info(f"🗜️  COMPRESSION_ENABLED | {agent_name} | 工具结果压缩中间件已启用 | 模式: {tool_compression_middleware.config.mode}")
 
     # 检查 state 中的消息
     state_messages = state.get("messages", [])
@@ -206,10 +214,11 @@ async def _execute_agent_step(
             )
 
     try:
-        # 应用工具结果压缩（如果启用）
+        # 应用工具结果压缩（如果启用，使用异步版本支持 summarize 模式）
         if tool_compression_middleware is not None:
             original_msg_count = len(agent_input["messages"])
-            compressed_messages = tool_compression_middleware.process_messages_before_invoke(
+            # 使用异步版本，支持 summarize 模式
+            compressed_messages = await tool_compression_middleware.process_messages_before_invoke_async(
                 agent_input["messages"]
             )
             
@@ -217,7 +226,8 @@ async def _execute_agent_step(
                 agent_input["messages"] = compressed_messages
                 enhanced_logger.logger.info(
                     f"🔄 COMPRESSION_APPLIED | {agent_name} | "
-                    f"消息列表已压缩 | 原始: {original_msg_count} 条 → 压缩后: {len(compressed_messages)} 条"
+                    f"消息列表已压缩 | 原始: {original_msg_count} 条 → 压缩后: {len(compressed_messages)} 条 | "
+                    f"模式: {tool_compression_middleware.config.mode}"
                 )
         
         # 启动心跳任务

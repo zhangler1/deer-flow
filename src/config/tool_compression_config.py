@@ -1,12 +1,18 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
-"""工具结果压缩配置模块"""
+"""工具结果压缩配置模块
+
+支持两种压缩模式：
+1. truncate: 截断模式 - 直接截断工具返回内容
+2. summarize: 大模型摘要模式 - 使用 LLM 将工具返回总结成一段文字
+"""
 
 from typing import Literal
 from pydantic import BaseModel, Field
 
 TriggerType = Literal["messages", "tokens"]
+CompressionMode = Literal["truncate", "summarize"]
 
 
 class TriggerCondition(BaseModel):
@@ -33,9 +39,40 @@ class ModelConfig(BaseModel):
     temperature: float = Field(default=0.3, description="温度参数")
 
 
+class SummarizeConfig(BaseModel):
+    """大模型摘要配置"""
+    # 摘要提示词模板，{content} 会被替换为工具返回内容
+    prompt: str = Field(
+        default=(
+            "请将以下工具调用返回结果压缩成一段简洁的摘要，"
+            "保留关键信息和数据，去除冗余内容。\n\n"
+            "工具返回内容：\n{content}\n\n"
+            "摘要："
+        ),
+        description="摘要提示词模板，{content} 会被替换为工具返回内容"
+    )
+    # 摘要最大长度（字符数）
+    max_summary_length: int = Field(
+        default=500,
+        description="摘要最大长度（字符数）"
+    )
+    # 是否保留原始工具名称
+    keep_tool_name: bool = Field(
+        default=True,
+        description="是否在摘要中保留原始工具名称"
+    )
+
+
 class ToolCompressionConfig(BaseModel):
     """工具结果压缩配置"""
     enabled: bool = Field(default=False, description="是否启用")
+    
+    # 压缩模式：truncate（截断）或 summarize（大模型摘要）
+    mode: CompressionMode = Field(
+        default="truncate",
+        description="压缩模式：truncate（截断）或 summarize（大模型摘要）"
+    )
+    
     trigger: list[TriggerCondition] = Field(
         default_factory=list,
         description="触发条件列表"
@@ -46,7 +83,11 @@ class ToolCompressionConfig(BaseModel):
     )
     model: ModelConfig = Field(
         default_factory=ModelConfig,
-        description="压缩模型配置"
+        description="压缩模型配置（用于摘要模式）"
+    )
+    summarize: SummarizeConfig = Field(
+        default_factory=SummarizeConfig,
+        description="大模型摘要配置"
     )
 
 

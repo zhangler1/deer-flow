@@ -101,10 +101,18 @@ CRAWLER:
 # ============================================================================
 # 自动压缩工具调用的返回结果，减少上下文长度，同时保留关键信息
 # 只压缩 ToolMessage，不影响用户输入和 AI 分析
+# 支持两种压缩模式：
+#   - truncate: 截断模式，直接截断工具返回内容
+#   - summarize: 大模型摘要模式，使用 LLM 将工具返回总结成一段文字
 
 TOOL_RESULT_COMPRESSION:
   # 是否启用工具结果压缩
   enabled: true
+  
+  # 压缩模式：truncate（截断）或 summarize（大模型摘要）
+  # truncate: 直接截断旧的工具返回内容
+  # summarize: 使用大模型将工具返回总结成简洁摘要
+  mode: summarize
   
   # 触发条件 - 当满足任一阈值时触发压缩（OR 逻辑）
   trigger:
@@ -119,12 +127,27 @@ TOOL_RESULT_COMPRESSION:
   keep:
     # 保留最近 N 条工具消息的完整内容
     recent_tool_messages: 2
-    # 每条工具消息保留的最大字符数（旧的工具消息会被截断）
+    # 每条工具消息保留的最大字符数（截断模式使用）
     max_content_per_tool: 1000
   
-  # 压缩模型配置
+  # 压缩模型配置（摘要模式使用）
   model:
     # 使用的模型（null = 使用 BASIC_MODEL）
     name: null
     # 压缩提示词温度
     temperature: 0.3
+  
+  # 大模型摘要配置（仅 summarize 模式生效）
+  summarize:
+    # 摘要提示词模板，{content} 会被替换为工具返回内容
+    prompt: |
+      请将以下工具调用返回结果压缩成一段简洁的摘要，保留关键信息和数据，去除冗余内容。
+      
+      工具返回内容：
+      {content}
+      
+      摘要：
+    # 摘要最大长度（字符数），超过此长度会被截断
+    max_summary_length: 500
+    # 是否在摘要中保留原始工具名称
+    keep_tool_name: true
