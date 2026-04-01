@@ -29,6 +29,7 @@ from src.middlewares.tool_result_compression import ToolResultCompressionMiddlew
 from src.graph.types import State
 from src.utils.enhanced_logger import get_enhanced_logger
 from src.utils.text_utils import remove_think_tags
+from src.utils.search_budget import SearchBudgetManager
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.utils')
@@ -137,6 +138,14 @@ async def _execute_agent_step(
     soft_limit = recursion_limit
     hard_limit = max(soft_limit * 10, 50)
 
+    # 初始化搜索预算管理器（用于更精细的预算控制）
+    # 可以在state中持久化budget_manager以跨步骤跟踪
+    budget_manager = SearchBudgetManager(
+        max_search_calls=soft_limit,
+        max_tokens=10000,
+        hard_token_limit=14000,
+    )
+
     # 1. 工具调用限制中间件
     tool_limit_middleware = ToolCallLimitMiddleware(max_calls=soft_limit)
     
@@ -158,9 +167,20 @@ async def _execute_agent_step(
     state_messages = state.get("messages", [])
     tool_call_count = tool_limit_middleware.count_tool_calls_in_messages(state_messages)
 
+    # 使用预算管理器检查状态
+    budget_status = budget_manager.get_budget_status(state_messages)
+    budget_info = budget_manager.get_remaining_budget(state_messages)
+
     enhanced_logger.logger.info(
         f"📊 TOOL_CALL_COUNT | {agent_name} | 当前工具调用: {tool_call_count} | "
         f"软限制(建议): {soft_limit} | 硬限制(LangGraph): {hard_limit}"
+    )
+    enhanced_logger.logger.info(
+        f"📊 BUDGET_STATUS | {agent_name} | "
+        f"搜索: {budget_info['search_calls_used']}/{soft_limit} | "
+        f"Tokens: {budget_info['estimated_tokens']}/{budget_manager.config.max_tokens} | "
+        f"警告级别: {budget_info['warning_level']} | "
+        f"可搜索: {budget_info['remaining_search_calls'] > 0}"
     )
 
     # 如果工具调用次数已经接近软限制（>= 80%），在输入中插入提示消息

@@ -42,6 +42,15 @@ from .report_search import (
 )
 
 from .research_skill_prompt_search import research_skill_prompt_search
+from .budget_controlled_search import (
+    BudgetControlledSearchTool,
+    create_budget_controlled_search_tool,
+    budget_controlled_online_search_tool,
+    get_budget_manager,
+    clear_budget_manager,
+    get_budget_store_stats,
+    BudgetManagerStore,
+)
 
 __all__ = [
     "crawl_tool",
@@ -68,5 +77,12 @@ __all__ = [
     "financial_summary",
     "call_financial_summary",
     "research_skill_prompt_search",
-    "report_search"
+    "report_search",
+    "BudgetControlledSearchTool",
+    "create_budget_controlled_search_tool",
+    "budget_controlled_online_search_tool",
+    "get_budget_manager",
+    "clear_budget_manager",
+    "get_budget_store_stats",
+    "BudgetManagerStore",
 ]

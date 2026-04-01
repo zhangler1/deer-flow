@@ -14,6 +14,12 @@ from .text_utils import (
 from .enhanced_logger import get_enhanced_logger
 from .json_utils import repair_json_output
 from .rerank import rerank_news, rerank_objects, RerankConfig
+from .search_budget import (
+    SearchBudgetManager,
+    BudgetConfig,
+    BudgetStatus,
+    create_budget_manager,
+)
 
 __all__ = [
     'remove_think_tags',
@@ -25,4 +31,8 @@ __all__ = [
     'rerank_news',
     'rerank_objects',
     'RerankConfig',
+    'SearchBudgetManager',
+    'BudgetConfig',
+    'BudgetStatus',
+    'create_budget_manager',
 ]

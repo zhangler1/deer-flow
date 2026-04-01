@@ -27,6 +27,9 @@ from src.tools import (
     financial_summary,
     product_instance_search,
     report_search,
+    budget_controlled_online_search_tool,
+    get_budget_manager,
+    clear_budget_manager,
 )
 from src.utils.enhanced_logger import get_enhanced_logger
 
@@ -85,30 +88,51 @@ async def researcher_node(
 
     elif report_style == "business_marketing":
         # 对公营销报告：使用完整的工具链
+        # 使用预算控制的搜索工具，防止搜索过多导致token溢出
+        session_id = state.get("session_id", "default")
         tools = [
-            online_search_tool(max_results=configurable.max_search_results),
+            budget_controlled_online_search_tool(
+                max_results=configurable.max_search_results,
+                session_id=session_id,
+                max_search_calls=researcher_limit,
+                max_tokens=10000,
+            ),
             research_skill_prompt_search,
             business_opportunity_search,
             sentiment_search,
             financial_summary,
             product_instance_search,
         ]
-        tool_names = "online_search, research_skill_prompt_search, business_opportunity_search, sentiment_search, financial_summary, product_instance_search"
+        tool_names = "budget_controlled_online_search, research_skill_prompt_search, business_opportunity_search, sentiment_search, financial_summary, product_instance_search"
 
     elif report_style == "business_marketing_client":
         # 对公营销客户版：使用基础搜索工具
+        # 使用预算控制的搜索工具
+        session_id = state.get("session_id", "default")
         tools = [
             research_skill_prompt_search,
-            online_search_tool(max_results=configurable.max_search_results),
+            budget_controlled_online_search_tool(
+                max_results=configurable.max_search_results,
+                session_id=session_id,
+                max_search_calls=researcher_limit,
+                max_tokens=10000,
+            ),
         ]
-        tool_names = "research_skill_prompt_search, online_search"
+        tool_names = "research_skill_prompt_search, budget_controlled_online_search"
 
     elif report_style == "academic":
         # 学术研究：使用基础搜索工具
+        # 使用预算控制的搜索工具
+        session_id = state.get("session_id", "default")
         tools = [
-            online_search_tool(max_results=configurable.max_search_results),
+            budget_controlled_online_search_tool(
+                max_results=configurable.max_search_results,
+                session_id=session_id,
+                max_search_calls=researcher_limit,
+                max_tokens=10000,
+            ),
         ]
-        tool_names = "online_search"
+        tool_names = "budget_controlled_online_search"
     
     else:
         # 默认配置
