@@ -59,7 +59,7 @@ async def researcher_node(
     
     budget_manager = get_budget_manager(
         session_id, 
-        max_search_calls=10,  # 默认值，后续会根据配置覆盖
+        max_search_calls=getattr(configurable, 'search_budget_max_calls', 5),
         max_tokens=max_tokens,
         token_chars_ratio=token_chars_ratio,
     )
