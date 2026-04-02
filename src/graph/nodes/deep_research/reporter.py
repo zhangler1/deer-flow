@@ -45,7 +45,6 @@ logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.reporter')
 
 
-@observe(name="📝 报告节点", as_type="agent")
 def reporter_node(state: State, config: RunnableConfig):
     """撰写最终报告的报告员节点"""
     start_time = time.time()

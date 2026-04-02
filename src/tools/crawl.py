@@ -19,20 +19,6 @@ LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 # Langfuse 集成 - v3 模式
 LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 
-# Langfuse 集成 - v3 模式 (@observe 装饰器会自动捕获输入输出)
-try:
-    from langfuse import observe
-except ImportError:
-    LANGFUSE_ENABLED = False
-    logging.warning("Langfuse not installed. Tracing disabled.")
-    
-    def observe(*args, **kwargs):
-        def decorator(func):
-            return func
-        # 支持 @observe 和 @observe(...) 两种用法
-        if len(args) == 1 and callable(args[0]) and not kwargs:
-            return args[0]
-        return decorator
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('tools.crawl')
@@ -148,9 +134,9 @@ URL：{url}
         return f"我已精读了这篇文章：{title}。"
 
 
+# @observe(name="爬虫工具",as_type="tool")
 @tool
 @log_io
-@observe(name="爬虫工具",as_type="tool")
 def crawl_tool(
     url: Annotated[str, "The url to crawl."],
     use_cache: Annotated[bool, "Whether to use cache. Default True."] = True,
@@ -395,3 +381,18 @@ def clear_crawl_cache() -> str:
     )
     
     return f"已清空精读缓存，共清除 {count} 个缓存项"
+
+# Langfuse 集成 - v3 模式 (@observe 装饰器会自动捕获输入输出)
+# try:
+#     from langfuse import observe
+# except ImportError:
+#     LANGFUSE_ENABLED = False
+#     logging.warning("Langfuse not installed. Tracing disabled.")
+#     
+#     def observe(*args, **kwargs):
+#         def decorator(func):
+#             return func
+#         # 支持 @observe 和 @observe(...) 两种用法
+#         if len(args) == 1 and callable(args[0]) and not kwargs:
+#             return args[0]
+#         return decorator

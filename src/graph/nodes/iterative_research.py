@@ -35,24 +35,15 @@ from src.utils.enhanced_logger import get_enhanced_logger
 import os
 _langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 try:
-    if _langfuse_enabled:
-        from langfuse import observe
-    else:
-        raise ImportError("Langfuse disabled by LANGFUSE_ENABLED=false")
+    pass
 except ImportError:
-    def observe(*args, **kwargs):
-        def decorator(func):
-            return func
-        if len(args) == 1 and callable(args[0]) and not kwargs:
-            return args[0]
-        return decorator
+    pass
 
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.iterative_research')
 
 
-@observe(name="🔄 迭代研究节点", as_type="agent")
 def iterative_research_node(state, config: RunnableConfig) -> Command[Literal["__end__", "iterative_research_node"]]:
     """
     迭代深度研究节点 - 针对单个问题进行多轮自主深入研究
@@ -271,7 +262,6 @@ def iterative_research_node(state, config: RunnableConfig) -> Command[Literal["_
         )
 
 
-@observe(name="📝 迭代研究报告节点", as_type="agent")
 def iterative_reporter_node(state, config: RunnableConfig) -> Command[Literal["__end__"]]:
     """
     迭代研究报告员节点 - 专门用于生成迭代研究的最终报告

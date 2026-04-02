@@ -46,7 +46,6 @@ logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.coordinator')
 
 
-@observe(name="🎯 协调节点", as_type="agent")
 def coordinator_node(
     state, config: RunnableConfig
 ) -> Command[Literal["planner", "background_investigator", "__end__"]]:

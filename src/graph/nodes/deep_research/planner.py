@@ -49,7 +49,6 @@ logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.planner')
 
 
-@observe(name="📋 规划节点", as_type="agent")
 def planner_node(
     state, config: RunnableConfig
 ) -> Command[Literal["human_feedback", "reporter"]]:

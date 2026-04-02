@@ -59,7 +59,6 @@ def _get_complexity_description(complexity: str) -> str:
     return descriptions.get(complexity, "未知复杂度")
 
 
-@observe(name="📡 路由节点", as_type="agent")
 def router_node(
     state: State, config: RunnableConfig
 ) -> Command[Literal["direct_answer_node", "simple_search_node", "iterative_research_node", "coordinator"]]:

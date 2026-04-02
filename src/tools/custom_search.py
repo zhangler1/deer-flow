@@ -17,23 +17,12 @@ from pydantic import BaseModel, Field
 from src.config.custom_search import get_custom_search_config, CustomSearchRepository
 from src.utils.enhanced_logger import console_print, get_enhanced_logger
 
+# LangFuse 集成 - 直接导入，失败时降级
+LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+
 # Langfuse 集成 - v3 模式
 LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 
-# Langfuse 集成 - v3 模式 (@observe 装饰器会自动捕获输入输出)
-try:
-    from langfuse import observe
-except ImportError:
-    LANGFUSE_ENABLED = False
-    logging.warning("Langfuse not installed. Tracing disabled.")
-    
-    def observe(*args, **kwargs):
-        def decorator(func):
-            return func
-        # 支持 @observe 和 @observe(...) 两种用法
-        if len(args) == 1 and callable(args[0]) and not kwargs:
-            return args[0]
-        return decorator
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('tools.custom_search')
@@ -239,7 +228,7 @@ class CustomSearchTool(BaseTool):
         return results[:self.max_results]
     
 
-    @observe(name="行内同步检索",as_type="tool")
+    
     def _run(
         self,
         query: str,
@@ -372,7 +361,7 @@ class CustomSearchTool(BaseTool):
                 "score": 0.0
             }]
     
-    @observe(name="行内异步检索",as_type="tool")
+    
     async def _arun(
         self,
         query: str,

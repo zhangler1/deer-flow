@@ -17,18 +17,6 @@ import json
 from typing import Optional, List, Dict, Any
 from langchain_core.tools import tool
 
-# Langfuse 集成 - v3 模式 (@observe 装饰器会自动捕获输入输出)
-try:
-    from langfuse import observe
-except ImportError:
-    logging.warning("Langfuse not installed. Tracing disabled.")
-    
-    def observe(*args, **kwargs):
-        def decorator(func):
-            return func
-        if len(args) == 1 and callable(args[0]) and not kwargs:
-            return args[0]
-        return decorator
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +101,6 @@ def _build_request_body(
     return req_body
 
 
-@observe(name="金融领域知识搜索函数API",as_type="tool")
 def call_domain_fin_search(
     keyword: str,
     scene: str = "default",
@@ -278,7 +265,6 @@ def _extract_knowledge(result: Dict[str, Any]) -> List[Dict[str, Any]]:
 # ===== LangChain Tool 封装 =====
 
 @tool
-@observe(name="金融领域知识搜索",as_type="tool")
 def domain_fin_search(
     keyword: str,
     scene: str = "default"

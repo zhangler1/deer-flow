@@ -50,7 +50,6 @@ logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.simple_nodes')
 
 
-@observe(name="⚡ 直接回答节点", as_type="agent")
 def direct_answer_node(state, config: RunnableConfig) -> Command[Literal["__end__"]]:
     """
     直接回答节点 - 不走检索，使用LLM的通用知识直接回答
