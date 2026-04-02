@@ -334,6 +334,8 @@ class BudgetControlledSearchTool(BaseTool):
         self,
         query: str,
         run_manager: Optional[CallbackManagerForToolRun] = None,
+        config: Optional[Dict[str, Any]] = None,
+        **kwargs
     ) -> Any:
         """执行搜索（带预算控制）
         
@@ -377,8 +379,8 @@ class BudgetControlledSearchTool(BaseTool):
         try:
             logger.info(f"🔍 SEARCH_EXECUTING | session: {self.session_id} | query: '{query}'")
             
-            # 调用被包装的工具
-            result = self.wrapped_tool._run(query, run_manager=run_manager)
+            # 调用被包装的工具（统一签名支持）
+            result = self.wrapped_tool._run(query, run_manager=run_manager, config=config, **kwargs)
             
             # 记录搜索调用
             budget.record_search_call()

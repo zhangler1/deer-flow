@@ -17,7 +17,11 @@ from pydantic import BaseModel, Field
 from src.config.custom_search import get_custom_search_config, CustomSearchRepository
 from src.utils.enhanced_logger import console_print, get_enhanced_logger
 
+# LangFuse 集成 - 直接导入，失败时降级
+LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 
+# Langfuse 集成 - v3 模式
+LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 
 
 logger = logging.getLogger(__name__)
@@ -230,6 +234,8 @@ class CustomSearchTool(BaseTool):
         query: str,
         repository_id: Optional[str] = None,
         run_manager: Optional[CallbackManagerForToolRun] = None,
+        config: Optional[Dict[str, Any]] = None,
+        **kwargs
     ) -> List[Dict[str, Any]]:
         """同步执行搜索"""
         import time
