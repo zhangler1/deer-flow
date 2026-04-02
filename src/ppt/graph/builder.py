@@ -21,13 +21,7 @@ def build_graph():
     
     compiled_graph = builder.compile()
     
-    # Add Langfuse callback for tracing (只在配置了 PUBLIC_KEY 时启用)
-    try:
-        if os.getenv("LANGFUSE_PUBLIC_KEY"):
-            from langfuse.langchain import CallbackHandler
-            return compiled_graph.with_config({"callbacks": [CallbackHandler()]})
-    except ImportError:
-        pass
+
     
     return compiled_graph
 

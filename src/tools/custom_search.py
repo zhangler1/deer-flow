@@ -17,11 +17,7 @@ from pydantic import BaseModel, Field
 from src.config.custom_search import get_custom_search_config, CustomSearchRepository
 from src.utils.enhanced_logger import console_print, get_enhanced_logger
 
-# LangFuse 集成 - 直接导入，失败时降级
-LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 
-# Langfuse 集成 - v3 模式
-LANGFUSE_ENABLED = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
 
 
 logger = logging.getLogger(__name__)

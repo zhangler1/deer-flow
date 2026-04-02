@@ -15,9 +15,7 @@ from dateutil.parser import parse as parse_date
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 
-# Langfuse 集成（受 LANGFUSE_ENABLED 开关控制）
-import os
-_langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+
 
 # 导入 CustomSearchTool（复用 CustomSearchTool，不依赖 online_search.py）
 from src.tools.custom_search import CustomSearchTool
@@ -152,7 +150,6 @@ def _online_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
     return tool._run(enhanced_query)
 
 
-# @observe(name="财务数据汇总函数API", as_type="tool")
 def call_financial_summary(
     query: str,
     max_results: int = 10,
@@ -248,7 +245,6 @@ def call_financial_summary(
 # ===== LangChain Tool 封装 =====
 
 @tool
-# @observe(name="财务数据汇总", as_type="tool")
 def financial_summary(
     query: str
 ) -> str:

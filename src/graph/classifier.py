@@ -15,24 +15,7 @@ from src.utils.enhanced_logger import get_enhanced_logger
 from src.prompts.template import env  # 直接导入 Jinja2 环境
 from src.utils.performance_monitor import PerformanceMonitor
 
-# Langfuse 集成（受 LANGFUSE_ENABLED 开关控制）
-import os
-_langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
-try:
-    if _langfuse_enabled:
-        from langfuse import observe
-    else:
-        raise ImportError("Langfuse disabled by LANGFUSE_ENABLED=false")
-except ImportError:
-    logging.warning("Langfuse not installed or disabled. Tracing disabled.")
-    
-    def observe(*args, **kwargs):
-        def decorator(func):
-            return func
-        # 支持 @observe 和 @observe(...) 两种用法
-        if len(args) == 1 and callable(args[0]) and not kwargs:
-            return args[0]
-        return decorator
+
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.classifier')
@@ -58,7 +41,7 @@ class RouteDecision(BaseModel):
     )
 
 
-@observe(name="智能路由分类器", as_type="agent")
+
 def classify_request(
     query: str, 
     enable_smart_routing: bool = True,
@@ -75,7 +58,7 @@ def classify_request(
     Returns:
         RouteDecision: 路由决策结果
         
-    注意: @observe 装饰器会自动捕获输入参数和返回值，无需手动记录
+    注意:
     """
     
     # 🎯 监控整个分类流程
@@ -174,7 +157,7 @@ def classify_request(
                 f"LLM耗时: {llm_monitor.get_duration_formatted()}"
             )
             
-            # 注意: @observe 装饰器会自动捕获返回值 (result)
+           
             return result
             
         except Exception as e:

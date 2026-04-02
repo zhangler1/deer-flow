@@ -31,13 +31,7 @@ from src.tools import (
 )
 from src.utils.enhanced_logger import get_enhanced_logger
 
-# Langfuse 集成（受 LANGFUSE_ENABLED 开关控制）
-import os
-_langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
-try:
-    pass
-except ImportError:
-    pass
+
 
 
 logger = logging.getLogger(__name__)

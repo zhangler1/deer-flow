@@ -46,13 +46,6 @@ def build_graph():
     
     compiled_graph = builder.compile()
     
-    # Langfuse tracing: 只在有环境变量时才添加 callback
-    try:
-        if os.getenv("LANGFUSE_PUBLIC_KEY"):
-            from langfuse.langchain import CallbackHandler
-            return compiled_graph.with_config({"callbacks": [CallbackHandler()]})
-    except ImportError:
-        pass
     
     return compiled_graph
 
