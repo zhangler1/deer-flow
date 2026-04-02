@@ -129,6 +129,24 @@ class SearchBudgetManager:
             bool: 如果可以搜索返回True
         """
         status = self.get_budget_status(messages)
+        
+        # 🔥 添加预算检查日志
+        if not status.can_search:
+            logger.warning(
+                f"🛑 BUDGET_LIMIT_REACHED | 预算已耗尽 | "
+                f"搜索次数: {status.search_calls_used}/{self.config.max_search_calls} | "
+                f"Tokens: {status.estimated_tokens}/{self.config.hard_token_limit} | "
+                f"警告级别: {status.warning_level}"
+            )
+        elif status.warning_level > 0:
+            logger.info(
+                f"💡 BUDGET_WARNING | 预算使用警告 | "
+                f"搜索次数: {status.search_calls_used}/{self.config.max_search_calls} | "
+                f"Tokens: {status.estimated_tokens}/{self.config.max_tokens} | "
+                f"警告级别: {status.warning_level} | "
+                f"剩余搜索: {status.remaining_search_calls}次"
+            )
+        
         return status.can_search
 
     def get_remaining_budget(self, messages: list[BaseMessage]) -> dict:
@@ -199,7 +217,11 @@ class SearchBudgetManager:
     def record_search_call(self) -> None:
         """记录一次搜索调用"""
         self._search_calls_used += 1
-        logger.debug(f"📊 Search call recorded | total: {self._search_calls_used}")
+        logger.info(
+            f"📊 BUDGET_SEARCH_RECORDED | 记录搜索调用 | "
+            f"已使用: {self._search_calls_used}/{self.config.max_search_calls} | "
+            f"剩余: {self.config.max_search_calls - self._search_calls_used}次"
+        )
 
     def get_warning_message(self, messages: list[BaseMessage]) -> Optional[str]:
         """根据当前状态获取警告消息
@@ -236,8 +258,14 @@ class SearchBudgetManager:
 
     def reset(self) -> None:
         """重置预算计数器"""
+        old_count = self._search_calls_used
         self._search_calls_used = 0
-        logger.info("🔄 SearchBudgetManager reset")
+        logger.info(
+            f"🔄 BUDGET_RESET | 预算计数器已清零 | "
+            f"之前使用: {old_count}次 | "
+            f"限制: {self.config.max_search_calls}次 | "
+            f"Tokens限制: {self.config.max_tokens}"
+        )
 
 
 # 便捷函数：创建默认配置的预算管理器

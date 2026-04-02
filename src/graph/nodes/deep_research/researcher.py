@@ -170,36 +170,14 @@ async def researcher_node(
     
     logger.info(f"Researcher tools: {tools}")
     
-    # 尝试使用带 Middleware 的 Agent
-    from src.middlewares.researcher_agent import create_researcher_agent
-    
-    agent = create_researcher_agent(
-        tools=tools,
-        model=None,
-        enable_summarization=True,
+    # 执行研究节点
+    result = await _setup_and_execute_agent_step(
+        state,
+        config,
+        "researcher",
+        tools,
+        recursion_limit=researcher_limit,
     )
-    
-    if agent is not None:
-        enhanced_logger.logger.info("✅ MIDDLEWARE_AGENT | Researcher agent 已启用 middleware 支持")
-        
-        result = await _setup_and_execute_agent_step(
-            state,
-            config,
-            "researcher",
-            tools,
-            recursion_limit=researcher_limit,
-            agent_executor=agent,
-        )
-    else:
-        enhanced_logger.logger.info("⚠️  FALLBACK_MODE | 使用传统 agent 模式（无 middleware 支持）")
-        
-        result = await _setup_and_execute_agent_step(
-            state,
-            config,
-            "researcher",
-            tools,
-            recursion_limit=researcher_limit,
-        )
     
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | researcher | 节点执行完成 | 总耗时: {duration:.2f}s")

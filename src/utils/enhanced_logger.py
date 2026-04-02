@@ -157,6 +157,9 @@ class EnhancedLogger:
             
         self.logger.setLevel(level)
         
+        # 禁止日志向父logger传播，避免重复输出
+        self.logger.propagate = False
+        
     def set_session_context(self, session_id: str, user_query: str):
         """设置会话上下文"""
         self.session_id = session_id

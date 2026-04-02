@@ -134,9 +134,19 @@ class ToolResultCompressionMiddleware:
             ToolMessage: 压缩后的工具消息
         """
         content = str(tool_msg.content)
+        tool_name = getattr(tool_msg, 'name', 'unknown')
         
         if len(content) <= max_length:
             return tool_msg
+        
+        # 🔥 记录截断日志
+        self.logger.info(
+            f"✂️  COMPRESSION_TRUNCATE | 截断工具消息 | "
+            f"工具: {tool_name} | "
+            f"原始长度: {len(content)}字符 | "
+            f"截断后: {max_length}字符 | "
+            f"压缩比: {(1 - max_length/len(content))*100:.1f}%"
+        )
         
         # 截断内容并添加提示
         compressed_content = content[:max_length] + f"\n\n... [已截断，原始长度: {len(content)} 字符] ..."
@@ -184,6 +194,11 @@ class ToolResultCompressionMiddleware:
         
         try:
             # 调用 LLM 生成摘要（同步方法）
+            self.logger.info(
+                f"🤖 COMPRESSION_SUMMARIZE_START | 开始 LLM 摘要 | "
+                f"工具: {getattr(tool_msg, 'name', 'unknown')} | "
+                f"原始长度: {len(content)}字符"
+            )
             response = self.llm.invoke([HumanMessage(content=prompt)])
             summary = str(response.content).strip()
             
@@ -207,9 +222,11 @@ class ToolResultCompressionMiddleware:
                 name=tool_msg.name if hasattr(tool_msg, 'name') else None,
             )
             
-            self.logger.debug(
-                f"🤖 SUMMARIZE_SUCCESS | "
-                f"原始: {original_length}字符 → 摘要: {len(summary)}字符"
+            self.logger.info(
+                f"✅ COMPRESSION_SUMMARIZE_SUCCESS | LLM摘要完成 | "
+                f"工具: {getattr(tool_msg, 'name', 'unknown')} | "
+                f"原始: {original_length}字符 → 摘要: {len(summary)}字符 | "
+                f"压缩比: {(1 - len(summary)/original_length)*100:.1f}%"
             )
             
             return summarized_msg
@@ -257,6 +274,11 @@ class ToolResultCompressionMiddleware:
         
         try:
             # 调用 LLM 生成摘要（异步方法）
+            self.logger.info(
+                f"🤖 COMPRESSION_SUMMARIZE_START | 开始 LLM 摘要 (异步) | "
+                f"工具: {getattr(tool_msg, 'name', 'unknown')} | "
+                f"原始长度: {len(content)}字符"
+            )
             response = await self.llm.ainvoke([HumanMessage(content=prompt)])
             summary = str(response.content).strip()
             
@@ -281,9 +303,11 @@ class ToolResultCompressionMiddleware:
                 name=tool_msg.name if hasattr(tool_msg, 'name') else None,
             )
             
-            self.logger.debug(
-                f"🤖 SUMMARIZE_SUCCESS | "
-                f"原始: {original_length}字符 → 摘要: {len(summary)}字符"
+            self.logger.info(
+                f"✅ COMPRESSION_SUMMARIZE_SUCCESS | LLM摘要完成 | "
+                f"工具: {getattr(tool_msg, 'name', 'unknown')} | "
+                f"原始: {original_length}字符 → 摘要: {len(summary)}字符 | "
+                f"压缩比: {(1 - len(summary)/original_length)*100:.1f}%"
             )
             
             return summarized_msg
@@ -490,13 +514,23 @@ class ToolResultCompressionMiddleware:
             self.logger.debug("⏸️  COMPRESSION_DISABLED | 工具结果压缩未启用")
             return messages
     
-        self.logger.debug(
-            f"📊 COMPRESSION_CHECK | "
+        self.logger.info(
+            f"📊 COMPRESSION_CHECK | 检查是否需要压缩 | "
             f"消息数: {len(messages)} | "
-            f"估算 tokens: {self.estimate_token_count(messages)}"
+            f"估算 tokens: {self.estimate_token_count(messages)} | "
+            f"模式: {self.config.mode}"
         )
     
-        return self.compress_messages(messages)
+        result = self.compress_messages(messages)
+        
+        if result != messages:
+            self.logger.info(
+                f"✅ COMPRESSION_APPLIED | 压缩已应用 | "
+                f"原始消息数: {len(messages)} | "
+                f"压缩后: {len(result)}"
+            )
+        
+        return result
     
     async def process_messages_before_invoke_async(
         self,
@@ -517,13 +551,23 @@ class ToolResultCompressionMiddleware:
             self.logger.debug("⏸️  COMPRESSION_DISABLED | 工具结果压缩未启用")
             return messages
     
-        self.logger.debug(
-            f"📊 COMPRESSION_CHECK | "
+        self.logger.info(
+            f"📊 COMPRESSION_CHECK | 检查是否需要压缩 | "
             f"消息数: {len(messages)} | "
-            f"估算 tokens: {self.estimate_token_count(messages)}"
+            f"估算 tokens: {self.estimate_token_count(messages)} | "
+            f"模式: {self.config.mode}"
         )
     
-        return await self.compress_messages_async(messages)
+        result = await self.compress_messages_async(messages)
+        
+        if result != messages:
+            self.logger.info(
+                f"✅ COMPRESSION_APPLIED | 压缩已应用 (异步) | "
+                f"原始消息数: {len(messages)} | "
+                f"压缩后: {len(result)}"
+            )
+        
+        return result
 
 
 async def invoke_with_tool_compression(
