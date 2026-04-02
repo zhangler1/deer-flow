@@ -441,6 +441,87 @@ def create_budget_controlled_search_tool(
     )
 
 
+def budget_controlled_financial_summary_tool(
+    session_id: str = "default",
+    max_search_calls: int = 10,
+    max_tokens: int = 12000,
+) -> BudgetControlledSearchTool:
+    """创建预算控制的财务数据汇总工具
+    
+    Args:
+        session_id: 会话ID
+        max_search_calls: 最大搜索调用次数
+        max_tokens: 最大token数量
+        
+    Returns:
+        BudgetControlledSearchTool: 预算控制的财务数据汇总工具
+    """
+    from src.tools.financial_summary import financial_summary
+    
+    original_tool = financial_summary
+    
+    return create_budget_controlled_search_tool(
+        wrapped_tool=original_tool,
+        session_id=session_id,
+        max_search_calls=max_search_calls,
+        max_tokens=max_tokens,
+    )
+
+
+def budget_controlled_product_instance_search_tool(
+    session_id: str = "default",
+    max_search_calls: int = 10,
+    max_tokens: int = 12000,
+) -> BudgetControlledSearchTool:
+    """创建预算控制的产品实例搜索工具
+    
+    Args:
+        session_id: 会话ID
+        max_search_calls: 最大搜索调用次数
+        max_tokens: 最大token数量
+        
+    Returns:
+        BudgetControlledSearchTool: 预算控制的产品实例搜索工具
+    """
+    from src.tools.product_instance_search import product_instance_search
+    
+    original_tool = product_instance_search
+    
+    return create_budget_controlled_search_tool(
+        wrapped_tool=original_tool,
+        session_id=session_id,
+        max_search_calls=max_search_calls,
+        max_tokens=max_tokens,
+    )
+
+
+def budget_controlled_product_search_tool(
+    session_id: str = "default",
+    max_search_calls: int = 10,
+    max_tokens: int = 12000,
+) -> BudgetControlledSearchTool:
+    """创建预算控制的产品搜索工具
+    
+    Args:
+        session_id: 会话ID
+        max_search_calls: 最大搜索调用次数
+        max_tokens: 最大token数量
+        
+    Returns:
+        BudgetControlledSearchTool: 预算控制的产品搜索工具
+    """
+    from src.tools.product_search import product_search
+    
+    original_tool = product_search
+    
+    return create_budget_controlled_search_tool(
+        wrapped_tool=original_tool,
+        session_id=session_id,
+        max_search_calls=max_search_calls,
+        max_tokens=max_tokens,
+    )
+
+
 # 便捷函数：创建预算控制的 online_search 工具
 def budget_controlled_online_search_tool(
     max_results: int = 10,
