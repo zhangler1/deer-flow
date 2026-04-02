@@ -48,6 +48,27 @@ async def researcher_node(
     
     logger.info("Researcher node is researching (with middleware support).")
     configurable = Configuration.from_runnable_config(config)
+    
+    # 🔥 每个 researcher 节点开始时清零预算，确保每个节点独立计算预算
+    session_id = state.get("session_id", "default")
+    
+    # 从配置中获取预算参数
+    max_tokens = getattr(configurable, 'search_budget_max_tokens', 10000)
+    hard_token_limit = getattr(configurable, 'search_budget_hard_limit', 14000)
+    token_chars_ratio = getattr(configurable, 'search_budget_token_chars_ratio', 2.5)
+    
+    budget_manager = get_budget_manager(
+        session_id, 
+        max_search_calls=10,  # 默认值，后续会根据配置覆盖
+        max_tokens=max_tokens,
+        token_chars_ratio=token_chars_ratio,
+    )
+    budget_manager.reset()  # 清零计数器
+    enhanced_logger.logger.info(
+        f"🔄 BUDGET_RESET | session: {session_id} | 预算计数器已清零 | "
+        f"max_tokens: {max_tokens} | hard_limit: {hard_token_limit} | "
+        f"token_chars_ratio: {token_chars_ratio}"
+    )
 
     # 读取 researcher 特定的递归限制配置
     researcher_limit = getattr(configurable, 'researcher_recursion_limit', None)
@@ -95,7 +116,7 @@ async def researcher_node(
                 max_results=configurable.max_search_results,
                 session_id=session_id,
                 max_search_calls=researcher_limit,
-                max_tokens=10000,
+                max_tokens=max_tokens,
             ),
             research_skill_prompt_search,
             business_opportunity_search,
@@ -115,7 +136,7 @@ async def researcher_node(
                 max_results=configurable.max_search_results,
                 session_id=session_id,
                 max_search_calls=researcher_limit,
-                max_tokens=10000,
+                max_tokens=max_tokens,
             ),
         ]
         tool_names = "research_skill_prompt_search, budget_controlled_online_search"
@@ -129,7 +150,7 @@ async def researcher_node(
                 max_results=configurable.max_search_results,
                 session_id=session_id,
                 max_search_calls=researcher_limit,
-                max_tokens=10000,
+                max_tokens=max_tokens,
             ),
         ]
         tool_names = "budget_controlled_online_search"

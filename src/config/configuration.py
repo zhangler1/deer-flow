@@ -55,6 +55,12 @@ class Configuration:
     report_style: str = ReportStyle.ACADEMIC.value  # Report style
     enable_deep_thinking: bool = False  # Whether to enable deep thinking
     system_context: str = ""  # 系统背景上下文，通过State传递给各节点，在Prompt Template中按需使用
+    
+    # 搜索预算控制配置
+    search_budget_max_calls: int = 5  # 最大搜索调用次数
+    search_budget_max_tokens: int = 10000  # 最大token数量（预警阈值）
+    search_budget_hard_limit: int = 14000  # 硬token限制（强制停止）
+    search_budget_token_chars_ratio: float = 2.5  # Token估算比例（字符数/token，纯中文场景）
 
     @classmethod
     def from_runnable_config(

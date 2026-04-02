@@ -151,3 +151,30 @@ TOOL_RESULT_COMPRESSION:
     max_summary_length: 500
     # 是否在摘要中保留原始工具名称
     keep_tool_name: true
+
+# ============================================================================
+# 搜索预算控制配置 (Search Budget Control)
+# ============================================================================
+# 控制研究节点的搜索工具调用次数和token消耗，防止上下文溢出
+# 每个researcher节点启动时会自动重置预算计数器
+
+SEARCH_BUDGET:
+  # 最大搜索调用次数（软限制）
+  # 不同报告类型可以有不同的限制：
+  # - business_marketing: 5次（对公营销报告）
+  # - industry_report: 3次（行业研报）
+  # - academic: 5次（学术研究）
+  max_search_calls: 5
+  
+  # 最大token数量（预警阈值）
+  # 当消息历史达到此token数时会发出警告
+  max_tokens: 10000
+  
+  # 硬token限制（强制停止）
+  # 超过此限制后将强制停止搜索
+  hard_token_limit: 14000
+  
+  # Token估算比例（字符数/token）
+  # 用于估算消息的token消耗，中文通常在2-3之间，英文在4左右
+  # 默认值2.5适合纯中文场景，中英混合建议3.0，纯英文建议4.0
+  token_chars_ratio: 2.5

@@ -39,23 +39,31 @@ class BudgetManagerStore:
     
     解决多用户并发访问时的竞态条件问题。
     使用读写锁确保线程安全。
+    
+    特性：
+    - TTL 自动过期：默认 20 分钟无访问后自动清理
+    - 容量限制：最多存储 1000 个 session，防止内存溢出
+    - LRU 驱逐：达到容量上限时清理最久未访问的 session
     """
     
-    def __init__(self, ttl_seconds: int = 3600):
+    def __init__(self, ttl_seconds: int = 1200, max_sessions: int = 100):
         """初始化存储
         
         Args:
-            ttl_seconds: 预算管理器的存活时间（秒），默认1小时
+            ttl_seconds: 预算管理器的存活时间（秒），默认20分钟
+            max_sessions: 最大存储的 session 数量，默认 1000
         """
         self._store: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.RLock()  # 可重入锁，支持嵌套锁定
         self._ttl_seconds = ttl_seconds
+        self._max_sessions = max_sessions
         
     def get_or_create(
         self, 
         session_id: str, 
         max_search_calls: int = 10, 
-        max_tokens: int = 12000
+        max_tokens: int = 12000,
+        token_chars_ratio: float = 3.0,
     ) -> SearchBudgetManager:
         """获取或创建预算管理器（线程安全）
         
@@ -63,6 +71,7 @@ class BudgetManagerStore:
             session_id: 会话ID
             max_search_calls: 最大搜索调用次数
             max_tokens: 最大token数量
+            token_chars_ratio: 字符数/token比例，用于估算token消耗
             
         Returns:
             SearchBudgetManager: 预算管理器实例
@@ -80,10 +89,15 @@ class BudgetManagerStore:
                 logger.debug(f"🔧 BudgetManager retrieved for session: {session_id}")
                 return entry['manager']
             
+            # 容量检查：如果超过最大数量，先清理最久未访问的 session（LRU驱逐）
+            if len(self._store) >= self._max_sessions:
+                self._cleanup_oldest()
+            
             # 创建新的管理器
             manager = SearchBudgetManager(
                 max_search_calls=max_search_calls,
                 max_tokens=max_tokens,
+                token_chars_ratio=token_chars_ratio,
             )
             self._store[session_id] = {
                 'manager': manager,
@@ -91,7 +105,10 @@ class BudgetManagerStore:
                 'last_accessed': now,
                 'session_id': session_id,
             }
-            logger.info(f"🔧 BudgetManager created for session: {session_id}")
+            logger.info(
+                f"🔧 BudgetManager created for session: {session_id} | "
+                f"Total sessions: {len(self._store)}/{self._max_sessions}"
+            )
             return manager
     
     def get(self, session_id: str) -> Optional[SearchBudgetManager]:
@@ -150,7 +167,39 @@ class BudgetManagerStore:
         
         for key in expired_keys:
             del self._store[key]
-            logger.info(f"🧹 Expired BudgetManager cleared for session: {key}")
+        
+        if expired_keys:
+            logger.info(
+                f"🧹 CLEANUP_EXPIRED | Cleared {len(expired_keys)} expired sessions | "
+                f"Remaining: {len(self._store)}/{self._max_sessions}"
+            )
+    
+    def _cleanup_oldest(self, count: int = 100) -> None:
+        """清理最久未访问的 session，防止内存溢出（LRU驱逐）
+        
+        Args:
+            count: 清理的数量，默认 100
+        """
+        if not self._store:
+            return
+        
+        # 按最后访问时间排序，获取最久未访问的 session
+        sorted_sessions = sorted(
+            self._store.items(),
+            key=lambda x: x[1]['last_accessed']
+        )
+        
+        # 清理最旧的 count 个 session
+        removed_count = 0
+        for session_id, _ in sorted_sessions[:count]:
+            del self._store[session_id]
+            removed_count += 1
+        
+        logger.warning(
+            f"⚠️ CLEANUP_OLDEST | Capacity limit reached! "
+            f"Cleared {removed_count} oldest sessions | "
+            f"Remaining: {len(self._store)}/{self._max_sessions}"
+        )
     
     def get_stats(self) -> Dict[str, Any]:
         """获取存储统计信息
@@ -161,31 +210,40 @@ class BudgetManagerStore:
         with self._lock:
             return {
                 'total_sessions': len(self._store),
+                'max_sessions': self._max_sessions,
+                'capacity_usage': f"{len(self._store)}/{self._max_sessions} ({len(self._store)/self._max_sessions*100:.1f}%)",
                 'session_ids': list(self._store.keys()),
                 'ttl_seconds': self._ttl_seconds,
             }
 
 
 # 全局存储实例（单例模式）
-_budget_store = BudgetManagerStore(ttl_seconds=3600)  # 1小时TTL
+# TTL=20分钟，最多 1000 个 session，防止内存溢出
+_budget_store = BudgetManagerStore(ttl_seconds=1200, max_sessions=100)
 
 
 # ============================================================================
 # 对外接口（保持向后兼容）
 # ============================================================================
 
-def get_budget_manager(session_id: str, max_search_calls: int = 10, max_tokens: int = 12000) -> SearchBudgetManager:
+def get_budget_manager(
+    session_id: str, 
+    max_search_calls: int = 10, 
+    max_tokens: int = 12000,
+    token_chars_ratio: float = 2.5,
+) -> SearchBudgetManager:
     """获取或创建预算管理器（线程安全）
     
     Args:
         session_id: 会话ID
         max_search_calls: 最大搜索调用次数
         max_tokens: 最大token数量
+        token_chars_ratio: 字符数/token比例，用于估算token消耗
         
     Returns:
         SearchBudgetManager: 预算管理器实例
     """
-    return _budget_store.get_or_create(session_id, max_search_calls, max_tokens)
+    return _budget_store.get_or_create(session_id, max_search_calls, max_tokens, token_chars_ratio)
 
 
 def clear_budget_manager(session_id: str) -> bool:

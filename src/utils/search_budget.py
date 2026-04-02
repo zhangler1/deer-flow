@@ -21,7 +21,7 @@ class BudgetConfig:
     max_search_calls: int = 10  # 最大搜索调用次数
     max_tokens: int = 12000     # 最大token数量（预警阈值）
     hard_token_limit: int = 16000  # 硬token限制（强制停止）
-    token_chars_ratio: float = 4.0  # 字符数/token比例（估算）
+    token_chars_ratio: float = 2.5  # 字符数/token比例（估算，纯中文场景）
 
 
 @dataclass
@@ -58,6 +58,7 @@ class SearchBudgetManager:
         max_search_calls: int = 10,
         max_tokens: int = 12000,
         hard_token_limit: int = 16000,
+        token_chars_ratio: float = 2.5,
     ):
         """初始化预算管理器
         
@@ -65,23 +66,26 @@ class SearchBudgetManager:
             max_search_calls: 最大搜索调用次数（软限制）
             max_tokens: 最大token数量预警阈值
             hard_token_limit: 硬token限制，超过后强制停止
+            token_chars_ratio: 字符数/token比例，用于估算token消耗
         """
         self.config = BudgetConfig(
             max_search_calls=max_search_calls,
             max_tokens=max_tokens,
             hard_token_limit=hard_token_limit,
+            token_chars_ratio=token_chars_ratio,
         )
         self._search_calls_used = 0
         logger.info(
             f"🔧 SearchBudgetManager initialized | "
             f"max_calls: {max_search_calls}, max_tokens: {max_tokens}, "
-            f"hard_limit: {hard_token_limit}"
+            f"hard_limit: {hard_token_limit}, token_chars_ratio: {token_chars_ratio}"
         )
 
     def estimate_tokens(self, messages: list[BaseMessage]) -> int:
         """估算消息列表的token数量
         
-        使用字符数/4的粗略估算方法。
+        使用字符数/token_chars_ratio的粗略估算方法。
+        默认比例为2.5，适合纯中文场景（中英混合建议3.0，纯英文建议4.0）。
         
         Args:
             messages: 消息列表
