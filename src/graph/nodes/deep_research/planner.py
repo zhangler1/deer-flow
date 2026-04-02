@@ -28,21 +28,7 @@ from src.utils.json_utils import repair_json_output
 
 from src.config import SELECTED_SEARCH_ENGINE, SearchEngine
 
-# Langfuse 集成（受 LANGFUSE_ENABLED 开关控制）
-import os
-_langfuse_enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
-try:
-    if _langfuse_enabled:
-        from langfuse import observe
-    else:
-        raise ImportError("Langfuse disabled by LANGFUSE_ENABLED=false")
-except ImportError:
-    def observe(*args, **kwargs):
-        def decorator(func):
-            return func
-        if len(args) == 1 and callable(args[0]) and not kwargs:
-            return args[0]
-        return decorator
+
 
 
 logger = logging.getLogger(__name__)
