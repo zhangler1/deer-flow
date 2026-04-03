@@ -277,6 +277,37 @@ async def _execute_agent_step(
                 pass
 
         agent_exec_duration = time.time() - agent_exec_start_time
+        
+        # 🔥 处理网络连接异常 - 跳过当前节点继续执行
+        import httpcore
+        if isinstance(e, (httpcore.RemoteProtocolError, httpcore.ConnectError, httpcore.ReadTimeout)):
+            enhanced_logger.logger.warning(
+                f"⚠️  AGENT_NETWORK_ERROR | {agent_name} | 网络连接异常，跳过当前节点 | 耗时: {agent_exec_duration:.2f}s | "
+                f"错误类型: {type(e).__name__} | 错误信息: {str(e)} | 时间: {time.strftime('%H:%M:%S')}"
+            )
+            logger.warning(f"Agent {agent_name} 网络连接异常，跳过当前步骤: {e}")
+            
+            # 标记当前步骤为部分完成（带错误信息）
+            current_step.execution_res = f"⚠️ 由于网络连接异常，此步骤被跳过。错误信息: {str(e)[:200]}"
+            
+            step_duration = time.time() - step_start_time
+            enhanced_logger.logger.info(f"⏭️  STEP_SKIPPED | {agent_name} | 步骤已跳过，继续下一步 | 总耗时: {step_duration:.2f}s")
+            
+            # 返回 Command 继续执行流程
+            return Command(
+                update={
+                    "messages": [
+                        HumanMessage(
+                            content=f"⚠️ 步骤 '{current_step.title}' 由于网络异常被跳过",
+                            name=agent_name,
+                        )
+                    ],
+                    "observations": observations + [current_step.execution_res],
+                },
+                goto="research_team",
+            )
+        
+        # 其他异常仍然抛出
         enhanced_logger.logger.error(
             f"❌ AGENT_INVOKE_ERROR | {agent_name} | LLM调用失败 | 耗时: {agent_exec_duration:.2f}s | "
             f"错误类型: {type(e).__name__} | 错误信息: {str(e)} | 时间: {time.strftime('%H:%M:%S')}"
