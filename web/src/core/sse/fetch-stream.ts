@@ -80,7 +80,6 @@ export async function* fetchStream(
   let totalBytesReceived = 0;
 
   try {
-    console.log("[fetchStream] Starting to read stream...", { url });
 
     while (true) {
       // 创建带超时的读取 Promise
@@ -88,7 +87,7 @@ export async function* fetchStream(
       const { promise: timeoutPromise, cleanup: cleanupTimeout } = createTimeoutPromise(STREAM_TIMEOUT_MS);
 
       // 使用 Promise.race 竞争：先返回的胜出
-      const result = await Promise.race([readPromise, timeoutPromise]) as ReadableStreamReadResult<string>;
+      const result: ReadableStreamReadResult<string> = await Promise.race([readPromise, timeoutPromise]);
 
       // 清理超时定时器
       cleanupTimeout();
@@ -97,11 +96,11 @@ export async function* fetchStream(
       const { done, value } = result;
 
       if (done) {
-        console.log("[fetchStream] Stream completed normally", {
-          totalEvents: eventCount,
-          totalBytes: totalBytesReceived,
-          duration: Date.now() - lastDataTime,
-        });
+        // console.log("[fetchStream] Stream completed normally", {
+        //   totalEvents: eventCount,
+        //   totalBytes: totalBytesReceived,
+        //   duration: Date.now() - lastDataTime,
+        // });
         break;
       }
 
@@ -112,12 +111,12 @@ export async function* fetchStream(
 
       // 记录接收到的数据
       totalBytesReceived += value.length;
-      console.log("[fetchStream] Data received", {
-        bytes: value.length,
-        totalBytes: totalBytesReceived,
-        timeSinceLastData: `${timeSinceLastData}ms`,
-        preview: value.substring(0, 200),
-      });
+      // console.log("[fetchStream] Data received", {
+      //   bytes: value.length,
+      //   totalBytes: totalBytesReceived,
+      //   timeSinceLastData: `${timeSinceLastData}ms`,
+      //   preview: value.substring(0, 200),
+      // });
 
       // 处理接收到的数据
       buffer += value;
@@ -133,21 +132,21 @@ export async function* fetchStream(
         if (event) {
           eventCount++;
           eventsParsedInThisChunk++;
-          console.log("[fetchStream] Event parsed", {
-            eventNumber: eventCount,
-            eventType: event.event,
-            dataLength: event.data?.length || 0,
-            dataPreview: event.data?.substring(0, 100),
-          });
+          // console.log("[fetchStream] Event parsed", {
+          //   eventNumber: eventCount,
+          //   eventType: event.event,
+          //   dataLength: event.data?.length || 0,
+          //   dataPreview: event.data?.substring(0, 100),
+          // });
           yield event;
         }
       }
 
       if (eventsParsedInThisChunk > 0) {
-        console.log("[fetchStream] Events in this chunk", {
-          count: eventsParsedInThisChunk,
-          remainingBufferSize: buffer.length,
-        });
+        // console.log("[fetchStream] Events in this chunk", {
+        //   count: eventsParsedInThisChunk,
+        //   remainingBufferSize: buffer.length,
+        // });
       }
     }
   } catch (error) {
