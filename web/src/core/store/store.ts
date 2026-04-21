@@ -202,7 +202,7 @@ export async function sendMessage(
   options: { abortSignal?: AbortSignal } = {},
 ) {
   // 重置迭代研究轮次状态
-  console.log('[轮次重置] 用户发送新消息，重置迭代研究状态');
+  // console.log('[轮次重置] 用户发送新消息，重置迭代研究状态');
   useStore.setState({
     currentIteration: 0,
     iterationRounds: new Map(),
@@ -265,7 +265,7 @@ export async function sendMessage(
     }, 100);
   };
 
-  console.log("[sendMessage] Starting to process stream...");
+  // console.log("[sendMessage] Starting to process stream...");
 
   try {
     for await (const event of stream) {
@@ -275,12 +275,7 @@ export async function sendMessage(
       const timeSinceLastEvent = now - lastEventTime;
       lastEventTime = now;
 
-      console.log("[sendMessage] Event received", {
-        eventNumber: eventCount,
-        eventType: type,
-        timeSinceLastEvent: `${timeSinceLastEvent}ms`,
-        hasMessageId: !!messageId,
-      });
+      // removed verbose: Event received log
 
       // 处理后端发来的 error 事件
       if (type === "error") {
@@ -328,25 +323,20 @@ export async function sendMessage(
       
       // Handle node transition events (迭代研究节点跳转)
       if (type === "node_transition") {
-        console.log(`[迭代研究节点跳转] 当前迭代轮次: ${data.iteration}`, {
-          from: data.from,
-          to: data.to,
-          reason: data.reason,
-          thread_id: data.thread_id,
-        });
+        // removed verbose: node transition log
         
         // 处理轮次切换逻辑
         const currentIteration = useStore.getState().currentIteration;
 
       // 如果是继续迭代（iteration增加了），需要折叠当前轮次并开始新轮次
-        console.log(`[轮次切换] 从第${currentIteration}轮切换到第${data.iteration}轮`);
+        // console.log(`[轮次切换] 从第${currentIteration}轮切换到第${data.iteration}轮`);
         // 折叠当前轮次
         if (currentIteration > 0) {
-          console.log(`[轮次折叠] 折叠第${currentIteration}轮`);
+          // console.log(`[轮次折叠] 折叠第${currentIteration}轮`);
           useStore.getState().collapseRound(currentIteration);
         }
         // 开始新轮次
-        console.log(`[轮次创建] 创建第${data.iteration}轮研究容器`);
+        // console.log(`[轮次创建] 创建第${data.iteration}轮研究容器`);
         useStore.getState().startNewRound(data.iteration);
         
         continue;
@@ -408,10 +398,10 @@ export async function sendMessage(
     // Flush any remaining batched updates before finishing
     flushNow();
     setResponding(false);
-    console.log("[sendMessage] Stream processing ended", {
-      totalEventsProcessed: eventCount,
-      duration: Date.now() - lastEventTime,
-    });
+    // console.log("[sendMessage] Stream processing ended", {
+    //   totalEventsProcessed: eventCount,
+    //   duration: Date.now() - lastEventTime,
+    // });
   }
 }
 
