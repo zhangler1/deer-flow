@@ -145,3 +145,29 @@ def clean_whitespace(text: str, preserve_paragraphs: bool = True) -> str:
     else:
         # 移除所有空行
         return '\n'.join(line for line in lines if line)
+
+
+def estimate_token_count(text: str) -> int:
+    """
+    粗略估算文本的 token 数：
+    - 中文（CJK）字符按 ~1 token 估算
+    - 其他字符按 ~4 字符 ≈ 1 token 估算
+    """
+    if not text:
+        return 0
+    cjk_chars = re.findall(r'[\u4e00-\u9fff]', text)
+    cjk_count = len(cjk_chars)
+    other_count = max(0, len(text) - cjk_count)
+    return cjk_count + (other_count + 3) // 4
+
+
+def get_messages_context_stats(messages) -> tuple[int, int]:
+    """
+    计算上下文长度统计（字符数，估算token数）
+    """
+    if isinstance(messages, list):
+        chars = sum(len(str(m)) for m in messages)
+        tokens = sum(estimate_token_count(str(m)) for m in messages)
+        return chars, tokens
+    text = str(messages)
+    return len(text), estimate_token_count(text)

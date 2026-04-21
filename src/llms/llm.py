@@ -6,17 +6,18 @@ import time
 from pathlib import Path
 from typing import Any, Dict, get_args, Union
 
-import httpx
-from langchain_core.language_models import BaseChatModel
-from langchain_deepseek import ChatDeepSeek
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import AzureChatOpenAI, ChatOpenAI
+import httpx  # type: ignore
+from langchain_core.language_models import BaseChatModel  # type: ignore
+from langchain_deepseek import ChatDeepSeek  # type: ignore
+from langchain_google_genai import ChatGoogleGenerativeAI  # type: ignore
+from langchain_openai import AzureChatOpenAI, ChatOpenAI  # type: ignore
 from typing import get_args
 
 from src.config import load_yaml_config
 from src.config.agents import LLMType
 from src.llms.providers.dashscope import ChatDashscope
 from src.utils.enhanced_logger import get_enhanced_logger
+from src.utils.text_utils import get_messages_context_stats
 
 
 class EnhancedLLMWrapper:
@@ -30,26 +31,26 @@ class EnhancedLLMWrapper:
     def invoke(self, messages, **kwargs):
         """记录并执行LLM调用，带有自动重试机制"""
         import asyncio
-        from httpx import RemoteProtocolError, ConnectError, TimeoutException
+        from httpx import RemoteProtocolError, ConnectError, TimeoutException  # type: ignore
 
         max_retries = 2  # 最大重试次数
         retry_delay = 2.0  # 重试延迟（秒）
 
         for attempt in range(max_retries + 1):
             start_time = time.time()
-            prompt_length = self._calculate_prompt_length(messages)
+            char_len, token_est = get_messages_context_stats(messages)
 
             if attempt == 0:
-                self.enhanced_logger.logger.info(f"🤖 LLM_INVOKE | {self.llm_type} | 开始思考 | 提示长度: {prompt_length}")
+                self.enhanced_logger.logger.info(f"🤖 LLM_INVOKE | {self.llm_type} | 开始思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
             else:
-                self.enhanced_logger.logger.warning(f"🔄 LLM_RETRY | {self.llm_type} | 第 {attempt} 次重试 | 提示长度: {prompt_length}")
+                self.enhanced_logger.logger.warning(f"🔄 LLM_RETRY | {self.llm_type} | 第 {attempt} 次重试 | 上下文长度: chars={char_len} | tokens≈{token_est}")
 
             try:
                 result = self.llm.invoke(messages, **kwargs)
                 duration = time.time() - start_time
                 response_length = len(str(result.content)) if hasattr(result, 'content') else 0
 
-                self.enhanced_logger.log_llm_thinking(self.llm_type, prompt_length, response_length, duration)
+                self.enhanced_logger.log_llm_thinking(self.llm_type, char_len, response_length, duration)
 
                 # 记录有关思考过程的额外信息
                 if hasattr(result, 'response_metadata'):
@@ -81,19 +82,19 @@ class EnhancedLLMWrapper:
             
     def stream(self, messages, **kwargs):
         """记录并执行流式LLM调用，带有自动重试机制"""
-        from httpx import RemoteProtocolError, ConnectError, TimeoutException
+        from httpx import RemoteProtocolError, ConnectError, TimeoutException  # type: ignore
 
         max_retries = 2  # 最大重试次数
         retry_delay = 2.0  # 重试延迟（秒）
 
         for attempt in range(max_retries + 1):
             start_time = time.time()
-            prompt_length = self._calculate_prompt_length(messages)
+            char_len, token_est = get_messages_context_stats(messages)
 
             if attempt == 0:
-                self.enhanced_logger.logger.info(f"🤖 LLM_STREAM | {self.llm_type} | 开始流式思考 | 提示长度: {prompt_length}")
+                self.enhanced_logger.logger.info(f"🤖 LLM_STREAM | {self.llm_type} | 开始流式思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
             else:
-                self.enhanced_logger.logger.warning(f"🔄 LLM_STREAM_RETRY | {self.llm_type} | 流式第 {attempt} 次重试 | 提示长度: {prompt_length}")
+                self.enhanced_logger.logger.warning(f"🔄 LLM_STREAM_RETRY | {self.llm_type} | 流式第 {attempt} 次重试 | 上下文长度: chars={char_len} | tokens≈{token_est}")
 
             try:
                 stream = self.llm.stream(messages, **kwargs)
@@ -164,9 +165,9 @@ class EnhancedStructuredLLMWrapper:
         
     def invoke(self, messages, **kwargs):
         start_time = time.time()
-        prompt_length = self._calculate_prompt_length(messages)
+        char_len, token_est = get_messages_context_stats(messages)
         
-        self.enhanced_logger.logger.info(f"🤖 LLM_STRUCTURED | {self.llm_type} | 开始结构化思考 | 提示长度: {prompt_length}")
+        self.enhanced_logger.logger.info(f"🤖 LLM_STRUCTURED | {self.llm_type} | 开始结构化思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
         
         try:
             result = self.structured_llm.invoke(messages, **kwargs)
@@ -203,9 +204,9 @@ class EnhancedToolBoundLLMWrapper:
         
     def invoke(self, messages, **kwargs):
         start_time = time.time()
-        prompt_length = self._calculate_prompt_length(messages)
+        char_len, token_est = get_messages_context_stats(messages)
         
-        self.enhanced_logger.logger.info(f"🤖 LLM_TOOLS | {self.llm_type} | 开始工具思考 | 提示长度: {prompt_length}")
+        self.enhanced_logger.logger.info(f"🤖 LLM_TOOLS | {self.llm_type} | 开始工具思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
         
         try:
             result = self.tool_bound_llm.invoke(messages, **kwargs)
