@@ -57,6 +57,7 @@ from .budget_controlled_search import (
 from .bocom_search import (
     bocomsearch,
     call_bocomsearch,
+    create_budget_controlled_bocomsearch_tool,
 )
 
 __all__ = [
@@ -97,4 +98,5 @@ __all__ = [
     "BudgetManagerStore",
     "bocomsearch",
     "call_bocomsearch",
+    "create_budget_controlled_bocomsearch_tool",
 ]
