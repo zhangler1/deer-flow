@@ -32,6 +32,7 @@ from src.tools import (
     budget_controlled_financial_summary_tool,
     get_budget_manager,
     clear_budget_manager,
+    bocomsearch,
 )
 from src.utils.enhanced_logger import get_enhanced_logger
 
@@ -120,7 +121,7 @@ async def researcher_node(
                 max_search_calls=researcher_limit,
                 max_tokens=max_tokens,
             ),
-            research_skill_prompt_search,
+            bocomsearch,
             business_opportunity_search,
             sentiment_search,
             budget_controlled_financial_summary_tool(
@@ -134,7 +135,7 @@ async def researcher_node(
                 max_tokens=max_tokens,
             ),
         ]
-        tool_names = "budget_controlled_online_search, research_skill_prompt_search, business_opportunity_search, sentiment_search, budget_controlled_financial_summary, budget_controlled_product_instance_search"
+        tool_names = "budget_controlled_online_search, bocomsearch, business_opportunity_search, sentiment_search, budget_controlled_financial_summary, budget_controlled_product_instance_search"
 
     elif report_style == "business_marketing_client":
         # 对公营销客户版：使用基础搜索工具

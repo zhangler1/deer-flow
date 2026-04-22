@@ -77,7 +77,7 @@ class ChatRequest(BaseModel):
     force_routing_path: Optional[str] = Field(
         None, description="🐛 Debug Mode: Force routing to specific path (direct_answer, simple_search, iterative_research, deep_research)"
     )
-
+    guwp_token: Optional[str] = Field(None, description="Guwp token for bocomsearch")
 
 class TTSRequest(BaseModel):
     text: str = Field(..., description="The text to convert to speech")

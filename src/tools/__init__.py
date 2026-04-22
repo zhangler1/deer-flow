@@ -54,6 +54,10 @@ from .budget_controlled_search import (
     get_budget_store_stats,
     BudgetManagerStore,
 )
+from .bocom_search import (
+    bocomsearch,
+    call_bocomsearch,
+)
 
 __all__ = [
     "crawl_tool",
@@ -91,4 +95,6 @@ __all__ = [
     "clear_budget_manager",
     "get_budget_store_stats",
     "BudgetManagerStore",
+    "bocomsearch",
+    "call_bocomsearch",
 ]

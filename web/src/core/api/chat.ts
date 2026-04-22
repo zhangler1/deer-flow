@@ -37,6 +37,7 @@ export async function* chatStream(
         }
       >;
     };
+    guwpToken?: string;
   },
   options: { abortSignal?: AbortSignal } = {},
 ) {
@@ -51,6 +52,7 @@ export async function* chatStream(
     body: JSON.stringify({
       messages: [{ role: "user", content: userMessage }],
       ...params,
+      guwp_token: params.guwpToken,
     }),
     signal: options.abortSignal,
   });

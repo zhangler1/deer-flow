@@ -23,6 +23,9 @@ const DEFAULT_SETTINGS: SettingsState = {
   mcp: {
     servers: [],
   },
+  tokens: {
+    guwpToken: "",
+  },
 };
 
 export type SettingsState = {
@@ -40,6 +43,9 @@ export type SettingsState = {
   };
   mcp: {
     servers: MCPServerMetadata[];
+  };
+  tokens: {
+    guwpToken: string;
   };
 };
 
@@ -95,7 +101,7 @@ export const getChatStreamSettings = () => {
         >;
       }
     | undefined = undefined;
-  const { mcp, general } = useSettingsStore.getState();
+  const { mcp, general, tokens } = useSettingsStore.getState();
   const mcpServers = mcp.servers.filter((server) => server.enabled);
   if (mcpServers.length > 0) {
     mcpSettings = {
@@ -135,6 +141,7 @@ export const getChatStreamSettings = () => {
     customSearchRepository: general.customSearchRepository, // 添加自定义搜索仓库设置
     mcpSettings,
     forceRoutingPath: general.forceRoutingPath, // 添加调试模式路由路径设置
+    guwpToken: tokens.guwpToken,
   };
 };
 

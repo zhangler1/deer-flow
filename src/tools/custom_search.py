@@ -211,6 +211,10 @@ class CustomSearchTool(BaseTool):
                 # === 次要可选字段 ===
                 "category": item.get("fullCategoryName", ""),
                 "createTime": item.get("createTime", ""),  # 创建时间
+                "docGuid": item.get("docGuid", ""),
+                "repository": item.get("repository", ""),
+                "attachEcmId": item.get("attachEcmId", ""),
+                "fromAttachment": bool(item.get("fromAttachment", False)),
             }
             
             # 只有当内容不为空时才添加到结果中
@@ -222,7 +226,6 @@ class CustomSearchTool(BaseTool):
         
         # 限制结果数量
         return results[:self.max_results]
-    
 
     
     def _run(

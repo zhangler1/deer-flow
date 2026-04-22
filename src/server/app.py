@@ -157,22 +157,32 @@ async def chat_stream(request: ChatRequest):
             request.enable_deep_thinking or False,
             system_context=system_context,  # 从环境变量读取
             force_routing_path=request.force_routing_path,  # 🐛 调试模式
+            guwp_token=request.guwp_token,
         ),
         media_type="text/event-stream",
     )
 
 
-def _process_tool_call_chunks(tool_call_chunks):
+def _process_tool_call_chunks(tool_call_chunks, extra_headers: Optional[Dict[str, str]] = None):
     """Process tool call chunks and sanitize arguments."""
     chunks = []
     for chunk in tool_call_chunks:
+        # Add extra headers info if present and chunk matches bocomsearch
+        name = chunk.get("name", "")
+        args = chunk.get("args", "")
+        if extra_headers and name == "bocomsearch":
+            # Inject marker for frontend or downstream to know headers should be applied
+            chunk_headers = {"__extra_headers__": extra_headers}
+        else:
+            chunk_headers = None
         chunks.append(
             {
-                "name": chunk.get("name", ""),
-                "args": sanitize_args(chunk.get("args", "")),
+                "name": name,
+                "args": sanitize_args(args),
                 "id": chunk.get("id", ""),
                 "index": chunk.get("index", 0),
                 "type": chunk.get("type", ""),
+                "headers": chunk_headers,
             }
         )
     return chunks
@@ -443,7 +453,8 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
             # AI Message - Tool Call
             event_stream_message["tool_calls"] = message_chunk.tool_calls
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
-                message_chunk.tool_call_chunks
+                message_chunk.tool_call_chunks,
+                extra_headers={"guwp-token": os.getenv("GUWP_TOKEN", "")},
             )
             
             # Set tag based on tool name
@@ -501,7 +512,8 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
         elif hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
             # AI Message - Tool Call Chunks
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
-                message_chunk.tool_call_chunks
+                message_chunk.tool_call_chunks,
+                extra_headers={"guwp-token": os.getenv("GUWP_TOKEN", "")},
             )
             
             # Check tool_call_chunk name and set tag accordingly
@@ -636,19 +648,19 @@ async def _astream_workflow_generator(
     enable_deep_thinking: bool,  # 是否启用“深度思考”（切换到 reasoning 模型等）
     system_context: str = "",  # 系统背景上下文
     force_routing_path: str = None,  # 🐛 调试模式：强制路由路径
+    guwp_token: Optional[str] = None,
 ):
     # Process initial messages
     for message in messages:
         if isinstance(message, dict) and "content" in message:
             _process_initial_messages(message, thread_id)
 
-    # system_context 通过 State 和 Configuration 传递给各节点
-    # 各节点在 Prompt Template 中按需使用，不在此处修改用户消息
-    if system_context:
-        enhanced_logger.logger.debug(  # 改为 DEBUG 级别，减少日志噪音
-            f"🏛️ SYSTEM_CONTEXT | 系统背景已配置: {system_context} | "
-            f"将通过State传递给工作流节点"
-        )
+    # Apply GUWP token to environment for tools that read from env
+    try:
+        if guwp_token:
+            os.environ["GUWP_TOKEN"] = guwp_token
+    except Exception:
+        pass
 
     # Prepare workflow input
     workflow_input = {
