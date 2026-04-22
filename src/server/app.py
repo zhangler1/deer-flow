@@ -452,9 +452,11 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
         if hasattr(message_chunk, 'tool_calls') and message_chunk.tool_calls:
             # AI Message - Tool Call
             event_stream_message["tool_calls"] = message_chunk.tool_calls
+            # ⚠️ 注意：这里的 guwp-token 用于前端展示，不影响后端工具调用
+            # 后端工具通过 state["guwp_token"] 获取 token
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
                 message_chunk.tool_call_chunks,
-                extra_headers={"guwp-token": os.getenv("GUWP_TOKEN", "")},
+                extra_headers={"guwp-token": ""},  # 前端不需要看到真实 token
             )
             
             # Set tag based on tool name
@@ -511,9 +513,11 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
             yield _make_event("tool_calls", event_stream_message)
         elif hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
             # AI Message - Tool Call Chunks
+            # ⚠️ 注意：这里的 guwp-token 用于前端展示，不影响后端工具调用
+            # 后端工具通过 state["guwp_token"] 获取 token
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
                 message_chunk.tool_call_chunks,
-                extra_headers={"guwp-token": os.getenv("GUWP_TOKEN", "")},
+                extra_headers={"guwp-token": ""},  # 前端不需要看到真实 token
             )
             
             # Check tool_call_chunk name and set tag accordingly
@@ -655,12 +659,8 @@ async def _astream_workflow_generator(
         if isinstance(message, dict) and "content" in message:
             _process_initial_messages(message, thread_id)
 
-    # Apply GUWP token to environment for tools that read from env
-    try:
-        if guwp_token:
-            os.environ["GUWP_TOKEN"] = guwp_token
-    except Exception:
-        pass
+    # ⚠️ 不再设置全局环境变量（避免多用户并发冲突）
+    # 改为通过 workflow_input["guwp_token"] 传递到 state，确保线程安全
 
     # Prepare workflow input
     workflow_input = {
@@ -678,6 +678,7 @@ async def _astream_workflow_generator(
         "iteration_count": 0,
         "iteration_history": [],
         "report_style": report_style.value,  # 将报告风格传递到 state，用于 researcher_node 动态选择工具
+        "guwp_token": guwp_token,  # ✅ 通过 state 传递 token，确保线程安全
     }
     if not auto_accepted_plan and interrupt_feedback:
         resume_msg = f"[{interrupt_feedback}]"
