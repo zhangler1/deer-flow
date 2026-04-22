@@ -15,7 +15,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 # 可用工具
 
 你可以使用以下工具进行分析:
-- **web_search**: 交通银行知识库，可根据配置使用不同的搜索引擎进行信息检索
+- **budget_controlled_online_search**: 交通银行知识库搜索，带预算控制的智能搜索引擎
 - **online_search**: 专门搜索互联网公开信息。适用于查询最新新闻、公开资讯、行业动态、学术文献
 - **industry_report_search**: 搜索行业报告。**⚠️ 仅在调研整个行业时使用(如"研究光伏行业的全产业链分析")，单个企业或具体问题请勿使用此工具**
 - **research_skill_prompt_search**: 根据步骤名称召回对应的提示词

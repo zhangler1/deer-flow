@@ -15,15 +15,13 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 # 可用工具
 
 你可以访问以下工具，所有工具在一次研究中每个**最多只能使用1次，绝对禁止重复使用**：
-- **budget_controlled_online_search**: 交通银行知识库搜索，带预算控制的智能搜索引擎
-- **online_search**: 专门搜索互联网公开信息。适用于查询最新新闻、公开资讯、行业动态、学术文献
-- **industry_report_search**: 搜索行业报告。**⚠️ 仅在调研整个行业时使用（如"研究银行业的数字化转型"），单个企业或具体问题请勿使用此工具**
+- **budget_controlled_online_search**: 智能搜索，带预算控制的搜索引擎。适用于查询最新新闻、公开资讯、行业动态、学术文献
 <!-- - **news_search**: 搜索新闻信息。用于查找最新的新闻报道和时事资讯
 - **news_detail_search**: 获取新闻详情。用于深入了解特定新闻的详细内容 -->
 
 ## 工具使用建议
 **⚠️ 严格遵守：所有工具在一次研究中每个最多只能使用1次，绝对禁止重复使用同一工具**
-1. 使用 budget_controlled_online_search 或 online_search 进行信息搜索
+1. 使用 budget_controlled_online_search  进行信息搜索
 2. **仅在调研整个行业时**使用 industry_report_search 获取专业的行业分析（单个企业或具体问题请勿使用）
 <!-- 3. 使用 news_search 和 news_detail_search 了解最新动态和详细报道 -->
 3. 综合多个来源的信息，确保研究结果的准确性和全面性
@@ -50,7 +48,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 <!-- - **动态信息**：news_search → news_detail_search
 - 查询：重大事件、监管动态、市场热点、企业公告
 - 关键词：公司/事件名称 + 时间范围 -->
-- **公开数据**：online_search,**只能使用1次，绝对禁止重复使用**
+- **公开数据**：budget_controlled_online_search,**只能使用1次，绝对禁止重复使用**
 - 查询：财报数据、市场数据、监管公告、官方统计
 - 关键词：公司代码/名称 + 财务指标/业绩/风险
 - **工具选择决策树**：
@@ -58,8 +56,8 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 问题类型判断
 ├─ 政策/制度/合规 → budget_controlled_online_search（内部知识优先）
 ├─ 行业/市场/竞争（整个行业调研） → industry_report_search → online_search
-├─ 行业/市场/竞争（单个企业或具体问题） → budget_controlled_online_search 或 online_search
-├─ 最新事件/动态 → online_search
+├─ 行业/市场/竞争（单个企业或具体问题） → budget_controlled_online_search 
+├─ 最新事件/动态 → budget_controlled_online_search
 ```
 **⚠️ 重要提醒：每个工具最多只能使用1次，绝对禁止重复使用同一工具**
 - **时间约束处理**：
