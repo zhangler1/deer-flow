@@ -23,9 +23,9 @@ from src.config.configuration import Configuration
 from src.llms.llm import get_llm_by_type
 from src.prompts.template import apply_prompt_template
 from src.tools import (
+    online_search_tool,
     crawl_tool,
     domain_fin_search,
-    get_web_search_tool,
 )
 from src.utils.enhanced_logger import get_enhanced_logger
 
@@ -135,10 +135,8 @@ async def simple_search_node(state, config: RunnableConfig) -> Command[Literal["
     try:
         # 配置工具：使用简单检索需要的工具
         tools = [
-            get_web_search_tool(
-                max_search_results=configurable.max_search_results,
-                engine=configurable.search_engine,
-                repository_id=configurable.custom_search_repository
+            online_search_tool(
+                max_results=configurable.max_search_results
             ),
             crawl_tool,
             domain_fin_search,
@@ -146,7 +144,7 @@ async def simple_search_node(state, config: RunnableConfig) -> Command[Literal["
         
         enhanced_logger.logger.info(
             f"🔧 TOOLS_READY | 简单检索工具配置完成 | "
-            f"工具数: {len(tools)} | 包含: web_search, crawl_tool, domain_fin_search"
+            f"工具数: {len(tools)} | 包含: online_search, crawl_tool, domain_fin_search"
         )
         
         # 创建简单检索智能体

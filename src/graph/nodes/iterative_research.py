@@ -23,8 +23,8 @@ from src.config.configuration import Configuration
 from src.llms.llm import get_llm_by_type
 from src.prompts.template import apply_prompt_template
 from src.tools import (
+    online_search_tool,
     crawl_tool,
-    get_web_search_tool,
     industry_report_search,
     news_search,
     news_detail_search,
@@ -81,10 +81,8 @@ def iterative_research_node(state, config: RunnableConfig) -> Command[Literal["_
     try:
         # 创建带有工具的 Agent
         tools = [
-            get_web_search_tool(
-                max_search_results=configurable.max_search_results,
-                engine=configurable.search_engine,
-                repository_id=configurable.custom_search_repository
+            online_search_tool(
+                max_results=configurable.max_search_results
             ),
             industry_report_search,
             news_search,

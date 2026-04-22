@@ -459,19 +459,19 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
             
             # Set tag based on tool name
             # Default to searching, but check for specific tool types
-            tag = "searching"  # default for web_search
+            tag = "searching"  # default for online_search
             for tool_call in message_chunk.tool_calls:
                 tool_name = tool_call.get("name", "")
                 if tool_name == "crawl_tool":
                     tag = "crawling"
                     break
-                elif tool_name == "web_search":
+                elif tool_name == "online_search" or tool_name == "web_search":
                     tag = "searching"
             event_stream_message["tag"] = tag
             
-            # Check if this is a web_search tool call and emit search_status event
+            # Check if this is an online_search or web_search tool call and emit search_status event
             for tool_call in message_chunk.tool_calls:
-                if tool_call.get("name") == "web_search":
+                if tool_call.get("name") in ["web_search", "online_search"]:
                     # Extract query and repository from tool call args
                     args = tool_call.get("args", {})
                     query = args.get("query", "")
