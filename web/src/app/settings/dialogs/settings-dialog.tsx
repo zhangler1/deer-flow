@@ -89,9 +89,10 @@ export function SettingsDialog() {
     };
   }, [settings, changes]);
 
-  if (isReplay) {
-    return null;
-  }
+  // ✅ 移除 replay 模式的隐藏限制，允许在任何模式下访问设置
+  // if (isReplay) {
+  //   return null;
+  // }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
