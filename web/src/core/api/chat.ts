@@ -22,7 +22,8 @@ export async function* chatStream(
     max_step_num: number;
     max_search_results?: number;
     search_engine?: string;
-    custom_search_repository?: string;
+    useBudgetControlledOnlineSearch?: boolean;  // Budget控制的在线检索
+    useBudgetControlledBocomSearch?: boolean;   // Budget控制的Bocom搜索
     interrupt_feedback?: string;
     enable_deep_thinking?: boolean;
     enable_background_investigation: boolean;

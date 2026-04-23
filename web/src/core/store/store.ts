@@ -235,7 +235,8 @@ export async function sendMessage(
       max_step_num: settings.maxStepNum,
       max_search_results: settings.maxSearchResults,
       search_engine: settings.searchEngine,
-      custom_search_repository: settings.customSearchRepository,
+      useBudgetControlledOnlineSearch: settings.useBudgetControlledOnlineSearch,  // 新增
+      useBudgetControlledBocomSearch: settings.useBudgetControlledBocomSearch,    // 新增
       report_style: settings.reportStyle,
       force_routing_path: settings.forceRoutingPath, // 🐛 调试模式
       mcp_settings: settings.mcpSettings,

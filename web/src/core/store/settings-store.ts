@@ -16,7 +16,8 @@ const DEFAULT_SETTINGS: SettingsState = {
     maxStepNum: 3,
     maxSearchResults: 2,
     searchEngine: "custom_search",
-    customSearchRepository: undefined,
+    useBudgetControlledOnlineSearch: true,  // 默认使用budget控制的在线检索
+    useBudgetControlledBocomSearch: true,   // 默认使用budget控制的bocom搜索
     reportStyle: "business_marketing",  // 默认为对公营销报告
     forceRoutingPath: "deep_research", // 调试模式默认路由设置为交心深度研究
   },
@@ -37,7 +38,8 @@ export type SettingsState = {
     maxStepNum: number;
     maxSearchResults: number;
     searchEngine: "tavily" | "duckduckgo" | "brave_search" | "arxiv" | "wikipedia" | "custom_search";
-    customSearchRepository?: string;
+    useBudgetControlledOnlineSearch: boolean;  // 是否使用budget控制的在线检索
+    useBudgetControlledBocomSearch: boolean;   // 是否使用budget控制的bocom搜索
     reportStyle: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report";
     forceRoutingPath?: "direct_answer" | "simple_search" | "iterative_research" | "deep_research"; // 限制调试模式路由路径选项
   };
@@ -138,7 +140,8 @@ export const getChatStreamSettings = () => {
   return {
     ...general,
     searchEngine: general.searchEngine, // 添加搜索引擎设置
-    customSearchRepository: general.customSearchRepository, // 添加自定义搜索仓库设置
+    useBudgetControlledOnlineSearch: general.useBudgetControlledOnlineSearch, // 添加budget控制的在线检索设置
+    useBudgetControlledBocomSearch: general.useBudgetControlledBocomSearch, // 添加budget控制的bocom搜索设置
     mcpSettings,
     forceRoutingPath: general.forceRoutingPath, // 添加调试模式路由路径设置
     guwpToken: tokens.guwpToken,

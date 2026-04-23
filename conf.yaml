@@ -55,33 +55,6 @@ SEARCH_ENGINE:
   exclude_domains:
     - example.com
 
-# Custom search engine configuration
-CUSTOM_SEARCH:
-  # Available repository configurations
-  repositories:
-    aggregation_search:
-      name: "聚合搜索"
-      description: "聚合多个数据源的搜索服务"
-      repository: "aggregation-search"
-      channel_id: "0"
-    vector_search:
-      name: "向量库"
-      description: "基于向量相似度的搜索服务"
-      repository: "euvd-searchByChannelId"
-      channel_id: "0"
-    dynamic_search:
-      name: "交行知道"
-      description: "交通银行内部知识库搜索"
-      repository: "okic-dynamicSearch"
-      channel_id: "0"
-    online_search:
-      name: "互联网检索"
-      description: "互联网公开信息搜索服务"
-      repository: "online-search"
-      channel_id: "0"
-  # Default repository to use
-  default_repository: "aggregation_search"
-
 # Web crawler configuration
 CRAWLER:
   # Crawler type: 'deep_research' or 'jina'

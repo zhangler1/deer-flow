@@ -102,6 +102,19 @@ async def researcher_node(
     report_style = state.get("report_style", "industry_report")
     enhanced_logger.logger.info(f"📋 REPORT_STYLE | 当前报告风格: {report_style}")
 
+    # 获取预算控制开关（优先从 configurable 读取，默认 True）
+    use_budget_online = getattr(configurable, 'use_budget_controlled_online_search', True)
+    use_budget_bocom = getattr(configurable, 'use_budget_controlled_bocom_search', True)
+    # 兼容字符串（环境变量传入时可能是字符串）
+    if isinstance(use_budget_online, str):
+        use_budget_online = use_budget_online.lower() not in ('false', '0', 'no', '')
+    if isinstance(use_budget_bocom, str):
+        use_budget_bocom = use_budget_bocom.lower() not in ('false', '0', 'no', '')
+    enhanced_logger.logger.info(
+        f"🔧 BUDGET_SWITCH | use_budget_controlled_online_search: {use_budget_online} | "
+        f"use_budget_controlled_bocom_search: {use_budget_bocom}"
+    )
+
     # 根据报告风格动态配置工具
     if report_style == "industry_report":
         # 行业研报：使用研报知识库搜索
@@ -113,24 +126,31 @@ async def researcher_node(
 
     elif report_style == "business_marketing":
         # 对公营销报告：使用完整的工具链
-        # 使用预算控制的搜索工具，防止搜索过多导致token溢出
         session_id = state.get("session_id", "default")
         # 从 state 中获取 guwp_token（如果有）
         guwp_token = state.get("guwp_token", None)
-        tools = [
-            budget_controlled_online_search_tool(
+        tools = []
+        tool_name_list = []
+        # 根据开关决定是否添加在线搜索工具
+        if use_budget_online:
+            tools.append(budget_controlled_online_search_tool(
                 max_results=configurable.max_search_results,
                 session_id=session_id,
                 max_search_calls=researcher_limit,
                 max_tokens=max_tokens,
-            ),
-            create_budget_controlled_bocomsearch_tool(
+            ))
+            tool_name_list.append("budget_controlled_online_search")
+        # 根据开关决定是否添加交行搜索工具
+        if use_budget_bocom:
+            tools.append(create_budget_controlled_bocomsearch_tool(
                 session_id=session_id,
                 max_search_calls=researcher_limit,
                 max_tokens=max_tokens,
                 max_results=configurable.max_search_results,
                 guwp_token=guwp_token,
-            ),
+            ))
+            tool_name_list.append("budget_controlled_bocomsearch")
+        tools += [
             business_opportunity_search,
             sentiment_search,
             budget_controlled_financial_summary_tool(
@@ -144,36 +164,40 @@ async def researcher_node(
                 max_tokens=max_tokens,
             ),
         ]
-        tool_names = "budget_controlled_online_search, budget_controlled_bocomsearch, business_opportunity_search, sentiment_search, budget_controlled_financial_summary, budget_controlled_product_instance_search"
+        tool_name_list += ["business_opportunity_search", "sentiment_search", "budget_controlled_financial_summary", "budget_controlled_product_instance_search"]
+        tool_names = ", ".join(tool_name_list)
 
     elif report_style == "business_marketing_client":
         # 对公营销客户版：使用基础搜索工具
-        # 使用预算控制的搜索工具
         session_id = state.get("session_id", "default")
-        tools = [
-            research_skill_prompt_search,
-            budget_controlled_online_search_tool(
+        tools = [research_skill_prompt_search]
+        tool_name_list = ["research_skill_prompt_search"]
+        # 根据开关决定是否添加在线搜索工具
+        if use_budget_online:
+            tools.append(budget_controlled_online_search_tool(
                 max_results=configurable.max_search_results,
                 session_id=session_id,
                 max_search_calls=researcher_limit,
                 max_tokens=max_tokens,
-            ),
-        ]
-        tool_names = "research_skill_prompt_search, budget_controlled_online_search"
+            ))
+            tool_name_list.append("budget_controlled_online_search")
+        tool_names = ", ".join(tool_name_list)
 
     elif report_style == "academic":
         # 学术研究：使用基础搜索工具
-        # 使用预算控制的搜索工具
         session_id = state.get("session_id", "default")
-        tools = [
-            budget_controlled_online_search_tool(
+        tools = []
+        tool_name_list = []
+        # 根据开关决定是否添加在线搜索工具
+        if use_budget_online:
+            tools.append(budget_controlled_online_search_tool(
                 max_results=configurable.max_search_results,
                 session_id=session_id,
                 max_search_calls=researcher_limit,
                 max_tokens=max_tokens,
-            ),
-        ]
-        tool_names = "budget_controlled_online_search"
+            ))
+            tool_name_list.append("budget_controlled_online_search")
+        tool_names = ", ".join(tool_name_list) if tool_name_list else "(无搜索工具)"
     
     else:
         # 默认配置

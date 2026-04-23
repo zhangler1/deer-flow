@@ -45,9 +45,6 @@
       "searchEngine": "Search Engine",
       "searchEngineDescription": "Choose the default search engine. Custom search engine is the recommended choice and can be used for enterprise internal search, while Tavily is for external web search.",
       "selectSearchEngine": "Select search engine",
-      "customSearchRepository": "Custom Search Repository",
-      "customSearchRepositoryDescription": "Select the data repository for custom search engine. Different repositories contain different types of data.",
-      "selectRepository": "Select repository",
       "debugMode": "Debug Mode",
       "forceRoutingPath": "Force Routing Path",
       "forceRoutingPathDescription": "Bypass smart classifier and force route to specific node. For development/debugging only, use auto routing in production.",
@@ -55,7 +52,12 @@
       "directAnswer": "Direct Answer",
       "simpleSearch": "Simple Search",
       "iterativeResearch": "Iterative Research",
-      "deepResearch": "Deep Research"
+      "deepResearch": "Deep Research",
+      "budgetControlledSearch": "Budget Controlled Search Settings",
+      "useBudgetControlledOnlineSearch": "Use Budget Controlled Online Search",
+      "useBudgetControlledOnlineSearchDescription": "When enabled, budget_controlled_search will be used for online search, automatically controlling search budget and resource consumption.",
+      "useBudgetControlledBocomSearch": "Use Budget Controlled Bocom Search",
+      "useBudgetControlledBocomSearchDescription": "When enabled, budget_controlled_bocom_search will be used for internal Bocom search, automatically controlling search budget and resource consumption."
     },
     "mcp": {
       "title": "MCP Servers",

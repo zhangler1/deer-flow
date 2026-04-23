@@ -50,7 +50,7 @@ from src.server.chat_request import (
     SimpleResearchResponse,
     # TTSRequest 已删除
 )
-from src.server.config_request import ConfigResponse, CustomSearchRepositoryConfig
+from src.server.config_request import ConfigResponse
 from src.server.mcp_request import MCPServerMetadataRequest, MCPServerMetadataResponse
 from src.server.mcp_utils import load_mcp_tools
 from src.server.rag_request import (
@@ -59,7 +59,6 @@ from src.server.rag_request import (
     RAGResourcesResponse,
 )
 from src.tools import VolcengineTTS
-from src.tools.custom_search import get_available_repositories
 from src.graph.checkpoint import chat_stream_message
 from src.utils.json_utils import sanitize_args
 from src.utils.enhanced_logger import get_enhanced_logger, setup_enhanced_logging
@@ -158,6 +157,8 @@ async def chat_stream(request: ChatRequest):
             system_context=system_context,  # 从环境变量读取
             force_routing_path=request.force_routing_path,  # 🐛 调试模式
             guwp_token=request.guwp_token,
+            use_budget_controlled_online_search=request.use_budget_controlled_online_search if request.use_budget_controlled_online_search is not None else True,
+            use_budget_controlled_bocom_search=request.use_budget_controlled_bocom_search if request.use_budget_controlled_bocom_search is not None else True,
         ),
         media_type="text/event-stream",
     )
@@ -653,6 +654,8 @@ async def _astream_workflow_generator(
     system_context: str = "",  # 系统背景上下文
     force_routing_path: str = None,  # 🐛 调试模式：强制路由路径
     guwp_token: Optional[str] = None,
+    use_budget_controlled_online_search: bool = True,  # 是否使用预算控制的在线搜索
+    use_budget_controlled_bocom_search: bool = True,  # 是否使用预算控制的交行搜索
 ):
     # Process initial messages
     for message in messages:
@@ -701,6 +704,8 @@ async def _astream_workflow_generator(
             "report_style": report_style.value,
             "enable_deep_thinking": enable_deep_thinking,
             "system_context": system_context,  # 将系统背景传递到配置中
+            "use_budget_controlled_online_search": use_budget_controlled_online_search,
+            "use_budget_controlled_bocom_search": use_budget_controlled_bocom_search,
         },
         "recursion_limit": get_recursion_limit(),
     }
@@ -927,26 +932,9 @@ async def rag_resources(request: Annotated[RAGResourceRequest, Query()]):
 @app.get("/api/config", response_model=ConfigResponse)
 async def config():
     """Get the config of the server."""
-    # 获取自定义搜索仓库配置
-    try:
-        repositories_data = get_available_repositories()
-        custom_search_repositories = [
-            CustomSearchRepositoryConfig(
-                id=repo["id"],
-                name=repo["name"],
-                description=repo["description"],
-                repository=repo["repository"]
-            )
-            for repo in repositories_data
-        ]
-    except Exception as e:
-        logger.warning(f"Failed to load custom search repositories: {e}")
-        custom_search_repositories = []
-    
     return ConfigResponse(
         rag=RAGConfigResponse(provider=SELECTED_RAG_PROVIDER),
         models=get_configured_llm_models(),
-        custom_search_repositories=custom_search_repositories,
     )
 
 

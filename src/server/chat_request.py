@@ -56,6 +56,12 @@ class ChatRequest(BaseModel):
     custom_search_repository: Optional[str] = Field(
         None, description="The repository ID for custom search engine"
     )
+    use_budget_controlled_online_search: Optional[bool] = Field(
+        True, description="Whether to use budget controlled online search"
+    )
+    use_budget_controlled_bocom_search: Optional[bool] = Field(
+        True, description="Whether to use budget controlled bocom search"
+    )
     auto_accepted_plan: Optional[bool] = Field(
         True, description="Whether to automatically accept the plan"
     )
@@ -135,6 +141,12 @@ class SimpleResearchRequest(BaseModel):
     max_iteration: Optional[int] = Field(5, description="迭代研究的最大迭代次数")
     search_engine: Optional[str] = Field("custom_search", description="搜索引擎 (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)")
     custom_search_repository: Optional[str] = Field(None, description="自定义搜索仓库ID")
+    use_budget_controlled_online_search: Optional[bool] = Field(
+        True, description="是否使用Budget控制的在线检索"
+    )
+    use_budget_controlled_bocom_search: Optional[bool] = Field(
+        True, description="是否使用Budget控制的交行搜索"
+    )
     auto_accepted_plan: Optional[bool] = Field(True, description="是否自动接受计划")
     interrupt_feedback: Optional[str] = Field(None, description="用户对计划的中断反馈")
     mcp_settings: Optional[dict] = Field(None, description="MCP设置")

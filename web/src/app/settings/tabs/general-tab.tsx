@@ -27,9 +27,8 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
-import type { SettingsState } from "~/core/store";
 import { useConfig } from "~/core/api/hooks";
-import type { CustomSearchRepositoryConfig } from "~/core/config";
+import type { SettingsState } from "~/core/store";
 
 import type { Tab } from "./types";
 
@@ -45,7 +44,8 @@ const generalFormSchema = z.object({
     message: "Max search results must be at least 1.",
   }),
   searchEngine: z.enum(["tavily", "duckduckgo", "brave_search", "arxiv", "wikipedia", "custom_search"]),
-  customSearchRepository: z.string().optional(),
+  useBudgetControlledOnlineSearch: z.boolean(),  // 是否使用budget控制的在线检索
+  useBudgetControlledBocomSearch: z.boolean(),   // 是否使用budget控制的bocom搜索
   // Others
   enableBackgroundInvestigation: z.boolean(),
   enableDeepThinking: z.boolean(),
@@ -62,7 +62,7 @@ export const GeneralTab: Tab = ({
   onChange: (changes: Partial<SettingsState>) => void;
 }) => {
   const t = useTranslations("settings.general");
-  const { config } = useConfig();
+  const { config: _config } = useConfig();
   const generalSettings = useMemo(() => settings.general, [settings]);
   const form = useForm<z.infer<typeof generalFormSchema>>({
     resolver: zodResolver(generalFormSchema, undefined, undefined),
@@ -72,13 +72,6 @@ export const GeneralTab: Tab = ({
   });
 
   const currentSettings = form.watch();
-  const searchEngine = form.watch("searchEngine");
-  
-  // 获取可用的自定义搜索仓库选项
-  const customSearchRepositories: CustomSearchRepositoryConfig[] = useMemo(
-    () => config?.custom_search_repositories ?? [],
-    [config]
-  );
   useEffect(() => {
     let hasChanges = false;
     for (const key in currentSettings) {
@@ -193,6 +186,59 @@ export const GeneralTab: Tab = ({
                 </FormItem>
               )}
             />
+            {/* Budget Controlled Search Settings */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">{t("budgetControlledSearch")}</h3>
+              
+              <FormField
+                control={form.control}
+                name="useBudgetControlledOnlineSearch"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="useBudgetControlledOnlineSearch"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                        <Label className="text-sm" htmlFor="useBudgetControlledOnlineSearch">
+                          {t("useBudgetControlledOnlineSearch")}
+                        </Label>
+                      </div>
+                    </FormControl>
+                    <FormDescription>
+                      {t("useBudgetControlledOnlineSearchDescription")}
+                    </FormDescription>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="useBudgetControlledBocomSearch"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="useBudgetControlledBocomSearch"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                        <Label className="text-sm" htmlFor="useBudgetControlledBocomSearch">
+                          {t("useBudgetControlledBocomSearch")}
+                        </Label>
+                      </div>
+                    </FormControl>
+                    <FormDescription>
+                      {t("useBudgetControlledBocomSearchDescription")}
+                    </FormDescription>
+                  </FormItem>
+                )}
+              />
+            </div>
+
             {/* GUWP Token 设置，仅用于本地调试 */}
             <FormItem>
               <FormLabel>GUWP Token</FormLabel>
@@ -254,43 +300,7 @@ export const GeneralTab: Tab = ({
                 </FormItem>
               )}
             />
-            {searchEngine === "custom_search" && customSearchRepositories.length > 0 && (
-              <FormField
-                control={form.control}
-                name="customSearchRepository"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("customSearchRepository")}</FormLabel>
-                    <FormControl>
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger className="w-60">
-                          <SelectValue placeholder={t("selectRepository")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {customSearchRepositories.map((repo) => (
-                            <SelectItem key={repo.id} value={repo.id}>
-                              <div className="flex flex-col items-start">
-                                <span>{repo.name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {repo.description}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormDescription>
-                      {t("customSearchRepositoryDescription")}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+
             {/* 🐛 Debug Mode: Force Routing Path */}
             <div className="border-t pt-4 mt-4">
               <h3 className="text-sm font-medium mb-3">🐛 {t("debugMode")}</h3>
