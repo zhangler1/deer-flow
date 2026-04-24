@@ -22,8 +22,24 @@ from typing import Any, Dict, List, Optional
 
 import requests
 from langchain_core.tools import tool  # type: ignore
+from pydantic import BaseModel, Field, ValidationError
 
 logger = logging.getLogger(__name__)
+
+
+class SearchResultItem(BaseModel):
+    """检索结果单项的数据模型，用于验证接口返回值"""
+    title: str = Field(default="", description="结果标题")
+    content: str = Field(default="", description="结果内容")
+    score: float = Field(default=0.0, description="匹配分数")
+    url: str = Field(default="", description="结果链接")
+    source: str = Field(default="", description="来源")
+    category: str = Field(default="", description="分类")
+    createTime: str = Field(default="", description="创建时间")
+    docGuid: str = Field(default="", description="文档GUID")
+    repository: str = Field(default="", description="仓库")
+    attachEcmId: str = Field(default="", description="附件ECM ID")
+    fromAttachment: bool = Field(default=False, description="是否来自附件")
 
 
 class BocomSearchConfig:
@@ -74,6 +90,18 @@ def _build_form_payload(query: str) -> Dict[str, str]:
     return {"REQ_MESSAGE": json.dumps(payload, ensure_ascii=False)}
 
 
+def _validate_search_results(results: List[Dict[str, Any]], context: str = "") -> None:
+    """验证检索结果是否符合 Pydantic 模型定义，不符合则打印日志但不抛异常"""
+    for idx, item in enumerate(results):
+        try:
+            SearchResultItem.model_validate(item)
+        except ValidationError as e:
+            logger.warning(
+                f"检索结果第 {idx + 1} 项数据类型不符合预期"
+                f"{f' [{context}]' if context else ''}: {e}"
+            )
+
+
 def _parse_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """解析 API 响应为标准结构"""
     results: List[Dict[str, Any]] = []
@@ -108,26 +136,13 @@ def _parse_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "repository": item.get("repository", ""),
                 "attachEcmId": item.get("attachEcmId", ""),
                 "fromAttachment": bool(item.get("fromAttachment", False)),
-                "category": item.get("fullCategoryName", ""),
-                "createTime": item.get("createTime", ""),
             }
         )
 
-            #         result = {
-            #     # === 核心必需字段 ===
-            #     "title": item.get("title", "").strip(),
-            #     "content": item.get("content", "").strip() or item.get("absContent", "").strip(),
-            #     "score": float(item.get("score", 0)) if item.get("score") else 0.0,
-            #     "url": item.get("url") or "",  # url可能为None
-            #     "source": item.get("source", ""),
-
-            #     # === 次要可选字段 ===
-            #     "category": item.get("fullCategoryName", ""),
-            #     "createTime": item.get("createTime", ""),  # 创建时间
-            # }
-
     # 简单排序与截断，可根据需要调整
     results.sort(key=lambda x: x.get("score", 0.0), reverse=True)
+    # 验证结果数据类型，仅记录日志不阻断流程
+    _validate_search_results(results, context="_parse_response")
     return results
 
 
@@ -155,11 +170,12 @@ def call_bocomsearch(query: str, guwp_token: Optional[str] = None, timeout: int 
         resp.raise_for_status()
         data = resp.json()
         results = _parse_response(data)
-        # 截断到 max_results（若提供）
-        return results[:max_results] if (max_results and max_results > 0) else results
+        trimmed = results[:max_results] if (max_results and max_results > 0) else results
+        _validate_search_results(trimmed, context="call_bocomsearch")
+        return trimmed
     except requests.exceptions.RequestException as e:
         logger.error(f"Bocom search API request failed: {e}")
-        return [
+        error_result = [
             {
                 "title": "搜索错误",
                 "url": "",
@@ -168,9 +184,11 @@ def call_bocomsearch(query: str, guwp_token: Optional[str] = None, timeout: int 
                 "score": 0.0,
             }
         ]
+        _validate_search_results(error_result, context="request_exception")
+        return error_result
     except Exception as e:
         logger.error(f"Unexpected error in bocomsearch: {e}")
-        return [
+        error_result = [
             {
                 "title": "搜索错误",
                 "url": "",
@@ -179,6 +197,8 @@ def call_bocomsearch(query: str, guwp_token: Optional[str] = None, timeout: int 
                 "score": 0.0,
             }
         ]
+        _validate_search_results(error_result, context="unexpected_exception")
+        return error_result
 
 
 @tool

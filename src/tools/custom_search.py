@@ -12,7 +12,7 @@ from langchain_core.callbacks import (
     CallbackManagerForToolRun,
 )
 from langchain_core.tools import BaseTool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from src.config.custom_search import get_custom_search_config, CustomSearchRepository
 from src.utils.enhanced_logger import console_print, get_enhanced_logger
@@ -22,6 +22,30 @@ from src.utils.enhanced_logger import console_print, get_enhanced_logger
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('tools.custom_search')
+
+
+class MuwpUser(BaseModel):
+    """MUWP 用户信息模型"""
+    muwp_branchID: str = Field(default="", description="分行ID")
+    muwp_loginName: str = Field(default="", description="登录名")
+    muwp_userCode: str = Field(default="", description="用户编码")
+    muwp_userName: str = Field(default="", description="用户姓名")
+    muwp_userID: str = Field(default="", description="用户ID")
+
+
+class SearchResultItem(BaseModel):
+    """检索结果单项的数据模型，用于验证接口返回值"""
+    title: str = Field(default="", description="结果标题")
+    content: str = Field(default="", description="结果内容")
+    score: float = Field(default=0.0, description="匹配分数")
+    url: str = Field(default="", description="结果链接")
+    source: str = Field(default="", description="来源")
+    category: str = Field(default="", description="分类")
+    createTime: str = Field(default="", description="创建时间")
+    docGuid: str = Field(default="", description="文档GUID")
+    repository: str = Field(default="", description="仓库")
+    attachEcmId: str = Field(default="", description="附件ECM ID")
+    fromAttachment: bool = Field(default=False, description="是否来自附件")
 
 
 class CustomSearchInput(BaseModel):
@@ -48,25 +72,11 @@ class CustomSearchTool(BaseTool):
     repository_id: str = Field(default="aggregation_search")
     
     # 用户信息配置
-    muwp_user: Dict[str, str] = Field(default_factory=dict)
+    muwp_user: MuwpUser = Field(default_factory=MuwpUser)
     
     # 内部使用的repository配置
     _repository_config: Optional[CustomSearchRepository] = None
 
-    @property
-    def repository(self) -> str:
-        """获取当前使用的repository名称"""
-        if self._repository_config:
-            return self._repository_config.repository
-        return self.repository_id
-    
-    @property
-    def channel_id(self) -> str:
-        """获取当前使用的channel_id"""
-        if self._repository_config:
-            return self._repository_config.channel_id
-        return "0"
-    
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # 设置args_schema
@@ -106,14 +116,15 @@ class CustomSearchTool(BaseTool):
                 f"Please check your conf.yaml file."
             )
         
-        # 设置默认用户信息（可以从环境变量获取）
-        self.muwp_user = {
-            "muwp_branchID": os.getenv("MUWP_BRANCH_ID", "1000027159"),
-            "muwp_loginName": os.getenv("MUWP_LOGIN_NAME", "xuew_4"),
-            "muwp_userCode": os.getenv("MUWP_USER_CODE", "9743616"),
-            "muwp_userName": os.getenv("MUWP_USER_NAME", "薛巍"),
-            "muwp_userID": os.getenv("MUWP_USER_ID", "132298")
-        }
+        # 如果外部未传入 muwp_user，则从环境变量设置默认值
+        if not self.muwp_user or not any(self.muwp_user.model_dump().values()):
+            self.muwp_user = MuwpUser(
+                muwp_branchID=os.getenv("MUWP_BRANCH_ID", ""),
+                muwp_loginName=os.getenv("MUWP_LOGIN_NAME", ""),
+                muwp_userCode=os.getenv("MUWP_USER_CODE", ""),
+                muwp_userName=os.getenv("MUWP_USER_NAME", ""),
+                muwp_userID=os.getenv("MUWP_USER_ID", "")
+            )
         
         if not self.api_url:
             raise ValueError("CUSTOM_SEARCH_API_URL environment variable is required")
@@ -152,7 +163,7 @@ class CustomSearchTool(BaseTool):
                         "channelId": self._repository_config.channel_id if self._repository_config else "0"
                     }
                 },
-                "muwpUser": self.muwp_user
+                "muwpUser": self.muwp_user.model_dump()
             }
         }
         
@@ -182,22 +193,33 @@ class CustomSearchTool(BaseTool):
             logger.error(f"Unexpected error in search API call: {e}")
             return []
     
+    def _validate_search_results(self, results: List[Dict[str, Any]], context: str = "") -> None:
+        """验证检索结果是否符合 Pydantic 模型定义，不符合则打印日志但不抛异常"""
+        for idx, item in enumerate(results):
+            try:
+                SearchResultItem.model_validate(item)
+            except ValidationError as e:
+                logger.warning(
+                    f"检索结果第 {idx + 1} 项数据类型不符合预期"
+                    f"{f' [{context}]' if context else ''}: {e}"
+                )
+
     def _parse_response(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         将交通银行搜索API响应转换为标准格式
         """
         results = []
-        
+
         # 检查响应是否成功
         rsp_head = data.get("RSP_HEAD", {})
         if rsp_head.get("TRAN_SUCCESS") != "1":
             logger.warning(f"Search API returned error: {rsp_head}")
             return results
-        
+
         # 从RSP_BODY中提取搜索结果
         rsp_body = data.get("RSP_BODY", {})
         api_results = rsp_body.get("result", [])
-        
+
         for item in api_results:
             # 转换为 DeerFlow 统一的结构化格式
             result = {
@@ -216,16 +238,19 @@ class CustomSearchTool(BaseTool):
                 "attachEcmId": item.get("attachEcmId", ""),
                 "fromAttachment": bool(item.get("fromAttachment", False)),
             }
-            
+
             # 只有当内容不为空时才添加到结果中
             if result["title"] or result["content"]:
                 results.append(result)
-        
+
         # 按分数排序（降序）
         results.sort(key=lambda x: x.get("score", 0), reverse=True)
-        
+
         # 限制结果数量
-        return results[:self.max_results]
+        trimmed_results = results[:self.max_results]
+        # 验证结果数据类型，仅记录日志不阻断流程
+        self._validate_search_results(trimmed_results, context="_parse_response")
+        return trimmed_results
 
     
     def _run(
@@ -328,14 +353,17 @@ class CustomSearchTool(BaseTool):
             # 返回结果列表，结果为空时返回提示
             if not results:
                 logger.warning("No search results found")
-                return [{
+                no_result = [{
                     "title": "未找到相关结果",
                     "url": "",
-                    "content": f"未能找到与查询“{query}”相关的信息，请尝试使用不同的关键词。",
+                    "content": f'未能找到与查询"{query}"相关的信息，请尝试使用不同的关键词。',
                     "source": "system",
                     "score": 0.0
                 }]
+                self._validate_search_results(no_result, context="empty_result")
+                return no_result
             
+            self._validate_search_results(results, context="_run")
             return results
         except Exception as e:
             duration = time.time() - start_time
@@ -354,13 +382,15 @@ class CustomSearchTool(BaseTool):
                 level=logging.ERROR
             )
             
-            return [{
+            error_result = [{
                 "title": "搜索错误",
                 "url": "",
                 "content": f"搜索服务出现错误: {str(e)}",
                 "source": "error",
                 "score": 0.0
             }]
+            self._validate_search_results(error_result, context="error_result")
+            return error_result
     
     
     async def _arun(
@@ -378,7 +408,7 @@ def get_custom_search_tool(
     max_results: int = 10,
     repository_id: Optional[str] = None,
     api_url: Optional[str] = None,
-    muwp_user: Optional[Dict[str, str]] = None
+    muwp_user: Optional[MuwpUser] = None
 ) -> CustomSearchTool:
     """创建自定义搜索工具实例"""
     kwargs: Dict[str, Any] = {"max_results": max_results}
