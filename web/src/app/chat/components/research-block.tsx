@@ -59,7 +59,30 @@ export function ResearchBlock({
     if (!report) {
       return;
     }
-    void navigator.clipboard.writeText(report.content);
+    
+    // 降级方案：兼容非 HTTPS 环境
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      // 使用现代 Clipboard API
+      void navigator.clipboard.writeText(report.content);
+    } else {
+      // 降级方案：使用传统的 execCommand 方法
+      const textArea = document.createElement('textarea');
+      textArea.value = report.content;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        console.error('[handleCopy] 复制失败:', err);
+      } finally {
+        document.body.removeChild(textArea);
+      }
+    }
+    
     setCopied(true);
     setTimeout(() => {
       setCopied(false);

@@ -25,12 +25,16 @@ export function ResearchReportBlock({
   const handleMarkdownChange = useCallback(
     (markdown: string) => {
       if (message) {
-        message.content = markdown;
+        // 创建新的 message 对象以确保触发响应式更新
+        const updatedMessage = { ...message, content: markdown };
+        
+        // 更新 store
+        const currentMessages = useStore.getState().messages;
+        const newMessages = new Map(currentMessages);
+        newMessages.set(message.id, updatedMessage);
+        
         useStore.setState({
-          messages: new Map(useStore.getState().messages).set(
-            message.id,
-            message,
-          ),
+          messages: newMessages,
         });
       }
     },
