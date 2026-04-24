@@ -33,9 +33,9 @@ REASONING_MODEL:
 
 # Reporter model for deep research report generation
 REPORTER_MODEL:
-  base_url: http://53.192.28.254:8841/v1
-  model: GLM-4.7-Flash
-  api_key: xxxx
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 

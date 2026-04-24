@@ -68,7 +68,23 @@ export async function* chatStream(
       console.error("[chatStream] Failed to parse SSE event, skipping", {
         event,
         error: parseError,
+        errorName: (parseError as Error).name,
+        errorMessage: (parseError as Error).message,
+        errorStack: (parseError as Error).stack,
         rawData: event.data,
+        rawDataLength: event.data?.length || 0,
+        rawDataType: typeof event.data,
+        rawDataTypeIsString: typeof event.data === 'string',
+        rawDataTypeIsNull: event.data === null,
+        rawDataTypeIsUndefined: event.data === undefined,
+        eventType: event.event,
+        // 打印完整的原始数据（如果不太长）
+        ...(event.data && event.data.length < 1000 ? { fullRawData: event.data } : {}),
+        // 如果数据较长，打印前500字符和后200字符
+        ...(event.data && event.data.length >= 1000 ? {
+          rawDataPrefix: event.data.substring(0, 500),
+          rawDataSuffix: event.data.substring(event.data.length - 200),
+        } : {}),
       });
       // 跳过此事件，继续处理后续事件
       // 如果想完全中断流，可以取消注释下面的 throw
