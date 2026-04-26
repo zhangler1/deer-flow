@@ -19,7 +19,7 @@ export function Tooltip({
   open,
   side,
   sideOffset,
-  delayDuration = 750,
+  delayDuration = 300,
 }: {
   className?: string;
   style?: CSSProperties;

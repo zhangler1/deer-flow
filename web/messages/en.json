@@ -130,6 +130,10 @@
         "description": "When enabled, DeerFlow will perform a quick search before planning. This is useful for researches related to ongoing events and news."
       },
       "enhancePrompt": "Enhance prompt with AI",
+      "enhancePromptTooltip": "Use AI to enhance your prompt for clearer, more professional research questions and better results",
+      "enhancePromptDisabledTooltip": "Please enter a prompt first, then click to enhance",
+      "sendTooltip": "Click to send message and start deep research",
+      "stopTooltip": "Click to stop generating",
       "searchEngine": "Search Engine",
       "on": "On",
       "off": "Off"

@@ -246,27 +246,39 @@ export function InputBox({
           <ReportStyleDialog />
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Tooltip title={t("enhancePrompt")}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "hover:bg-accent h-10 w-10",
-                isEnhancing && "animate-pulse",
-              )}
-              onClick={handleEnhancePrompt}
-              disabled={isEnhancing || currentPrompt.trim() === ""}
-            >
-              {isEnhancing ? (
-                <div className="flex h-10 w-10 items-center justify-center">
-                  <div className="bg-foreground h-3 w-3 animate-bounce rounded-full opacity-70" />
-                </div>
-              ) : (
-                <MagicWandIcon className="text-brand" />
-              )}
-            </Button>
+          <Tooltip
+            className="max-w-60"
+            title={
+              isEnhancing || currentPrompt.trim() === ""
+                ? t("enhancePromptDisabledTooltip")
+                : t("enhancePromptTooltip")
+            }
+          >
+            <span className="inline-flex">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "hover:bg-accent h-10 w-10",
+                  isEnhancing && "animate-pulse",
+                )}
+                onClick={handleEnhancePrompt}
+                disabled={isEnhancing || currentPrompt.trim() === ""}
+              >
+                {isEnhancing ? (
+                  <div className="flex h-10 w-10 items-center justify-center">
+                    <div className="bg-foreground h-3 w-3 animate-bounce rounded-full opacity-70" />
+                  </div>
+                ) : (
+                  <MagicWandIcon className="text-brand" />
+                )}
+              </Button>
+            </span>
           </Tooltip>
-          <Tooltip title={responding ? tCommon("stop") : tCommon("send")}>
+          <Tooltip
+            className="max-w-60"
+            title={responding ? t("stopTooltip") : t("sendTooltip")}
+          >
             <Button
               variant="outline"
               size="icon"
