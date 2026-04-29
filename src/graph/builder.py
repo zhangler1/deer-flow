@@ -19,12 +19,6 @@ from .nodes import (
     reporter_node,
     research_team_node,
     researcher_node,
-    # 新增的智能路由节点（3种路径）
-    router_node,
-    direct_answer_node,
-    simple_search_node,
-    iterative_research_node,  # 新增：迭代研究节点
-    iterative_reporter_node,  # 新增：迭代研究报告节点
 )
 from .types import State
 
@@ -130,25 +124,10 @@ def _build_base_graph():
     """Build and return the base state graph with all nodes and edges."""
     builder = StateGraph(State)
     
-    # 起始节点改为router，实现智能路由
-    builder.add_edge(START, "router")
-    
-    # 添加智能路由节点（入口节点）
-    builder.add_node("router", router_node)
-    
-    # 添加3种路径的节点
-    # 1. 直接回答节点（通用知识，不走检索）
-    builder.add_node("direct_answer_node", direct_answer_node)
-    
-    # 2. 简单检索节点（主流路径，单次检索）
-    builder.add_node("simple_search_node", simple_search_node)
-    
-    # 3. 迭代研究节点（单问题深挖，自主迭代）
-    builder.add_node("iterative_research_node", iterative_research_node)
-    builder.add_node("iterative_reporter_node", iterative_reporter_node)
-    
-    # 4. 深度研究路径（原有的复杂流程，通过coordinator进入）
-    # coordinator 是深度研究的入口
+    # 起始节点直接进入深度研究（coordinator）
+    builder.add_edge(START, "coordinator")
+
+    # 深度研究路径的节点
     builder.add_node("coordinator", coordinator_node)
     builder.add_node("background_investigator", background_investigation_node)
     builder.add_node("planner", planner_node)
@@ -159,7 +138,7 @@ def _build_base_graph():
     # builder.add_node("coder", coder_node)
     builder.add_node("human_feedback", human_feedback_node)
     
-    # 深度研究路径的边（保持不变）
+    # 深度研究路径的边
     builder.add_edge("background_investigator", "planner")
     builder.add_conditional_edges(
         "research_team",
@@ -168,12 +147,6 @@ def _build_base_graph():
         ["planner", "researcher", "reporter"],
     )
     builder.add_edge("reporter", END)
-    
-    # 简单路径节点直接结束
-    builder.add_edge("direct_answer_node", END)
-    builder.add_edge("simple_search_node", END)
-    # 迭代研究节点的跳转由节点内部控制，should_continue为false时才进入报告节点
-    builder.add_edge("iterative_reporter_node", END)  # 迭代研究报告节点结束
     
     return builder
 
