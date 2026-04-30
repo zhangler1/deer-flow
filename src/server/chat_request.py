@@ -170,6 +170,12 @@ class ChatCompletionChoice(BaseModel):
     sources: List[str] = Field(default_factory=list, description="参考来源")
     thinking_steps: Optional[int] = Field(0, description="实际思考步骤数")
 
+class MarkdownToWordRequest(BaseModel):
+    """Markdown 转 Word 请求模型"""
+    content: str = Field(..., description="Markdown 格式的文本内容")
+    filename: Optional[str] = Field(None, description="输出文件名（不含扩展名），默认为 research-report")
+
+
 class SimpleResearchResponse(BaseModel):
     id: str = Field(..., description="对话的唯一标识符")
     object: str = Field("chat.completion", description="对象类型，固定为 'chat.completion'")

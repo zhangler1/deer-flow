@@ -4,6 +4,7 @@
 import base64
 from datetime import datetime
 import json
+import tempfile
 from langchain_core.messages.base import BaseMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 import logging
@@ -14,6 +15,7 @@ from typing import Annotated, Any, List, cast, Dict,Optional
 import uuid
 from uuid import uuid4
 import os
+import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
@@ -46,6 +48,7 @@ from src.server.chat_request import (
     GeneratePodcastRequest,
     GeneratePPTRequest,
     GenerateProseRequest,
+    MarkdownToWordRequest,
     SimpleResearchRequest,
     SimpleResearchResponse,
     # TTSRequest 已删除
@@ -794,6 +797,70 @@ def _make_event(event_type: str, data: Dict[str, Any]):
 
 
 
+# ============================================================
+# Markdown 转 Word 代理接口
+# ============================================================
+
+EASYPARSE_SERVICE_URL = os.getenv("EASYPARSE_SERVICE_URL", "http://localhost:5000")
+
+
+@app.post("/api/markdown/to_word")
+async def markdown_to_word(request: MarkdownToWordRequest):
+    """
+    将 Markdown 内容转换为 Word 文档
+
+    调用 easyparse 服务的 /markdown_to_word 接口进行转换，
+    服务地址通过 EASYPARSE_SERVICE_URL 环境变量配置。
+    """
+    easyparse_url = f"{EASYPARSE_SERVICE_URL}/markdown_to_word"
+
+    # 将 markdown 内容写入临时文件
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, encoding="utf-8"
+    ) as tmp:
+        tmp.write(request.content)
+        tmp_path = tmp.name
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            with open(tmp_path, "rb") as f:
+                response = await client.post(
+                    easyparse_url,
+                    files={"file": ("report.md", f, "text/markdown")},
+                )
+
+        if response.status_code != 200:
+            logger.error(f"easyparse 转换失败: status={response.status_code}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Markdown 转 Word 失败: easyparse 返回 {response.status_code}",
+            )
+
+        filename = request.filename or "research-report"
+
+        return Response(
+            content=response.content,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}.docx"',
+            },
+        )
+    except httpx.ConnectError:
+        logger.error(f"无法连接 easyparse 服务: {EASYPARSE_SERVICE_URL}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"无法连接 easyparse 服务({EASYPARSE_SERVICE_URL})，请确认服务已启动",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Markdown 转 Word 异常: {e}")
+        raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
 
 @app.post("/api/ppt/generate")

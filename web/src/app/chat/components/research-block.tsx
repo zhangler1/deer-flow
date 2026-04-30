@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { Check, Copy, Headphones, Pencil, Undo2, X, Download } from "lucide-react";
+import { Check, Copy, Headphones, Pencil, Undo2, X, Download, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
@@ -12,6 +12,7 @@ import { Card } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useReplay } from "~/core/replay";
 import { closeResearch, listenToPodcast, useStore } from "~/core/store";
+import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { cn } from "~/lib/utils";
 
 import { ResearchActivitiesBlock } from "./research-activities-block";
@@ -89,8 +90,10 @@ export function ResearchBlock({
     }, 1000);
   }, [reportId]);
 
-  // Download report as markdown
-  const handleDownload = useCallback(() => {
+  const [downloading, setDownloading] = useState(false);
+
+  // Download report as Word (.docx), fallback to Markdown
+  const handleDownload = useCallback(async () => {
     if (!reportId) {
       return;
     }
@@ -101,12 +104,47 @@ export function ResearchBlock({
     const now = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-    const filename = `research-report-${timestamp}.md`;
+    const filename = `research-report-${timestamp}`;
+
+    // 尝试调用后端 API 转换为 Word
+    try {
+      setDownloading(true);
+      const res = await fetch(resolveServiceURL("markdown/to_word"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: report.content, filename }),
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 0);
+        return;
+      }
+
+      // API 返回错误，降级为 Markdown 下载
+      console.warn(`[handleDownload] Word 转换失败 (status=${res.status})，降级下载 Markdown`);
+    } catch (err) {
+      // 网络异常（easyparse 服务不可达等），降级为 Markdown 下载
+      console.warn('[handleDownload] Word 转换请求异常，降级下载 Markdown:', err);
+    } finally {
+      setDownloading(false);
+    }
+
+    // 降级：下载原始 Markdown
     const blob = new Blob([report.content], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = `${filename}.md`;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
@@ -170,9 +208,10 @@ export function ResearchBlock({
                   className="text-gray-400"
                   size="icon"
                   variant="ghost"
+                  disabled={downloading}
                   onClick={handleDownload}
                 >
-                  <Download />
+                  {downloading ? <Loader2 className="animate-spin" /> : <Download />}
                 </Button>
               </Tooltip>
             </>
