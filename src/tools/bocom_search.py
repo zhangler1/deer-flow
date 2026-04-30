@@ -211,73 +211,8 @@ def bocomsearch(query: str) -> List[Dict[str, Any]]:
     return call_bocomsearch(query=query, max_results=10)
 
 
-def create_budget_controlled_bocomsearch_tool(
-    session_id: str = "default",
-    max_search_calls: int = 5,
-    max_tokens: int = 10000,
-    max_results: int = 10,
-    guwp_token: Optional[str] = None,
-):
-    """
-    创建带预算控制的交通银行搜索工具
-    
-    与 budget_controlled_online_search 共用预算管理器，确保总搜索量不超限
-    
-    Args:
-        session_id: 会话ID，用于隔离不同用户的预算
-        max_search_calls: 最大搜索调用次数（与 online_search 共享）
-        max_tokens: 最大token预算（与 online_search 共享）
-        max_results: 单次搜索返回的最大结果数
-        guwp_token: GUWP认证令牌，未提供时从环境变量读取
-        
-    Returns:
-        BudgetControlledBocomSearchTool: 带预算控制的搜索工具实例
-    """
-    from src.tools.budget_controlled_search import BudgetControlledSearchTool
-    from langchain_core.tools import BaseTool
-    from langchain_core.callbacks import CallbackManagerForToolRun
-    
-    # 创建 bocomsearch 基础工具类
-    class BocomSearchBaseTool(BaseTool):
-        """Bocom搜索基础工具，适配 BudgetControlledSearchTool"""
-        name: str = "bocomsearch"
-        description: str = "搜索交通银行内部知识库。适用于查询银行政策、产品信息、业务流程、合规要求等内部资料。"
-        max_results: int = 10
-        guwp_token: Optional[str] = None
-        
-        def __init__(self, max_results: int = 10, guwp_token: Optional[str] = None, **kwargs):
-            super().__init__(**kwargs)
-            self.max_results = max_results
-            self.guwp_token = guwp_token
-        
-        def _run(
-            self,
-            query: str,
-            run_manager: Optional[CallbackManagerForToolRun] = None,
-            **kwargs
-        ) -> List[Dict[str, Any]]:
-            """执行搜索"""
-            return call_bocomsearch(
-                query=query,
-                guwp_token=self.guwp_token,
-                max_results=self.max_results,
-            )
-    
-    # 创建基础工具实例
-    base_tool = BocomSearchBaseTool(max_results=max_results, guwp_token=guwp_token)
-    
-    # 创建预算控制包装器
-    return BudgetControlledSearchTool(
-        wrapped_tool=base_tool,
-        session_id=session_id,
-        max_search_calls=max_search_calls,
-        max_tokens=max_tokens,
-    )
-
-
 __all__ = [
     "BocomSearchConfig",
     "call_bocomsearch",
     "bocomsearch",
-    "create_budget_controlled_bocomsearch_tool",
 ]

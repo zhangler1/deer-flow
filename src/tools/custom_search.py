@@ -14,7 +14,6 @@ from langchain_core.callbacks import (
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field, ValidationError
 
-from src.config.custom_search import get_custom_search_config, CustomSearchRepository
 from src.utils.enhanced_logger import console_print, get_enhanced_logger
 
 
@@ -61,7 +60,7 @@ class CustomSearchTool(BaseTool):
     适配交通银行内部搜索API格式
     """
     
-    name: str = "web_search"
+    name: str = "intranet_search"
     description: str = "搜索网络信息。输入应该是搜索查询字符串。"
     
     # 配置参数
@@ -69,13 +68,11 @@ class CustomSearchTool(BaseTool):
     api_key: str = Field(default="")
     max_results: int = Field(default=10)
     timeout: int = Field(default=30)
-    repository_id: str = Field(default="aggregation_search")
+    repository: str = Field(default="aggregation-search")  # API请求中的repository参数
+    channel_id: str = Field(default="0")  # API请求中的channelId参数
     
     # 用户信息配置
     muwp_user: MuwpUser = Field(default_factory=MuwpUser)
-    
-    # 内部使用的repository配置
-    _repository_config: Optional[CustomSearchRepository] = None
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -83,38 +80,14 @@ class CustomSearchTool(BaseTool):
         self.args_schema = CustomSearchInput
         
         # 从环境变量获取配置
-        self.api_url = os.getenv("CUSTOM_SEARCH_API_URL", "")
-        self.api_key = os.getenv("CUSTOM_SEARCH_API_KEY", "")
+        self.api_url = os.getenv("ONLINE_SEARCH_API_URL", "")
+        self.api_key = os.getenv("ONLINE_SEARCH_API_KEY", "")
         
-        # 获取自定义搜索配置
-        custom_config = get_custom_search_config()
-        
-        # 设置默认repository_id（仅当没有显式传入时）
-        # 注意：如果通过 kwargs 传入了 repository_id，这里不会覆盖
-        if not hasattr(self, 'repository_id') or not self.repository_id:
-            self.repository_id = "dynamic_search"
-        
-        # 保存原始的 repository_id，用于错误提示
-        original_repository_id = self.repository_id
-        
-        # 获取repository配置
-        self._repository_config = custom_config.get_repository(self.repository_id)
-        if not self._repository_config:
-            # 如果指定的repository不存在，使用默认的
-            self._repository_config = custom_config.get_default_repository()
-            if self._repository_config:
-                logger.warning(
-                    f"Repository '{original_repository_id}' not found in configuration. "
-                    f"Using default '{self._repository_config.repository}'. "
-                    f"Please add '{original_repository_id}' to conf.yaml to avoid this warning."
-                )
-        
-        if not self._repository_config:
-            raise ValueError(
-                f"No valid repository configuration found. "
-                f"Repository '{original_repository_id}' does not exist and no default repository is configured. "
-                f"Please check your conf.yaml file."
-            )
+        # 从环境变量读取 repository 和 channel_id（可选，有默认值）
+        if not self.repository or self.repository == "aggregation-search":
+            self.repository = os.getenv("CUSTOM_SEARCH_REPOSITORY", "aggregation-search")
+        if not self.channel_id or self.channel_id == "0":
+            self.channel_id = os.getenv("CUSTOM_SEARCH_CHANNEL_ID", "0")
         
         # 如果外部未传入 muwp_user，则从环境变量设置默认值
         if not self.muwp_user or not any(self.muwp_user.model_dump().values()):
@@ -127,7 +100,7 @@ class CustomSearchTool(BaseTool):
             )
         
         if not self.api_url:
-            raise ValueError("CUSTOM_SEARCH_API_URL environment variable is required")
+            raise ValueError("ONLINE_SEARCH_API_URL environment variable is required")
     
     def _call_search_api(self, query: str) -> List[Dict[str, Any]]:
         """调用交通银行内部搜索 API"""
@@ -158,9 +131,9 @@ class CustomSearchTool(BaseTool):
                             "role": "user"
                         }
                     ],
-                    "repository": self._repository_config.repository if self._repository_config else "default",
+                    "repository": self.repository,
                     "param": {
-                        "channelId": self._repository_config.channel_id if self._repository_config else "0"
+                        "channelId": self.channel_id
                     }
                 },
                 "muwpUser": self.muwp_user.model_dump()
@@ -265,39 +238,35 @@ class CustomSearchTool(BaseTool):
         import time
         start_time = time.time()
         
-        # 如果提供了repository_id参数，则优先使用
-        original_config = None
-        if repository_id and repository_id != self.repository_id:
-            custom_config = get_custom_search_config()
-            temp_repo_config = custom_config.get_repository(repository_id)
-            if temp_repo_config:
-                # 临时更换repository配置
-                original_config = self._repository_config
-                self._repository_config = temp_repo_config
-                logger.info(f"Using repository: {temp_repo_config.name} ({temp_repo_config.repository})")
+        # 如果提供了repository_id参数，临时覆盖repository和channel_id
+        original_repository = self.repository
+        original_channel_id = self.channel_id
+        if repository_id:
+            self.repository = repository_id
+            # repository_id 作为 channel_id 的备选
+            self.channel_id = kwargs.get("channel_id", self.channel_id)
         
         # 记录检索开始
-        repo_name = self._repository_config.name if self._repository_config else "默认仓库"
+        tool_name = self.name
         
         enhanced_logger.logger.info(
-            f"🔍 SEARCH_START | custom_search | 开始自定义搜索 | "
-            f"仓库: {repo_name} | 查询: '{query}'"
+            f"🔍 SEARCH_START | {tool_name} | 开始搜索 | "
+            f"仓库: {self.repository} | 查询: '{query}'"
         )
         console_print(
-            f"\033[32m[🔍 开始搜索] 仓库: {repo_name}\033[0m \033[35m| 查询: '{query}'\033[0m",
+            f"\033[32m[🔍 开始搜索] 工具: {tool_name} | 仓库: {self.repository}\033[0m \033[35m| 查询: '{query}'\033[0m",
             level=logging.INFO
         )
         
         logger.info(f"Custom search query: {query}")
-        if self._repository_config:
-            logger.info(f"Using repository: {self._repository_config.name} ({self._repository_config.repository})")
+        logger.info(f"Using repository: {self.repository}")
         
         try:
             results = self._call_search_api(query)
             duration = time.time() - start_time
             
             enhanced_logger.logger.info(
-                f"✅ SEARCH_COMPLETE | custom_search | 搜索完成 | "
+                f"✅ SEARCH_COMPLETE | {self.name} | 搜索完成 | "
                 f"结果数: {len(results)} | 耗时: {duration:.2f}s"
             )
             logger.info(f"Custom search returned {len(results)} results in {duration:.2f}s")
@@ -346,9 +315,10 @@ class CustomSearchTool(BaseTool):
                     level=logging.INFO
                 )
             
-            # 恢复原始配置（如果有的话）
-            if repository_id and repository_id != self.repository_id and original_config is not None:
-                self._repository_config = original_config
+            # 恢复原始配置
+            if repository_id:
+                self.repository = original_repository
+                self.channel_id = original_channel_id
             
             # 返回结果列表，结果为空时返回提示
             if not results:
@@ -368,12 +338,13 @@ class CustomSearchTool(BaseTool):
         except Exception as e:
             duration = time.time() - start_time
             
-            # 恢复原始配置（如果有的话）
-            if repository_id and repository_id != self.repository_id and original_config is not None:
-                self._repository_config = original_config
+            # 恢复原始配置
+            if repository_id:
+                self.repository = original_repository
+                self.channel_id = original_channel_id
             
             enhanced_logger.logger.error(
-                f"❌ SEARCH_ERROR | custom_search | 搜索失败 | "
+                f"❌ SEARCH_ERROR | {self.name} | 搜索失败 | "
                 f"耗时: {duration:.2f}s | 错误: {str(e)}"
             )
             logger.error(f"Custom search error: {e}")
@@ -417,19 +388,13 @@ def get_custom_search_tool(
     if api_url:
         kwargs["api_url"] = api_url
     if repository_id:
-        kwargs["repository_id"] = repository_id
+        kwargs["repository"] = repository_id
     if muwp_user:
         kwargs["muwp_user"] = muwp_user
         
     return CustomSearchTool(**kwargs)
 
 
-def get_available_repositories() -> List[Dict[str, str]]:
-    """获取可用的repository选择列表"""
-    custom_config = get_custom_search_config()
-    return custom_config.get_repository_choices()
-
-
 def create_custom_search_with_repository(repository_id: str, max_results: int = 10) -> CustomSearchTool:
     """根据repository_id创建自定义搜索工具"""
-    return CustomSearchTool(repository_id=repository_id, max_results=max_results)
+    return CustomSearchTool(repository=repository_id, max_results=max_results)

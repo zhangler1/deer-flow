@@ -30,10 +30,10 @@ from src.tools import (
     budget_controlled_online_search_tool,
     budget_controlled_product_instance_search_tool,
     budget_controlled_financial_summary_tool,
+    budget_controlled_bocomsearch_tool,
     get_budget_manager,
     clear_budget_manager,
     bocomsearch,
-    create_budget_controlled_bocomsearch_tool,
 )
 from src.utils.enhanced_logger import get_enhanced_logger
 
@@ -142,7 +142,7 @@ async def researcher_node(
             tool_name_list.append("budget_controlled_online_search")
         # 根据开关决定是否添加交行搜索工具
         if use_budget_bocom:
-            tools.append(create_budget_controlled_bocomsearch_tool(
+            tools.append(budget_controlled_bocomsearch_tool(
                 session_id=session_id,
                 max_search_calls=researcher_limit,
                 max_tokens=max_tokens,

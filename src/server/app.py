@@ -65,7 +65,6 @@ from src.tools import VolcengineTTS
 from src.graph.checkpoint import chat_stream_message
 from src.utils.json_utils import sanitize_args
 from src.utils.enhanced_logger import get_enhanced_logger, setup_enhanced_logging
-from src.config.custom_search import get_custom_search_config
 
 logger = logging.getLogger(__name__)
 
@@ -483,16 +482,8 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
                     query = args.get("query", "")
                     repository_id = args.get("repository_id", "")
                     
-                    # Get repository name from config if available
-                    repository_name = None
-                    if repository_id:
-                        try:
-                            custom_search_config = get_custom_search_config()
-                            repo_config = custom_search_config.get_repository(repository_id)
-                            if repo_config:
-                                repository_name = repo_config.name
-                        except Exception:
-                            pass
+                    # Get repository name from repository_id
+                    repository_name = repository_id if repository_id else None
                     
                     # Track this search call
                     tool_call_id = tool_call.get("id", "")
