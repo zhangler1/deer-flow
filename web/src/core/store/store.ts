@@ -374,17 +374,26 @@ export async function sendMessage(
       }
     }
   } catch (error) {
-    const errMsg = (error as Error).message ?? "未知错误";
-    console.error("[sendMessage] Streaming error caught", {
-      error,
-      message: errMsg,
-      stack: (error as Error).stack,
-      messageId,
-      totalEventsProcessed: eventCount,
-    });
-    toast(`生成回答时出错: ${errMsg}`);
+    // 区分用户主动取消和真实错误
+    const isAborted =
+      (error instanceof DOMException && error.name === "AbortError") ||
+      (error instanceof Error && error.name === "AbortError");
+
+    if (isAborted) {
+      // 用户主动取消，不弹错误提示
+      console.info("[sendMessage] Stream aborted by user");
+    } else {
+      const errMsg = (error as Error).message ?? "未知错误";
+      console.error("[sendMessage] Streaming error caught", {
+        error,
+        message: errMsg,
+        stack: (error as Error).stack,
+        messageId,
+        totalEventsProcessed: eventCount,
+      });
+      toast(`生成回答时出错: ${errMsg}`);
+    }
     // Update message status.
-    // TODO: const isAborted = (error as Error).name === "AbortError";
     if (messageId != null) {
       const message = getMessage(messageId);
       if (message?.isStreaming) {

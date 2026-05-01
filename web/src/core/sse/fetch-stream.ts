@@ -159,7 +159,15 @@ export async function* fetchStream(
       timeSinceLastData: Date.now() - lastDataTime,
     });
 
-    // 重新抛出错误，让上层处理
+    // 用户主动取消（AbortError）不应视为错误，直接透传，不做包装
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
+
+    // 其他错误：包装后抛出
     throw new Error(
       `SSE stream interrupted: ${errorMsg}\n` +
       `Time since last data: ${Date.now() - lastDataTime}ms\n` +
