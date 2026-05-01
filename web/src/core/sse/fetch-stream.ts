@@ -150,7 +150,18 @@ export async function* fetchStream(
       }
     }
   } catch (error) {
-    // 捕获并处理读取错误
+    // 用户主动取消（AbortError）不应视为错误，静默处理
+    const isAborted =
+      (error instanceof DOMException && error.name === "AbortError") ||
+      (error instanceof Error && error.name === "AbortError");
+
+    if (isAborted) {
+      // 用户主动取消，仅 info 级别日志，不触发错误弹窗
+      console.info("[fetchStream] Stream aborted by user");
+      throw error;
+    }
+
+    // 真实错误：记录并包装
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error("[fetchStream] Stream read error", {
       error,
@@ -159,15 +170,6 @@ export async function* fetchStream(
       timeSinceLastData: Date.now() - lastDataTime,
     });
 
-    // 用户主动取消（AbortError）不应视为错误，直接透传，不做包装
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw error;
-    }
-    if (error instanceof Error && error.name === "AbortError") {
-      throw error;
-    }
-
-    // 其他错误：包装后抛出
     throw new Error(
       `SSE stream interrupted: ${errorMsg}\n` +
       `Time since last data: ${Date.now() - lastDataTime}ms\n` +
