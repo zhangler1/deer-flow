@@ -35,8 +35,8 @@ graph = build_graph()
 async def run_agent_workflow_async(
     user_input: str,
     debug: bool = False,
-    max_plan_iterations: int = 1,
-    max_step_num: int = 3,
+    max_plan_iterations: int = 2,
+    max_step_num: int = 5,
     enable_background_investigation: bool = True,
 ):
     """Run the agent workflow asynchronously with the given user input.

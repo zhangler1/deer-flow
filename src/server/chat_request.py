@@ -39,7 +39,7 @@ class ChatRequest(BaseModel):
         "__default__", description="A specific conversation identifier"
     )
     max_plan_iterations: Optional[int] = Field(
-        1, description="The maximum number of plan iterations"
+        2, description="The maximum number of plan iterations"
     )
     max_step_num: Optional[int] = Field(
         3, description="The maximum number of steps in a plan"
@@ -135,8 +135,8 @@ class SimpleResearchRequest(BaseModel):
     resources: Optional[List[Resource]] = Field([], description="资源列表")
     debug: Optional[bool] = Field(False, description="是否启用调试日志")
     thread_id: Optional[str] = Field("__default__", description="会话标识符")
-    max_plan_iterations: Optional[int] = Field(1, description="最大计划迭代次数")
-    max_step_num: Optional[int] = Field(3, description="计划中的最大步骤数")
+    max_plan_iterations: Optional[int] = Field(2, description="最大计划迭代次数")
+    max_step_num: Optional[int] = Field(5, description="计划中的最大步骤数")
     max_search_results: Optional[int] = Field(3, description="最大搜索结果数")
     max_iteration: Optional[int] = Field(5, description="迭代研究的最大迭代次数")
     search_engine: Optional[str] = Field("custom_search", description="搜索引擎 (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)")

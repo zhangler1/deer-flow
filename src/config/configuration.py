@@ -45,8 +45,8 @@ class Configuration:
     resources: list[Resource] = field(
         default_factory=list
     )  # Resources to be used for the research
-    max_plan_iterations: int = 1  # Maximum number of plan iterations
-    max_step_num: int = 3  # Maximum number of steps in a plan
+    max_plan_iterations: int = 2  # Maximum number of plan iterations
+    max_step_num: int = 5  # Maximum number of steps in a plan
     max_search_results: int = 2  # Maximum number of search results
     max_iteration: int = 5  # Maximum number of iterations for iterative research node
     search_engine: str = "custom_search"  # Search engine to use
