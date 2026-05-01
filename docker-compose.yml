@@ -1,4 +1,26 @@
 services:
+  # PostgreSQL - LangGraph Checkpoint 持久化存储
+  postgres:
+    image: postgres:16-alpine
+    container_name: deer-flow-postgres
+    environment:
+      - POSTGRES_USER=deerflow
+      - POSTGRES_PASSWORD=deerflow_password_2025
+      - POSTGRES_DB=deerflow_checkpoint
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - deer-flow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deerflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   backend:
     # build:
     #   context: .
@@ -65,6 +87,7 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
+      - postgres  # 依赖 PostgreSQL
       - frontend
       - backend
       - easyparse-1
@@ -150,3 +173,4 @@ networks:
 volumes:
   venv_data:
   shared_tmp:
+  postgres_data:  # PostgreSQL 数据持久化
