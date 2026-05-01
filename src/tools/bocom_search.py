@@ -123,6 +123,11 @@ def _parse_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
         except Exception:
             score = 0.0
 
+        # 处理 fullCategoryName：可能是 None、字符串或列表
+        raw_category = item.get("fullCategoryName") or ""
+        if isinstance(raw_category, list):
+            raw_category = "/".join(str(c) for c in raw_category if c)
+
         results.append(
             {
                 "title": title,
@@ -130,12 +135,12 @@ def _parse_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "score": score,
                 "url": item.get("url") or "",
                 "source": item.get("source") or "bocomsearch",
-                "category": item.get("fullCategoryName", ""),
-                "createTime": item.get("createTime", ""),
-                "docGuid": item.get("docGuid", ""),
-                "repository": item.get("repository", ""),
-                "attachEcmId": item.get("attachEcmId", ""),
-                "fromAttachment": bool(item.get("fromAttachment", False)),
+                "category": raw_category,
+                "createTime": item.get("createTime") or "",
+                "docGuid": item.get("docGuid") or "",
+                "repository": item.get("repository") or "",
+                "attachEcmId": item.get("attachEcmId") or "",
+                "fromAttachment": bool(item.get("fromAttachment") or False),
             }
         )
 

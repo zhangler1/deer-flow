@@ -194,22 +194,27 @@ class CustomSearchTool(BaseTool):
         api_results = rsp_body.get("result", [])
 
         for item in api_results:
+            # 处理 fullCategoryName：可能是 None、字符串或列表
+            raw_category = item.get("fullCategoryName") or ""
+            if isinstance(raw_category, list):
+                raw_category = "/".join(str(c) for c in raw_category if c)
+
             # 转换为 DeerFlow 统一的结构化格式
             result = {
                 # === 核心必需字段 ===
-                "title": item.get("title", "").strip(),
-                "content": item.get("content", "").strip() or item.get("absContent", "").strip(),
-                "score": float(item.get("score", 0)) if item.get("score") else 0.0,
+                "title": (item.get("title") or "").strip(),
+                "content": (item.get("content") or "").strip() or (item.get("absContent") or "").strip(),
+                "score": float(item.get("score") or 0) if item.get("score") else 0.0,
                 "url": item.get("url") or "",  # url可能为None
-                "source": item.get("source", ""),
+                "source": item.get("source") or "",
 
                 # === 次要可选字段 ===
-                "category": item.get("fullCategoryName", ""),
-                "createTime": item.get("createTime", ""),  # 创建时间
-                "docGuid": item.get("docGuid", ""),
-                "repository": item.get("repository", ""),
-                "attachEcmId": item.get("attachEcmId", ""),
-                "fromAttachment": bool(item.get("fromAttachment", False)),
+                "category": raw_category,
+                "createTime": item.get("createTime") or "",  # 创建时间
+                "docGuid": item.get("docGuid") or "",
+                "repository": item.get("repository") or "",
+                "attachEcmId": item.get("attachEcmId") or "",
+                "fromAttachment": bool(item.get("fromAttachment") or False),
             }
 
             # 只有当内容不为空时才添加到结果中
