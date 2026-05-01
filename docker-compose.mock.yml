@@ -16,9 +16,6 @@
 
 services:
   mock-search:
-    build:
-      context: ./middlewares/search
-      dockerfile: Dockerfile
     image: deer-flow-mock-search:latest
     container_name: deer-flow-mock-search
     # 代码热挂载：改 Mock 数据或新增数据无需重建镜像
@@ -37,8 +34,8 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8010/health',timeout=3)"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 10
+      start_period: 30s
 
   # 覆盖 backend 的搜索类环境变量，指向容器内 mock-search
   # 这里的 environment 会合并到 docker-compose.yml 的 backend 配置上，

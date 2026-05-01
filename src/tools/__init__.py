@@ -60,6 +60,7 @@ from .bocom_search import (
 )
 from .budget_controlled_search import (
     create_budget_controlled_bocomsearch_tool,
+    budget_controlled_bocomsearch_tool,
 )
 
 __all__ = [

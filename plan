@@ -1,7 +1,0 @@
-增强工具调用限制 (utils.py)
-1当前在80%时插入提示， 增加强制停止逻辑  
-
-2新增SearchBudgetManager
-跟踪搜索次数和token消耗
-提供can_search()、get_remaining_budget()接口
-在每次工具调用前检查预算

@@ -35,7 +35,7 @@ app.add_middleware(
 # ============================================================
 BOCOM_MOCK_RESULTS = [
     {
-        "question": null,
+        "question": None,
         "source": "惠民贷业务管理办法（2021年版）.ofd",
         "url": "http://mock-wiki/knowledge/huiMaiDai/001",
         "content": "一、业务定义\n惠民贷是指交行向符合准入条件的个人客户提供的消费贷款。惠民贷用途仅能用于消费，不得用于购买房产、生产经营，不得用于投资理财及法律法规禁止的其他用途。\n二、开办分行及贷款客群\n办理惠民贷年龄一般要求：男性25-57周岁，女性25-52周岁。\n三、产品要素\n授信额度：全线上申请惠民贷额度最高不超过20万元，线上线下一体化模式最高不超过80万元。",
@@ -52,10 +52,10 @@ BOCOM_MOCK_RESULTS = [
             "个人金融-消费贷款"
         ],
         "attachEcmId": "20250101001_10001_06001",
-        "fromAttachment": false
+        "fromAttachment": False
     },
     {
-        "question": null,
+        "question": None,
         "source": "交通银行信用卡业务操作规程（2024修订版）.docx",
         "url": "http://mock-wiki/knowledge/creditCard/002",
         "content": "第一章 总则\n第一条 为规范交通银行信用卡业务操作，保障持卡人权益，根据中国人民银行相关规定，制定本规程。\n第二章 申请与审批\n第二条 个人申请交通银行信用卡，须年满18周岁，具有完全民事行为能力，具备稳定的还款能力。\n第三章 额度管理\n第三条 信用卡额度由系统综合评定，普通卡起步额度一般不低于1000元，白金卡不低于10000元。",
@@ -72,10 +72,10 @@ BOCOM_MOCK_RESULTS = [
             "个人金融-信用卡"
         ],
         "attachEcmId": "20240601002_20002_06001",
-        "fromAttachment": false
+        "fromAttachment": False
     },
     {
-        "question": null,
+        "question": None,
         "source": "交通银行规章制度管理办法_交银办2023年249号.docx",
         "url": "http://mock-wiki/knowledge/regulation/003",
         "content": "第一章 总则\n第二条 本办法所称规章制度，是指本行就经营管理事项制定的具有普遍适用性和持续效力的规范性文件。\n第二章 制定权限\n第五条 总行各部门制定的规章制度，报总行相关管理部门审核后发布。",
@@ -92,10 +92,10 @@ BOCOM_MOCK_RESULTS = [
             "部门事务-公文信息"
         ],
         "attachEcmId": "20230901003_30003_06001",
-        "fromAttachment": false
+        "fromAttachment": False
     },
     {
-        "question": null,
+        "question": None,
         "source": "交通银行个人网银操作手册（V5.0）.pdf",
         "url": "http://mock-wiki/knowledge/netbank/004",
         "content": "一、登录方式\n客户可通过交通银行官网（www.bankcomm.com）或手机银行APP登录个人网银，首次登录须完成实名认证。\n二、常用功能\n账户查询：支持活期、定期、理财、基金等各类账户余额及明细查询。\n转账汇款：支持行内转账、跨行汇款及境外汇款等。\n缴费服务：支持水电燃气、通信费、有线电视等生活缴费。",
@@ -112,10 +112,10 @@ BOCOM_MOCK_RESULTS = [
             "数字金融-网银服务"
         ],
         "attachEcmId": "20240301004_40004_06001",
-        "fromAttachment": false
+        "fromAttachment": False
     },
     {
-        "question": null,
+        "question": None,
         "source": "反洗钱业务培训材料（2025年）.pptx",
         "url": "http://mock-wiki/knowledge/aml/005",
         "content": "一、反洗钱基本概念\n洗钱是指将犯罪所得及其收益通过各种手段掩饰、隐瞒其来源和性质，使其在形式上合法化的行为。\n二、金融机构反洗钱义务\n客户身份识别：开立账户时须核实客户真实身份，留存有效证件信息。\n大额交易报告：单笔人民币交易5万元以上须上报大额交易报告，发现可疑交易须及时向中国人民银行报告。\n三、违规处罚\n违反反洗钱规定的机构和个人，将依法受到行政处罚直至刑事追责。",
@@ -132,7 +132,7 @@ BOCOM_MOCK_RESULTS = [
             "合规风控-反洗钱"
         ],
         "attachEcmId": "20250120005_50005_06001",
-        "fromAttachment": false
+        "fromAttachment": False
     }
 ]
 
@@ -142,89 +142,89 @@ BOCOM_MOCK_RESULTS = [
 # ============================================================
 ONLINE_MOCK_RESULTS = [
     {
-        "question": null,
+        "question": None,
         "source": "新华财经",
         "url": "https://www.xinhua.net/finance/article/2025/bocom-profit-01.html",
         "content": "交通银行2024年年度业绩报告显示，全年实现营业收入2456亿元，同比增长3.2%，净利润912亿元，同比增长5.1%。不良贷款率较上年末下降0.05个百分点至1.28%，资产质量持续改善。零售业务客户数突破2亿户，手机银行月活用户达1.3亿。",
         "title": "交通银行2024年实现净利润912亿元 资产质量持续改善",
         "score": "0.95",
-        "docGuid": null,
+        "docGuid": None,
         "docId": "online_001",
         "repository": "online_search",
         "absContent": "交通银行2024年净利润912亿元，同比增长5.1%，不良率降至1.28%，零售客户突破2亿户。",
-        "knowType": null,
+        "knowType": None,
         "createTime": "2025-03-28 10:00:00",
-        "updateTime": null,
-        "hobbies": null,
-        "fullCategoryName": null
+        "updateTime": None,
+        "hobbies": None,
+        "fullCategoryName": None
     },
     {
-        "question": null,
+        "question": None,
         "source": "21世纪经济报道",
         "url": "https://www.21jingji.com/article/20250315/bocom-digital.html",
         "content": "近日，交通银行正式发布数字化转型三年规划（2025-2027），计划三年累计科技投入不低于600亿元。重点推进AI大模型与金融融合应用，在风控、投研、客服三大场景率先落地。交行自研金融大模型已完成内部测试，预计2025年下半年向全行推广，并加快推进核心系统云化改造。",
         "title": "交通银行发布数字化转型三年规划 三年科技投入不低于600亿元",
         "score": "0.89",
-        "docGuid": null,
+        "docGuid": None,
         "docId": "online_002",
         "repository": "online_search",
         "absContent": "交通银行发布2025-2027数字化转型规划，三年科技投入600亿元，推进AI大模型与金融场景融合。",
-        "knowType": null,
+        "knowType": None,
         "createTime": "2025-03-15 09:30:00",
-        "updateTime": null,
-        "hobbies": null,
-        "fullCategoryName": null
+        "updateTime": None,
+        "hobbies": None,
+        "fullCategoryName": None
     },
     {
-        "question": null,
+        "question": None,
         "source": "中国银行业协会官网",
         "url": "https://www.china-cba.net/news/2025/interest-rate.html",
         "content": "中国人民银行发布公告，自2025年2月20日起，1年期LPR为3.10%，5年期以上LPR为3.60%，均与上月持平。分析人士指出，货币政策保持稳中偏松基调，后续仍有适度降息空间。多家商业银行已调整住房贷款利率，首套房贷款利率最低已降至3.05%。",
         "title": "2025年2月LPR保持不变 首套房贷最低利率已降至3.05%",
         "score": "0.82",
-        "docGuid": null,
+        "docGuid": None,
         "docId": "online_003",
         "repository": "online_search",
         "absContent": "2025年2月LPR维持3.10%/3.60%不变，首套房贷最低利率已降至3.05%，市场预期年内仍有降息空间。",
-        "knowType": null,
+        "knowType": None,
         "createTime": "2025-02-20 14:00:00",
-        "updateTime": null,
-        "hobbies": null,
-        "fullCategoryName": null
+        "updateTime": None,
+        "hobbies": None,
+        "fullCategoryName": None
     },
     {
-        "question": null,
+        "question": None,
         "source": "财联社",
         "url": "https://www.cls.cn/article/2025/fintech-banking.html",
         "content": "金融科技浪潮下，银行业正加速推进智能化升级。据统计，2024年国内银行业IT投入总规模超过3500亿元，同比增长12%。人工智能相关投入占比显著提升，主要聚焦于智能客服、反欺诈风控、精准营销三大方向。头部股份制银行AI应用已覆盖80%以上的高频业务场景，智能客服分流率普遍超过60%。",
         "title": "2024年银行业IT投入超3500亿 AI应用覆盖率持续提升",
         "score": "0.76",
-        "docGuid": null,
+        "docGuid": None,
         "docId": "online_004",
         "repository": "online_search",
         "absContent": "2024年银行业IT投入超3500亿元，AI应用覆盖80%高频场景，智能客服分流率超60%。",
-        "knowType": null,
+        "knowType": None,
         "createTime": "2025-01-18 16:00:00",
-        "updateTime": null,
-        "hobbies": null,
-        "fullCategoryName": null
+        "updateTime": None,
+        "hobbies": None,
+        "fullCategoryName": None
     },
     {
-        "question": null,
+        "question": None,
         "source": "证券时报",
         "url": "https://www.stcn.com/article/2025/personal-loan-policy.html",
         "content": "国家金融监督管理总局近日发布个人消费贷款业务监管指引，进一步规范消费信贷市场秩序。指引明确，消费贷款不得流入房市、股市，金融机构须加强贷款资金用途管控，建立资金流向监测机制。同时要求，消费贷款期限原则上不超过5年，年化利率须在贷款合同中明确披露。",
         "title": "金监总局发布消费贷款监管新规 贷款期限原则上不超过5年",
         "score": "0.71",
-        "docGuid": null,
+        "docGuid": None,
         "docId": "online_005",
         "repository": "online_search",
         "absContent": "金监总局新规要求消费贷款期限不超5年，不得流入房市股市，须建立资金流向监测机制。",
-        "knowType": null,
+        "knowType": None,
         "createTime": "2025-02-05 11:00:00",
-        "updateTime": null,
-        "hobbies": null,
-        "fullCategoryName": null
+        "updateTime": None,
+        "hobbies": None,
+        "fullCategoryName": None
     }
 ]
 

@@ -57,19 +57,21 @@ SERVICES = {
 
 def start_service(name: str, cfg: dict) -> subprocess.Popen:
     cmd = [
-        sys.executable, "-m", "uvicorn",
+        sys.executable, "-u", "-m", "uvicorn",   # -u 强制无缓冲
         cfg["module"],
         "--host", "0.0.0.0",
         "--port", str(cfg["port"]),
         "--reload",
+        "--log-level", "info",
     ]
-    print(f"  ▶  [{name}] 端口 {cfg['port']}  {cfg['desc']}")
+    print(f"  ▶  [{name}] 端口 {cfg['port']}  {cfg['desc']}", flush=True)
+    # 子进程直接继承父进程 stdout/stderr，日志实时进入 docker logs
+    env = {**os.environ, "PYTHONUNBUFFERED": "1"}
     proc = subprocess.Popen(
         cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
+        stdout=None,   # 继承父进程 stdout
+        stderr=None,   # 继承父进程 stderr
+        env=env,
     )
     return proc
 
@@ -92,40 +94,32 @@ def main():
         processes[name] = start_service(name, cfg)
         time.sleep(0.3)  # 错开启动时间，避免端口竞争
 
-    print(f"\n✅ 已启动 {len(processes)} 个服务，Ctrl+C 停止所有服务\n")
+    print(f"\n✅ 已启动 {len(processes)} 个服务，Ctrl+C 停止所有服务\n", flush=True)
 
     def shutdown(sig, frame):
-        print("\n[停止] 正在关闭所有 Mock 服务...")
+        print("\n[停止] 正在关闭所有 Mock 服务...", flush=True)
         for name, proc in processes.items():
             proc.terminate()
-            print(f"  ✕  [{name}] 已停止")
+            print(f"  ✕  [{name}] 已停止", flush=True)
         sys.exit(0)
 
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    # 主循环：转发所有子进程的输出
-    import select
-    fds = {proc.stdout.fileno(): name for name, proc in processes.items()}
+    # 主循环：子进程日志已直接继承到父进程 stdout，
+    # 这里只需周期性检查子进程存活状态
     while True:
-        try:
-            readable, _, _ = select.select(list(fds.keys()), [], [], 1.0)
-            for fd in readable:
-                name = fds[fd]
-                line = processes[name].stdout.readline()
-                if line:
-                    print(f"[{name}] {line}", end="")
-        except Exception:
-            pass
-
-        # 检查是否有子进程意外退出
+        time.sleep(2)
         for name, proc in list(processes.items()):
             if proc.poll() is not None:
-                print(f"\n⚠️  [{name}] 意外退出（代码 {proc.returncode}），请检查日志")
+                print(
+                    f"\n⚠️  [{name}] 意外退出（代码 {proc.returncode}），请检查日志",
+                    flush=True,
+                )
                 processes.pop(name)
 
         if not processes:
-            print("所有服务均已退出，启动器退出。")
+            print("所有服务均已退出，启动器退出。", flush=True)
             break
 
 

@@ -11,11 +11,17 @@ WORKDIR /app
 # 设置 pip 源加速（如果在外网可选注释）
 ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
+# 关键：强制 Python 无缓冲输出，否则 docker logs 看不到 uvicorn 日志
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=UTF-8
+
 # 先装依赖，利用 Docker 层缓存
+# 注意：uvicorn[standard] 自带 watchfiles/httptools/websockets，--reload 必需
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir \
     "fastapi>=0.116.1" \
-    "uvicorn>=0.35.0" \
+    "uvicorn[standard]>=0.35.0" \
+    "watchfiles>=0.21.0" \
     "python-multipart>=0.0.6" \
     "pydantic>=2.11.9"
 
@@ -26,7 +32,8 @@ COPY . /app
 EXPOSE 8010 8011 8012 8013
 
 # 健康检查（仅看 8010 主搜索接口）
-HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=10s \
+# start_period 给 30s，让 4 个 uvicorn 子进程都起来
+HEALTHCHECK --interval=10s --timeout=5s --retries=10 --start-period=30s \
     CMD python -c "import urllib.request,sys;\
 urllib.request.urlopen('http://localhost:8010/health',timeout=3);sys.exit(0)" || exit 1
 

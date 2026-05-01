@@ -706,17 +706,15 @@ async def _astream_workflow_generator(
 
     checkpoint_saver = get_bool_env("LANGGRAPH_CHECKPOINT_SAVER", False)
     checkpoint_url = get_str_env("LANGGRAPH_CHECKPOINT_DB_URL", "")
-    # Handle checkpointer if configured
-    connection_kwargs = {
-        "autocommit": True,
-        "row_factory": "dict_row",
-        "prepare_threshold": 0,
-    }
+    # 注：新版 langgraph-checkpoint-postgres 的 from_conn_string() 不再接受
+    # psycopg 级别的 kwargs（如 autocommit / row_factory / prepare_threshold），
+    # 内部已自动启用 autocommit=True。如需自定义连接参数，
+    # 请改用 AsyncConnectionPool + AsyncPostgresSaver(pool)。
     if checkpoint_saver and checkpoint_url != "":
         if checkpoint_url.startswith("postgresql://"):
             logger.info("start async postgres checkpointer.")
             async with AsyncPostgresSaver.from_conn_string(
-                checkpoint_url, **connection_kwargs
+                checkpoint_url
             ) as checkpointer:
                 await checkpointer.setup()
                 graph.checkpointer = checkpointer

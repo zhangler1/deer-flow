@@ -114,7 +114,9 @@ services:
       - shared_tmp:/tmp/shared_all
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/docs"]
+      # 改为 TCP 端口探测，不依赖具体 HTTP 路径
+      # （原 /docs 返回 404 导致 curl -f 失败）
+      test: ["CMD-SHELL", "python -c \"import socket,sys;s=socket.socket();s.settimeout(3);s.connect(('127.0.0.1',5000));s.close()\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -147,7 +149,8 @@ services:
       - shared_tmp:/tmp/shared_all
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/docs"]
+      # 改为 TCP 端口探测，不依赖具体 HTTP 路径
+      test: ["CMD-SHELL", "python -c \"import socket,sys;s=socket.socket();s.settimeout(3);s.connect(('127.0.0.1',5000));s.close()\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
