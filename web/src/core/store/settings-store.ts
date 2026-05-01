@@ -12,8 +12,8 @@ const DEFAULT_SETTINGS: SettingsState = {
     autoAcceptedPlan: false,
     enableDeepThinking: false,
     enableBackgroundInvestigation: true,  // 默认开启背景调研
-    maxPlanIterations: 1,
-    maxStepNum: 3,
+    maxPlanIterations: 2,
+    maxStepNum: 5,
     maxSearchResults: 2,
     searchEngine: "custom_search",
     useBudgetControlledOnlineSearch: true,  // 默认使用budget控制的在线检索

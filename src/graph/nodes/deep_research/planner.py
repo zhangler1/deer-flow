@@ -204,6 +204,24 @@ def planner_node(
     )
 
 
+def _serialize_current_plan(current_plan) -> str:
+    """将 current_plan 序列化为可读字符串，供 LLM 消费"""
+    if current_plan is None:
+        return ""
+    # Plan 对象
+    if hasattr(current_plan, 'model_dump'):
+        import json
+        return json.dumps(current_plan.model_dump(), ensure_ascii=False, indent=2)
+    # 字符串（可能是 JSON）
+    if isinstance(current_plan, str):
+        return current_plan
+    # dict
+    if isinstance(current_plan, dict):
+        import json
+        return json.dumps(current_plan, ensure_ascii=False, indent=2)
+    return str(current_plan)
+
+
 def human_feedback_node(
     state,
 ) -> Command[Literal["planner", "research_team", "reporter", "__end__"]]:
@@ -215,10 +233,26 @@ def human_feedback_node(
         feedback = interrupt("Please Review the Plan.")
 
         if feedback and str(feedback).upper().startswith("[EDIT_PLAN]"):
+            # 提取用户的实际修改意见（去掉协议前缀）
+            user_feedback = str(feedback)
+            # 尝试提取 [edit_plan] 之后的用户输入
+            import re
+            match = re.match(r'\[edit_plan\]\s*(.*)', user_feedback, re.IGNORECASE | re.DOTALL)
+            edit_instruction = match.group(1).strip() if match else user_feedback
+
+            # 将当前计划和用户修改意见一起注入 messages，确保 planner 能感知
+            plan_content = _serialize_current_plan(current_plan)
+            feedback_content = (
+                "用户要求修改研究计划，请根据以下修改意见调整计划。\n\n"
+                f"【当前研究计划】\n{plan_content}\n\n"
+                f"【用户修改意见】\n{edit_instruction}"
+            )
+            enhanced_logger.logger.info(f"📝 EDIT_PLAN_FEEDBACK | 用户修改意见: {edit_instruction[:200]}")
+
             return Command(
                 update={
                     "messages": [
-                        HumanMessage(content=feedback, name="feedback"),
+                        HumanMessage(content=feedback_content, name="feedback"),
                     ],
                 },
                 goto="planner",
