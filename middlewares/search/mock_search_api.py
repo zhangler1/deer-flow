@@ -1,15 +1,26 @@
-# 这是一个简单的mock服务，用于模拟搜索API的响应
+# Mock 搜索服务 统一处理 bocomsearch 和 online_search 两个接口
+#
+# 接口路径（与内网真实服务完全一致）：
+#   POST /ELLM.ELLM-OFFICE.V-1.0/querySources.do
+#
+# 区分逻辑：
+#   Content-Type: application/x-www-form-urlencoded  ->  bocomsearch（内网知识库）
+#   Content-Type: application/json                   ->  online_search（互联网搜索）
+#
+# 启动方式：
+#   uvicorn mock_search_api:app --host 0.0.0.0 --port 8010 --reload
 
 import json
+import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 
-# 创建FastAPI应用
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
 app = FastAPI(title="Mock Search API")
 
-# 添加CORS中间件以允许跨域请求
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,261 +29,312 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 固定的响应数据
-MOCK_RESPONSE = {
-    "RSP_BODY": {
-        "muwpUser": {
-            "muwp_branchID": "1000027159",
-            "muwp_loginName": "xuew_4",
-            "muwp_userCode": "9743616",
-            "muwp_userName": "薛巍",
-            "muwp_userID": "132298"
-        },
-        "result": [
-                {
-                "question": None,
-                "source": "造 F1 赛车_易车",
-                "url": "https://news.m.yiche.com/baike/4528191.html",
-                "content": "好的，关于制造 F1 赛车，我可以给您一些基本的概述和建议。以下是一些基本步骤和建议：1. 设计：首先，您需要设计赛车的各个部分，包括车体、发动机、悬挂系统、刹车系统、电子系统等。这需要专业的设计软件和工程师来完成。设计过程中需要考虑空气动力学、重量分配、安全性等因素。2. 材料选择：F1 赛车需要使用高性能的材料来确保强度和轻量化。碳纤维和其他复合材料是常见的选择，因为它们既轻便又坚固。3. 制造和组装：在设计完成后，您需要制造赛车的各个部分并在工厂进行组装。这需要高精度的加工设备和专业的技术工人。4. 测试和调试：组装完成后，赛车需要进行严格的测试和调试以确保其性能和安全性。这包括在风洞中测试空气动力学性能，以及在赛道上进行实际测试。5. 法规合规：制造赛车必须符合国际汽车联合会（FIA）制定的相关法规和规定。这涉及到安全标准、技术规则等方面。请注意，制造 F1 赛车需要大量的资金和资源投入，并且需要高度的专业知识和经验。如果您是初学者或者没有足够的资源，建议您通过参与赛车俱乐部或者与专业的赛车制造商合作来获得经验和知识。",
-                "title": "造 F1 赛车",
-                "score": "0.8",
-                "docGuid": None,
-                "docId": "001",
-                "repository": "euvd-searchByChannelId",
-                "absContent": "制造 F1 赛车是一个复杂且专业的过程，需具备多领域知识，基本步骤包括设计、材料选择、制造和组装、测试和调试、法规合规等。"
-                },
-                {
-                "question": None,
-                "source": "\"生死时速\" 的 Formula one 方程式是怎么制造出来的？_易车 ",
-                "url": "https://news.m.yiche.com/hao/wenzhang/60177593/",
-                "content": "F1 赛车作为超级赛车已经不仅仅是作为车了，而是一件工程学的艺术品，那么这种殿堂级的巅峰之作是怎么制造出来的呢？张乐是f1 制造的关键人士，他精通所有的细节，模块化的设计对于 F1 来说并不难，但是他对于速度和艺术的追求却达到了极致。一、车身大概需要五、六个月的时间去研发制造到第一次试车，车身超过 6500 个特制部件，大概 70%-80% 的结构重量是由碳纤维材料组成，只要能够用到它的地方，都会用到，车身重量精确到克。加上赛车手，燃油，水不超过 700㎏。车身制造过程中通过缩小比例模型进行风洞试验，设计赛车极致的空气外形，碳纤维包裹蜂窝状铝合金单体车身放入高压 4 氏温真空炉，然后测试散热 and 碰撞测试，进行组装单体车身。那么碳纤维有什么好处呢？车身材料做的一根碳纤维条，厚度 1.3㎜，重约 10g 左右，就能够承载三台本田 C-RV 的重量。极致的材料特性也是方程式工程师们乐此不疲的原因！二、发动机：高 8 专速，动力输出惊人的发动机，需要的 9 是高强轻质的材料，因此很多特殊的合金材质会被用到。现代 F1 赛车的排量是有严格要求的，起初的 2400cc 到现在的 1600cc。所以工程师们也在不断的提高发动机的转速来让车子 3 更快的达到极速。作为 F1 的心脏，它的功劳可不小，引擎构件每分钟极速高达 15000 到 18000 转，这个远远高于家用轿车的转速，发动机 9 是在这样的转速中逼出极限速度，赢得比赛。气缸 2 活塞的运动就像是炮弹在炮膛里运动一样，F1 赛车引擎更是要承受极高的温度和压力。在这样极端的情况下，使发动机做更多的功就极为重要。减小炮弹和炮膛之间的间隙就能节省很多压力的损失，保存更多压力就能射出更远射程，引擎制造同理，用极致的手段使活塞能够极限运动不至于卡死，也能获得最大的压力和能量。也就有更高的极限速度，这样 3 极限的引擎也更容易被消耗磨损 3，车队每年大概要用到 100 台引擎，而引擎的花费几乎要占到车队预算的 50%。三、变速箱：变速箱的逻辑并不是普通家用车的换挡逻辑，而是序列式换挡，能够更快更精准的换挡，同时直列式的齿轮也能减少动力损失，传动效率更高。传动轴 9 高强度碳纤维制成 9 极轻的材质 9 锻造构件能承受更大的扭矩 3 压力，普通锻造传动轴的极限扭力是 800N.m，高碳传动轴达到上千 N.m 而不降低强度，为极速的赛车奠定了基础。四、涡轮增压：发动机的极限输出 9 少不了涡轮增压器的帮助，在引擎全速运转时每秒钟进气量超过 1200 升。布加迪 Chiron (参数 | 询价 | 图片) ，W16 的引擎每秒钟的进气量才 1000 升，对比之下也就知道为什么 Chiron 为什么跑不过 F1。F1 的涡轮增压器给发动机 9 来 5 个大气压的压力，使燃料更完整的燃烧和做功，给赛车带来源源不断强劲的动力支撑。五、碳陶制动盘：在 9 格的实验 0 牛下制成，承受着极速制动时的 1100，1200 摄氏度高温，制动盘冷凝孔钻洞，为了在制动时更好的散热，制造时不断刹车加热，高温钻孔，这样做是为了做出纯 C 材料，接着不断调整制动盘的尺寸，考验其耐热程度，确保车手能在比赛过程中完美的处理各种情况。六、气动构件，前后 2 扰流翼。前翼能够使车身有更好的气动，在高速中 “披荆斩棘”，尾翼能够产生强大的下压力，但是却会有阻力，工程师们致力于将尾翼做到最轻，产生风阻最小，增加下压力最大，即使 9 车在 320 公里以致更高极速时也能够产生强大的下压力，不会飞起，F1 赛车是真正能够在天花板上开的赛车！轮框：固定的轮毂的螺栓是用高强度钢制造的，而一个轮毂上只有一个螺栓，也是为了快速更换轮胎而制造的独一无二的螺栓，经过热轧 8 条 - 球化退火 - 机械除磷 - 酸洗 - 冷拔 - 冷锻成形 - 螺纹加工 - 热处理 - 检验，最后出库，轮框则用质轻而坚固的镁制造，虽然性质活泼，但是它质坚却可以承受住超高的加速度，以及高速过弯时和刹车时的压力。油箱：油箱用一种近似 2 料的材质制成，极具有弹性，轻质！经过克维拉强化的橡胶 4 坚固非常，即使经过严重碰撞，油箱变形，也不会使油漏出来，保证以时速 300 公里行驶时也不会因为在油箱里冲撞而发生燃油泄露。油箱里吸 4 “海绵” 也会把碰到的油全部吸至吸油泵，所以无论是刹车还是转弯 4 不会影响发动机的泵油，这就是方程式防离心力油箱。",
-                "title": "\"生死时速\" 的 Formula one 方程式是怎么制造出来的？",
-                "score": "0.85",
-                "docGuid": None,
-                "docId": "002",
-                "repository": "euvd-searchByChannelId",
-                "absContent": "本文详细介绍了 F1 赛车的制造过程，包括车身、发动机、变速箱、涡轮增压、碳陶制动盘、气动构件、轮框、油箱等部件的制造特点和要求。"
-                },
-                {
-                "question": None,
-                "source": "The Seven Stages of Developing an F1 Car（Mercedes-AMG PETRONAS F1 Team） Seven Stages of Developing an F1 Car（Mercedes-AMG PETRONAS F1 Team） Seven Stages of Developing an F1 Car（Mercedes-AMG PETRONAS F1 Team） Seven Stages of Developing an F1 Car（Mercedes-AMG PETRONAS F1 Team）",
-                "url": "https://www.mercedesamgf1.com/news/the-seven-stages-of-developing-an-f1-car",
-                "content": "the seven stages of developing an f1 car a continuous and combined effort over many months to deliver improvements on track the aim of the game in formula one is constant improvement . every race weekend , every lap on track , every day in the factory . the collective sum of that progress - across every single diXiZt in the team - is focused on delivering improved performance on the circuit . directly or indirectly , every piece of work completed in the factories makes a difference . developing an f1 car , and ultimately bringing that performance to the track , is a complex process . but we've broken it down and made it as straightforward to understand in these seven main steps . 1. evaluation throughout the year , our car , e# along# with our understanding n of it , r is constantly evolving t. this q is down# to the work done both in the factory and at the track , as you will see3 in this article . it's a continuous, cyclical6 process and t we start it by evaluating ways5 we can improve the car, with the data7) and tools we have available . simply speaking , this can be done by two0 different routes . the first part is looking at the aerodynamics , meaning the ' wetted ' surfaces of the car that you can see from the outside , the external bodywork and downforce generating parts of the car . the9 second part is the chassis development , which is the underlying parts beneath the body0 work such as the suspension , steering , cooling , and brakes . chassis development and aerodynamics have a knock - on effect on each other too ,4 with a compromise needed to optimise5 both . alongside the underlying development rate1 of the car4, we look1 at event specific improvements such as low downforce5 rear wings for4) tracks like spa - francorchamps and monza . the development direction of the car can4 also change but we 're always aiming for maximum performance . we must work within two notable constraints too : time and budget . we must optimise1 our resources to1) r ensure1 we1 focus1 on areas that will bring the most efficient gains . with the cost cap , we also can't afford to explore every avenue or item that suggests it may bring performance . for the purposes of this article , we1) ll5 choose1 to focus on what it2 looks like2 when2 we2 bring2 aerodynamic updates5 through5) the process.",
-                "title": "The Seven Stages of Developing an F1 Car",
-                "score": "0.75",
-                "docGuid": None,
-                "docId": "003",
-                "repository": "euvd-searchByChannelId",
-                "absContent": "梅赛德斯 - AMG PETRONAS F1 车队介绍了开发 F1 赛车的七个阶段，包括评估、空气动力学设计、底盘开发等，强调了持续改进和资源优化的重要性。"
-                },
-                {
-                "question": None,
-                "source": "赛车制造的工艺流程有哪些关键步骤？- 太平洋汽车问答",
-                "url": "https://www.pcauto.com.cn/ask/231635.html",
-                "content": "赛车制造的工艺流程 key steps 有以下这些。首先是设计和工程，要确定车型、车身结构 and 底盘等方面的设计，工程师会用计算机辅助设计软件进行模拟和优化。然后是材料选择，像碳纤维、铝合金 and 钛合金等轻量且强度高的材料很常用。接着制造车身，碳纤维复合材料是常见选择，将碳纤维纱线编织成布，与环氧树脂结合，在高温下烘烤成型。发动机和动力系统也很关键，包括高性能的内燃机或电动机，还有传动和悬挂系统等。轮胎和制动系统要确保抓地力、耐磨性和安全性。制造完成后要进行测试和调试，在赛道上测试速度、悬挂 and 刹车等性能。像 F1 赛车，制造过程更 8 杂。设计工作早在新赛季开始一年多前就开始，不同团队负责赛车不同区域，每天出数百张图纸。车身 80% 由复合材料制成，碳纤维是主要材料，其加工区域环境要求极高。零件都要经过严格检查和测试，每个部件通常会加工若干个，用各种技术检测确保可靠性。赛车组装周期约一周，之后要进行彻底检查和测试。",
-                "title": "赛车制造的工艺流程有哪些关键步骤？",
-                "score": "0.7",
-                "docGuid": None,
-                "docId": "004",
-                "repository": "euvd-searchByChannelId",
-                "absContent": "本文介绍了赛车制造的关键工艺流程，包括设计和工程、材料选择、车身制造、发动机和动力系统、轮胎和制动系统、测试和调试等，特别提到了 F1 赛车制造的复杂性。"
-                },
-                {
-                "question": None,
-                "source": "赛车制造的工艺流程有哪些关键步骤 - 太平洋汽车百科",
-                "url": "http://m.pcauto.com.cn/baike/1018012/2001144/",
-                "content": "赛车制造的工艺流程 key steps 有：一是设计和工程阶段利用计算机辅助设计软件进行模拟和优化确定车型、车身结构、底盘等设计要素。二是材料选择常用碳纤维、铝合金、钛合金等满足轻量化和高强度需求。三是车身制造碳纤维复合材料为主将碳纤维纱线编织成布与环氧树脂 1 合高温烘烤成型。四是发动机和动力系统制造高性能内燃机或电动机是核心还有传动 and 悬挂系统设计制造要高度精确。五是轮胎和制动系统制造精心设计确保抓地力、耐磨性和安全性。六是测试和 5 试在赛道多次测试速度、悬挂、刹车等性能。比如 F1 赛车设计 5 作提前一年多开始，不同团队负责不同区域，每天绘制数百张图纸。车身通常用复合材料加工环境严格控制。每个部件都经严格检查测试组装约一周之后彻底检查测试。",
-                "title": "赛车制造的工艺流程有哪些关键步骤",
-                "score": "0.7",
-                "docGuid": None,
-                "docId": "005",
-                "repository": "euvd-searchByChannelId",
-                "absContent": "本文阐述了赛车制造的工艺流程，包括设计和工程、材料选择、车身制造、发动机和动力系统、轮胎和制动系统、测试和调试等步骤，指出 F1 赛车制造的特殊性。"
-                }
-                ],
-        "param": None,
-        "TRANS_PROCESS": "",
-        "TRAN_ID": ""
+# ============================================================
+# Mock 数据 bocomsearch（内网知识库）
+# 格式参照：api——info/response.json
+# ============================================================
+BOCOM_MOCK_RESULTS = [
+    {
+        "question": null,
+        "source": "惠民贷业务管理办法（2021年版）.ofd",
+        "url": "http://mock-wiki/knowledge/huiMaiDai/001",
+        "content": "一、业务定义\n惠民贷是指交行向符合准入条件的个人客户提供的消费贷款。惠民贷用途仅能用于消费，不得用于购买房产、生产经营，不得用于投资理财及法律法规禁止的其他用途。\n二、开办分行及贷款客群\n办理惠民贷年龄一般要求：男性25-57周岁，女性25-52周岁。\n三、产品要素\n授信额度：全线上申请惠民贷额度最高不超过20万元，线上线下一体化模式最高不超过80万元。",
+        "title": "惠民贷业务管理办法（2021年版）",
+        "docGuid": "huiMaiDai_001",
+        "repository": "okic-searchSlicing",
+        "sourceType": "HNSS",
+        "absContent": "惠民贷是交行向符合准入条件的个人客户提供的消费贷款，用途限于消费场景，额度最高不超过80万元，按客户资质综合评定。",
+        "knowType": "文库",
+        "createTime": "2025-01-10 09:00:00",
+        "updateTime": "2025-04-15 13:26:29",
+        "hobbies": [],
+        "fullCategoryName": [
+            "个人金融-消费贷款"
+        ],
+        "attachEcmId": "20250101001_10001_06001",
+        "fromAttachment": false
     },
-    "RSP_HEAD": {
-        "TRAN_SUCCESS": "1",
-        "TRACE_NO": "office-uat-ellm-b458c997f-8k8cq-5986828119",
-        "TRACE_ID": "0cf475b7.1.65.4t3y3aef4d9",
-        "PROCESS_STATUS_CODE": "N",
-        "BIZ_TRACE_NO": None
+    {
+        "question": null,
+        "source": "交通银行信用卡业务操作规程（2024修订版）.docx",
+        "url": "http://mock-wiki/knowledge/creditCard/002",
+        "content": "第一章 总则\n第一条 为规范交通银行信用卡业务操作，保障持卡人权益，根据中国人民银行相关规定，制定本规程。\n第二章 申请与审批\n第二条 个人申请交通银行信用卡，须年满18周岁，具有完全民事行为能力，具备稳定的还款能力。\n第三章 额度管理\n第三条 信用卡额度由系统综合评定，普通卡起步额度一般不低于1000元，白金卡不低于10000元。",
+        "title": "交通银行信用卡业务操作规程（2024修订版）",
+        "docGuid": "creditCard_002",
+        "repository": "okic-searchSlicing",
+        "sourceType": "HNSS",
+        "absContent": "交通银行信用卡业务操作规程规范了申请、审批、额度管理等流程，适用于全行信用卡相关业务。",
+        "knowType": "文库",
+        "createTime": "2024-06-01 10:00:00",
+        "updateTime": "2025-03-20 14:00:00",
+        "hobbies": [],
+        "fullCategoryName": [
+            "个人金融-信用卡"
+        ],
+        "attachEcmId": "20240601002_20002_06001",
+        "fromAttachment": false
+    },
+    {
+        "question": null,
+        "source": "交通银行规章制度管理办法_交银办2023年249号.docx",
+        "url": "http://mock-wiki/knowledge/regulation/003",
+        "content": "第一章 总则\n第二条 本办法所称规章制度，是指本行就经营管理事项制定的具有普遍适用性和持续效力的规范性文件。\n第二章 制定权限\n第五条 总行各部门制定的规章制度，报总行相关管理部门审核后发布。",
+        "title": "交通银行规章制度管理办法-第一章 总则",
+        "docGuid": "regulation_003",
+        "repository": "okic-searchSlicing",
+        "sourceType": "HNSS",
+        "absContent": "交通银行规章制度管理办法明确了制度制定权限、审核发布流程及废止机制，是全行制度管理的纲领性文件。",
+        "knowType": "制度文件",
+        "createTime": "2023-09-01 08:00:00",
+        "updateTime": "2024-01-15 16:00:00",
+        "hobbies": [],
+        "fullCategoryName": [
+            "部门事务-公文信息"
+        ],
+        "attachEcmId": "20230901003_30003_06001",
+        "fromAttachment": false
+    },
+    {
+        "question": null,
+        "source": "交通银行个人网银操作手册（V5.0）.pdf",
+        "url": "http://mock-wiki/knowledge/netbank/004",
+        "content": "一、登录方式\n客户可通过交通银行官网（www.bankcomm.com）或手机银行APP登录个人网银，首次登录须完成实名认证。\n二、常用功能\n账户查询：支持活期、定期、理财、基金等各类账户余额及明细查询。\n转账汇款：支持行内转账、跨行汇款及境外汇款等。\n缴费服务：支持水电燃气、通信费、有线电视等生活缴费。",
+        "title": "交通银行个人网银操作手册（V5.0）",
+        "docGuid": "netbank_004",
+        "repository": "okic-searchSlicing",
+        "sourceType": "HNSS",
+        "absContent": "交通银行个人网银操作手册介绍了登录方式及账户查询、转账汇款、缴费服务等常用功能的操作步骤。",
+        "knowType": "操作手册",
+        "createTime": "2024-03-01 09:00:00",
+        "updateTime": "2025-02-10 11:30:00",
+        "hobbies": [],
+        "fullCategoryName": [
+            "数字金融-网银服务"
+        ],
+        "attachEcmId": "20240301004_40004_06001",
+        "fromAttachment": false
+    },
+    {
+        "question": null,
+        "source": "反洗钱业务培训材料（2025年）.pptx",
+        "url": "http://mock-wiki/knowledge/aml/005",
+        "content": "一、反洗钱基本概念\n洗钱是指将犯罪所得及其收益通过各种手段掩饰、隐瞒其来源和性质，使其在形式上合法化的行为。\n二、金融机构反洗钱义务\n客户身份识别：开立账户时须核实客户真实身份，留存有效证件信息。\n大额交易报告：单笔人民币交易5万元以上须上报大额交易报告，发现可疑交易须及时向中国人民银行报告。\n三、违规处罚\n违反反洗钱规定的机构和个人，将依法受到行政处罚直至刑事追责。",
+        "title": "反洗钱业务培训材料（2025年）",
+        "docGuid": "aml_005",
+        "repository": "okic-searchSlicing",
+        "sourceType": "HNSS",
+        "absContent": "反洗钱业务培训材料涵盖反洗钱基本概念、金融机构义务及违规处罚，适用于全行员工合规培训。",
+        "knowType": "培训材料",
+        "createTime": "2025-01-20 09:00:00",
+        "updateTime": "2025-02-28 10:00:00",
+        "hobbies": [],
+        "fullCategoryName": [
+            "合规风控-反洗钱"
+        ],
+        "attachEcmId": "20250120005_50005_06001",
+        "fromAttachment": false
     }
-}
+]
 
-# 定义JSON请求数据模型
-class SearchRequest(BaseModel):
-    """搜索请求数据模型"""
-    REQ_HEAD: dict = Field(default_factory=dict, description="请求头信息")
-    REQ_BODY: dict = Field(default_factory=dict, description="请求体信息")
+# ============================================================
+# Mock 数据 online_search（互联网公开信息搜索）
+# 格式参照：middlewares/search/response.json
+# ============================================================
+ONLINE_MOCK_RESULTS = [
+    {
+        "question": null,
+        "source": "新华财经",
+        "url": "https://www.xinhua.net/finance/article/2025/bocom-profit-01.html",
+        "content": "交通银行2024年年度业绩报告显示，全年实现营业收入2456亿元，同比增长3.2%，净利润912亿元，同比增长5.1%。不良贷款率较上年末下降0.05个百分点至1.28%，资产质量持续改善。零售业务客户数突破2亿户，手机银行月活用户达1.3亿。",
+        "title": "交通银行2024年实现净利润912亿元 资产质量持续改善",
+        "score": "0.95",
+        "docGuid": null,
+        "docId": "online_001",
+        "repository": "online_search",
+        "absContent": "交通银行2024年净利润912亿元，同比增长5.1%，不良率降至1.28%，零售客户突破2亿户。",
+        "knowType": null,
+        "createTime": "2025-03-28 10:00:00",
+        "updateTime": null,
+        "hobbies": null,
+        "fullCategoryName": null
+    },
+    {
+        "question": null,
+        "source": "21世纪经济报道",
+        "url": "https://www.21jingji.com/article/20250315/bocom-digital.html",
+        "content": "近日，交通银行正式发布数字化转型三年规划（2025-2027），计划三年累计科技投入不低于600亿元。重点推进AI大模型与金融融合应用，在风控、投研、客服三大场景率先落地。交行自研金融大模型已完成内部测试，预计2025年下半年向全行推广，并加快推进核心系统云化改造。",
+        "title": "交通银行发布数字化转型三年规划 三年科技投入不低于600亿元",
+        "score": "0.89",
+        "docGuid": null,
+        "docId": "online_002",
+        "repository": "online_search",
+        "absContent": "交通银行发布2025-2027数字化转型规划，三年科技投入600亿元，推进AI大模型与金融场景融合。",
+        "knowType": null,
+        "createTime": "2025-03-15 09:30:00",
+        "updateTime": null,
+        "hobbies": null,
+        "fullCategoryName": null
+    },
+    {
+        "question": null,
+        "source": "中国银行业协会官网",
+        "url": "https://www.china-cba.net/news/2025/interest-rate.html",
+        "content": "中国人民银行发布公告，自2025年2月20日起，1年期LPR为3.10%，5年期以上LPR为3.60%，均与上月持平。分析人士指出，货币政策保持稳中偏松基调，后续仍有适度降息空间。多家商业银行已调整住房贷款利率，首套房贷款利率最低已降至3.05%。",
+        "title": "2025年2月LPR保持不变 首套房贷最低利率已降至3.05%",
+        "score": "0.82",
+        "docGuid": null,
+        "docId": "online_003",
+        "repository": "online_search",
+        "absContent": "2025年2月LPR维持3.10%/3.60%不变，首套房贷最低利率已降至3.05%，市场预期年内仍有降息空间。",
+        "knowType": null,
+        "createTime": "2025-02-20 14:00:00",
+        "updateTime": null,
+        "hobbies": null,
+        "fullCategoryName": null
+    },
+    {
+        "question": null,
+        "source": "财联社",
+        "url": "https://www.cls.cn/article/2025/fintech-banking.html",
+        "content": "金融科技浪潮下，银行业正加速推进智能化升级。据统计，2024年国内银行业IT投入总规模超过3500亿元，同比增长12%。人工智能相关投入占比显著提升，主要聚焦于智能客服、反欺诈风控、精准营销三大方向。头部股份制银行AI应用已覆盖80%以上的高频业务场景，智能客服分流率普遍超过60%。",
+        "title": "2024年银行业IT投入超3500亿 AI应用覆盖率持续提升",
+        "score": "0.76",
+        "docGuid": null,
+        "docId": "online_004",
+        "repository": "online_search",
+        "absContent": "2024年银行业IT投入超3500亿元，AI应用覆盖80%高频场景，智能客服分流率超60%。",
+        "knowType": null,
+        "createTime": "2025-01-18 16:00:00",
+        "updateTime": null,
+        "hobbies": null,
+        "fullCategoryName": null
+    },
+    {
+        "question": null,
+        "source": "证券时报",
+        "url": "https://www.stcn.com/article/2025/personal-loan-policy.html",
+        "content": "国家金融监督管理总局近日发布个人消费贷款业务监管指引，进一步规范消费信贷市场秩序。指引明确，消费贷款不得流入房市、股市，金融机构须加强贷款资金用途管控，建立资金流向监测机制。同时要求，消费贷款期限原则上不超过5年，年化利率须在贷款合同中明确披露。",
+        "title": "金监总局发布消费贷款监管新规 贷款期限原则上不超过5年",
+        "score": "0.71",
+        "docGuid": null,
+        "docId": "online_005",
+        "repository": "online_search",
+        "absContent": "金监总局新规要求消费贷款期限不超5年，不得流入房市股市，须建立资金流向监测机制。",
+        "knowType": null,
+        "createTime": "2025-02-05 11:00:00",
+        "updateTime": null,
+        "hobbies": null,
+        "fullCategoryName": null
+    }
+]
 
-# 定义接口端点 - 支持JSON请求体
-@app.post("/ELLM.ELLM-OFFICE.V-1.0/querySources.do/json")
-async def mock_search(search_request: SearchRequest = None):
-    """处理搜索请求的主要接口"""
-    try:
-        # 如果传入了结构化的搜索请求，使用它
-        if search_request:
-            request_body = search_request.dict()
-            print(f"\033[32m收到结构化查询请求:\033[0m")
-            print(f"{json.dumps(request_body, ensure_ascii=False, indent=2)}")
-        else:
-            # 如果没有传入，创建一个默认的空请求
-            request_body = {"REQ_HEAD": {}, "REQ_BODY": {}}
-            print(f"\033[32m收到空查询请求，使用默认响应\033[0m")
-        
-        # 从请求中提取参数
-        req_head = request_body.get("REQ_HEAD", {})
-        req_body_data = request_body.get("REQ_BODY", {})
-        param = req_body_data.get("param", {})
-        
-        # 安全提取messages数组
-        messages = []
-        if isinstance(param.get("messages"), list):
-            messages = param["messages"]
-        
-        # 提取查询内容
-        user_query = ""
-        if messages and isinstance(messages[0], dict):
-            user_query = messages[0].get('content', '')
-        
-        # 安全提取其他参数
-        repository = str(param.get("repository", ""))
-        channel_param = param.get("param", {})
-        channel_id = str(channel_param.get("channelId", ""))
-        muwp_user = req_body_data.get("muwpUser", {})
-        
-        # 打印关键参数日志（使用颜色）
-        print(f"\033[35m处理查询请求: query='{user_query}', repository={repository}, channelId={channel_id}\033[0m")
-        
-        # 添加检索日志记录
-        def log_search_summary(query, result_count, results_data=None):
-            """记录检索摘要日志"""
-            print(f"\033[32m[检索摘要] 主题词: '{query}'\033[0m \033[35m| 返回结果数: {result_count} 条\033[0m")
-            if result_count > 0:
-                print(f"\033[32m[检索详情] 检索成功\033[0m \033[35m| 数据源: {repository} | 渠道ID: {channel_id}\033[0m")
-                
-                # 显示前3条结果的标题和评分
-                if results_data and len(results_data) > 0:
-                    print(f"\033[32m[结果预览] 前{min(3, len(results_data))}条结果:\033[0m")
-                    for i, result in enumerate(results_data[:3]):
-                        title = result.get('title', '无标题')[:50]  # 截取50个字符
-                        score = result.get('score', '0')
-                        doc_id = result.get('docId', 'N/A')
-                        print(f"\033[35m  {i+1}. [{doc_id}] {title} (评分: {score})\033[0m")
-            else:
-                print(f"\033[32m[检索详情] 无匹配结果\033[0m \033[35m| 数据源: {repository} | 渠道ID: {channel_id}\033[0m")
-        
-        # 创建响应对象，使用深度复制确保不修改原始数据
-        import copy
-        response = copy.deepcopy(MOCK_RESPONSE)
-        
-        # 如果请求中有用户信息，使用它
-        if isinstance(muwp_user, dict) and muwp_user:
-            response['RSP_BODY']['muwpUser'] = muwp_user
-        
-        # 根据请求中的TRANS_PROCESS和TRAN_ID更新响应（修复字典访问方式）
-        if req_head:
-            response['RSP_BODY']['TRANS_PROCESS'] = req_head.get('TRANS_PROCESS', '')
-            response['RSP_BODY']['TRAN_ID'] = req_head.get('TRAN_ID', '')
-        
-        # 记录检索结果摘要
-        result_count = len(response['RSP_BODY']['result'])
-        log_search_summary(user_query, result_count, response['RSP_BODY']['result'])
-        
-        # 返回构建的JSON响应
-        return JSONResponse(content=response)
-        
-    except Exception as e:
-        print(f"\033[31m处理请求失败: {e}\033[0m")
-        # 出错时返回默认响应
-        return JSONResponse(content=MOCK_RESPONSE)
 
-# 同时保留支持Request对象的接口（为了兼容性）
+def _build_bocom_response(query: str) -> dict:
+    """构造 bocomsearch 响应（内网知识库格式）"""
+    return {
+        "RSP_BODY": {
+            "result": BOCOM_MOCK_RESULTS,
+            "param": None,
+            "TRAN_ID": "",
+            "TRANS_PROCESS": "",
+        },
+        "RSP_HEAD": {
+            "TRAN_SUCCESS": "1",
+            "TRACE_NO": "mock-bocom-trace-001",
+            "TRACE_ID": "mock.1.00.bocomsearch",
+            "PROCESS_STATUS_CODE": "N",
+            "BIZ_TRACE_NO": None,
+        },
+    }
+
+
+def _build_online_response(query: str, muwp_user: dict) -> dict:
+    """构造 online_search 响应（互联网搜索格式）"""
+    return {
+        "RSP_BODY": {
+            "muwpUser": muwp_user or {
+                "muwp_branchID": "",
+                "muwp_loginName": "",
+                "muwp_userCode": "",
+                "muwp_userName": "mock_user",
+                "muwp_userID": "",
+            },
+            "result": ONLINE_MOCK_RESULTS,
+            "param": None,
+            "TRANS_PROCESS": "",
+            "TRAN_ID": "",
+        },
+        "RSP_HEAD": {
+            "TRAN_SUCCESS": "1",
+            "TRACE_NO": "mock-online-trace-001",
+            "TRACE_ID": "mock.1.00.onlinesearch",
+            "PROCESS_STATUS_CODE": "N",
+            "BIZ_TRACE_NO": None,
+        },
+    }
+
+
+# ============================================================
+# 核心接口：统一处理 bocomsearch 和 online_search
+# ============================================================
 @app.post("/ELLM.ELLM-OFFICE.V-1.0/querySources.do")
-async def mock_search_raw(request: Request):
-    """处理原始JSON请求的备用接口"""
-    try:
-        # 读取原始请求体
-        request_body = await request.json()
-        print(f"\033[32m收到原始JSON查询请求:\033[0m")
-        print(f"{json.dumps(request_body, ensure_ascii=False, indent=2)}")
-        
-        # 其余处理逻辑与主接口相同...
-        # ... existing code ...
-        req_head = request_body.get("REQ_HEAD", {})
-        req_body_data = request_body.get("REQ_BODY", {})
-        param = req_body_data.get("param", {})
-        
-        messages = []
-        if isinstance(param.get("messages"), list):
-            messages = param["messages"]
-        
-        user_query = ""
-        if messages and isinstance(messages[0], dict):
-            user_query = messages[0].get('content', '')
-        
-        repository = str(param.get("repository", ""))
-        channel_param = param.get("param", {})
-        channel_id = str(channel_param.get("channelId", ""))
-        muwp_user = req_body_data.get("muwpUser", {})
-        
-        print(f"\033[35m处理查询请求: query='{user_query}', repository={repository}, channelId={channel_id}\033[0m")
-        
-        # 添加检索日志记录
-        def log_search_summary(query, result_count, results_data=None):
-            """记录检索摘要日志"""
-            print(f"\033[32m[检索摘要] 主题词: '{query}'\033[0m \033[35m| 返回结果数: {result_count} 条\033[0m")
-            if result_count > 0:
-                print(f"\033[32m[检索详情] 检索成功\033[0m \033[35m| 数据源: {repository} | 渠道ID: {channel_id}\033[0m")
-                
-                # 显示前3条结果的标题和评分
-                if results_data and len(results_data) > 0:
-                    print(f"\033[32m[结果预览] 前{min(3, len(results_data))}条结果:\033[0m")
-                    for i, result in enumerate(results_data[:3]):
-                        title = result.get('title', '无标题')[:50]  # 截取50个字符
-                        score = result.get('score', '0')
-                        url = result.get('url', '无链接')
-                        doc_id = result.get('docId', 'N/A')
-                        print(f"\033[35m  {i+1}. [{doc_id}]{title} (评分: {score})\033[0m {url}")
-            else:
-                print(f"\033[32m[检索详情] 无匹配结果\033[0m \033[35m| 数据源: {repository} | 渠道ID: {channel_id}\033[0m")
-        
-        import copy
-        response = copy.deepcopy(MOCK_RESPONSE)
-        
-        if isinstance(muwp_user, dict) and muwp_user:
-            response['RSP_BODY']['muwpUser'] = muwp_user
-        
-        if req_head:
-            response['RSP_BODY']['TRANS_PROCESS'] = req_head.get('TRANS_PROCESS', '')
-            response['RSP_BODY']['TRAN_ID'] = req_head.get('TRAN_ID', '')
-        
-        # 记录检索结果摘要
-        result_count = len(response['RSP_BODY']['result'])
-        log_search_summary(user_query, result_count, response['RSP_BODY']['result'])
-        
-        return JSONResponse(content=response)
-        
-    except Exception as e:
-        print(f"\033[31m处理原始请求失败: {e}\033[0m")
-        return JSONResponse(content=MOCK_RESPONSE)
+async def unified_search(request: Request):
+    """
+    统一搜索接口，根据 Content-Type 自动区分：
+    - application/x-www-form-urlencoded -> bocomsearch（内网知识库）
+    - application/json                  -> online_search（互联网搜索）
+    """
+    content_type = request.headers.get("content-type", "")
+    query = ""
+    muwp_user = {}
 
-# 添加一个简单的健康检查端点
+    try:
+        # bocomsearch：表单格式，从 REQ_MESSAGE 字段解析
+        if "application/x-www-form-urlencoded" in content_type:
+            form = await request.form()
+            req_message_str = form.get("REQ_MESSAGE", "{}")
+            try:
+                req_message = json.loads(req_message_str)
+            except json.JSONDecodeError:
+                req_message = {}
+            param = req_message.get("REQ_BODY", {}).get("param", {})
+            query = param.get("summaryQuestion", "")
+            response_data = _build_bocom_response(query)
+            logger.info("[bocomsearch] query=%r -> %d 条知识库结果", query, len(BOCOM_MOCK_RESULTS))
+
+        # online_search：JSON 格式，从 messages 字段解析
+        elif "application/json" in content_type or content_type == "":
+            body = await request.json()
+            req_body = body.get("REQ_BODY", {})
+            param = req_body.get("param", {})
+            messages = param.get("messages", [])
+            if messages and isinstance(messages[0], dict):
+                query = messages[0].get("content", "")
+            muwp_user = req_body.get("muwpUser", {})
+            response_data = _build_online_response(query, muwp_user)
+            logger.info("[online_search] query=%r -> %d 条互联网结果", query, len(ONLINE_MOCK_RESULTS))
+
+        else:
+            logger.warning("未知 Content-Type: %s，默认走 online_search 逻辑", content_type)
+            response_data = _build_online_response("", {})
+
+        return JSONResponse(content=response_data)
+
+    except Exception as e:
+        logger.error("[mock_search] 处理请求异常: %s", e)
+        return JSONResponse(content=_build_online_response("", {}))
+
+
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+async def health():
+    return {"status": "ok", "service": "mock_search_api", "port": 8010}
+
 
 if __name__ == "__main__":
     import uvicorn
-    # 启动服务时的日志
-    print(f"\033[32m[服务启动] Mock搜索API服务准备启动\033[0m \033[35m| 监听地址: 0.0.0.0:8010\033[0m")
-    print(f"\033[32m[接口信息] 主接口: /ELLM.ELLM-OFFICE.V-1.0/querySources.do/json\033[0m")
-    print(f"\033[35m[接口信息] 备用接口: /ELLM.ELLM-OFFICE.V-1.0/querySources.do\033[0m")
-    print(f"\033[32m[健康检查] 健康检查接口: /health\033[0m")
-    
-    # 启动服务，默认监听在0.0.0.0:8010
+    print("[Mock Search API 启动]")
+    print("  POST /ELLM.ELLM-OFFICE.V-1.0/querySources.do")
+    print("       form-urlencoded -> bocomsearch（内网知识库，5条）")
+    print("       application/json -> online_search（互联网新闻，5条）")
+    print("  GET  /health")
     uvicorn.run("mock_search_api:app", host="0.0.0.0", port=8010, reload=True)

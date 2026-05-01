@@ -1,0 +1,60 @@
+# ===========================================================
+# docker-compose.mock.yml  —  Mock 模式 override 文件
+# ===========================================================
+# 使用方式：
+#   外网开发（Mock 模式）：
+#     docker compose -f docker-compose.yml -f docker-compose.mock.yml up -d
+#
+#   生产模式（走真实内网接口）：
+#     docker compose up -d
+#
+# 效果：
+#   1. 新增 mock-search 容器，对外暴露 8010/8011/8012/8013 端口
+#   2. 自动将 backend 的搜索类 URL 指向容器内 service name (http://mock-search:xxxx)
+#   3. backend 依赖 mock-search 的健康检查，确保 Mock 就绪后再启动
+# ===========================================================
+
+services:
+  mock-search:
+    build:
+      context: ./middlewares/search
+      dockerfile: Dockerfile
+    image: deer-flow-mock-search:latest
+    container_name: deer-flow-mock-search
+    # 代码热挂载：改 Mock 数据或新增数据无需重建镜像
+    volumes:
+      - ./middlewares/search:/app
+    # 宿主机调试用端口映射（可选，仅本机访问 Mock 可删除）
+    ports:
+      - "8010:8010"
+      - "8011:8011"
+      - "8012:8012"
+      - "8013:8013"
+    restart: unless-stopped
+    networks:
+      - deer-flow-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8010/health',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # 覆盖 backend 的搜索类环境变量，指向容器内 mock-search
+  # 这里的 environment 会合并到 docker-compose.yml 的 backend 配置上，
+  # 并且优先级高于 env_file 中的 .env
+  backend:
+    environment:
+      # 搜索接口（8010 单端口，bocomsearch + online_search）
+      - BOCOM_SEARCH_API_URL=http://mock-search:8010/ELLM.ELLM-OFFICE.V-1.0/querySources.do
+      - ONLINE_SEARCH_API_URL=http://mock-search:8010/ELLM.ELLM-OFFICE.V-1.0/querySources.do
+      # 行业研报
+      - INDUSTRY_REPORT_API_URL=http://mock-search:8011/IDIS/IDIS-DATA/queryIndustryReportList.bocms
+      # 新闻
+      - NEWS_SEARCH_API_URL=http://mock-search:8012/IDIS/IDIS-DATA/queryNewsList.bocms
+      - NEWS_DETAIL_API_URL=http://mock-search:8013/IDIS/IDIS-DATA/queryNewsDetail.bocms
+    depends_on:
+      mock-search:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
