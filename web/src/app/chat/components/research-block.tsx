@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { Check, Copy, Headphones, Pencil, Undo2, X, Download, Loader2 } from "lucide-react";
+import { Check, Copy, Pencil, Undo2, X, Download, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
@@ -11,7 +11,7 @@ import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useReplay } from "~/core/replay";
-import { closeResearch, listenToPodcast, useStore } from "~/core/store";
+import { closeResearch, useStore } from "~/core/store";
 import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { cn } from "~/lib/utils";
 
@@ -42,13 +42,6 @@ export function ResearchBlock({
       setActiveTab("report");
     }
   }, [hasReport]);
-
-  const handleGeneratePodcast = useCallback(async () => {
-    if (!researchId) {
-      return;
-    }
-    await listenToPodcast(researchId);
-  }, [researchId]);
 
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -171,17 +164,6 @@ export function ResearchBlock({
         <div className="absolute right-4 flex h-9 items-center justify-center">
           {hasReport && !reportStreaming && (
             <>
-              <Tooltip title={t("generatePodcast")}>
-                <Button
-                  className="text-gray-400"
-                  size="icon"
-                  variant="ghost"
-                  disabled={isReplay}
-                  onClick={handleGeneratePodcast}
-                >
-                  <Headphones />
-                </Button>
-              </Tooltip>
               <Tooltip title={t("edit")}>
                 <Button
                   className="text-gray-400"
