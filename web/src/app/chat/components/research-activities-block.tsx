@@ -34,6 +34,24 @@ type CrawlResult = {
   summary?: string;
 };
 
+// ── Plan 类型定义 ──────────────────────────────────
+
+type PlanStep = {
+  title: string;
+  description: string;
+  need_search: boolean;
+  step_type: string;
+  execution_res?: string | null;
+};
+
+type Plan = {
+  locale: string;
+  has_enough_context: boolean;
+  thought: string;
+  title: string;
+  steps: PlanStep[];
+};
+
 // ── 辅助函数 ──────────────────────────────────────
 
 /** 从 URL 提取域名 */
@@ -157,41 +175,116 @@ function buildStepsFromActivityIds(
 ): { steps: ThinkingStep[]; title: string } {
   const steps: ThinkingStep[] = [];
   let title = "深度研究";
+  let planSteps: PlanStep[] = [];
+
+  // 收集非 reporter/planner 的 researcher 消息
+  const researcherMessages: import("~/core/messages/types").Message[] = [];
 
   for (let i = 0; i < activityIds.length; i++) {
     const messageId = activityIds[i]!;
     const message = getMessage(messageId);
     if (!message) continue;
 
-    // 第一条消息的 content 作为标题
-    if (i === 0 && message.content) {
-      title = message.content.slice(0, 50) || "深度研究";
+    // planner 消息：解析 Plan JSON 获取 title 和 steps
+    if (message.agent === "planner") {
+      const plan = parseJSON<Plan>(message.content, null);
+      if (plan) {
+        title = plan.title || "深度研究";
+        planSteps = plan.steps || [];
+      }
       continue;
     }
 
-    // 跳过 reporter 和 planner 的消息
-    if (message.agent === "reporter" || message.agent === "planner") continue;
+    // 跳过 reporter 消息
+    if (message.agent === "reporter") continue;
 
-    // 构建步骤描述：只取 --- 之前的第一段摘要
-    const rawContent = message.content || "";
-    const description = extractSummary(rawContent) || "";
-    if (!description && !message.toolCalls?.length) continue;
+    // 跳过第一条（research 本身，通常无内容）
+    if (i === 0) continue;
 
-    // 提取工具调用标签
-    const toolCallTags: ToolCallTag[] = [];
-    if (message.toolCalls) {
-      for (const tc of message.toolCalls) {
-        if (tc.result?.startsWith("Error")) continue;
-        toolCallTags.push(...extractToolCallTags(tc));
+    // 收集 researcher 消息
+    researcherMessages.push(message);
+  }
+
+  // 按 plan steps 组织，每个 plan step 对应一个活动步骤
+  if (planSteps.length > 0) {
+    // 有计划步骤时，将 researcher 消息按顺序分配给各 plan step
+    // 通常每个 researcher 消息对应一个 plan step
+    for (let i = 0; i < planSteps.length; i++) {
+      const planStep = planSteps[i]!;
+      const researcherMsg = researcherMessages[i];
+
+      // 提取工具调用标签
+      const toolCallTags: ToolCallTag[] = [];
+      if (researcherMsg?.toolCalls) {
+        for (const tc of researcherMsg.toolCalls) {
+          if (tc.result?.startsWith("Error")) continue;
+          toolCallTags.push(...extractToolCallTags(tc));
+        }
       }
+
+      // 步骤描述：优先用 researcher 消息内容，否则用 plan step 的 description
+      const rawContent = researcherMsg?.content || "";
+      const description = extractSummary(rawContent)
+        || planStep.description
+        || (toolCallTags.length > 0 ? "执行搜索与资料阅读" : "");
+
+      if (!description && toolCallTags.length === 0) continue;
+
+      steps.push({
+        id: researcherMsg?.id || `plan-step-${i}`,
+        title: planStep.title, // 使用 plan step 的标题
+        description,
+        content: rawContent || undefined,
+        toolCalls: toolCallTags,
+      });
     }
 
-    steps.push({
-      id: messageId,
-      title: undefined, // 不显示步骤小标题，保持简洁
-      description: description || (toolCallTags.length > 0 ? "执行搜索与资料阅读" : ""),
-      toolCalls: toolCallTags,
-    });
+    // 如果 researcher 消息比 plan steps 多（意外情况），追加剩余消息
+    for (let i = planSteps.length; i < researcherMessages.length; i++) {
+      const msg = researcherMessages[i]!;
+      const rawContent = msg.content || "";
+      const description = extractSummary(rawContent);
+      if (!description && !msg.toolCalls?.length) continue;
+
+      const toolCallTags: ToolCallTag[] = [];
+      if (msg.toolCalls) {
+        for (const tc of msg.toolCalls) {
+          if (tc.result?.startsWith("Error")) continue;
+          toolCallTags.push(...extractToolCallTags(tc));
+        }
+      }
+
+      steps.push({
+        id: msg.id,
+        title: undefined,
+        description: description || (toolCallTags.length > 0 ? "执行搜索与资料阅读" : ""),
+        content: rawContent || undefined,
+        toolCalls: toolCallTags,
+      });
+    }
+  } else {
+    // 无计划步骤时，回退到原始逻辑
+    for (const msg of researcherMessages) {
+      const rawContent = msg.content || "";
+      const description = extractSummary(rawContent);
+      if (!description && !msg.toolCalls?.length) continue;
+
+      const toolCallTags: ToolCallTag[] = [];
+      if (msg.toolCalls) {
+        for (const tc of msg.toolCalls) {
+          if (tc.result?.startsWith("Error")) continue;
+          toolCallTags.push(...extractToolCallTags(tc));
+        }
+      }
+
+      steps.push({
+        id: msg.id,
+        title: undefined,
+        description: description || (toolCallTags.length > 0 ? "执行搜索与资料阅读" : ""),
+        content: rawContent || undefined,
+        toolCalls: toolCallTags,
+      });
+    }
   }
 
   return { steps, title };
