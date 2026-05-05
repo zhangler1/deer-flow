@@ -10,8 +10,11 @@ import { useReplay } from "~/core/replay";
 import { useMessage, useStore } from "~/core/store";
 import { cn } from "~/lib/utils";
 
+import { ReportReferences } from "./report-references";
+
 export function ResearchReportBlock({
   className,
+  researchId,
   messageId,
   editing,
 }: {
@@ -69,6 +72,8 @@ export function ResearchReportBlock({
             {message?.content}
           </Markdown>
           {message?.isStreaming && <LoadingAnimation className="my-12" />}
+          {/* 报告完成后展示参考资料 */}
+          {isCompleted && <ReportReferences researchId={researchId} />}
         </>
       )}
     </div>
