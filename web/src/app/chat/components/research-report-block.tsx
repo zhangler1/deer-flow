@@ -10,6 +10,7 @@ import { useReplay } from "~/core/replay";
 import { useMessage, useStore } from "~/core/store";
 import { cn } from "~/lib/utils";
 
+import { CollapsibleReport } from "./collapsible-report";
 import { ReportReferences } from "./report-references";
 
 export function ResearchReportBlock({
@@ -68,9 +69,17 @@ export function ResearchReportBlock({
         />
       ) : (
         <>
-          <Markdown animated checkLinkCredibility>
-            {message?.content}
-          </Markdown>
+          {/* 流式输出时用原始 Markdown（支持打字动画） */}
+          {message?.isStreaming ? (
+            <Markdown animated checkLinkCredibility>
+              {message?.content}
+            </Markdown>
+          ) : (
+            <CollapsibleReport
+              content={message?.content ?? ""}
+              checkLinkCredibility
+            />
+          )}
           {message?.isStreaming && <LoadingAnimation className="my-12" />}
           {/* 报告完成后展示参考资料 */}
           {isCompleted && <ReportReferences researchId={researchId} />}
