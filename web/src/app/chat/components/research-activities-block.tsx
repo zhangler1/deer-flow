@@ -45,6 +45,20 @@ function extractDomain(url: string): string {
   }
 }
 
+/** 从 Markdown 内容中提取摘要（--- 之前的第一段纯文本） */
+function extractSummary(content: string): string {
+  if (!content) return "";
+  // 按 --- 分隔，只取前面的摘要部分
+  const separatorIndex = content.indexOf("\n---");
+  const summary = separatorIndex > 0 ? content.slice(0, separatorIndex) : content;
+  // 去掉 Markdown 标题标记（# 开头行），只保留纯文本
+  const lines = summary
+    .split("\n")
+    .map((line) => line.replace(/^#+\s*/, "").trim())
+    .filter((line) => line.length > 0);
+  return lines.join(" ").trim();
+}
+
 /** 判断是否为搜索类工具 */
 function isSearchTool(name: string): boolean {
   return [
@@ -158,8 +172,9 @@ function buildStepsFromActivityIds(
     // 跳过 reporter 和 planner 的消息
     if (message.agent === "reporter" || message.agent === "planner") continue;
 
-    // 构建步骤描述
-    const description = message.content || "";
+    // 构建步骤描述：只取 --- 之前的第一段摘要
+    const rawContent = message.content || "";
+    const description = extractSummary(rawContent) || "";
     if (!description && !message.toolCalls?.length) continue;
 
     // 提取工具调用标签
