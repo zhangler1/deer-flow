@@ -34,6 +34,14 @@ export function mergeMessage(message: Message, event: ChatEvent) {
     message.roundText = event.data.round_text;
   }
   
+  // Update stepIndex/stepTitle if present in event (from backend plan step tracking)
+  if ('step_index' in event.data && event.data.step_index !== undefined) {
+    message.stepIndex = event.data.step_index;
+  }
+  if ('step_title' in event.data && event.data.step_title) {
+    message.stepTitle = event.data.step_title;
+  }
+  
   if ('finish_reason' in event.data && event.data.finish_reason) {
     message.finishReason = event.data.finish_reason;
     message.isStreaming = false;

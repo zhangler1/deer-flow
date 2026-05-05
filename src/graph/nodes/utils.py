@@ -378,6 +378,8 @@ async def _execute_agent_step(
                 )
             ],
             "observations": observations + [response_content],
+            "current_step_index": len(completed_steps),
+            "current_step_title": current_step.title,
         },
         goto="research_team",
     )

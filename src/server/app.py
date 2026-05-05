@@ -403,7 +403,8 @@ def _process_initial_messages(message, thread_id):
     )
 
 
-async def _process_message_chunk(message_chunk, message_metadata, thread_id, agent):
+async def _process_message_chunk(message_chunk, message_metadata, thread_id, agent,
+                                                 step_index: int = -1, step_title: str = ""):
     """Process a single message chunk and yield appropriate events."""
     agent_name = _get_agent_name(agent, message_metadata)
     
@@ -430,6 +431,12 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
     event_stream_message = _create_event_stream_message(
         message_chunk, message_metadata, thread_id, agent_name
     )
+
+    # 附加当前 plan step 信息（供前端逐步展示）
+    # step_index/step_title 由 _stream_graph_events 从 updates 事件推导，per-request 隔离
+    if agent_name == "researcher" and step_index >= 0:
+        event_stream_message["step_index"] = step_index
+        event_stream_message["step_title"] = step_title
 
     if isinstance(message_chunk, ToolMessage):
         # Tool Message - Return the result of the tool call
@@ -545,6 +552,11 @@ async def _stream_graph_events(
     last_event_time = time.time()
     logger.info(f"[STREAM_START] thread_id={thread_id} | 开始流式传输事件")
 
+    # 追踪当前 plan step 信息（从 updates 事件中提取，per-request 隔离）
+    # 上一个节点执行完后 State 已更新，下一步的 step 信息自然确定
+    _step_index = -1  # 当前 plan step 索引（-1=未开始，0=第一步...）
+    _step_title = ""  # 当前 plan step 标题
+
     try:
         async for agent, _, event_data in graph_instance.astream(
             workflow_input,
@@ -573,13 +585,6 @@ async def _stream_graph_events(
                 node_transition = event_data.get("node_transition")
                 if node_transition:
                     # 这里 node_transition 由 iterative_research_node 写入
-                    # 结构示例：
-                    # {
-                    #   "from": "iterative_research_node",
-                    #   "to": "iterative_research_node" | "iterative_reporter_node",
-                    #   "iteration": 3,
-                    #   "reason": "continue" | "finish",
-                    # }
                     iteration = node_transition.get("iteration")
                     from_node = node_transition.get("from")
                     to_node = node_transition.get("to")
@@ -593,10 +598,36 @@ async def _stream_graph_events(
                         "reason": reason,
                     }
                     logger.info(f"[STREAM_EVENT] thread_id={thread_id} | 事件类型: node_transition | 事件数: {event_count} | payload: {event_payload}")
-                    # 发送一个独立的 SSE 事件，事件名可自定义，例如 node_transition
                     sse_event = _make_event("node_transition", event_payload)
                     logger.info(f"[SSE调试] 生成的 SSE 事件内容: {sse_event[:200]}...")
                     yield sse_event
+
+                # 3) 从 updates 事件中提取 plan step 信息
+                # 上一个节点执行完 → State 已更新 → 当前 step 自然确定
+                # LangGraph updates 事件结构: {nodeName: {field: value, ...}}
+                for _node_name, _node_update in event_data.items():
+                    if not isinstance(_node_update, dict):
+                        continue
+                    if "current_step_index" in _node_update:
+                        # researcher 刚完成 step N，下一步是 step N+1
+                        _step_index = _node_update["current_step_index"] + 1
+                    if "current_step_title" in _node_update:
+                        _step_title = _node_update["current_step_title"]
+                
+                    # 4) 如果 plan 刚创建（planner/human_feedback 节点），
+                    #    从 current_plan 中提取第一个 step 的信息
+                    if "current_plan" in _node_update and _step_index < 0:
+                        plan_obj = _node_update["current_plan"]
+                        steps = None
+                        if hasattr(plan_obj, 'steps'):
+                            steps = plan_obj.steps
+                        elif isinstance(plan_obj, dict) and 'steps' in plan_obj:
+                            steps = plan_obj['steps']
+                        if steps and len(steps) > 0:
+                            _step_index = 0
+                            first_step = steps[0]
+                            _step_title = getattr(first_step, 'title', None) or (first_step.get('title', '') if isinstance(first_step, dict) else '')
+                    break  # 只处理第一个节点更新
 
                 # 其他 update 目前不需要转成事件，直接忽略
                 continue
@@ -610,7 +641,8 @@ async def _stream_graph_events(
             logger.debug(f"[STREAM_MESSAGE] thread_id={thread_id} | 事件数: {event_count} | agent: {agent_name} | 内容长度: {len(message_chunk.content) if hasattr(message_chunk, 'content') else 0}")
 
             async for event in _process_message_chunk(
-                message_chunk, message_metadata, thread_id, agent
+                message_chunk, message_metadata, thread_id, agent,
+                step_index=_step_index, step_title=_step_title
             ):
                 yield event
 

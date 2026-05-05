@@ -32,6 +32,10 @@ interface GenericEvent<T extends string, D extends object> {
     finish_reason?: "stop" | "tool_calls" | "interrupt";
     tag?: "routing" | "planning" | "searching" | "crawling" | "iterative_answering" | "reporting" | "waiting_for_feedback" | "error" | "answering" | "round_progress";
     round_text?: string;
+    /** 当前 plan step 索引（仅 researcher 消息） */
+    step_index?: number;
+    /** 当前 plan step 标题（仅 researcher 消息） */
+    step_title?: string;
   } & D;
 }
 

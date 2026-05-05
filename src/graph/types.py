@@ -40,3 +40,7 @@ class State(MessagesState):
     
     # GUWP Token 相关字段（用于交通银行内网搜索鉴权）
     guwp_token: str = None  # GUWP认证令牌，通过 state 传递确保线程安全（避免多用户并发时环境变量覆盖）
+
+    # 当前研究步骤追踪（由 _execute_agent_step 更新，供其他节点和前端读取）
+    current_step_index: int = -1  # 当前 plan step 索引（从0开始，-1 表示未开始）
+    current_step_title: str = ""  # 当前 plan step 标题

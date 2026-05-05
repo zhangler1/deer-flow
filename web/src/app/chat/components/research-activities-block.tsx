@@ -207,10 +207,10 @@ function buildStepsFromActivityIds(
     researcherMessages.push(message);
   }
 
-  // 以 researcher 消息为主驱动，逐步关联 plan step
-  // 每个 plan step 拆成两行：标题行（加粗）+ 活动行（缩进）
-  // 只有当 researcher 消息到达时，才展示对应的 plan step
-  let planStepIndex = 0;
+  // 以 researcher 消息为主驱动，利用后端传入的 stepIndex 控制展示层级
+  // 只有后端确认了 stepIndex 的消息，才展示其对应的 plan step 标题
+  // stepIndex 未到达时 = 该步骤还未被后端确认，不展示标题行
+  let lastStepIndex = -1;
 
   for (const msg of researcherMessages) {
     const rawContent = msg.content || "";
@@ -227,25 +227,31 @@ function buildStepsFromActivityIds(
 
     if (!description && toolCallTags.length === 0) continue;
 
-    // 按顺序分配 plan step
-    const currentPlanStep = planSteps[planStepIndex];
-    planStepIndex++;
+    // 必须有后端传入的 stepIndex 才展示 plan step 标题
+    // stepIndex === undefined 表示后端尚未确认该步骤，跳过标题行
+    const msgStepIndex = msg.stepIndex;
+    const msgStepTitle = msg.stepTitle;
 
-    // Plan step 标题行（加粗，作为分组标题）
-    if (currentPlanStep?.title) {
-      steps.push({
-        id: `plan-${steps.length}`,
-        description: currentPlanStep.title,
-        toolCalls: [],
-        isPlanStep: true,
-      });
+    // 如果进入新的 step 且后端已确认 stepIndex，先展示 plan step 标题行
+    if (msgStepIndex !== undefined && msgStepIndex !== lastStepIndex) {
+      lastStepIndex = msgStepIndex;
+      const currentPlanStep = planSteps[msgStepIndex];
+      const stepTitle = msgStepTitle || currentPlanStep?.title;
+      if (stepTitle) {
+        steps.push({
+          id: `plan-${msgStepIndex}`,
+          description: stepTitle,
+          toolCalls: [],
+          isPlanStep: true,
+        });
+      }
     }
 
     // Research 活动行（缩进在 plan step 下）
     steps.push({
       id: msg.id,
       description: description
-        || currentPlanStep?.description
+        || (msgStepIndex !== undefined ? planSteps[msgStepIndex]?.description : undefined)
         || (toolCallTags.length > 0 ? "执行搜索与资料阅读" : ""),
       toolCalls: toolCallTags,
     });
@@ -306,6 +312,19 @@ export function ResearchActivitiesBlock({
   });
   const showLoading = ongoing && !reportCompleted;
 
+  // 订阅 researcher 消息的 stepIndex 变化，确保流式更新时重新渲染
+  const stepIndexDeps = useStore((state) => {
+    const ids = state.researchActivityIds.get(researchId) || [];
+    const indices: number[] = [];
+    for (const id of ids) {
+      const msg = state.messages.get(id);
+      if (msg?.agent === "researcher" && msg.stepIndex !== undefined) {
+        indices.push(msg.stepIndex);
+      }
+    }
+    return indices.join(",");
+  });
+
   const { steps, title } = useMemo(() => {
     const state = useStore.getState();
     return buildStepsFromActivityIds(
@@ -314,7 +333,8 @@ export function ResearchActivitiesBlock({
       reportCompleted,
       reportGenerating,
     );
-  }, [activityIds, reportCompleted, reportGenerating]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activityIds, reportCompleted, reportGenerating, stepIndexDeps]);
 
   if (steps.length === 0) {
     return ongoing ? (

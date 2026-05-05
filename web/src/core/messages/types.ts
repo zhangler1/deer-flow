@@ -31,6 +31,10 @@ export interface Message {
   resources?: Array<Resource>;
   tag?: "routing" | "planning" | "searching" | "crawling" | "iterative_answering" | "reporting" | "waiting_for_feedback" | "error" | "answering" | "round_progress";
   roundText?: string;
+  /** 当前 plan step 索引（从0开始，由后端 SSE 事件传入） */
+  stepIndex?: number;
+  /** 当前 plan step 标题（由后端 SSE 事件传入） */
+  stepTitle?: string;
 }
 
 export interface Option {
