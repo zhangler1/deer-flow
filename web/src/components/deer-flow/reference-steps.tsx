@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, BookOpen, ChevronDown, CheckCircle } from "lucide-react";
+import { Search, BookOpen, ChevronDown, CheckCircle, FileText } from "lucide-react";
 import { useState } from "react";
 
 import { FavIcon } from "~/components/deer-flow/fav-icon";
@@ -48,6 +48,8 @@ export interface ThinkingStep {
   toolCalls: ToolCallTag[];
   /** 是否为完成收尾步骤（显示对勾图标） */
   isCompleted?: boolean;
+  /** 是否为计划步骤标题（加粗显示，作为 research 活动的分组标题） */
+  isPlanStep?: boolean;
 }
 
 /** ReferenceSteps 组件属性 */
@@ -112,12 +114,14 @@ function SourceLinkBadge({ url, domain, favicon }: SourceLink) {
 }
 
 /** 步骤左侧竖线图标 */
-function StepIcon({ isLast, isCompleted }: { isLast: boolean; isCompleted?: boolean }) {
+function StepIcon({ isLast, isCompleted, isPlanStep }: { isLast: boolean; isCompleted?: boolean; isPlanStep?: boolean }) {
   return (
     <div className="flex shrink-0 flex-col items-center text-muted-foreground/50">
       <div className="flex h-3.5 w-3.5 items-center justify-center">
         {isCompleted ? (
           <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+        ) : isPlanStep ? (
+          <FileText className="h-3 w-3 text-foreground/70" />
         ) : (
           <div className="h-1.5 w-1.5 rounded-full bg-current" />
         )}
@@ -190,58 +194,67 @@ function StepRow({
   return (
     <div className="flex gap-2">
       {/* 左侧竖线 + 圆点 */}
-      <StepIcon isLast={isLast} isCompleted={step.isCompleted} />
+      <StepIcon isLast={isLast} isCompleted={step.isCompleted} isPlanStep={step.isPlanStep} />
 
       {/* 右侧内容 */}
       <div className="min-w-0 flex-1">
-        {/* 步骤小标题 */}
-        {step.title && (
-          <div className="mb-1 text-sm font-medium text-foreground">
-            {step.title}
+        {/* 计划步骤标题（加粗，高层级） */}
+        {step.isPlanStep ? (
+          <div className="text-sm font-semibold text-foreground">
+            {step.description}
           </div>
-        )}
-
-        {/* 步骤描述 */}
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {step.description}
-        </p>
-
-        {/* 工具调用标签 */}
-        {(searchTags.length > 0 || sourceLinks.length > 0) && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {/* 搜索/阅读标签 */}
-            {searchTags.map((tag, i) => {
-              if (tag.type === "search") {
-                return (
-                  <SearchTagBadge key={`search-${i}`} query={tag.query} />
-                );
-              }
-              return (
-                <ReadTagBadge key={`read-${i}`} label={tag.label} />
-              );
-            })}
-
-            {/* 来源链接 */}
-            {visibleSources.map((source, i) => (
-              <SourceLinkBadge key={`source-${i}`} {...source} />
-            ))}
-
-            {/* 展开/收起按钮 */}
-            {hasMore && (
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-0.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <ChevronDown
-                  className={cn(
-                    "h-3.5 w-3.5 transition-transform",
-                    expanded && "rotate-180",
-                  )}
-                />
-                <span>{expanded ? "收起" : `展开 (${hiddenCount})`}</span>
-              </button>
+        ) : (
+          <>
+            {/* 步骤小标题 */}
+            {step.title && (
+              <div className="mb-1 text-sm font-medium text-foreground">
+                {step.title}
+              </div>
             )}
-          </div>
+
+            {/* 步骤描述 */}
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {step.description}
+            </p>
+
+            {/* 工具调用标签 */}
+            {(searchTags.length > 0 || sourceLinks.length > 0) && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {/* 搜索/阅读标签 */}
+                {searchTags.map((tag, i) => {
+                  if (tag.type === "search") {
+                    return (
+                      <SearchTagBadge key={`search-${i}`} query={tag.query} />
+                    );
+                  }
+                  return (
+                    <ReadTagBadge key={`read-${i}`} label={tag.label} />
+                  );
+                })}
+
+                {/* 来源链接 */}
+                {visibleSources.map((source, i) => (
+                  <SourceLinkBadge key={`source-${i}`} {...source} />
+                ))}
+
+                {/* 展开/收起按钮 */}
+                {hasMore && (
+                  <button
+                    onClick={() => setExpanded(!expanded)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-0.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 transition-transform",
+                        expanded && "rotate-180",
+                      )}
+                    />
+                    <span>{expanded ? "收起" : `展开 (${hiddenCount})`}</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
