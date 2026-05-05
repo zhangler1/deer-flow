@@ -172,6 +172,8 @@ function extractToolCallTags(toolCall: ToolCallRuntime): ToolCallTag[] {
 function buildStepsFromActivityIds(
   activityIds: string[],
   getMessage: (id: string) => import("~/core/messages/types").Message | undefined,
+  isCompleted: boolean = false,
+  isReportGenerating: boolean = false,
 ): { steps: ThinkingStep[]; title: string } {
   const steps: ThinkingStep[] = [];
   let title = "深度研究";
@@ -287,6 +289,27 @@ function buildStepsFromActivityIds(
     }
   }
 
+  // 报告生成中，追加提示步骤
+  if (isReportGenerating && !isCompleted && steps.length > 0) {
+    steps.push({
+      id: "report-generating-step",
+      title: undefined,
+      description: "研究报告生成中",
+      toolCalls: [],
+    });
+  }
+
+  // 研究完成后，追加收尾步骤
+  if (isCompleted && steps.length > 0) {
+    steps.push({
+      id: "completion-step",
+      title: undefined,
+      description: "已搜集和分析资料",
+      toolCalls: [],
+      isCompleted: true,
+    });
+  }
+
   return { steps, title };
 }
 
@@ -305,13 +328,31 @@ export function ResearchActivitiesBlock({
   const ongoing = useStore(
     (state) => state.ongoingResearchId === researchId,
   );
+  // 报告已完成时，确保不再显示 loading
+  const reportId = useStore((state) =>
+    researchId ? state.researchReportIds.get(researchId) : undefined,
+  );
+  const reportCompleted = useStore((state) => {
+    if (!reportId) return false;
+    const report = state.messages.get(reportId);
+    return report ? !report.isStreaming && !!report.content : false;
+  });
+  const reportGenerating = useStore((state) => {
+    if (!reportId) return false;
+    const report = state.messages.get(reportId);
+    return report ? !!report.isStreaming : false;
+  });
+  const showLoading = ongoing && !reportCompleted;
 
   const { steps, title } = useMemo(() => {
     const state = useStore.getState();
-    return buildStepsFromActivityIds(activityIds, (id) =>
-      state.messages.get(id),
+    return buildStepsFromActivityIds(
+      activityIds,
+      (id) => state.messages.get(id),
+      reportCompleted,
+      reportGenerating,
     );
-  }, [activityIds]);
+  }, [activityIds, reportCompleted, reportGenerating]);
 
   if (steps.length === 0) {
     return ongoing ? (
@@ -332,7 +373,7 @@ export function ResearchActivitiesBlock({
           maxVisibleSources={3}
         />
       </motion.div>
-      {ongoing && <LoadingAnimation className="mx-4 my-12" />}
+      {showLoading && <LoadingAnimation className="mx-4 my-12" />}
     </div>
   );
 }

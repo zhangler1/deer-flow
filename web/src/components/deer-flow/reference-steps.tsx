@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, BookOpen, ChevronDown } from "lucide-react";
+import { Search, BookOpen, ChevronDown, CheckCircle } from "lucide-react";
 import { useState } from "react";
 
 import { FavIcon } from "~/components/deer-flow/fav-icon";
@@ -46,6 +46,8 @@ export interface ThinkingStep {
   description: string;
   /** 工具调用标签列表 */
   toolCalls: ToolCallTag[];
+  /** 是否为完成收尾步骤（显示对勾图标） */
+  isCompleted?: boolean;
 }
 
 /** ReferenceSteps 组件属性 */
@@ -110,11 +112,15 @@ function SourceLinkBadge({ url, domain, favicon }: SourceLink) {
 }
 
 /** 步骤左侧竖线图标 */
-function StepIcon({ isLast }: { isLast: boolean }) {
+function StepIcon({ isLast, isCompleted }: { isLast: boolean; isCompleted?: boolean }) {
   return (
     <div className="flex shrink-0 flex-col items-center text-muted-foreground/50">
       <div className="flex h-3.5 w-3.5 items-center justify-center">
-        <div className="h-1.5 w-1.5 rounded-full bg-current" />
+        {isCompleted ? (
+          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+        ) : (
+          <div className="h-1.5 w-1.5 rounded-full bg-current" />
+        )}
       </div>
       {!isLast && (
         <div className="mt-1 w-px flex-1 bg-border/50" />
@@ -184,7 +190,7 @@ function StepRow({
   return (
     <div className="flex gap-2">
       {/* 左侧竖线 + 圆点 */}
-      <StepIcon isLast={isLast} />
+      <StepIcon isLast={isLast} isCompleted={step.isCompleted} />
 
       {/* 右侧内容 */}
       <div className="min-w-0 flex-1">
