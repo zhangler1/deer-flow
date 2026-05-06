@@ -434,10 +434,13 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
 
     # 附加当前 plan step 信息（供前端逐步展示）
     # step_index/step_title 由 _stream_graph_events 从 updates 事件推导，per-request 隔离
-    if agent_name == "researcher" and step_index >= 0:
+    # 兼容 subgraph 场景：agent_name 可能是 "ResearchTeam" 或 "researcher"
+    langgraph_node = message_metadata.get("langgraph_node", "") if isinstance(message_metadata, dict) else ""
+    is_researcher = agent_name == "researcher" or langgraph_node == "researcher"
+    if is_researcher and step_index >= 0:
         event_stream_message["step_index"] = step_index
         event_stream_message["step_title"] = step_title
-        logger.debug(f"[STEP_TRACK] msg chunk | agent={agent_name} | step_index={step_index} | step_title={step_title}")
+        logger.debug(f"[STEP_TRACK] msg chunk | agent={agent_name} | node={langgraph_node} | step_index={step_index} | step_title={step_title}")
 
     if isinstance(message_chunk, ToolMessage):
         # Tool Message - Return the result of the tool call
@@ -654,11 +657,15 @@ async def _stream_graph_events(
 
             # 记录接收到消息块
             agent_name = _get_agent_name(agent, message_metadata)
-            logger.debug(f"[STREAM_MESSAGE] thread_id={thread_id} | 事件数: {event_count} | agent: {agent_name} | 内容长度: {len(message_chunk.content) if hasattr(message_chunk, 'content') else 0}")
+            # Debug: 记录 agent tuple 详情，确认 subgraph 场景下的 agent_name
+            if agent_name in ("researcher", "ResearchTeam") or (agent and len(agent) > 1):
+                logger.info(f"[STEP_TRACK] thread_id={thread_id} | agent_tuple={agent} | agent_name={agent_name} | _step_index={_step_index}")
 
             # Fallback: 如果 researcher 消息到达但 _step_index 未更新（updates 时序竞争），
             # 从缓存的 plan steps 和 State 中的 current_step_index 推算
-            if agent_name == "researcher" and _step_index < 0 and _cached_plan_steps:
+            _msg_node = message_metadata.get("langgraph_node", "") if isinstance(message_metadata, dict) else ""
+            _is_researcher = agent_name == "researcher" or _msg_node == "researcher"
+            if _is_researcher and _step_index < 0 and _cached_plan_steps:
                 _step_index = 0
                 if not _step_title and len(_cached_plan_steps) > 0:
                     first_step = _cached_plan_steps[0]
