@@ -60,6 +60,10 @@ export async function* chatStream(
   
   for await (const event of stream) {
     try {
+      // 心跳 ping 事件仅用于保持连接活跃，不需要传递给消费者
+      if (event.event === "ping") {
+        continue;
+      }
       yield {
         type: event.event,
         data: JSON.parse(event.data),
