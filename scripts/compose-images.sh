@@ -72,7 +72,7 @@ COMPOSE_CMD=$(find_compose_cmd) || { echo "错误：未找到 docker compose 或
 get_images() {
   ${COMPOSE_CMD} -f "$COMPOSE_FILE" config \
     | awk -F: '/^[[:space:]]*image:[[:space:]]*/ { sub(/^[[:space:]]*image:[[:space:]]*/, ""); print }' \
-    | sed -e 's/["\'\'\ ]//g' -e 's/#.*$//' \
+    | sed -e 's/["'\'' ]//g' -e 's/#.*$//' \
     | awk 'NF>0 {print $0}' \
     | sort -u
 }
@@ -89,6 +89,7 @@ save_images() {
   if [[ -z "$imgs" ]]; then
     echo "警告：未在 compose 中发现 image 字段。若服务通过 build 生成镜像且未命名 image，请先构建并手动保存对应镜像名。" >&2
   fi
+  echo "输出目录: $OUT_DIR"
   echo "准备保存以下镜像："
   echo "$imgs" | sed 's/^/  - /'
 

@@ -657,8 +657,8 @@ async def _stream_graph_events(
 
             # 记录接收到消息块
             agent_name = _get_agent_name(agent, message_metadata)
-            # Debug: 记录 agent tuple 详情，确认 subgraph 场景下的 agent_name
-            if agent_name in ("researcher", "ResearchTeam") or (agent and len(agent) > 1):
+            # 仅在 agent_name 不常见时记录（调试 subgraph 场景），避免每条 chunk 都打日志
+            if agent_name not in ("researcher", "reporter", "planner", "unknown") and agent and len(agent) > 1:
                 logger.info(f"[STEP_TRACK] thread_id={thread_id} | agent_tuple={agent} | agent_name={agent_name} | _step_index={_step_index}")
 
             # Fallback: 如果 researcher 消息到达但 _step_index 未更新（updates 时序竞争），

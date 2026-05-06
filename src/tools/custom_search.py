@@ -252,73 +252,13 @@ class CustomSearchTool(BaseTool):
             self.channel_id = kwargs.get("channel_id", self.channel_id)
         
         # 记录检索开始
-        tool_name = self.name
-        
-        enhanced_logger.logger.info(
-            f"🔍 SEARCH_START | {tool_name} | 开始搜索 | "
-            f"仓库: {self.repository} | 查询: '{query}'"
-        )
-        console_print(
-            f"\033[32m[🔍 开始搜索] 工具: {tool_name} | 仓库: {self.repository}\033[0m \033[35m| 查询: '{query}'\033[0m",
-            level=logging.INFO
-        )
-        
-        logger.info(f"Custom search query: {query}")
-        logger.info(f"Using repository: {self.repository}")
+        logger.info(f"🔍 {self.name} | 搜索 | 仓库={self.repository} | 查询='{query}'")
         
         try:
             results = self._call_search_api(query)
             duration = time.time() - start_time
             
-            enhanced_logger.logger.info(
-                f"✅ SEARCH_COMPLETE | {self.name} | 搜索完成 | "
-                f"结果数: {len(results)} | 耗时: {duration:.2f}s"
-            )
-            logger.info(f"Custom search returned {len(results)} results in {duration:.2f}s")
-            
-            # 打印检索结果摘要（带日志级别判断）
-            console_print(
-                f"\033[32m[✅ 搜索完成] 查询: '{query}'\033[0m \033[35m| 返回 {len(results)} 条结果 | 耗时: {duration:.2f}s\033[0m",
-                level=logging.INFO
-            )
-            
-            if results and results[0].get('title') != "未找到相关结果" and results[0].get('title') != "搜索错误":
-                console_print(
-                    f"\033[32m[📊 结果详情] 共 {len(results)} 条结果:\033[0m",
-                    level=logging.DEBUG
-                )
-                for i, result in enumerate(results[:5]):  # 只打印前5条
-                    title = result.get('title', '无标题')
-                    content = result.get('content', '')
-                    # 截取内容前60字
-                    content_preview = content[:60] if content else '无内容'
-                    score = result.get('score', 0)
-                    source = result.get('source', '')
-                    
-                    console_print(
-                        f"\033[32m  {i+1}. 标题: {title}\033[0m",
-                        level=logging.DEBUG
-                    )
-                    console_print(
-                        f"\033[35m     内容: {content_preview}...\033[0m",
-                        level=logging.DEBUG
-                    )
-                    if score > 0:
-                        console_print(
-                            f"\033[35m     [评分: {score:.2f} | 来源: {source}]\033[0m",
-                            level=logging.DEBUG
-                        )
-                        
-                if len(results) > 5:
-                    console_print(
-                        f"\033[35m  ... 还有 {len(results) - 5} 条结果\033[0m",
-                        level=logging.DEBUG
-                    )
-            elif not results or results[0].get('title') == "未找到相关结果":
-                console_print(
-                    f"\033[33m[⚠️  无结果] 未找到与 '{query}' 相关的信息\033[0m",
-                    level=logging.INFO
-                )
+            logger.info(f"✅ {self.name} | 搜索完成 | 结果={len(results)} | 耗时={duration:.1f}s")
             
             # 恢复原始配置
             if repository_id:
