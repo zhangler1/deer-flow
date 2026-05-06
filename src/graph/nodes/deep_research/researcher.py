@@ -117,12 +117,33 @@ async def researcher_node(
 
     # 根据报告风格动态配置工具
     if report_style == "industry_report":
-        # 行业研报：使用研报知识库搜索
+        # 行业研报：bocomsearch + online_search（与学术共用同样的预算控制搜索工具）
+        session_id = state.get("session_id", "default")
+        guwp_token = state.get("guwp_token", None)
         tools = [
             research_skill_prompt_search,
-            report_search,
         ]
-        tool_names = "report_search"
+        tool_name_list = ["research_skill_prompt_search"]
+        # 根据开关决定是否添加在线搜索工具
+        if use_budget_online:
+            tools.append(budget_controlled_online_search_tool(
+                max_results=configurable.max_search_results,
+                session_id=session_id,
+                max_search_calls=researcher_limit,
+                max_tokens=max_tokens,
+            ))
+            tool_name_list.append("budget_controlled_online_search")
+        # 根据开关决定是否添加交行搜索工具
+        if use_budget_bocom:
+            tools.append(budget_controlled_bocomsearch_tool(
+                session_id=session_id,
+                max_search_calls=researcher_limit,
+                max_tokens=max_tokens,
+                max_results=configurable.max_search_results,
+                guwp_token=guwp_token,
+            ))
+            tool_name_list.append("budget_controlled_bocomsearch")
+        tool_names = ", ".join(tool_name_list)
 
     elif report_style == "business_marketing":
         # 对公营销报告：使用完整的工具链
