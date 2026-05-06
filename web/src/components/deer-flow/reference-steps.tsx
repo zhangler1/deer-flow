@@ -200,7 +200,7 @@ function StepRow({
       <div className="min-w-0 flex-1">
         {/* 计划步骤标题（加粗，高层级） */}
         {step.isPlanStep ? (
-          <div className="text-sm font-semibold text-foreground">
+          <div className="text-base font-semibold text-foreground">
             {step.description}
           </div>
         ) : (

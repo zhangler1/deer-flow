@@ -99,13 +99,17 @@ export function ResearchBlock({
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
     const filename = `research-report-${timestamp}`;
 
-    // 尝试调用后端 API 转换为 Word
+    // 尝试调用 easyparse 服务转换为 Word
+    // easyparse 接受 multipart/form-data 文件上传，路由为 /markdown_to_word
     try {
       setDownloading(true);
-      const res = await fetch(resolveServiceURL("markdown/to_word"), {
+      const formData = new FormData();
+      const mdBlob = new Blob([report.content], { type: 'text/markdown' });
+      formData.append('file', mdBlob, `${filename}.md`);
+
+      const res = await fetch(resolveServiceURL("markdown_to_word"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: report.content, filename }),
+        body: formData,
       });
 
       if (res.ok) {
