@@ -854,7 +854,7 @@ def _make_event(event_type: str, data: Dict[str, Any]):
 # Markdown 转 Word 代理接口
 # ============================================================
 
-EASYPARSE_SERVICE_URL = os.getenv("EASYPARSE_SERVICE_URL", "http://localhost:5000")
+EASYPARSE_SERVICE_URL = os.getenv("EASYPARSE_SERVICE_URL", "http://nginx")
 
 
 @app.post("/api/markdown/to_word")
@@ -862,8 +862,9 @@ async def markdown_to_word(request: MarkdownToWordRequest):
     """
     将 Markdown 内容转换为 Word 文档
 
-    调用 easyparse 服务的 /markdown_to_word 接口进行转换，
-    服务地址通过 EASYPARSE_SERVICE_URL 环境变量配置。
+    调用 easyparse 服务进行转换，通过 nginx 负载均衡分发到 easyparse 实例。
+    调用链: 后端 → nginx(/markdown_to_word) → easyparse 集群
+    EASYPARSE_SERVICE_URL 默认 http://nginx，拼接后请求 nginx 的负载均衡路由。
     """
     easyparse_url = f"{EASYPARSE_SERVICE_URL}/markdown_to_word"
 
