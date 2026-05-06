@@ -44,3 +44,5 @@ class State(MessagesState):
     # 当前研究步骤追踪（由 _execute_agent_step 更新，供其他节点和前端读取）
     current_step_index: int = -1  # 当前 plan step 索引（从0开始，-1 表示未开始）
     current_step_title: str = ""  # 当前 plan step 标题
+    next_step_index: int = -1  # 下一步 plan step 索引（-1 表示无下一步）
+    next_step_title: str = ""  # 下一步 plan step 标题

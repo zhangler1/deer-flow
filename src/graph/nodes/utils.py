@@ -378,8 +378,14 @@ async def _execute_agent_step(
                 )
             ],
             "observations": observations + [response_content],
+            # 当前步骤信息（刚完成的步骤）
             "current_step_index": len(completed_steps),
             "current_step_title": current_step.title,
+            # 下一步信息（供 SSE 层直接使用，无需 +1 推算）
+            "next_step_index": len(completed_steps) + 1 if len(completed_steps) + 1 < len(plan_steps) else -1,
+            "next_step_title": (plan_steps[len(completed_steps) + 1].title
+                                if len(completed_steps) + 1 < len(plan_steps)
+                                else ""),
         },
         goto="research_team",
     )

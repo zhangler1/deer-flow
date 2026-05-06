@@ -437,6 +437,7 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
     if agent_name == "researcher" and step_index >= 0:
         event_stream_message["step_index"] = step_index
         event_stream_message["step_title"] = step_title
+        logger.debug(f"[STEP_TRACK] msg chunk | agent={agent_name} | step_index={step_index} | step_title={step_title}")
 
     if isinstance(message_chunk, ToolMessage):
         # Tool Message - Return the result of the tool call
@@ -556,6 +557,7 @@ async def _stream_graph_events(
     # 上一个节点执行完后 State 已更新，下一步的 step 信息自然确定
     _step_index = -1  # 当前 plan step 索引（-1=未开始，0=第一步...）
     _step_title = ""  # 当前 plan step 标题
+    _cached_plan_steps = None  # 缓存 plan steps，用于 fallback 推算
 
     try:
         async for agent, _, event_data in graph_instance.astream(
@@ -608,25 +610,39 @@ async def _stream_graph_events(
                 for _node_name, _node_update in event_data.items():
                     if not isinstance(_node_update, dict):
                         continue
-                    if "current_step_index" in _node_update:
-                        # researcher 刚完成 step N，下一步是 step N+1
+                    if "next_step_index" in _node_update:
+                        # 优先使用下一步信息（utils.py 已算好，无需 SSE 层推导）
+                        _next_idx = _node_update["next_step_index"]
+                        if _next_idx is not None and _next_idx >= 0:
+                            _step_index = _next_idx
+                            _step_title = _node_update.get("next_step_title", "")
+                            logger.info(f"[STEP_TRACK] thread_id={thread_id} | next_step: index={_step_index} | title={_step_title}")
+                    elif "current_step_index" in _node_update:
+                        # Fallback: 如果没有 next_step_index，从 current_step_index 推算
+                        # current_step_index 是刚完成的步骤索引，下一步需要 +1
                         _step_index = _node_update["current_step_index"] + 1
-                    if "current_step_title" in _node_update:
-                        _step_title = _node_update["current_step_title"]
+                        _step_title = ""  # 清空，下面从 plan 中取
+                        logger.info(f"[STEP_TRACK] thread_id={thread_id} | fallback: current_step_index={_node_update['current_step_index']} | _step_index={_step_index}")
                 
-                    # 4) 如果 plan 刚创建（planner/human_feedback 节点），
-                    #    从 current_plan 中提取第一个 step 的信息
-                    if "current_plan" in _node_update and _step_index < 0:
+                    # 4) 从 current_plan 中补充 step_title
+                    #    - plan 刚创建时：step_index < 0，取第一步
+                    #    - step 完成后：step_index 已更新，取对应步骤的标题
+                    if "current_plan" in _node_update:
                         plan_obj = _node_update["current_plan"]
                         steps = None
                         if hasattr(plan_obj, 'steps'):
                             steps = plan_obj.steps
                         elif isinstance(plan_obj, dict) and 'steps' in plan_obj:
                             steps = plan_obj['steps']
-                        if steps and len(steps) > 0:
-                            _step_index = 0
-                            first_step = steps[0]
-                            _step_title = getattr(first_step, 'title', None) or (first_step.get('title', '') if isinstance(first_step, dict) else '')
+                        if steps:
+                            _cached_plan_steps = steps  # 缓存用于 fallback
+                            if _step_index < 0:
+                                # plan 刚创建，从第一步开始
+                                _step_index = 0
+                            # 从 plan 中取当前 step_index 对应的标题
+                            if _step_index < len(steps) and not _step_title:
+                                target_step = steps[_step_index]
+                                _step_title = getattr(target_step, 'title', None) or (target_step.get('title', '') if isinstance(target_step, dict) else '')
                     break  # 只处理第一个节点更新
 
                 # 其他 update 目前不需要转成事件，直接忽略
@@ -639,6 +655,15 @@ async def _stream_graph_events(
             # 记录接收到消息块
             agent_name = _get_agent_name(agent, message_metadata)
             logger.debug(f"[STREAM_MESSAGE] thread_id={thread_id} | 事件数: {event_count} | agent: {agent_name} | 内容长度: {len(message_chunk.content) if hasattr(message_chunk, 'content') else 0}")
+
+            # Fallback: 如果 researcher 消息到达但 _step_index 未更新（updates 时序竞争），
+            # 从缓存的 plan steps 和 State 中的 current_step_index 推算
+            if agent_name == "researcher" and _step_index < 0 and _cached_plan_steps:
+                _step_index = 0
+                if not _step_title and len(_cached_plan_steps) > 0:
+                    first_step = _cached_plan_steps[0]
+                    _step_title = getattr(first_step, 'title', None) or (first_step.get('title', '') if isinstance(first_step, dict) else '')
+                logger.info(f"[STEP_TRACK] thread_id={thread_id} | fallback: _step_index={_step_index} | _step_title={_step_title}")
 
             async for event in _process_message_chunk(
                 message_chunk, message_metadata, thread_id, agent,

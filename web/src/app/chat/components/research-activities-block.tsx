@@ -83,6 +83,8 @@ function isSearchTool(name: string): boolean {
     "web_search",
     "domain_fin_search",
     "online_search",
+    "bocomsearch",
+    "budget_controlled_bocomsearch",
     "industry_report_search",
     "product_search",
     "product_instance_search",
@@ -208,9 +210,11 @@ function buildStepsFromActivityIds(
   }
 
   // 以 researcher 消息为主驱动，利用后端传入的 stepIndex 控制展示层级
-  // 只有后端确认了 stepIndex 的消息，才展示其对应的 plan step 标题
-  // stepIndex 未到达时 = 该步骤还未被后端确认，不展示标题行
+  // 优先使用后端传入的 stepIndex，当 stepIndex 缺失时按 planSteps 顺序推导
   let lastStepIndex = -1;
+
+  // 跟踪已展示的 plan step，确保每个 step 至少显示一次标题行
+  const shownPlanSteps = new Set<number>();
 
   for (const msg of researcherMessages) {
     const rawContent = msg.content || "";
@@ -227,17 +231,24 @@ function buildStepsFromActivityIds(
 
     if (!description && toolCallTags.length === 0) continue;
 
-    // 必须有后端传入的 stepIndex 才展示 plan step 标题
-    // stepIndex === undefined 表示后端尚未确认该步骤，跳过标题行
-    const msgStepIndex = msg.stepIndex;
+    // 优先使用后端传入的 stepIndex
+    // 当 stepIndex 缺失时（如最后一步 updates 时序问题），按顺序推导
+    let msgStepIndex = msg.stepIndex;
     const msgStepTitle = msg.stepTitle;
 
-    // 如果进入新的 step 且后端已确认 stepIndex，先展示 plan step 标题行
+    // Fallback: 如果后端没有传 stepIndex，基于 lastStepIndex 推导
+    // 这是处理最后一步 updates 事件时序竞争的保底逻辑
+    if (msgStepIndex === undefined && lastStepIndex >= 0 && lastStepIndex < planSteps.length - 1) {
+      msgStepIndex = lastStepIndex + 1;
+    }
+
+    // 如果进入新的 step，先展示 plan step 标题行
     if (msgStepIndex !== undefined && msgStepIndex !== lastStepIndex) {
       lastStepIndex = msgStepIndex;
       const currentPlanStep = planSteps[msgStepIndex];
       const stepTitle = msgStepTitle || currentPlanStep?.title;
-      if (stepTitle) {
+      if (stepTitle && !shownPlanSteps.has(msgStepIndex)) {
+        shownPlanSteps.add(msgStepIndex);
         steps.push({
           id: `plan-${msgStepIndex}`,
           description: stepTitle,
