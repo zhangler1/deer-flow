@@ -119,7 +119,8 @@ function extractToolCallTags(toolCall: ToolCallRuntime): ToolCallTag[] {
     }
 
     // 来源链接（从搜索结果中提取前 N 条）
-    if (toolCall.result) {
+    // research_skill_prompt_search 返回纯 markdown，不是 JSON，跳过解析
+    if (toolCall.result && toolCall.name !== "research_skill_prompt_search") {
       try {
         const results = parseJSON<SearchResult[]>(toolCall.result, []);
         if (Array.isArray(results)) {
