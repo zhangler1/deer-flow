@@ -349,6 +349,10 @@ async def _execute_agent_step(
     # Process the result
     response_content = result["messages"][-1].content
     
+    # 防止空 content 导致 LLM 报错 "content len should not be 0"
+    if not response_content or not str(response_content).strip():
+        response_content = "（步骤已完成，工具调用未产生文本响应）"
+    
     # 移除思考标签（如果存在）
     if response_content and '<think>' in response_content.lower():
         original_length = len(response_content)

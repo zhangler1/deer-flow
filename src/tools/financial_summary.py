@@ -139,7 +139,7 @@ def _online_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
     )
 
     tool = CustomSearchTool(
-        repository_id="online-search",
+        repository="online-search",
         max_results=10
     )
     # 自定义工具名称和描述

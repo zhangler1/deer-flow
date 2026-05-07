@@ -272,26 +272,63 @@ class BudgetControlledSearchInput(BaseModel):
     query: str = Field(description="搜索查询字符串")
 
 
-class BudgetControlledSearchTool(BaseTool):
-    """预算控制的搜索工具
+class BocomSearchBaseTool(BaseTool):
+    """交行搜索基础工具，适配 BudgetControlledSearchTool 包装
     
-    包装原始搜索工具，在执行前检查预算。
-    当预算不足时，返回提示信息给模型，而不是执行搜索。
+    封装 call_bocomsearch 函数为 LangChain BaseTool 接口，
+    使其可被 BudgetControlledSearchTool 包装并纳入预算控制。
+    """
+    name: str = "bocomsearch"
+    description: str = "搜索交通银行内部知识库。适用于查询银行政策、产品信息、业务流程、合规要求等内部资料。"
+    repository: str = "bocom-search"
+    max_results: int = 10
+    guwp_token: Optional[str] = None
+    
+    def _run(
+        self,
+        query: str,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+        **kwargs
+    ) -> List[Dict[str, Any]]:
+        """执行交行搜索"""
+        from src.tools.bocom_search import call_bocomsearch
+        token_preview = (self.guwp_token[:8] + "...") if self.guwp_token and len(self.guwp_token) > 8 else self.guwp_token
+        logger.info(f"🔑 bocomsearch | guwp_token={token_preview} | max_results={self.max_results}")
+        return call_bocomsearch(
+            query=query,
+            guwp_token=self.guwp_token,
+            max_results=self.max_results,
+        )
+
+
+class BudgetControlledSearchTool(BaseTool):
+    """预算控制的搜索工具包装器
+    
+    在 React 框架下，大模型自主决定工具调用。本工具通过包装原始搜索工具，
+    在执行层实现预算控制：当预算充足时正常执行搜索，当预算不足时返回提示信息。
+    
+    核心机制：
+    - 包装任意 BaseTool（online_search / bocomsearch / report_search 等）
+    - 从 wrapped_tool 自动继承 name / description，对外透明
+    - 按 session_id 隔离不同用户的预算状态
+    - 搜索前检查预算，搜索后扣减预算
     
     使用示例:
-        # 创建原始工具
-        original_tool = online_search_tool(max_results=5)
+        # 方式1：通过便捷函数创建
+        tool = budget_controlled_online_search_tool(max_results=5, session_id="s1")
         
-        # 包装为预算控制工具
-        budget_tool = BudgetControlledSearchTool(
+        # 方式2：手动包装
+        original_tool = online_search_tool(max_results=5)
+        tool = BudgetControlledSearchTool(
             wrapped_tool=original_tool,
-            session_id="session_123",
-            max_search_calls=10,
+            session_id="s1",
+            max_search_calls=3,
         )
     """
     
-    name: str = "online_search"
-    description: str = "搜索互联网公开信息。适用于查询最新新闻、公开资讯、行业动态等。当系统提示搜索预算不足时，请立即停止搜索并基于已有信息回答问题。"
+    # 默认值仅作 Pydantic 占位，__init__ 中会被 wrapped_tool 的属性覆盖
+    name: str = "budget_controlled_search"
+    description: str = "预算控制的搜索工具"
     args_schema: Type[BaseModel] = BudgetControlledSearchInput
     
     # 被包装的工具
@@ -307,12 +344,12 @@ class BudgetControlledSearchTool(BaseTool):
         """初始化预算控制工具
         
         Args:
-            wrapped_tool: 被包装的原始搜索工具
+            wrapped_tool: 被包装的原始搜索工具（online_search / bocomsearch 等）
             session_id: 会话ID，用于隔离不同会话的预算
             max_search_calls: 最大搜索调用次数
             max_tokens: 最大token数量
         """
-        # 从被包装工具复制属性
+        # 从被包装工具继承 name / description，对外保持透明
         kwargs['name'] = wrapped_tool.name
         kwargs['description'] = wrapped_tool.description
         kwargs['wrapped_tool'] = wrapped_tool
@@ -326,9 +363,14 @@ class BudgetControlledSearchTool(BaseTool):
         get_budget_manager(session_id, max_search_calls, max_tokens)
         
         logger.info(
-            f"🔧 BudgetControlledSearchTool initialized | "
-            f"session: {session_id} | max_calls: {max_search_calls}"
+            f"🔧 BudgetControlledSearchTool 初始化 | "
+            f"工具={wrapped_tool.name} | session={session_id} | max_calls={max_search_calls}"
         )
+    
+    @property
+    def repository(self) -> str:
+        """获取被包装工具的仓库标识（用于日志）"""
+        return getattr(self.wrapped_tool, 'repository', 'N/A')
     
     def _run(
         self,
@@ -340,80 +382,82 @@ class BudgetControlledSearchTool(BaseTool):
         """执行搜索（带预算控制）
         
         流程：
-        1. 检查预算状态
-        2. 如果预算充足，执行原始搜索工具
-        3. 如果预算不足，返回提示信息
+        1. 检查预算状态 → 不足则拦截，返回预算耗尽提示
+        2. 预算充足 → 执行原始搜索工具
+        3. 扣减预算 → 在结果中附加预算警告（如接近上限）
         """
-        # 获取预算管理器
         budget = get_budget_manager(
-            self.session_id, 
-            self.max_search_calls, 
-            self.max_tokens
+            self.session_id, self.max_search_calls, self.max_tokens
         )
-        
-        # 获取当前消息上下文（从run_manager或state）
-        # 注意：这里简化处理，实际可能需要从state获取完整消息
         messages = []  # 简化处理，实际应从state获取
         
-        # 检查预算状态
+        # ── 1. 预算检查 ──
         if not budget.can_search(messages):
-            status = budget.get_budget_status(messages)
-            warning_msg = budget.get_warning_message(messages)
-            
-            logger.warning(
-                f"🛑 SEARCH_BLOCKED | session: {self.session_id} | "
-                f"calls: {status.search_calls_used}/{self.max_search_calls} | "
-                f"tokens: {status.estimated_tokens}/{self.max_tokens}"
-            )
-            
-            # 返回预算不足的提示信息给模型
-            return {
-                "status": "budget_exhausted",
-                "message": warning_msg or "搜索预算已耗尽，请基于已有信息回答问题。",
-                "search_calls_used": status.search_calls_used,
-                "max_search_calls": self.max_search_calls,
-                "suggestion": "请立即停止搜索，综合分析已收集的信息并输出最终答案。"
-            }
+            return self._build_budget_exhausted_response(budget, messages)
         
-        # 预算充足，执行原始搜索
+        # ── 2. 执行搜索 ──
         try:
-            logger.info(f"🔍 SEARCH_EXECUTING | session: {self.session_id} | query: '{query}'")
-            
-            # 调用被包装的工具（统一签名支持）
+            logger.info(
+                f"🔍 {self.name} | 搜索 | 仓库={self.repository} | "
+                f"session={self.session_id} | 查询='{query}'"
+            )
             result = self.wrapped_tool._run(query, run_manager=run_manager, config=config, **kwargs)
             
-            # 记录搜索调用
+            # ── 3. 扣减预算 ──
             budget.record_search_call()
-            
-            # 获取更新后的预算状态
             status = budget.get_budget_status(messages)
             remaining = budget.get_remaining_budget(messages)
             
             logger.info(
-                f"✅ SEARCH_COMPLETED | session: {self.session_id} | "
-                f"remaining_calls: {remaining['remaining_search_calls']} | "
-                f"warning_level: {remaining['warning_level']}"
+                f"✅ {self.name} | 搜索完成 | 结果={len(result) if isinstance(result, list) else 1} | "
+                f"剩余={remaining['remaining_search_calls']} | 警告级别={remaining['warning_level']}"
             )
             
-            # 如果接近预算限制，在结果中添加警告
+            # 接近预算上限时，在结果中附加警告
             if remaining['warning_level'] >= 1:
-                warning = budget.get_warning_message(messages)
-                if isinstance(result, dict):
-                    result['_budget_warning'] = warning
-                    result['_remaining_calls'] = remaining['remaining_search_calls']
-                elif isinstance(result, list):
-                    # 在列表结果中添加警告信息
-                    result.append({
-                        "_budget_warning": warning,
-                        "_remaining_calls": remaining['remaining_search_calls'],
-                        "_type": "system_notice"
-                    })
+                self._attach_budget_warning(result, budget, messages, remaining)
             
             return result
             
         except Exception as e:
-            logger.error(f"❌ SEARCH_ERROR | session: {self.session_id} | error: {e}")
+            logger.error(f"❌ {self.name} | 搜索异常 | session={self.session_id} | error={e}")
             raise
+    
+    
+    def _build_budget_exhausted_response(self, budget: SearchBudgetManager, messages: list) -> dict:
+        """构建预算耗尽的响应"""
+        status = budget.get_budget_status(messages)
+        warning_msg = budget.get_warning_message(messages)
+        
+        logger.warning(
+            f"🛑 {self.name} | 预算耗尽 | session={self.session_id} | "
+            f"已用={status.search_calls_used}/{self.max_search_calls} | "
+            f"tokens={status.estimated_tokens}/{self.max_tokens}"
+        )
+        
+        return {
+            "status": "budget_exhausted",
+            "message": warning_msg or "搜索预算已耗尽，请基于已有信息回答问题。",
+            "search_calls_used": status.search_calls_used,
+            "max_search_calls": self.max_search_calls,
+            "suggestion": "请立即停止搜索，综合分析已收集的信息并输出最终答案。"
+        }
+    
+    
+    def _attach_budget_warning(self, result: Any, budget: SearchBudgetManager, 
+                                 messages: list, remaining: dict) -> None:
+        """在搜索结果中附加预算警告（原地修改）"""
+        warning = budget.get_warning_message(messages)
+        warning_info = {
+            "_budget_warning": warning,
+            "_remaining_calls": remaining['remaining_search_calls'],
+            "_type": "system_notice"
+        }
+        if isinstance(result, dict):
+            result['_budget_warning'] = warning
+            result['_remaining_calls'] = remaining['remaining_search_calls']
+        elif isinstance(result, list):
+            result.append(warning_info)
 
 
 def create_budget_controlled_search_tool(
@@ -561,7 +605,7 @@ def budget_controlled_bocomsearch_tool(
     max_results: int = 10,
     guwp_token: Optional[str] = None,
 ) -> BudgetControlledSearchTool:
-    """创建预算控制的交通银行搜索工具
+    """创建预算控制的交行搜索工具
     
     与 budget_controlled_online_search 共用预算管理器，确保总搜索量不超限
     
@@ -575,40 +619,8 @@ def budget_controlled_bocomsearch_tool(
     Returns:
         BudgetControlledSearchTool: 带预算控制的搜索工具实例
     """
-    from src.tools.bocom_search import call_bocomsearch
-    from langchain_core.tools import BaseTool
-    from langchain_core.callbacks import CallbackManagerForToolRun
-    
-    # 创建 bocomsearch 基础工具类
-    class BocomSearchBaseTool(BaseTool):
-        """Bocom搜索基础工具，适配 BudgetControlledSearchTool"""
-        name: str = "bocomsearch"
-        description: str = "搜索交通银行内部知识库。适用于查询银行政策、产品信息、业务流程、合规要求等内部资料。"
-        max_results: int = 10
-        guwp_token: Optional[str] = None
-        
-        def __init__(self, max_results: int = 10, guwp_token: Optional[str] = None, **kwargs):
-            super().__init__(**kwargs)
-            self.max_results = max_results
-            self.guwp_token = guwp_token
-        
-        def _run(
-            self,
-            query: str,
-            run_manager: Optional[CallbackManagerForToolRun] = None,
-            **kwargs
-        ) -> List[Dict[str, Any]]:
-            """执行搜索"""
-            return call_bocomsearch(
-                query=query,
-                guwp_token=self.guwp_token,
-                max_results=self.max_results,
-            )
-    
-    # 创建基础工具实例
     base_tool = BocomSearchBaseTool(max_results=max_results, guwp_token=guwp_token)
     
-    # 创建预算控制包装器
     return create_budget_controlled_search_tool(
         wrapped_tool=base_tool,
         session_id=session_id,
