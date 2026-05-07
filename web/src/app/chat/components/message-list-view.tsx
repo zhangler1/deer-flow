@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Lightbulb,
   Wrench,
+  FileText,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useMemo, useRef, useState } from "react";
@@ -190,7 +191,7 @@ export function MessageListView({
   return (
     <ScrollContainer
       className={cn("flex h-full w-full flex-col overflow-hidden", className)}
-      scrollShadowColor="var(--app-background)"
+      scrollShadow={false}
       autoScrollToBottom
       ref={scrollContainerRef}
     >
@@ -749,8 +750,12 @@ function MessageListItem({
     );
   } else if (startOfResearch) {
     content = (
-      <div className="w-full px-4">
+      <div className="px-4 flex flex-col gap-2">
+        <div className="text-base text-muted-foreground">
+          接下来将为你生成报告：
+        </div>
         <ResearchCard
+          className="w-[340px] max-w-full"
           researchId={message.id}
           onToggleResearch={onToggleResearch}
         />
@@ -847,28 +852,33 @@ function ResearchCard({
     }
     onToggleResearch?.();
   }, [openResearchId, researchId, onToggleResearch]);
+  const isOpen = openResearchId === researchId;
   return (
-    <Card className={cn("w-full", className)}>
-      <CardHeader>
-        <CardTitle>
-          <RainbowText animated={state !== t("reportGenerated")}>
+    <Card
+      className={cn(
+        "w-full cursor-pointer transition-all duration-200 hover:shadow-md hover:border-gray-300",
+        isOpen
+          ? "bg-[linear-gradient(109deg,rgb(243,247,255)_0%,white_50%,white_100%)] !bg-transparent ring-1 ring-primary/20 border-primary/30"
+          : "bg-white",
+        className,
+      )}
+      onClick={handleOpen}
+    >
+      <div className="flex items-center py-1.5 px-2 gap-2">
+        {/* 左侧图标 */}
+        <div className="shrink-0 flex items-center justify-center w-6 h-6 rounded bg-primary/10 text-primary">
+          <FileText className="w-3.5 h-3.5" />
+        </div>
+        {/* 中间信息 */}
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm text-foreground truncate">
             {title !== undefined && title !== "" ? title : t("deepResearch")}
-          </RainbowText>
-        </CardTitle>
-      </CardHeader>
-      <CardFooter>
-        <div className="flex w-full">
-          <RollingText className="text-muted-foreground flex-grow text-sm">
+          </div>
+          <RollingText className="text-muted-foreground text-xs">
             {state}
           </RollingText>
-          <Button
-            variant={!openResearchId ? "default" : "outline"}
-            onClick={handleOpen}
-          >
-            {researchId !== openResearchId ? t("open") : t("close")}
-          </Button>
         </div>
-      </CardFooter>
+      </div>
     </Card>
   );
 }
