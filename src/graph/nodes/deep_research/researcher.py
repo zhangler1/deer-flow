@@ -98,8 +98,8 @@ async def researcher_node(
     
     enhanced_logger.logger.info(f"🔍 RESEARCH_INIT | 开始研究步骤: {current_step_title}")
 
-    # 获取报告风格，默认为行业研报
-    report_style = state.get("report_style", "industry_report")
+    # 获取报告风格，默认为学术
+    report_style = state.get("report_style", "academic")
     enhanced_logger.logger.info(f"📋 REPORT_STYLE | 当前报告风格: {report_style}")
 
     # 获取预算控制开关（优先从 configurable 读取，默认 True）
@@ -227,9 +227,8 @@ async def researcher_node(
         # 默认配置
         tools = [
             research_skill_prompt_search,
-            report_search,
         ]
-        tool_names = "research_skill_prompt_search, report_search"
+        tool_names = "research_skill_prompt_search"
 
     enhanced_logger.logger.info(
         f"🔧 TOOLS_READY | 研究工具配置完成 | "
