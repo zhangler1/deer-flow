@@ -1,10 +1,14 @@
 services:
-  deer-flow-web:
+  deer-flow-front:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        # 后端 API 完整 URL（可选）。留空表示走同域相对路径：${basePath}/api/xxx
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+        # Next.js basePath：子路径部署前缀。需在 next build 时 inline 进客户端 bundle，
+        # 不能通过运行时环境变量或 .env.local 挂载修改。
+        NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-/deep-research-deerflow}
     image: deer-flow-web
     ports:
       - "3000:3000"

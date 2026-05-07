@@ -11,6 +11,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 
 import { ThemeProviderWrapper } from "~/components/deer-flow/theme-provider-wrapper";
+import { withBasePath } from "~/core/utils/base-path";
 import { env } from "~/env";
 
 import { Toaster } from "../components/deer-flow/toaster";
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
   title: "💡 交心深度研究",
   description:
     "Deep Exploration and Efficient Research, an AI tool that combines language models with specialized tools for research tasks.",
-  icons: [{ rel: "icon", url: "/favicon.ico" }],
+  icons: [{ rel: "icon", url: withBasePath("/favicon.ico") }],
 };
 
 // 暂时注释掉 Geist 字体配置

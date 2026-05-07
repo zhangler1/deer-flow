@@ -27,6 +27,8 @@ FROM node:20-bookworm AS builder
 WORKDIR /app
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_BASE_PATH
+ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -65,4 +67,5 @@ ENV PORT=3000
 CMD ["server.js"]
 
 
-# docker build . -t deer-flow-front.prd:latest --build-arg NEXT_PUBLIC_API_URL=http://192.168.0.106:8000/api  
+# docker build . -t deer-flow-front.prd:latest --build-arg NEXT_PUBLIC_API_URL=http://192.168.0.112:8000/api  
+# 子路径部署示例：--build-arg NEXT_PUBLIC_BASE_PATH=/deep-research-deerflow

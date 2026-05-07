@@ -67,10 +67,15 @@ services:
       - .env  
     # 挂载环境变量
     volumes:
-      - ./web/messages:/app/messages/
-      - ./web/.env.local:/app/web/.env.local:ro
-      - ./conf.yaml:/app/conf.yaml:ro
+      # ① 只挂会改的东西
       - ./web/src:/app/src
+      - ./web/public:/app/public
+      - ./web/messages:/app/messages
+      - ./web/next.config.js:/app/next.config.js:ro
+      - ./web/.env.local:/app/.env.local:ro   # 修正目标路径
+      # ② 用匿名卷保护镜像内的 node_modules 和 .next
+      - /app/node_modules
+      - /app/.next
     depends_on:
       - backend
     restart: unless-stopped

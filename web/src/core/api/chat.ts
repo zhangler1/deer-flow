@@ -8,6 +8,7 @@ import type { Resource } from "../messages";
 import { extractReplayIdFromSearchParams } from "../replay/get-replay-id";
 import { fetchStream } from "../sse";
 import { sleep } from "../utils";
+import { withBasePath } from "../utils/base-path";
 
 import { resolveServiceURL } from "./resolve-service-url";
 import type { ChatEvent } from "./types";
@@ -123,24 +124,24 @@ async function* chatReplayStream(
   let replayFilePath = "";
   if (urlParams.has("mock")) {
     if (urlParams.get("mock")) {
-      replayFilePath = `/mock/${urlParams.get("mock")!}.txt`;
+      replayFilePath = withBasePath(`/mock/${urlParams.get("mock")!}.txt`);
     } else {
       if (params.interrupt_feedback === "accepted") {
-        replayFilePath = "/mock/final-answer.txt";
+        replayFilePath = withBasePath("/mock/final-answer.txt");
       } else if (params.interrupt_feedback === "edit_plan") {
-        replayFilePath = "/mock/re-plan.txt";
+        replayFilePath = withBasePath("/mock/re-plan.txt");
       } else {
-        replayFilePath = "/mock/first-plan.txt";
+        replayFilePath = withBasePath("/mock/first-plan.txt");
       }
     }
     fastForwardReplaying = true;
   } else {
     const replayId = extractReplayIdFromSearchParams(window.location.search);
     if (replayId) {
-      replayFilePath = `/replay/${replayId}.txt`;
+      replayFilePath = withBasePath(`/replay/${replayId}.txt`);
     } else {
       // Fallback to a default replay
-      replayFilePath = `/replay/eiffel-tower-vs-tallest-building.txt`;
+      replayFilePath = withBasePath(`/replay/eiffel-tower-vs-tallest-building.txt`);
     }
   }
   const text = await fetchReplay(replayFilePath, {

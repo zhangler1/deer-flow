@@ -1,10 +1,12 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
+import { withBasePath } from "~/core/utils/base-path";
 import { cn } from "~/lib/utils";
 
 // 默认的 favicon 图标（使用本地静态资源，内网环境友好）
-const DEFAULT_FAVICON = "/images/favicon-standard.png";
+// 使用 withBasePath 以展开为 子路径部署时的 /basePath/images/...
+const DEFAULT_FAVICON = withBasePath("/images/favicon-standard.png");
 
 export function FavIcon({
   className,

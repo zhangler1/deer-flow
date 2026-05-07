@@ -7,6 +7,8 @@ import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
+import { withBasePath } from "~/core/utils/base-path";
+
 export function Logo() {
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -14,7 +16,7 @@ export function Logo() {
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     // 强制刷新并重新加载问答页面
-    window.location.href = '/chat';
+    window.location.href = withBasePath('/chat');
   };
 
   // 等待组件挂载后再渲染主题相关内容，避免hydration错误
@@ -28,7 +30,7 @@ export function Logo() {
   return (
     <a
       className="flex items-center gap-2 opacity-70 transition-opacity duration-300 hover:opacity-100 cursor-pointer"
-      href="/chat"
+      href={withBasePath("/chat")}
       onClick={handleClick}
     >
       {/* 在mounted之前，先渲染一个占位符，避免布局偏移 */}
@@ -37,7 +39,7 @@ export function Logo() {
       ) : isJiaoxinTheme ? (
         // 交心主题：显示AI机器人图标
         <Image
-          src="/images/jiaoxin-logo.png"
+          src={withBasePath("/images/jiaoxin-logo.png")}
           alt="交心深度研究"
           width={32}
           height={32}
