@@ -21,6 +21,9 @@ patch*
 # user conf
 # conf.yaml
 
+# branch-specific compose
+docker-compose.yml
+
 .idea/
 .langgraph_api/
 .DS_Store
