@@ -876,7 +876,16 @@ async def markdown_to_word(request: MarkdownToWordRequest):
         tmp_path = tmp.name
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # 内网服务间调用，必须显式禁用代理：
+        # 1) trust_env=False 让 httpx 忽略环境变量 HTTP_PROXY/HTTPS_PROXY/ALL_PROXY 等
+        # 2) proxy=None 双保险，避免任何隐式代理注入
+        # 否则内网调用 http://nginx 会被容器 env 里的 SOCKS/HTTP 代理劫持，
+        # 触发 socksio.exceptions.ProtocolError: Malformed reply
+        async with httpx.AsyncClient(
+            timeout=60.0,
+            trust_env=False,
+            proxy=None,
+        ) as client:
             with open(tmp_path, "rb") as f:
                 response = await client.post(
                     easyparse_url,
