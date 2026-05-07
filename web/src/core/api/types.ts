@@ -103,6 +103,14 @@ export interface NodeTransitionEvent {
   };
 }
 
+export interface PingEvent {
+  type: "ping";
+  data: {
+    thread_id: string;
+    timestamp: number;
+  };
+}
+
 export interface ErrorEvent {
   type: "error";
   data: {
@@ -119,4 +127,5 @@ export type ChatEvent =
   | InterruptEvent
   | SearchStatusEvent
   | NodeTransitionEvent
+  | PingEvent
   | ErrorEvent;

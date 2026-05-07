@@ -3,6 +3,7 @@
 
 import base64
 from datetime import datetime
+import asyncio
 import json
 import tempfile
 from langchain_core.messages.base import BaseMessage
@@ -551,32 +552,53 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
 async def _stream_graph_events(
     graph_instance, workflow_input, workflow_config, thread_id
 ):
-    """Stream events from the graph and process them."""
+    """Stream events from the graph and process them.
+
+    内置心跳机制：当 LangGraph 工作流长时间无输出时（如 LLM 推理、搜索等待），
+    自动发送 SSE ping 事件保持连接活跃，防止中间代理（nginx 等）因超时断开连接。
+    """
     event_count = 0
     last_event_time = time.time()
     logger.info(f"[STREAM_START] thread_id={thread_id} | 开始流式传输事件")
 
-    # 追踪当前 plan step 信息（从 updates 事件中提取，per-request 隔离）
-    # 上一个节点执行完后 State 已更新，下一步的 step 信息自然确定
-    _step_index = -1  # 当前 plan step 索引（-1=未开始，0=第一步...）
-    _step_title = ""  # 当前 plan step 标题
-    _cached_plan_steps = None  # 缓存 plan steps，用于 fallback 推算
+    # 心跳间隔（秒）：每 30 秒发送一次 ping，远小于 nginx proxy_read_timeout
+    HEARTBEAT_INTERVAL = 30
+
+    # 追踪当前 plan step 信息
+    _step_index = -1
+    _step_title = ""
+    _cached_plan_steps = None
 
     try:
-        async for agent, _, event_data in graph_instance.astream(
+        # 使用显式异步迭代 + 超时心跳机制
+        stream_iterator = graph_instance.astream(
             workflow_input,
             config=workflow_config,
             stream_mode=["messages", "updates"],
             subgraphs=True,
-        ):
+        ).__aiter__()
+
+        while True:
+            try:
+                agent, _, event_data = await asyncio.wait_for(
+                    stream_iterator.__anext__(),
+                    timeout=HEARTBEAT_INTERVAL
+                )
+            except StopAsyncIteration:
+                break
+            except asyncio.TimeoutError:
+                # 超时未收到事件，发送心跳 ping 保持连接
+                ping_event = _make_event("ping", {
+                    "thread_id": thread_id,
+                    "timestamp": time.time(),
+                })
+                logger.debug(f"[HEARTBEAT] thread_id={thread_id} | 发送 ping 心跳")
+                yield ping_event
+                continue
+
             event_count += 1
             current_time = time.time()
-            time_since_last_event = current_time - last_event_time
             last_event_time = current_time
-
-            # 每10个事件或超过30秒记录一次状态
-            # if event_count % 10 == 0 or time_since_last_event > 30:
-            #     logger.info(f"[STREAM_PROGRESS] thread_id={thread_id} | 事件数: {event_count} | 距离上次事件: {time_since_last_event:.2f}s")
 
             if isinstance(event_data, dict):
 
