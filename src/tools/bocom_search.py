@@ -164,22 +164,54 @@ def call_bocomsearch(query: str, guwp_token: Optional[str] = None, timeout: int 
         标准化搜索结果列表
     """
     token = guwp_token or os.getenv("GUWP_TOKEN", "").strip()
+    token_preview = (token[:8] + "...") if token and len(token) > 8 else token
+    
+    # ── 调试日志1: 入参检查 ──
+    logger.info(
+        f"🔍 bocomsearch | 入参 | query='{query}' | token={token_preview} | "
+        f"max_results={max_results} | timeout={timeout}"
+    )
+    
     if not token:
-        logger.warning("GUWP_TOKEN is empty; bocomsearch may fail due to missing auth header")
+        logger.warning("🔑 bocomsearch | GUWP_TOKEN 为空，请求可能因鉴权失败")
 
     headers = {**BocomSearchConfig.HEADERS_BASE, "guwp-token": token} if token else BocomSearchConfig.HEADERS_BASE
     form_data = _build_form_payload(query)
+    
+    # ── 调试日志2: 请求详情 ──
+    logger.info(
+        f"📡 bocomsearch | 发起请求 | url={BocomSearchConfig.API_URL} | "
+        f"REQ_MESSAGE长度={len(form_data.get('REQ_MESSAGE', ''))}"
+    )
 
     try:
         resp = requests.post(BocomSearchConfig.API_URL, headers=headers, data=form_data, timeout=timeout)
+        
+        # ── 调试日志3: 响应状态 ──
+        logger.info(
+            f"📡 bocomsearch | 响应 | status={resp.status_code} | "
+            f"content-length={len(resp.content)} | encoding={resp.encoding}"
+        )
+        
         resp.raise_for_status()
         data = resp.json()
+        
+        # ── 调试日志4: 响应结构 ──
+        rsp_head = data.get("RSP_HEAD", {})
+        tran_success = rsp_head.get("TRAN_SUCCESS")
+        result_count = len(data.get("RSP_BODY", {}).get("result", []))
+        logger.info(
+            f"📡 bocomsearch | 解析 | TRAN_SUCCESS={tran_success} | "
+            f"result条数={result_count} | RSP_HEAD keys={list(rsp_head.keys())}"
+        )
+        
         results = _parse_response(data)
         trimmed = results[:max_results] if (max_results and max_results > 0) else results
+        logger.info(f"✅ bocomsearch | 完成 | 结果={len(trimmed)}")
         _validate_search_results(trimmed, context="call_bocomsearch")
         return trimmed
     except requests.exceptions.RequestException as e:
-        logger.error(f"Bocom search API request failed: {e}")
+        logger.error(f"❌ bocomsearch | 请求失败 | type={type(e).__name__} | error={e}")
         error_result = [
             {
                 "title": "搜索错误",
@@ -192,7 +224,7 @@ def call_bocomsearch(query: str, guwp_token: Optional[str] = None, timeout: int 
         _validate_search_results(error_result, context="request_exception")
         return error_result
     except Exception as e:
-        logger.error(f"Unexpected error in bocomsearch: {e}")
+        logger.error(f"❌ bocomsearch | 异常 | type={type(e).__name__} | error={e}")
         error_result = [
             {
                 "title": "搜索错误",

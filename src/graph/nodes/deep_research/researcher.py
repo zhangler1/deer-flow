@@ -120,6 +120,8 @@ async def researcher_node(
         # 行业研报：bocomsearch + online_search（与学术共用同样的预算控制搜索工具）
         session_id = state.get("session_id", "default")
         guwp_token = state.get("guwp_token", None)
+        token_preview = (guwp_token[:8] + "...") if guwp_token and len(guwp_token) > 8 else guwp_token
+        logger.info(f"🔑 industry_report | guwp_token={token_preview} | session_id={session_id}")
         tools = [
             research_skill_prompt_search,
         ]
@@ -148,8 +150,9 @@ async def researcher_node(
     elif report_style == "business_marketing":
         # 对公营销报告：使用完整的工具链
         session_id = state.get("session_id", "default")
-        # 从 state 中获取 guwp_token（如果有）
         guwp_token = state.get("guwp_token", None)
+        token_preview = (guwp_token[:8] + "...") if guwp_token and len(guwp_token) > 8 else guwp_token
+        logger.info(f"🔑 business_marketing | guwp_token={token_preview} | session_id={session_id}")
         tools = []
         tool_name_list = []
         # 根据开关决定是否添加在线搜索工具
