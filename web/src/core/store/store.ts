@@ -240,6 +240,7 @@ export async function sendMessage(
       report_style: settings.reportStyle,
       force_routing_path: settings.forceRoutingPath, // 🐛 调试模式
       mcp_settings: settings.mcpSettings,
+      guwpToken: settings.guwpToken,
     },
     options,
   );
