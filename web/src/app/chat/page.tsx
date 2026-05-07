@@ -38,8 +38,15 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex h-screen w-screen justify-center overscroll-none">
-      <header className="fixed top-0 left-0 flex h-12 w-full items-center justify-between px-4">
+    <div className="flex h-screen w-screen justify-center overscroll-none bg-white">
+      <header
+        className="fixed top-0 left-0 flex h-12 w-full items-center justify-between px-4 z-50 border-b border-gray-200/60"
+        style={{
+          background: "linear-gradient(to right, rgba(249,250,251,0.92) calc(16px + var(--header-split, 0px)), rgba(255,255,255,0.92) calc(16px + var(--header-split, 0px)))",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+        }}
+      >
         <div className="flex items-center gap-2">
           <Tooltip title="返回上一页">
             <Button

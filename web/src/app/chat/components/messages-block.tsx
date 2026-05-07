@@ -94,14 +94,14 @@ export function MessagesBlock({ className }: { className?: string }) {
         onSendMessage={handleSend}
       />
       {!isReplay ? (
-        <div className="relative flex h-42 shrink-0 pb-4">
+        <div className="relative flex h-42 shrink-0 pb-4 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.06)]">
           {!responding && messageCount === 0 && (
             <ConversationStarter
               className="absolute top-[-218px] left-0"
               onSend={handleSend}
             />
           )}
-          <div className="flex flex-col gap-2 h-full w-full">
+          <div className="flex flex-col gap-2 h-full w-full px-4">
             <SearchStatusBar className="w-full" />
             <InputBox
               className="flex-1 w-full"
