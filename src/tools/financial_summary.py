@@ -17,8 +17,8 @@ from langchain_core.messages import HumanMessage
 
 
 
-# 导入 CustomSearchTool（复用 CustomSearchTool，不依赖 online_search.py）
-from src.tools.custom_search import CustomSearchTool
+# 复用 online_search 的 call_online_search，避免重复构造 CustomSearchTool
+from src.tools.online_search import call_online_search
 # 导入 LLM 工具
 from src.llms.llm import get_llm_by_type
 from src.config.agents import LLMType
@@ -107,9 +107,7 @@ def _extract_company_name(query: str) -> str:
 
 def _online_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
     """
-    联网搜索函数（复现 online_search.py 的 call_online_search 逻辑）
-
-    创建 CustomSearchTool 实例，固定使用 online-search repository
+    联网搜索函数：在 query 上拼接年份做查询增强，然后委托给 online_search
 
     Args:
         query: 搜索查询字符串
@@ -138,16 +136,8 @@ def _online_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
         f"(当前月份: {current_month}月, 使用年份: {search_year})"
     )
 
-    tool = CustomSearchTool(
-        repository="online-search",
-        max_results=10
-    )
-    # 自定义工具名称和描述
-    tool.name = "online_search"
-    tool.description = "搜索互联网公开信息。适用于查询最新新闻、公开资讯、行业动态、学术文献等互联网内容。输入应该是搜索查询字符串。"
-
-    # 调用搜索（使用增强后的查询）
-    return tool._run(enhanced_query)
+    # 直接复用 online_search 工具，避免重复构造 CustomSearchTool
+    return call_online_search(enhanced_query, max_results=max_results)
 
 
 def call_financial_summary(

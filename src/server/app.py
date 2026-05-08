@@ -486,23 +486,20 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
                     tag = "searching"
             event_stream_message["tag"] = tag
             
-            # Check if this is an online_search or web_search tool call and emit search_status event
+            # Check if this is an online_search, bocomsearch or web_search tool call and emit search_status event
             for tool_call in message_chunk.tool_calls:
-                if tool_call.get("name") in ["web_search", "online_search"]:
+                if tool_call.get("name") in ["web_search", "online_search", "bocomsearch"]:
                     # Extract query and repository from tool call args
                     args = tool_call.get("args", {})
                     query = args.get("query", "")
-                    repository_id = args.get("repository_id", "")
-                    
-                    # Get repository name from repository_id
-                    repository_name = repository_id if repository_id else None
+                    repository = args.get("repository", "")
                     
                     # Track this search call
                     tool_call_id = tool_call.get("id", "")
                     if tool_call_id:
                         _active_search_calls[tool_call_id] = {
                             "query": query,
-                            "repository": repository_name or repository_id,
+                            "repository": repository or tool_call.get("name", ""),
                         }
                     
                     # Emit search started event
@@ -512,7 +509,7 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
                         "id": message_chunk.id,
                         "role": "assistant",
                         "query": query,
-                        "repository": repository_name or repository_id if repository_id else None,
+                        "repository": repository or tool_call.get("name", ""),
                         "status": "started",
                     }
                     yield _make_event("search_status", search_event)

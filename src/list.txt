@@ -1,0 +1,38 @@
+[
+  {
+    "orgName": "交通银行/营运与渠道管理部/安全保卫部",
+    "parentOrgName": "交通银行/营运与渠道管理部",
+    "orgSeq": "-1.0.1000000002.1000003416",
+    "orgOrder": 9999,
+    "isCascading": 0,
+    "userId": 2000000327,
+    "userName": "葛坚",
+    "loginName": "gej",
+    "userType": "01",
+    "ehrPosition": "副总经理",
+    "includeNonStaff": 0,
+    "staffType": 0,
+    "isGranted": true,
+    "fromOrg": false,
+    "isDenied": false,
+    "fromGroup": false
+  },
+  {
+    "orgName": "交通银行/营运与渠道管理部/安全保卫部",
+    "parentOrgName": "交通银行/营运与渠道管理部",
+    "orgSeq": "-1.0.1000000002.1000003416",
+    "orgOrder": 9999,
+    "isCascading": 0,
+    "userId": 2000020793,
+    "userName": "王海东",
+    "loginName": "wang_haidong",
+    "userType": "01",
+    "ehrPosition": "总经理",
+    "includeNonStaff": 0,
+    "staffType": 0,
+    "isGranted": true,
+    "fromOrg": false,
+    "isDenied": false,
+    "fromGroup": false
+  }
+  ]

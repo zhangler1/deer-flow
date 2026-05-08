@@ -45,7 +45,7 @@ def get_search_config():
 
 
 # Get the selected search tool
-def get_web_search_tool(max_search_results: int, engine: Optional[str] = None, repository_id: Optional[str] = None):
+def get_web_search_tool(max_search_results: int, engine: Optional[str] = None, repository: Optional[str] = None):
     start_time = time.time()
     search_config = get_search_config()
     
@@ -126,9 +126,9 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None, r
         )
     elif selected_engine == SearchEngine.CUSTOM_SEARCH.value:
         # 使用自定义搜索引擎
-        if repository_id:
-            tool = create_custom_search_with_repository(repository_id=repository_id, max_results=max_search_results)
-            enhanced_logger.logger.info(f"🔧 TOOL_READY | 自定义搜索工具就绪 | 仓库ID: {repository_id}")
+        if repository:
+            tool = create_custom_search_with_repository(repository=repository, max_results=max_search_results)
+            enhanced_logger.logger.info(f"🔧 TOOL_READY | 自定义搜索工具就绪 | 仓库: {repository}")
         else:
             tool = get_custom_search_tool(max_results=max_search_results)
             enhanced_logger.logger.info(f"🔧 TOOL_READY | 默认自定义搜索工具就绪")

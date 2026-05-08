@@ -50,7 +50,7 @@ class SearchResultItem(BaseModel):
 class CustomSearchInput(BaseModel):
     """Input for custom search tool."""
     query: str = Field(description="Search query string")
-    repository_id: Optional[str] = Field(default=None, description="Repository ID to use for search")
+    repository: Optional[str] = Field(default=None, description="Repository to use for search (e.g. online_search, aggregation-search)")
 
 
 class CustomSearchTool(BaseTool):
@@ -79,15 +79,12 @@ class CustomSearchTool(BaseTool):
         # 设置args_schema
         self.args_schema = CustomSearchInput
         
-        # 从环境变量获取配置
+        # 从环境变量获取 API 地址和密钥
         self.api_url = os.getenv("ONLINE_SEARCH_API_URL", "")
         self.api_key = os.getenv("ONLINE_SEARCH_API_KEY", "")
         
-        # 从环境变量读取 repository 和 channel_id（可选，有默认值）
-        if not self.repository or self.repository == "aggregation-search":
-            self.repository = os.getenv("CUSTOM_SEARCH_REPOSITORY", "aggregation-search")
-        if not self.channel_id or self.channel_id == "0":
-            self.channel_id = os.getenv("CUSTOM_SEARCH_CHANNEL_ID", "0")
+        # repository / channel_id 完全由构造参数决定，不再从环境变量覆盖
+        # 调用方通过 CustomSearchTool(repository="xxx") 显式传入
         
         # 如果外部未传入 muwp_user，则从环境变量设置默认值
         if not self.muwp_user or not any(self.muwp_user.model_dump().values()):
@@ -140,6 +137,15 @@ class CustomSearchTool(BaseTool):
             }
         }
         
+        # ── 调试日志: 请求 payload ──
+        logger.info(
+            f"📡 {self.name} | 发起请求 | url={self.api_url} | "
+            f"repository={self.repository} | channelId={self.channel_id} | query='{query}'"
+        )
+        logger.debug(
+            f"📡 {self.name} | 完整payload: {json.dumps(payload, ensure_ascii=False)[:500]}"
+        )
+        
         try:
             response = requests.post(
                 self.api_url,
@@ -147,23 +153,39 @@ class CustomSearchTool(BaseTool):
                 json=payload,
                 timeout=self.timeout
             )
+            
+            # ── 调试日志: 响应状态 ──
+            logger.info(
+                f"📡 {self.name} | 响应 | status={response.status_code} | "
+                f"content-length={len(response.content)} | encoding={response.encoding}"
+            )
+            
             response.raise_for_status()
             
             # 解析响应
             data = response.json()
+            
+            # ── 调试日志: 响应结构 ──
+            rsp_head = data.get("RSP_HEAD", {})
+            tran_success = rsp_head.get("TRAN_SUCCESS")
+            result_count = len(data.get("RSP_BODY", {}).get("result", []))
+            logger.info(
+                f"📡 {self.name} | 解析 | TRAN_SUCCESS={tran_success} | "
+                f"result条数={result_count}"
+            )
             
             # 将API响应格式转换为标准格式
             results = self._parse_response(data)
             return results
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Custom search API request failed: {e}")
+            logger.error(f"❌ {self.name} | 请求失败 | url={self.api_url} | error={e}")
             return []
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse custom search API response: {e}")
+            logger.error(f"❌ {self.name} | JSON解析失败 | error={e}")
             return []
         except Exception as e:
-            logger.error(f"Unexpected error in search API call: {e}")
+            logger.error(f"❌ {self.name} | 未知错误 | error={e}")
             return []
     
     def _validate_search_results(self, results: List[Dict[str, Any]], context: str = "") -> None:
@@ -234,7 +256,7 @@ class CustomSearchTool(BaseTool):
     def _run(
         self,
         query: str,
-        repository_id: Optional[str] = None,
+        repository: Optional[str] = None,
         run_manager: Optional[CallbackManagerForToolRun] = None,
         config: Optional[Dict[str, Any]] = None,
         **kwargs
@@ -243,12 +265,11 @@ class CustomSearchTool(BaseTool):
         import time
         start_time = time.time()
         
-        # 如果提供了repository_id参数，临时覆盖repository和channel_id
+        # 如果 LLM 调用时显式传入 repository 参数，临时覆盖实例配置
         original_repository = self.repository
         original_channel_id = self.channel_id
-        if repository_id:
-            self.repository = repository_id
-            # repository_id 作为 channel_id 的备选
+        if repository:
+            self.repository = repository
             self.channel_id = kwargs.get("channel_id", self.channel_id)
         
         # 记录检索开始
@@ -261,7 +282,7 @@ class CustomSearchTool(BaseTool):
             logger.info(f"✅ {self.name} | 搜索完成 | 结果={len(results)} | 耗时={duration:.1f}s")
             
             # 恢复原始配置
-            if repository_id:
+            if repository:
                 self.repository = original_repository
                 self.channel_id = original_channel_id
             
@@ -284,7 +305,7 @@ class CustomSearchTool(BaseTool):
             duration = time.time() - start_time
             
             # 恢复原始配置
-            if repository_id:
+            if repository:
                 self.repository = original_repository
                 self.channel_id = original_channel_id
             
@@ -312,17 +333,17 @@ class CustomSearchTool(BaseTool):
     async def _arun(
         self,
         query: str,
-        repository_id: Optional[str] = None,
+        repository: Optional[str] = None,
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
     ) -> List[Dict[str, Any]]:
         """异步执行搜索（可选实现）"""
         # 对于简单的 HTTP 请求，可以直接调用同步方法
-        return self._run(query, repository_id, None)
+        return self._run(query, repository, None)
 
 
 def get_custom_search_tool(
     max_results: int = 10,
-    repository_id: Optional[str] = None,
+    repository: Optional[str] = None,
     api_url: Optional[str] = None,
     muwp_user: Optional[MuwpUser] = None
 ) -> CustomSearchTool:
@@ -332,14 +353,14 @@ def get_custom_search_tool(
     # 如果提供了参数，则传递给工具
     if api_url:
         kwargs["api_url"] = api_url
-    if repository_id:
-        kwargs["repository"] = repository_id
+    if repository:
+        kwargs["repository"] = repository
     if muwp_user:
         kwargs["muwp_user"] = muwp_user
         
     return CustomSearchTool(**kwargs)
 
 
-def create_custom_search_with_repository(repository_id: str, max_results: int = 10) -> CustomSearchTool:
-    """根据repository_id创建自定义搜索工具"""
-    return CustomSearchTool(repository=repository_id, max_results=max_results)
+def create_custom_search_with_repository(repository: str, max_results: int = 10) -> CustomSearchTool:
+    """根据 repository 创建自定义搜索工具"""
+    return CustomSearchTool(repository=repository, max_results=max_results)

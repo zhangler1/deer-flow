@@ -53,9 +53,6 @@ class ChatRequest(BaseModel):
     search_engine: Optional[str] = Field(
         "custom_search", description="The search engine to use (tavily, duckduckgo, brave_search, arxiv, wikipedia, custom_search)"
     )
-    custom_search_repository: Optional[str] = Field(
-        None, description="The repository ID for custom search engine"
-    )
     use_budget_controlled_online_search: Optional[bool] = Field(
         True, description="Whether to use budget controlled online search"
     )
