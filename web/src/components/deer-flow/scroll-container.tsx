@@ -20,11 +20,13 @@ export interface ScrollContainerProps {
   scrollShadow?: boolean;
   scrollShadowColor?: string;
   autoScrollToBottom?: boolean;
+  onAtBottomChange?: (atBottom: boolean) => void;
   ref?: RefObject<ScrollContainerRef | null>;
 }
 
 export interface ScrollContainerRef {
   scrollToBottom(): void;
+  forceScrollToBottom(): void;
 }
 
 export function ScrollContainer({
@@ -33,6 +35,7 @@ export function ScrollContainer({
   scrollShadow = true,
   scrollShadowColor = "var(--background)",
   autoScrollToBottom = false,
+  onAtBottomChange,
   ref,
 }: ScrollContainerProps) {
   const { scrollRef, contentRef, scrollToBottom, isAtBottom } =
@@ -43,7 +46,14 @@ export function ScrollContainer({
         scrollToBottom();
       }
     },
+    forceScrollToBottom() {
+      scrollToBottom();
+    },
   }));
+
+  useEffect(() => {
+    onAtBottomChange?.(isAtBottom);
+  }, [isAtBottom, onAtBottomChange]);
 
   const tempScrollRef = useRef<HTMLElement>(null);
   const tempContentRef = useRef<HTMLElement>(null);

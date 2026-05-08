@@ -1,0 +1,33 @@
+/* Copyright (c) 2025 Bytedance Ltd. and/or its affiliates */
+/* SPDX-License-Identifier: MIT */
+
+.flowing {
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.5) 41.6667%,
+    rgba(0, 0, 0, 1) 50%,
+    rgba(0, 0, 0, 0.5) 58.3333%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.5) 41.6667%,
+    rgba(0, 0, 0, 1) 50%,
+    rgba(0, 0, 0, 0.5) 58.3333%
+  );
+  -webkit-mask-size: 240% 100%;
+  mask-size: 240% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: flowingHighlight 2.4s linear infinite;
+}
+
+@keyframes flowingHighlight {
+  0% {
+    -webkit-mask-position: 100% 0%;
+    mask-position: 100% 0%;
+  }
+  100% {
+    -webkit-mask-position: 0% 0%;
+    mask-position: 0% 0%;
+  }
+}

@@ -11,8 +11,8 @@ import { cn } from "~/lib/utils";
 import { MessagesBlock } from "./components/messages-block";
 import { ResearchBlock } from "./components/research-block";
 
-// 默认左侧占比 30%
-const DEFAULT_LEFT_RATIO = 0.30;
+// 默认左侧占比 40%
+const DEFAULT_LEFT_RATIO = 0.40;
 // 左侧最小宽度（像素）
 const MIN_LEFT_WIDTH = 400;
 // 右侧最小占比
@@ -129,15 +129,15 @@ export default function Main() {
               className="absolute left-1/2 -top-12 w-0.5 -translate-x-1/2 bg-gradient-to-b from-transparent via-border to-transparent opacity-0 transition-opacity hover:opacity-100"
               style={{ height: "calc(100% + 3rem)" }}
             />
-            {/* 可点击热区：叠在分界线上 */}
+            {/* 可点击热区：仅放在分隔条右侧（报告面板边缘），避免遮挡左侧 MessagesBlock 的滚动条 */}
             <div
-              className="absolute top-0 left-1/2 h-full w-16 -translate-x-1/2 cursor-col-resize group"
+              className="absolute top-0 left-0 h-full w-8 cursor-col-resize group"
               onMouseDown={handleMouseDown}
             >
-              {/* 热区内细线 */}
-              <div className="absolute left-1/2 top-0 h-full w-0.5 -translate-x-1/2 bg-gradient-to-b from-transparent via-border to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-              {/* 抓手 */}
-              <div className="absolute left-1/2 top-1/2 flex h-14 w-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-solid border-border bg-white shadow-sm opacity-0 transition-opacity group-hover:opacity-100">
+              {/* 热区内细线（视觉居中） */}
+              <div className="absolute right-full top-0 h-full w-0.5 bg-gradient-to-b from-transparent via-border to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+              {/* 抓手（视觉居中） */}
+              <div className="absolute right-full top-1/2 flex h-14 w-3.5 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-solid border-border bg-white shadow-sm opacity-0 transition-opacity group-hover:opacity-100">
                 <div className="h-5 w-px rounded-full bg-muted-foreground/30" />
               </div>
             </div>

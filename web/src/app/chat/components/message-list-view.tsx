@@ -13,9 +13,10 @@ import {
   FileText,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState, useImperativeHandle } from "react";
 
 import { LoadingAnimation } from "~/components/deer-flow/loading-animation";
+import { FlowingText } from "~/components/deer-flow/flowing-text";
 import { Markdown } from "~/components/deer-flow/markdown";
 import { RainbowText } from "~/components/deer-flow/rainbow-text";
 import { RollingText } from "~/components/deer-flow/rolling-text";
@@ -58,6 +59,8 @@ export function MessageListView({
   className,
   onFeedback,
   onSendMessage,
+  onAtBottomChange,
+  scrollRef,
 }: {
   className?: string;
   onFeedback?: (feedback: { option: Option }) => void;
@@ -65,8 +68,20 @@ export function MessageListView({
     message: string,
     options?: { interruptFeedback?: string },
   ) => void;
+  onAtBottomChange?: (atBottom: boolean) => void;
+  scrollRef?: React.RefObject<ScrollContainerRef | null>;
 }) {
   const scrollContainerRef = useRef<ScrollContainerRef>(null);
+  // 将内部 scrollContainerRef 暂露给父级，用于外部滑动到底部按钮等场景
+  useImperativeHandle(
+    scrollRef,
+    () => ({
+      scrollToBottom: () => scrollContainerRef.current?.scrollToBottom(),
+      forceScrollToBottom: () =>
+        scrollContainerRef.current?.forceScrollToBottom(),
+    }),
+    [],
+  );
   const messageIds = useMessageIds();
   const interruptMessage = useLastInterruptMessage();
   const waitingForFeedbackMessageId = useLastFeedbackMessageId();
@@ -193,6 +208,7 @@ export function MessageListView({
       className={cn("flex h-full w-full flex-col overflow-hidden", className)}
       scrollShadow={false}
       autoScrollToBottom
+      onAtBottomChange={onAtBottomChange}
       ref={scrollContainerRef}
     >
       <ul className="flex flex-col">
@@ -229,7 +245,7 @@ export function MessageListView({
         <div className="flex h-8 w-full shrink-0"></div>
       </ul>
       {responding && (noOngoingResearch || !ongoingResearchIsOpen) && (
-        <LoadingAnimation className="ml-4" />
+        <LoadingAnimation className="ml-4 mb-4" />
       )}
     </ScrollContainer>
   );
@@ -750,16 +766,10 @@ function MessageListItem({
     );
   } else if (startOfResearch) {
     content = (
-      <div className="px-4 flex flex-col gap-2">
-        <div className="text-base text-muted-foreground">
-          接下来将为你生成报告：
-        </div>
-        <ResearchCard
-          className="w-[340px] max-w-full"
-          researchId={message.id}
-          onToggleResearch={onToggleResearch}
-        />
-      </div>
+      <StartOfResearchBlock
+        researchId={message.id}
+        onToggleResearch={onToggleResearch}
+      />
     );
   } else if (message.agent === "iterative_research_node") {
     // 特殊处理迭代研究节点的消息
@@ -815,6 +825,36 @@ function MessageListItem({
   );
 }
 
+function StartOfResearchBlock({
+  researchId,
+  onToggleResearch,
+}: {
+  researchId: string;
+  onToggleResearch?: () => void;
+}) {
+  // 跟随内部 ResearchCard 的逻辑：当该 research 已有 report 且 report 不再流式传输，则视为生成完成
+  const reportId = useStore((state) => state.researchReportIds.get(researchId));
+  const reportGenerated = useStore((state) => {
+    if (!reportId) return false;
+    const msg = state.messages.get(reportId);
+    return !!msg && !msg.isStreaming;
+  });
+  return (
+    <div className="px-4 flex flex-col gap-2">
+      <div className="text-base font-medium text-foreground w-fit max-w-full">
+        <FlowingText animated={!reportGenerated}>
+          接下来将为你生成报告：
+        </FlowingText>
+      </div>
+      <ResearchCard
+        className="w-[340px] max-w-full"
+        researchId={researchId}
+        onToggleResearch={onToggleResearch}
+      />
+    </div>
+  );
+}
+
 function ResearchCard({
   className,
   researchId,
@@ -859,7 +899,7 @@ function ResearchCard({
         "w-full cursor-pointer transition-all duration-200 hover:shadow-md hover:border-gray-300",
         isOpen
           ? "bg-[linear-gradient(109deg,rgb(243,247,255)_0%,white_50%,white_100%)] !bg-transparent ring-1 ring-primary/20 border-primary/30"
-          : "bg-white",
+          : "bg-[linear-gradient(to_right,white_0%,white_50%,rgb(243,247,255)_100%)]",
         className,
       )}
       onClick={handleOpen}
