@@ -340,7 +340,13 @@ def iterative_reporter_node(state, config: RunnableConfig) -> Command[Literal["_
             f"✅ LLM_COMPLETE | iterative_reporter | 报告生成完成 | 报告长度: {report_length} | LLM耗时: {llm_duration:.2f}s"
         )
         
-        logger.info(f"iterative reporter response: {response_content}")
+        # 长文本日志截断：只保留前300字和后300字
+        _resp_str = response_content if isinstance(response_content, str) else str(response_content)
+        if len(_resp_str) > 600:
+            _resp_preview = f"{_resp_str[:300]}\n...[省略 {len(_resp_str) - 600} 字]...\n{_resp_str[-300:]}"
+        else:
+            _resp_preview = _resp_str
+        logger.info(f"iterative reporter response: {_resp_preview}")
         
         duration = time.time() - start_time
         enhanced_logger.logger.info(

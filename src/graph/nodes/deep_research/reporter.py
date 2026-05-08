@@ -112,7 +112,13 @@ def reporter_node(state: State, config: RunnableConfig):
         logger.exception(f"Reporter LLM调用异常: {e}")
         raise
     
-    logger.info(f"reporter response: {response_content}")
+    # 长文本日志截断：只保留前300字和后300字
+    _resp_str = response_content if isinstance(response_content, str) else str(response_content)
+    if len(_resp_str) > 600:
+        _resp_preview = f"{_resp_str[:300]}\n...[省略 {len(_resp_str) - 600} 字]...\n{_resp_str[-300:]}"
+    else:
+        _resp_preview = _resp_str
+    logger.info(f"reporter response: {_resp_preview}")
 
     # 保存 observations 为 markdown 文件
     if observations:
