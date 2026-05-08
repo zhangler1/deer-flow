@@ -220,7 +220,15 @@ async def _execute_agent_step(
 
     # 记录Agent执行过程
     agent_exec_start_time = time.time()
-    enhanced_logger.logger.info(f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | 递归限制: {actual_recursion_limit} | 开始时间: {time.strftime('%H:%M:%S')}")
+    # 整步超时（秒），默认 900s，可通过 AGENT_STEP_TIMEOUT 环境变量覆盖
+    try:
+        step_timeout = float(os.getenv("AGENT_STEP_TIMEOUT", "900"))
+    except ValueError:
+        step_timeout = 900.0
+    enhanced_logger.logger.info(
+        f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | 递归限制: {actual_recursion_limit} | "
+        f"超时阈值: {step_timeout:.0f}s | 开始时间: {time.strftime('%H:%M:%S')}"
+    )
 
     # 添加定期心跳日志的异步任务
     async def log_agent_progress():
@@ -230,7 +238,8 @@ async def _execute_agent_step(
             await asyncio.sleep(progress_interval)
             current_duration = time.time() - agent_exec_start_time
             enhanced_logger.logger.info(
-                f"💓 AGENT_HEARTBEAT | {agent_name} | Agent仍在执行中... | 已耗时: {current_duration:.1f}s | 时间: {time.strftime('%H:%M:%S')}"
+                f"💓 AGENT_HEARTBEAT | {agent_name} | Agent仍在执行中... | "
+                f"已耗时: {current_duration:.1f}s / 超时: {step_timeout:.0f}s | 时间: {time.strftime('%H:%M:%S')}"
             )
 
     try:
@@ -253,8 +262,12 @@ async def _execute_agent_step(
         # 启动心跳任务
         heartbeat_task = asyncio.create_task(log_agent_progress())
 
-        result = await agent.ainvoke(
-            input=agent_input, config={"recursion_limit": actual_recursion_limit}
+        # 整步超时兜底：超时后取消 agent 任务，走 skip_step 分支
+        result = await asyncio.wait_for(
+            agent.ainvoke(
+                input=agent_input, config={"recursion_limit": actual_recursion_limit}
+            ),
+            timeout=step_timeout,
         )
 
         # 取消心跳任务
@@ -266,6 +279,57 @@ async def _execute_agent_step(
 
         agent_exec_duration = time.time() - agent_exec_start_time
         enhanced_logger.logger.info(f"✅ AGENT_INVOKED | {agent_name} | LLM调用成功完成 | 耗时: {agent_exec_duration:.2f}s | 结束时间: {time.strftime('%H:%M:%S')}")
+
+    except asyncio.TimeoutError:
+        # 取消心跳任务
+        if 'heartbeat_task' in locals():
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+
+        agent_exec_duration = time.time() - agent_exec_start_time
+        enhanced_logger.logger.warning(
+            f"⏰ AGENT_TIMEOUT | {agent_name} | 超过 {step_timeout:.0f}s 阈值，跳过当前步骤 | "
+            f"已耗时: {agent_exec_duration:.2f}s | 时间: {time.strftime('%H:%M:%S')}"
+        )
+        logger.warning(
+            f"Agent {agent_name} 执行超时({step_timeout:.0f}s)，跳过步骤 '{current_step.title}'"
+        )
+
+        # 标记当前步骤为因超时跳过
+        current_step.execution_res = f"⚠️ 由于执行超时({step_timeout:.0f}s)，此步骤被跳过。"
+
+        step_duration = time.time() - step_start_time
+        enhanced_logger.logger.info(
+            f"⏭️  STEP_SKIPPED | {agent_name} | 步骤因超时跳过，继续下一步 | 总耗时: {step_duration:.2f}s"
+        )
+
+        return Command(
+            update={
+                "messages": [
+                    HumanMessage(
+                        content=f"⚠️ 步骤 '{current_step.title}' 由于执行超时({step_timeout:.0f}s)被跳过",
+                        name=agent_name,
+                    )
+                ],
+                "observations": observations + [current_step.execution_res],
+                "current_step_index": len(completed_steps),
+                "current_step_title": current_step.title,
+                "next_step_index": (
+                    len(completed_steps) + 1
+                    if len(completed_steps) + 1 < len(plan_steps)
+                    else -1
+                ),
+                "next_step_title": (
+                    plan_steps[len(completed_steps) + 1].title
+                    if len(completed_steps) + 1 < len(plan_steps)
+                    else ""
+                ),
+            },
+            goto="research_team",
+        )
 
     except Exception as e:
         # 取消心跳任务
