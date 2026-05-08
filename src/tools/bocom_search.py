@@ -178,10 +178,32 @@ def call_bocomsearch(query: str, guwp_token: Optional[str] = None, timeout: int 
     headers = {**BocomSearchConfig.HEADERS_BASE, "guwp-token": token} if token else BocomSearchConfig.HEADERS_BASE
     form_data = _build_form_payload(query)
     
-    # ── 调试日志2: 请求详情 ──
+    # ── 调试日志2: 请求详情（可直接复制到 Apifox/Postman 调试）──
+    # headers 脱敏：隐藏 guwp-token 实际值
+    safe_headers = dict(headers)
+    if "guwp-token" in safe_headers:
+        safe_headers["guwp-token"] = token_preview or "***"
+    # REQ_MESSAGE 里面是 JSON 字符串，还原为可读的 pretty JSON
+    try:
+        req_message_pretty = json.dumps(
+            json.loads(form_data["REQ_MESSAGE"]),
+            ensure_ascii=False,
+            indent=2,
+        )
+    except Exception:
+        req_message_pretty = form_data.get("REQ_MESSAGE", "")
+    debug_block = (
+        f"\n─── bocomsearch REQUEST (可直接复制到 Apifox/Postman) ───\n"
+        f"POST {BocomSearchConfig.API_URL}\n"
+        f"Headers:\n{json.dumps(safe_headers, ensure_ascii=False, indent=2)}\n"
+        f"Body (application/x-www-form-urlencoded):\n"
+        f"REQ_MESSAGE=\n{req_message_pretty}\n"
+        f"───────────────────────────────────────────────────────────────────────\n"
+    )
     logger.info(
         f"📡 bocomsearch | 发起请求 | url={BocomSearchConfig.API_URL} | "
         f"REQ_MESSAGE长度={len(form_data.get('REQ_MESSAGE', ''))}"
+        f"{debug_block}"
     )
 
     try:

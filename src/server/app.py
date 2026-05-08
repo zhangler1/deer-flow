@@ -150,7 +150,6 @@ async def chat_stream(request: ChatRequest):
             request.max_search_results or 3,
             request.max_iteration or 5,
             request.search_engine or "custom_search",
-            request.custom_search_repository or "",
             request.auto_accepted_plan or False,
             request.interrupt_feedback or "",
             request.mcp_settings if (mcp_enabled and request.mcp_settings) else {},
@@ -721,7 +720,6 @@ async def _astream_workflow_generator(
     max_search_results: int,  # 每次搜索的最大返回条数
     max_iteration: int,  # 迭代研究节点的最大迭代轮数
     search_engine: str,  # 选用的搜索引擎（custom_search/tavily/...）
-    custom_search_repository: str,  # 自定义搜索仓库ID（限定检索域）
     auto_accepted_plan: bool,  # 是否自动接受规划（否则会发起中断等待用户确认）
     interrupt_feedback: str,  # 用户对规划的中断反馈（用于恢复时合并到输入）
     mcp_settings: dict,  # MCP 工具的动态配置（服务、工具、环境变量等）
@@ -776,7 +774,6 @@ async def _astream_workflow_generator(
             "max_search_results": max_search_results,
             "max_iteration": max_iteration,
             "search_engine": search_engine,
-            "custom_search_repository": custom_search_repository,
             "mcp_settings": mcp_settings,
             "report_style": report_style.value,
             "enable_deep_thinking": enable_deep_thinking,
@@ -1291,7 +1288,6 @@ async def _full_workflow_sse_generator(
             max_search_results=request.max_search_results or 1,
             max_iteration=request.max_iteration or 5,
             search_engine=request.search_engine or "custom_search",
-            custom_search_repository=request.custom_search_repository or "",
             auto_accepted_plan=request.auto_accepted_plan if request.auto_accepted_plan is not None else True,
             interrupt_feedback=request.interrupt_feedback or "",
             mcp_settings=request.mcp_settings or {},

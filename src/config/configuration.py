@@ -50,7 +50,6 @@ class Configuration:
     max_search_results: int = 2  # Maximum number of search results
     max_iteration: int = 5  # Maximum number of iterations for iterative research node
     search_engine: str = "custom_search"  # Search engine to use
-    custom_search_repository: Optional[str] = None  # Custom search repository ID
     use_budget_controlled_online_search: bool = True  # 是否使用Budget控制的在线检索
     use_budget_controlled_bocom_search: bool = True   # 是否使用Budget控制的交行搜索
     mcp_settings: dict = None  # MCP settings, including dynamic loaded tools

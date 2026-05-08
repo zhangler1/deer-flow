@@ -24,7 +24,7 @@ from src.tools.decorators import create_logged_tool
 from src.tools.tavily_search.tavily_search_results_with_images import (
     TavilySearchWithImages,
 )
-from src.tools.custom_search import get_custom_search_tool, create_custom_search_with_repository
+from src.tools.custom_search import get_custom_search_tool
 from src.utils.enhanced_logger import get_enhanced_logger
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def get_search_config():
 
 
 # Get the selected search tool
-def get_web_search_tool(max_search_results: int, engine: Optional[str] = None, repository: Optional[str] = None):
+def get_web_search_tool(max_search_results: int, engine: Optional[str] = None):
     start_time = time.time()
     search_config = get_search_config()
     
@@ -125,15 +125,10 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None, r
             ),
         )
     elif selected_engine == SearchEngine.CUSTOM_SEARCH.value:
-        # 使用自定义搜索引擎
-        if repository:
-            tool = create_custom_search_with_repository(repository=repository, max_results=max_search_results)
-            enhanced_logger.logger.info(f"🔧 TOOL_READY | 自定义搜索工具就绪 | 仓库: {repository}")
-        else:
-            tool = get_custom_search_tool(max_results=max_search_results)
-            enhanced_logger.logger.info(f"🔧 TOOL_READY | 默认自定义搜索工具就绪")
+        # 使用默认 repository 的自定义搜索引擎（repository 配置已废弃）
+        tool = get_custom_search_tool(max_results=max_search_results)
         duration = time.time() - start_time
-        enhanced_logger.logger.info(f"🔧 TOOL_READY | 自定义搜索工具配置完成 | 耗时: {duration:.2f}s")
+        enhanced_logger.logger.info(f"🔧 TOOL_READY | 默认自定义搜索工具就绪 | 耗时: {duration:.2f}s")
         return tool
     else:
         enhanced_logger.logger.error(f"❌ TOOL_ERROR | 不支持的搜索引擎: {selected_engine}")

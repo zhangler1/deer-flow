@@ -137,13 +137,22 @@ class CustomSearchTool(BaseTool):
             }
         }
         
-        # ── 调试日志: 请求 payload ──
+        # ── 调试日志: 请求 payload（可直接复制到 Apifox/Postman 调试）──
+        # headers 脱敏：隐藏 Authorization 实际值
+        safe_headers = dict(headers)
+        if "Authorization" in safe_headers:
+            safe_headers["Authorization"] = "Bearer ***"
+        debug_block = (
+            f"\n─── {self.name} REQUEST (可直接复制到 Apifox/Postman) ───\n"
+            f"POST {self.api_url}\n"
+            f"Headers:\n{json.dumps(safe_headers, ensure_ascii=False, indent=2)}\n"
+            f"Body (application/json):\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
+            f"───────────────────────────────────────────────────────────────────────\n"
+        )
         logger.info(
             f"📡 {self.name} | 发起请求 | url={self.api_url} | "
             f"repository={self.repository} | channelId={self.channel_id} | query='{query}'"
-        )
-        logger.debug(
-            f"📡 {self.name} | 完整payload: {json.dumps(payload, ensure_ascii=False)[:500]}"
+            f"{debug_block}"
         )
         
         try:
@@ -359,8 +368,3 @@ def get_custom_search_tool(
         kwargs["muwp_user"] = muwp_user
         
     return CustomSearchTool(**kwargs)
-
-
-def create_custom_search_with_repository(repository: str, max_results: int = 10) -> CustomSearchTool:
-    """根据 repository 创建自定义搜索工具"""
-    return CustomSearchTool(repository=repository, max_results=max_results)
