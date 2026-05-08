@@ -12,16 +12,15 @@ WORKDIR /app
 
 # Pre-cache the application dependencies.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project
+    uv sync  --no-install-project
 
 # Copy the application into the container.
 COPY . /app
 
 # Install the application dependencies.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked 
+    uv sync 
 
 EXPOSE 8000
 
