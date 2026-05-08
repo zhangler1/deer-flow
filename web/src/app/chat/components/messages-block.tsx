@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 import { motion } from "framer-motion";
-import { FastForward, Play } from "lucide-react";
+import { ArrowDown, FastForward, Play } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState } from "react";
 
 import { RainbowText } from "~/components/deer-flow/rainbow-text";
+import type { ScrollContainerRef } from "~/components/deer-flow/scroll-container";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -25,7 +26,6 @@ import { cn } from "~/lib/utils";
 import { ConversationStarter } from "./conversation-starter";
 import { InputBox } from "./input-box";
 import { MessageListView } from "./message-list-view";
-import { SearchStatusBar } from "./search-status-bar";
 import { Welcome } from "./welcome";
 
 export function MessagesBlock({ className }: { className?: string }) {
@@ -86,32 +86,58 @@ export function MessagesBlock({ className }: { className?: string }) {
     setFastForwarding(!fastForwarding);
     fastForwardReplay(!fastForwarding);
   }, [fastForwarding]);
+
+  // 当用户上滑离开底部时，展示“滑动到底部”按钮
+  const messageListRef = useRef<ScrollContainerRef>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const handleScrollToBottom = useCallback(() => {
+    messageListRef.current?.forceScrollToBottom();
+  }, []);
   return (
     <div className={cn("flex h-full flex-col", className)}>
       <MessageListView
         className="flex flex-grow"
         onFeedback={handleFeedback}
         onSendMessage={handleSend}
+        onAtBottomChange={setIsAtBottom}
+        scrollRef={messageListRef}
       />
       {!isReplay ? (
-        <div className="relative flex h-42 shrink-0 pb-4 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.06)]">
+        <div className="relative flex h-42 shrink-0 pb-4 pl-4 pr-[26px]">
           {!responding && messageCount === 0 && (
             <ConversationStarter
-              className="absolute top-[-218px] left-0"
+              className="absolute top-[-218px] left-4"
               onSend={handleSend}
             />
           )}
-          <div className="flex flex-col gap-2 h-full w-full px-4">
-            <SearchStatusBar className="w-full" />
-            <InputBox
-              className="flex-1 w-full"
-              responding={responding}
-              feedback={feedback}
-              onSend={handleSend}
-              onCancel={handleCancel}
-              onRemoveFeedback={handleRemoveFeedback}
-            />
-          </div>
+          {/* 输入框上方的柔和渐变遮罩：仅保留 backdrop-blur，不附加颜色，避免与父容器背景不一致 */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-full z-10 h-10 backdrop-blur-[3px] [mask-image:linear-gradient(to_top,black_30%,transparent)]"
+          />
+          {/* 滚动到底部按钮：完整悬浮在输入框上方，无跨边缘视觉，边框和阴影更柔和 */}
+          {!isAtBottom && (
+            <motion.button
+              type="button"
+              aria-label="滑动到底部"
+              onClick={handleScrollToBottom}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.2 }}
+              className="absolute left-1/2 bottom-full mb-2 z-20 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border border-border/60 bg-white/90 text-muted-foreground shadow-sm backdrop-blur-sm transition-all hover:text-foreground hover:shadow-md"
+            >
+              <ArrowDown size={16} />
+            </motion.button>
+          )}
+          <InputBox
+            className="flex-1 w-full"
+            responding={responding}
+            feedback={feedback}
+            onSend={handleSend}
+            onCancel={handleCancel}
+            onRemoveFeedback={handleRemoveFeedback}
+          />
         </div>
       ) : (
         <>
