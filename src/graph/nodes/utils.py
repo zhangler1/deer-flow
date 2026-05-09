@@ -318,13 +318,83 @@ async def _execute_agent_step(
         # 启动心跳任务
         heartbeat_task = asyncio.create_task(log_agent_progress())
 
-        # 整步超时兜底：超时后取消 agent 任务，走 skip_step 分支
-        result = await asyncio.wait_for(
+        # 并发等待：agent 执行 vs 客户端断连，先到先得（硬性中断）
+        agent_task = asyncio.create_task(
             agent.ainvoke(
                 input=agent_input, config={"recursion_limit": actual_recursion_limit}
-            ),
-            timeout=step_timeout,
+            )
         )
+        wait_set = {agent_task}
+        cancel_wait_task = None
+        if cancel_event is not None:
+            cancel_wait_task = asyncio.create_task(cancel_event.wait())
+            wait_set.add(cancel_wait_task)
+
+        done, _pending = await asyncio.wait(
+            wait_set,
+            timeout=step_timeout,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        # 分支 1：客户端断连 / 显式 cancel 触发
+        if cancel_wait_task is not None and cancel_wait_task in done:
+            agent_task.cancel()
+            try:
+                await agent_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+            agent_exec_duration = time.time() - agent_exec_start_time
+            enhanced_logger.logger.info(
+                f"⛔ AGENT_CANCELLED | {agent_name} | 客户端断连，已中止 agent | 耗时: {agent_exec_duration:.2f}s"
+            )
+            for step in plan_steps:
+                if not step.execution_res:
+                    step.execution_res = "[用户取消]"
+            step_duration = time.time() - step_start_time
+            enhanced_logger.logger.info(
+                f"⛔ STEP_CANCELLED_MID | {agent_name} | 步骤执行中被中止 | 总耗时: {step_duration:.2f}s"
+            )
+            return Command(
+                update={
+                    "messages": [
+                        HumanMessage(
+                            content=f"⛔ 步骤 '{current_step.title}' 被用户取消",
+                            name=agent_name,
+                        )
+                    ],
+                    "observations": observations + ["[研究被用户取消]"],
+                    "current_step_index": len(plan_steps) - 1,
+                    "current_step_title": current_step.title,
+                    "next_step_index": -1,
+                    "next_step_title": "",
+                },
+                goto="research_team",
+            )
+
+        # 分支 2：超时。agent_task 仍在 pending，抑 TimeoutError
+        if agent_task not in done:
+            agent_task.cancel()
+            if cancel_wait_task is not None:
+                cancel_wait_task.cancel()
+            try:
+                await agent_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            raise asyncio.TimeoutError()
+
+        # 分支 3：正常完成
+        if cancel_wait_task is not None:
+            cancel_wait_task.cancel()
+            try:
+                await cancel_wait_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        result = agent_task.result()
 
         # 取消心跳任务
         heartbeat_task.cancel()
@@ -543,7 +613,14 @@ async def _setup_and_execute_agent_step(
     """
     setup_start_time = time.time()
     enhanced_logger.logger.info(f"🔄 AGENT_SETUP_ENTRY | {agent_type} | 开始配置智能体")
-    
+
+    # 提取取消信号（统一封装，一行搞定）
+    from src.graph.cancellation import get_from_config as _get_cancel_event
+    cancel_event = _get_cancel_event(config)
+    enhanced_logger.logger.info(
+        f"🔍 CANCEL_EVENT_STATUS | {agent_type} | cancel_event={'已注册' if cancel_event is not None else 'None'}"
+    )
+
     # 如果提供了自定义 agent_executor，直接使用（跳过 MCP 配置）
     if agent_executor is not None:
         enhanced_logger.logger.info(f"✅ CUSTOM_AGENT | {agent_type} | 使用自定义 agent executor (middleware 支持)")
@@ -554,10 +631,7 @@ async def _setup_and_execute_agent_step(
     configurable = Configuration.from_runnable_config(config)
     mcp_servers = {}
     enabled_tools = {}
-    
-    # 提取取消信号（客户端断连时通知节点停止）
-    cancel_event = config.get("configurable", {}).get("cancel_event")
-    
+
     enhanced_logger.logger.info(f"🔧 TOOL_CONFIG | {agent_type} | 默认工具数: {len(default_tools)}")
 
     # Extract MCP server configuration for this agent type

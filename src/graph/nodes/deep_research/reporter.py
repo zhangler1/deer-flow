@@ -93,10 +93,12 @@ def reporter_node(state: State, config: RunnableConfig):
         reporter_llm = get_llm_by_type(AGENT_LLM_MAP["reporter"])
         enhanced_logger.logger.info(f"🔍 LLM_INFO | reporter | 模型类型: {type(reporter_llm).__name__} | 模型名称: {getattr(reporter_llm, 'model_name', 'unknown')}")
 
-        # 从 config 中获取取消事件（用于检测客户端断连）
-        cancel_event = config.get("configurable", {}).get("cancel_event") if isinstance(config, dict) else None
-        if cancel_event is None and hasattr(config, 'get'):
-            cancel_event = config.get("configurable", {}).get("cancel_event")
+        # 获取取消事件（统一封装，一行搞定）
+        from src.graph.cancellation import get_from_config as _get_cancel_event
+        cancel_event = _get_cancel_event(config)
+        enhanced_logger.logger.info(
+            f"🔍 CANCEL_EVENT_STATUS | reporter | cancel_event={'已注册' if cancel_event is not None else 'None'}"
+        )
 
         # 如果已取消，直接返回
         if cancel_event and cancel_event.is_set():

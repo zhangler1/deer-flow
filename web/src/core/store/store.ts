@@ -383,6 +383,22 @@ export async function sendMessage(
     if (isAborted) {
       // 用户主动取消，不弹错误提示
       console.info("[sendMessage] Stream aborted by user");
+      // 把所有还在流式中的消息标为终止，停止波浪号 + 尾部追加"已终止"
+      const store = useStore.getState();
+      for (const id of store.messageIds) {
+        const m = store.messages.get(id);
+        if (m?.isStreaming) {
+          m.isStreaming = false;
+          m.finishReason = "stop";
+          if (m.content && !m.content.endsWith("[已终止]")) {
+            m.content = m.content + "\n\n**[已终止]**";
+          } else if (!m.content) {
+            m.content = "**[已终止]**";
+          }
+          store.updateMessage(m);
+        }
+      }
+      store.setOngoingResearch(null);
     } else {
       const errMsg = (error as Error).message ?? "未知错误";
       console.error("[sendMessage] Streaming error caught", {

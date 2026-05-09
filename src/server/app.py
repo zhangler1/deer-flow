@@ -140,8 +140,10 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
     # 从环境变量读取系统背景上下文
     system_context = get_str_env("SYSTEM_CONTEXT", "")
 
-    # 创建取消事件：客户端断连时用于通知后端节点中止
-    cancel_event = asyncio.Event()
+    # 创建取消事件：客户端断连或显式调用 /api/chat/cancel 时用于通知后端节点中止
+    # 采用全局注册表按 thread_id 索引，避免通过 LangGraph config 传递对象引用导致丢失
+    from src.graph import cancellation as _cancel_registry
+    cancel_event = _cancel_registry.register(thread_id)
 
     async def _cancellable_stream():
         """包装生成器，检测客户端断连并设置取消信号。"""
@@ -173,12 +175,16 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                     logger.info(f"[CLIENT_DISCONNECTED] thread_id={thread_id} | 客户端已断连，停止推送")
                     cancel_event.set()
                     break
+                if cancel_event.is_set():
+                    logger.info(f"[CANCEL_TRIGGERED] thread_id={thread_id} | cancel_event 已设置，停止推送")
+                    break
                 yield event
         except asyncio.CancelledError:
             logger.info(f"[STREAM_CANCELLED] thread_id={thread_id} | 流被取消")
         finally:
             cancel_event.set()  # 确保无论如何都通知下游停止
-            logger.info(f"[STREAM_CLEANUP] thread_id={thread_id} | cancel_event 已设置")
+            _cancel_registry.unregister(thread_id)
+            logger.info(f"[STREAM_CLEANUP] thread_id={thread_id} | cancel_event 已设置, registry 已清理")
 
     return StreamingResponse(
         _cancellable_stream(),
@@ -209,6 +215,25 @@ def _process_tool_call_chunks(tool_call_chunks, extra_headers: Optional[Dict[str
             }
         )
     return chunks
+
+
+@app.post("/api/chat/cancel")
+async def chat_cancel(payload: dict):
+    """显式取消接口：前端点停止时调用，按 thread_id 主动触发 cancel_event。
+
+    不依赖 TCP 断连检测，避免浏览器 fetch abort 后 keep-alive 连接不关闭导致的失联。
+    """
+    from src.graph import cancellation as _cancel_registry
+    thread_id = (payload or {}).get("thread_id")
+    if not thread_id:
+        return {"ok": False, "reason": "thread_id required"}
+    event = _cancel_registry.get(thread_id)
+    if event is None:
+        logger.info(f"[CHAT_CANCEL] thread_id={thread_id} | 未找到 cancel_event（任务可能已结束）")
+        return {"ok": False, "reason": "not found"}
+    event.set()
+    logger.info(f"[CHAT_CANCEL] thread_id={thread_id} | 已触发 cancel_event")
+    return {"ok": True}
 
 
 def _get_agent_name(agent, message_metadata):

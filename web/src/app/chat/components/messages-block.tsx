@@ -20,6 +20,7 @@ import { useReplayMetadata } from "~/core/api/hooks";
 import type { Option, Resource } from "~/core/messages";
 import { useReplay } from "~/core/replay";
 import { sendMessage, useMessageIds, useStore } from "~/core/store";
+import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { env } from "~/env";
 import { cn } from "~/lib/utils";
 
@@ -65,6 +66,20 @@ export function MessagesBlock({ className }: { className?: string }) {
     [feedback],
   );
   const handleCancel = useCallback(() => {
+    // 双保险：前端 abort + 后端显式 cancel 接口
+    // 原因：浏览器 fetch abort 后，keep-alive TCP 连接不一定立即关闭，
+    // ASGI 可能收不到 http.disconnect，必须显式通知后端
+    const threadId = useStore.getState().threadId;
+    if (threadId) {
+      fetch(resolveServiceURL("chat/cancel"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thread_id: threadId }),
+        keepalive: true,
+      }).catch((err) => {
+        console.warn("[handleCancel] cancel 接口调用失败", err);
+      });
+    }
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
   }, []);
