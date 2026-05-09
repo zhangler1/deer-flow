@@ -17,7 +17,7 @@ import uuid
 from uuid import uuid4
 import os
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolMessage
@@ -121,7 +121,7 @@ graph = build_graph_with_memory()
 
 
 @app.post("/api/chat/stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, raw_request: Request):
     # Check if MCP server configuration is enabled
     mcp_enabled = get_bool_env("ENABLE_MCP_SERVER_CONFIGURATION", False)
 
@@ -140,28 +140,48 @@ async def chat_stream(request: ChatRequest):
     # 从环境变量读取系统背景上下文
     system_context = get_str_env("SYSTEM_CONTEXT", "")
 
+    # 创建取消事件：客户端断连时用于通知后端节点中止
+    cancel_event = asyncio.Event()
+
+    async def _cancellable_stream():
+        """包装生成器，检测客户端断连并设置取消信号。"""
+        try:
+            async for event in _astream_workflow_generator(
+                request.model_dump()["messages"],
+                thread_id,
+                request.resources or [],
+                request.max_plan_iterations or 2,
+                request.max_step_num or 5,
+                request.max_search_results or 3,
+                request.max_iteration or 5,
+                request.search_engine or "custom_search",
+                request.auto_accepted_plan or False,
+                request.interrupt_feedback or "",
+                request.mcp_settings if (mcp_enabled and request.mcp_settings) else {},
+                request.enable_background_investigation or True,
+                request.report_style or ReportStyle.ACADEMIC,
+                request.enable_deep_thinking or False,
+                system_context=system_context,
+                force_routing_path=request.force_routing_path,
+                guwp_token=request.guwp_token,
+                use_budget_controlled_online_search=request.use_budget_controlled_online_search if request.use_budget_controlled_online_search is not None else True,
+                use_budget_controlled_bocom_search=request.use_budget_controlled_bocom_search if request.use_budget_controlled_bocom_search is not None else True,
+                cancel_event=cancel_event,
+            ):
+                # 每发送一个 SSE 事件前检查客户端是否断连
+                if await raw_request.is_disconnected():
+                    logger.info(f"[CLIENT_DISCONNECTED] thread_id={thread_id} | 客户端已断连，停止推送")
+                    cancel_event.set()
+                    break
+                yield event
+        except asyncio.CancelledError:
+            logger.info(f"[STREAM_CANCELLED] thread_id={thread_id} | 流被取消")
+        finally:
+            cancel_event.set()  # 确保无论如何都通知下游停止
+            logger.info(f"[STREAM_CLEANUP] thread_id={thread_id} | cancel_event 已设置")
+
     return StreamingResponse(
-        _astream_workflow_generator(
-            request.model_dump()["messages"],
-            thread_id,
-            request.resources or [],
-            request.max_plan_iterations or 2,
-            request.max_step_num or 5,
-            request.max_search_results or 3,
-            request.max_iteration or 5,
-            request.search_engine or "custom_search",
-            request.auto_accepted_plan or False,
-            request.interrupt_feedback or "",
-            request.mcp_settings if (mcp_enabled and request.mcp_settings) else {},
-            request.enable_background_investigation or True,
-            request.report_style or ReportStyle.ACADEMIC,
-            request.enable_deep_thinking or False,
-            system_context=system_context,  # 从环境变量读取
-            force_routing_path=request.force_routing_path,  # 🐛 调试模式
-            guwp_token=request.guwp_token,
-            use_budget_controlled_online_search=request.use_budget_controlled_online_search if request.use_budget_controlled_online_search is not None else True,
-            use_budget_controlled_bocom_search=request.use_budget_controlled_bocom_search if request.use_budget_controlled_bocom_search is not None else True,
-        ),
+        _cancellable_stream(),
         media_type="text/event-stream",
     )
 
@@ -731,6 +751,7 @@ async def _astream_workflow_generator(
     guwp_token: Optional[str] = None,
     use_budget_controlled_online_search: bool = True,  # 是否使用预算控制的在线搜索
     use_budget_controlled_bocom_search: bool = True,  # 是否使用预算控制的交行搜索
+    cancel_event: asyncio.Event = None,  # 客户端断连取消信号
 ):
     # Process initial messages
     for message in messages:
@@ -780,6 +801,7 @@ async def _astream_workflow_generator(
             "system_context": system_context,  # 将系统背景传递到配置中
             "use_budget_controlled_online_search": use_budget_controlled_online_search,
             "use_budget_controlled_bocom_search": use_budget_controlled_bocom_search,
+            "cancel_event": cancel_event,  # 客户端断连取消信号，reporter 节点检测
         },
         "recursion_limit": get_recursion_limit(),
     }

@@ -93,14 +93,50 @@ def reporter_node(state: State, config: RunnableConfig):
         reporter_llm = get_llm_by_type(AGENT_LLM_MAP["reporter"])
         enhanced_logger.logger.info(f"🔍 LLM_INFO | reporter | 模型类型: {type(reporter_llm).__name__} | 模型名称: {getattr(reporter_llm, 'model_name', 'unknown')}")
 
-        enhanced_logger.logger.info(f"⏳ LLM_CALL_START | reporter | 准备调用LLM.invoke() | 时间: {time.strftime('%H:%M:%S')}")
+        # 从 config 中获取取消事件（用于检测客户端断连）
+        cancel_event = config.get("configurable", {}).get("cancel_event") if isinstance(config, dict) else None
+        if cancel_event is None and hasattr(config, 'get'):
+            cancel_event = config.get("configurable", {}).get("cancel_event")
 
-        response = reporter_llm.invoke(invoke_messages)
+        # 如果已取消，直接返回
+        if cancel_event and cancel_event.is_set():
+            enhanced_logger.logger.info(f"⛔ LLM_SKIPPED | reporter | 客户端已断连，跳过报告生成")
+            return {"final_report": "报告生成已被用户取消。"}
+
+        enhanced_logger.logger.info(f"⏳ LLM_CALL_START | reporter | 准备调用LLM.stream() | 时间: {time.strftime('%H:%M:%S')}")
+
+        # 使用 stream() 替代 invoke()，允许在 chunk 之间检测取消信号
+        chunks = []
+        cancelled = False
+        for chunk in reporter_llm.stream(invoke_messages):
+            if cancel_event and cancel_event.is_set():
+                enhanced_logger.logger.info(
+                    f"⛔ LLM_CANCELLED | reporter | 客户端断连，中止报告生成 | "
+                    f"已生成 {len(chunks)} 个 chunk"
+                )
+                cancelled = True
+                break
+            chunks.append(chunk)
+
+        # 拼接所有 chunk 的内容
+        response_content = "".join(
+            chunk.content for chunk in chunks if hasattr(chunk, 'content') and chunk.content
+        )
 
         llm_call_end_time = time.time()
-        enhanced_logger.logger.info(f"✅ LLM_CALL_END | reporter | LLM调用成功返回 | 时间: {time.strftime('%H:%M:%S')} | 耗时: {llm_call_end_time - llm_start_time:.2f}s")
-
-        response_content = response.content
+        if cancelled:
+            enhanced_logger.logger.info(
+                f"⛔ LLM_CALL_CANCELLED | reporter | 报告生成被中断 | "
+                f"耗时: {llm_call_end_time - llm_start_time:.2f}s | "
+                f"已生成内容长度: {len(response_content)}"
+            )
+            if not response_content:
+                response_content = "报告生成已被用户取消。"
+        else:
+            enhanced_logger.logger.info(
+                f"✅ LLM_CALL_END | reporter | LLM调用成功返回 | "
+                f"时间: {time.strftime('%H:%M:%S')} | 耗时: {llm_call_end_time - llm_start_time:.2f}s"
+            )
 
         llm_duration = time.time() - llm_start_time
         report_length = len(response_content) if response_content else 0

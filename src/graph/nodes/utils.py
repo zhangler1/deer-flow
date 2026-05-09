@@ -75,7 +75,8 @@ def handoff_to_planner(
 
 
 async def _execute_agent_step(
-    state: State, agent: Any, agent_name: str, recursion_limit: int = 10
+    state: State, agent: Any, agent_name: str, recursion_limit: int = 10,
+    cancel_event=None,
 ) -> Command[Literal["research_team"]]:
     """使用指定智能体执行步骤的辅助函数
     
@@ -84,6 +85,7 @@ async def _execute_agent_step(
         agent: 智能体实例
         agent_name: 智能体名称
         recursion_limit: 递归限制
+        cancel_event: 可选的 asyncio.Event，客户端断连时被 set
         
     Returns:
         Command 对象，用于更新状态并转到 research_team
@@ -121,6 +123,27 @@ async def _execute_agent_step(
         enhanced_logger.logger.warning(f"⚠️ STEP_NOT_FOUND | {agent_name} | 未找到未执行的步骤")
         logger.warning("未找到未执行的步骤")
         return Command(goto="research_team")
+
+    # ─── 取消信号检查：如果客户端已断连，标记所有剩余 step 为 cancelled ───
+    if cancel_event and cancel_event.is_set():
+        enhanced_logger.logger.info(
+            f"⛔ STEP_CANCELLED | {agent_name} | 客户端已断连，跳过剩余步骤"
+        )
+        # 标记所有未完成步骤为 cancelled，使路由函数认为全部完成 → 进入 reporter
+        for step in plan_steps:
+            if not step.execution_res:
+                step.execution_res = "[用户取消]"
+        return Command(
+            update={
+                "observations": observations + ["[研究被用户取消]"],
+                "current_step_index": len(plan_steps) - 1,
+                "current_step_title": current_step.title,
+                "next_step_index": -1,
+                "next_step_title": "",
+            },
+            goto="research_team",
+        )
+    # ─────────────────────────────────────────────────────────────────────
 
     enhanced_logger.logger.info(f"🎯 STEP_SELECTED | {agent_name} | 正在执行: {current_step.title}")
     logger.info(f"Executing step: {current_step.title}, agent: {agent_name}")
@@ -526,11 +549,14 @@ async def _setup_and_execute_agent_step(
         enhanced_logger.logger.info(f"✅ CUSTOM_AGENT | {agent_type} | 使用自定义 agent executor (middleware 支持)")
         setup_duration = time.time() - setup_start_time
         enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | 自定义智能体配置完成 | 耗时: {setup_duration:.2f}s")
-        return await _execute_agent_step(state, agent_executor, agent_type, recursion_limit=recursion_limit)
+        return await _execute_agent_step(state, agent_executor, agent_type, recursion_limit=recursion_limit, cancel_event=cancel_event)
     
     configurable = Configuration.from_runnable_config(config)
     mcp_servers = {}
     enabled_tools = {}
+    
+    # 提取取消信号（客户端断连时通知节点停止）
+    cancel_event = config.get("configurable", {}).get("cancel_event")
     
     enhanced_logger.logger.info(f"🔧 TOOL_CONFIG | {agent_type} | 默认工具数: {len(default_tools)}")
 
@@ -570,7 +596,7 @@ async def _setup_and_execute_agent_step(
         setup_duration = time.time() - setup_start_time
         enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | MCP智能体配置完成 | 耗时: {setup_duration:.2f}s")
 
-        return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit)
+        return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit, cancel_event=cancel_event)
     else:
         enhanced_logger.logger.info(f"🔧 DEFAULT_TOOLS | {agent_type} | 使用默认工具 | 工具数: {len(default_tools)}")
         # Use default tools if no MCP servers are configured
@@ -579,4 +605,4 @@ async def _setup_and_execute_agent_step(
         setup_duration = time.time() - setup_start_time
         enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | 默认智能体配置完成 | 耗时: {setup_duration:.2f}s")
 
-        return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit)
+        return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit, cancel_event=cancel_event)
