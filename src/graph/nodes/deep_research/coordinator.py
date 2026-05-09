@@ -8,11 +8,12 @@
 - coordinator_node: 协调节点，与用户沟通并决定处理路径
 """
 
+import json
 import logging
 import time
 from typing import Literal
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
@@ -32,6 +33,79 @@ logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.coordinator')
 
 
+# ---------------------------------------------------------------------------
+# 辅助：让 LLM 判断是否为全新话题（需要重置已有研究状态）
+# ---------------------------------------------------------------------------
+
+_RESET_JUDGE_PROMPT = """你是一个智能助手。请判断用户的新输入与之前已完成的研究报告主题之间的关系。
+
+## 之前的研究主题
+{old_topic}
+
+## 用户的新输入
+{new_input}
+
+## 判断规则
+- 如果新输入是一个**全新的研究话题**（与之前的主题无关），返回 {"reset": true}
+- 如果新输入是对已有报告的**追问、修改、深入**（基于同一主题），返回 {"reset": false}
+
+只返回 JSON，不要解释。"""
+
+
+def _should_reset_state(state: dict) -> bool:
+    """判断是否需要重置上一轮研究状态。
+
+    条件：final_report 非空（上一轮已完成）且 LLM 判定新输入为全新话题。
+    如果 LLM 调用失败，保守策略：默认重置（避免状态污染）。
+    """
+    final_report = state.get("final_report", "")
+    if not final_report:
+        return False  # 尚无已完成的报告，无需重置
+
+    old_topic = state.get("research_topic", "")
+    # 取最后一条用户消息作为新输入
+    messages = state.get("messages", [])
+    new_input = ""
+    for msg in reversed(messages):
+        if isinstance(msg, dict) and msg.get("role") == "user":
+            new_input = msg.get("content", "")
+            break
+        elif hasattr(msg, "type") and msg.type == "human":
+            new_input = msg.content
+            break
+
+    if not new_input:
+        return True  # 无法获取新输入，保守重置
+
+    enhanced_logger.logger.info(
+        f"🔍 RESET_JUDGE | 检测到上一轮已完成报告，启动 LLM 判断 | "
+        f"old_topic='{old_topic[:50]}' | new_input='{new_input[:50]}'"
+    )
+
+    try:
+        judge_llm = get_llm_by_type("basic")
+        prompt = _RESET_JUDGE_PROMPT.format(
+            old_topic=old_topic[:200],
+            new_input=new_input[:500],
+        )
+        resp = judge_llm.invoke([SystemMessage(content=prompt)])
+        content = resp.content.strip()
+        # 容忍 markdown 代码块
+        if content.startswith("```"):
+            content = content.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        result = json.loads(content)
+        should_reset = result.get("reset", True)
+        enhanced_logger.logger.info(
+            f"🔍 RESET_JUDGE_RESULT | LLM 判断: reset={should_reset} | 原始响应: {content[:100]}"
+        )
+        return bool(should_reset)
+    except Exception as e:
+        enhanced_logger.logger.warning(
+            f"⚠️ RESET_JUDGE_FAILED | LLM判断失败，保守重置 | error={e}"
+        )
+        return True  # 保守策略：默认重置
+
+
 def coordinator_node(
     state, config: RunnableConfig
 ) -> Command[Literal["planner", "background_investigator", "__end__"]]:
@@ -41,6 +115,32 @@ def coordinator_node(
     
     logger.info("Coordinator talking.")
     configurable = Configuration.from_runnable_config(config)
+
+    # ------------------------------------------------------------------
+    # 智能状态重置：如果上一轮已生成报告，让 LLM 判断是否为新话题
+    # ------------------------------------------------------------------
+    state_reset_fields = {}
+    if _should_reset_state(state):
+        enhanced_logger.logger.info(
+            "🔄 STATE_RESET | 判定为全新话题，重置 observations / current_plan / final_report"
+        )
+        state_reset_fields = {
+            "observations": [],
+            "current_plan": None,
+            "final_report": "",
+            "plan_iterations": 0,
+            "current_step_index": -1,
+            "current_step_title": "",
+            "next_step_index": -1,
+            "next_step_title": "",
+            "background_investigation_results": None,
+        }
+    else:
+        if state.get("final_report"):
+            enhanced_logger.logger.info(
+                "🔄 STATE_KEEP | 判定为追问/修改，保留已有研究状态"
+            )
+    # ------------------------------------------------------------------
     
     enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | research_topic: {state.get('research_topic', 'Not set')}")
     enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | locale: {state.get('locale', 'Not set')}")
@@ -137,6 +237,7 @@ def coordinator_node(
     
     return Command(
         update={
+            **state_reset_fields,
             "messages": messages,
             "locale": locale,
             "research_topic": research_topic,
