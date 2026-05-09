@@ -1,0 +1,69 @@
+# ==============================================================================
+# 内网 BOCOM ELLM 环境配置模板
+# ==============================================================================
+# 使用方式：
+#   1. 将此文件复制或直接编辑后使用：
+#        cp conf.internal.yaml.example conf.internal.yaml  # (若存在模板)
+#   2. 启动服务前设置环境变量：
+#        export LLM_NETWORK=internal
+#      系统会自动加载本文件替代 conf.yaml。
+#   3. 未设置 LLM_NETWORK 或设为 external 时，继续使用 conf.yaml（DeepSeek 等外网配置），
+#      两套配置互不影响。
+#
+# 关键字段说明：
+#   - platform: 必须固定为 "ellm"，用于工厂方法路由到 EllmChatModel
+#   - api_key_url:  ELLM 网关的密钥服务地址
+#   - scene_code:   ELLM 场景编码
+#   - api_key_refresh_interval / api_key_refresh_ahead: 密钥后台刷新参数（秒）
+# ==============================================================================
+
+BASIC_MODEL:
+  platform: ellm
+  model: Qwen3-235B-A22B
+  base_url: http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-ADAPTER.V-1.0/v1
+  api_key_url: http://eaip-ellm-1.bocomm.com/ELLM.ELLM-OMSERVICE.V-1.0/createSceneApiKey.do
+  scene_code: P2024146
+  api_key_refresh_interval: 1800
+  api_key_refresh_ahead: 300
+  max_tokens: 8192
+  temperature: 0.7
+  verify_ssl: false
+
+REASONING_MODEL:
+  platform: ellm
+  model: Qwen3-235B-A22B
+  base_url: http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-ADAPTER.V-1.0/v1
+  api_key_url: http://eaip-ellm-1.bocomm.com/ELLM.ELLM-OMSERVICE.V-1.0/createSceneApiKey.do
+  scene_code: P2024146
+  api_key_refresh_interval: 1800
+  api_key_refresh_ahead: 300
+  max_tokens: 8192
+  temperature: 0.7
+  verify_ssl: false
+
+REPORTER_MODEL:
+  platform: ellm
+  model: Qwen3-235B-A22B
+  base_url: http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-ADAPTER.V-1.0/v1
+  api_key_url: http://eaip-ellm-1.bocomm.com/ELLM.ELLM-OMSERVICE.V-1.0/createSceneApiKey.do
+  scene_code: P2024146
+  api_key_refresh_interval: 1800
+  api_key_refresh_ahead: 300
+  max_tokens: 8192
+  temperature: 0.7
+  verify_ssl: false
+
+# ==============================================================================
+# 以下非 LLM 相关配置：保持与 conf.yaml 结构一致，可按内网实际情况覆盖。
+# 若不在此文件声明，将不会被加载（本项目按文件级切换，不做跨文件合并）。
+# 详细字段说明参见 conf.yaml。
+# ==============================================================================
+
+
+
+
+SEARCH_BUDGET:
+  max_search_calls: 5
+  max_tokens: 10000
+  hard_token_limit: 14000
+  token_chars_ratio: 2.5

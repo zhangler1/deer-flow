@@ -21,6 +21,15 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# ── ELLM 链路调试开关 ──
+# 设置环境变量 ELLM_LOG_DEBUG=1 （或 true / yes）可将 ELLM 相关模块的日志活动
+# （API key 获取 / 后台刷新 / header 注入）单独切到 DEBUG 级别，
+# 其他模块保持 INFO，便于排查内网鉴权问题而不注入替换日志。
+if os.getenv("ELLM_LOG_DEBUG", "").lower() in ("1", "true", "yes"):
+    logging.getLogger("src.llms.providers.ellm").setLevel(logging.DEBUG)
+    logging.getLogger("src.llms.providers.ellm_apikey_manager").setLevel(logging.DEBUG)
+    logger.info("ELLM_LOG_DEBUG enabled: src.llms.providers.ellm[_apikey_manager] -> DEBUG")
+
 # To ensure compatibility with Windows event loop issues when using Uvicorn and Asyncio Checkpointer,
 # This is necessary because some libraries expect a selector-based event loop.
 # This is a workaround for issues with Uvicorn and Watchdog on Windows.

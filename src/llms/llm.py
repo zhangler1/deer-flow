@@ -245,8 +245,27 @@ enhanced_logger = get_enhanced_logger('llms.llm')
 
 
 def _get_config_file_path() -> str:
-    """Get the path to the configuration file."""
-    return str((Path(__file__).parent.parent.parent / "conf.yaml").resolve())
+    """Get the path to the configuration file.
+
+    Switchable by the ``LLM_NETWORK`` environment variable:
+      - ``external`` (default): use ``conf.yaml`` (e.g. DeepSeek/OpenAI)
+      - ``internal``:          use ``conf.internal.yaml`` (e.g. BOCOM ELLM)
+
+    If ``LLM_NETWORK=internal`` is set but ``conf.internal.yaml`` does not
+    exist, a warning is logged and the loader falls back to ``conf.yaml``
+    so the process can still start.
+    """
+    root = Path(__file__).parent.parent.parent
+    network = os.getenv("LLM_NETWORK", "external").lower()
+    if network == "internal":
+        internal = root / "conf.internal.yaml"
+        if internal.exists():
+            return str(internal.resolve())
+        enhanced_logger.logger.warning(
+            "LLM_NETWORK=internal but conf.internal.yaml not found, "
+            "falling back to conf.yaml"
+        )
+    return str((root / "conf.yaml").resolve())
 
 
 def _get_llm_type_config_keys() -> dict[str, str]:
@@ -334,8 +353,19 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
         merged_conf["http_client"] = http_client
         merged_conf["http_async_client"] = http_async_client
 
-    # Check if it's Google AI Studio platform based on configuration
+    # Check platform-specific routing based on configuration
     platform = merged_conf.get("platform", "").lower()
+
+    # --- BOCOM ELLM (internal) dispatch ---
+    if platform == "ellm":
+        from src.llms.providers.ellm import EllmChatModel
+        # ELLM uses its own httpx client + "api-key" header; remove
+        # OpenAI-style http clients and the platform marker before init.
+        merged_conf.pop("http_client", None)
+        merged_conf.pop("http_async_client", None)
+        merged_conf.pop("platform", None)
+        return EllmChatModel(**merged_conf)
+
     is_google_aistudio = platform == "google_aistudio" or platform == "google-aistudio"
 
     if is_google_aistudio:

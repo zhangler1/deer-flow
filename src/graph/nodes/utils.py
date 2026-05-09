@@ -35,6 +35,35 @@ logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.utils')
 
 
+def _load_search_budget_config() -> dict:
+    """从当前激活的 yaml (conf.yaml / conf.internal.yaml) 加载 SEARCH_BUDGET 段。
+
+    未配置或解析失败时返回空 dict，由调用处用默认值兄底。
+    使用 lazy import 避免循环依赖。
+    """
+    try:
+        from src.llms.llm import _get_config_file_path
+        from src.config import load_yaml_config
+        return load_yaml_config(_get_config_file_path()).get("SEARCH_BUDGET", {}) or {}
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"读取 SEARCH_BUDGET 配置失败，将使用默认值: {e}")
+        return {}
+
+
+def _safe_int(value, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 @tool
 def handoff_to_planner(
     research_topic: Annotated[str, "要移交的研究任务主题"],
@@ -139,11 +168,15 @@ async def _execute_agent_step(
     hard_limit = max(soft_limit * 10, 50)
 
     # 初始化搜索预算管理器（用于更精细的预算控制）
+    # 参数优先从 yaml 的 SEARCH_BUDGET 段读取（随 LLM_NETWORK 切换同步），
+    # 缺失时回落到历史硬编码默认值，保持向后兼容。
     # 可以在state中持久化budget_manager以跨步骤跟踪
+    _budget_conf = _load_search_budget_config()
     budget_manager = SearchBudgetManager(
-        max_search_calls=soft_limit,
-        max_tokens=10000,
-        hard_token_limit=14000,
+        max_search_calls=_safe_int(_budget_conf.get("max_search_calls"), soft_limit),
+        max_tokens=_safe_int(_budget_conf.get("max_tokens"), 10000),
+        hard_token_limit=_safe_int(_budget_conf.get("hard_token_limit"), 14000),
+        token_chars_ratio=_safe_float(_budget_conf.get("token_chars_ratio"), 2.5),
     )
 
     # 1. 工具调用限制中间件
