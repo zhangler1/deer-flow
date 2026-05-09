@@ -17,7 +17,8 @@ export interface Message {
     | "direct_answer_node"
     | "simple_search_node"
     | "iterative_research_node"
-    | "iterative_reporter_node";
+    | "iterative_reporter_node"
+    | "system";
   role: MessageRole;
   isStreaming?: boolean;
   content: string;

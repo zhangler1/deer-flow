@@ -384,19 +384,26 @@ export async function sendMessage(
       // 用户主动取消，不弹错误提示
       console.info("[sendMessage] Stream aborted by user");
       // 把所有还在流式中的消息标为终止，停止波浪号 + 尾部追加"已终止"
+      // 注意：必须构造新对象，不能 mutate，否则 Zustand/React 浅比较无法触发 re-render
       const store = useStore.getState();
+      const updated: Message[] = [];
       for (const id of store.messageIds) {
         const m = store.messages.get(id);
         if (m?.isStreaming) {
-          m.isStreaming = false;
-          m.finishReason = "stop";
-          if (m.content && !m.content.endsWith("[已终止]")) {
-            m.content = m.content + "\n\n**[已终止]**";
-          } else if (!m.content) {
-            m.content = "**[已终止]**";
-          }
-          store.updateMessage(m);
+          const existing = m.content ?? "";
+          const newContent = existing
+            ? (existing.endsWith("[已终止]") ? existing : existing + "\n\n**[已终止]**")
+            : "**[已终止]**";
+          updated.push({
+            ...m,
+            isStreaming: false,
+            finishReason: "stop",
+            content: newContent,
+          });
         }
+      }
+      if (updated.length > 0) {
+        store.updateMessages(updated);
       }
       store.setOngoingResearch(null);
     } else {
@@ -425,10 +432,52 @@ export async function sendMessage(
     // Flush any remaining batched updates before finishing
     flushNow();
     setResponding(false);
-    // console.log("[sendMessage] Stream processing ended", {
-    //   totalEventsProcessed: eventCount,
-    //   duration: Date.now() - lastEventTime,
-    // });
+    // 兑底清理：无论什么分支（abort / 正常 / 错误），把所有仍在 isStreaming 的消息终止，防止波浪号不消失
+    try {
+      const store = useStore.getState();
+      const updated: Message[] = [];
+      let hasInterrupted = false;
+      for (const id of store.messageIds) {
+        const m = store.messages.get(id);
+        if (m?.isStreaming) {
+          hasInterrupted = true;
+          const existing = m.content ?? "";
+          const newContent = existing
+            ? (existing.endsWith("[已终止]") ? existing : existing + "\n\n**[已终止]**")
+            : "**[已终止]**";
+          updated.push({
+            ...m,
+            isStreaming: false,
+            finishReason: m.finishReason ?? "stop",
+            content: newContent,
+          });
+        }
+      }
+      if (updated.length > 0) {
+        store.updateMessages(updated);
+      }
+      store.setOngoingResearch(null);
+      // 若确实发生了中断（有消息被打断），在主聊天区追加一条终止提示消息
+      if (hasInterrupted) {
+        const lastMsgId = store.messageIds[store.messageIds.length - 1];
+        const lastMsg = lastMsgId ? store.messages.get(lastMsgId) : undefined;
+        // 如果最后一条已经是终止提示，不重复添加
+        if (!lastMsg || lastMsg.agent !== "system" || !lastMsg.content?.includes("研究已停止")) {
+          store.appendMessage({
+            id: nanoid(),
+            threadId: store.threadId,
+            role: "assistant",
+            agent: "system",
+            content: "⛔ 研究已停止",
+            contentChunks: ["⛔ 研究已停止"],
+            isStreaming: false,
+            finishReason: "stop",
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[sendMessage] finally 清理波浪号异常", e);
+    }
   }
 }
 

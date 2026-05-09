@@ -129,6 +129,7 @@ export function MessageListView({
           message.agent === "simple_search_node" ||
           message.agent === "iterative_research_node" ||  // 添加迭代研究节点消息显示
           message.agent === "iterative_reporter_node" ||
+          message.agent === "system" ||  // 终止提示等系统消息
           startOfResearch
         )) {
           return null;
@@ -839,10 +840,16 @@ function StartOfResearchBlock({
     const msg = state.messages.get(reportId);
     return !!msg && !msg.isStreaming;
   });
+  // 研究是否还在进行中（被取消或正常结束后都应停止动画）
+  const researchOngoing = useStore(
+    (state) => state.ongoingResearchId === researchId,
+  );
+  // 只有「研究还在进行」且「报告未完成」时才流动，否则停止动画
+  const flowingAnimated = researchOngoing && !reportGenerated;
   return (
     <div className="px-4 flex flex-col gap-2">
       <div className="text-base font-medium text-foreground w-fit max-w-full">
-        <FlowingText animated={!reportGenerated}>
+        <FlowingText animated={flowingAnimated}>
           接下来将为你生成报告：
         </FlowingText>
       </div>

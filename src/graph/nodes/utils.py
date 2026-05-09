@@ -336,21 +336,26 @@ async def _execute_agent_step(
             return_when=asyncio.FIRST_COMPLETED,
         )
 
-        # 分支 1：客户端断连 / 显式 cancel 触发
-        if cancel_wait_task is not None and cancel_wait_task in done:
-            agent_task.cancel()
+        # 辅助：静默取消任务（吞掉 CancelledError / 一般异常）
+        async def _silently_cancel(t):
+            if t is None or t.done():
+                return
+            t.cancel()
             try:
-                await agent_task
+                await t
             except (asyncio.CancelledError, Exception):
                 pass
-            heartbeat_task.cancel()
-            try:
-                await heartbeat_task
-            except asyncio.CancelledError:
-                pass
+
+        # 分支 1：客户端断连 / 显式 cancel 触发
+        if cancel_wait_task is not None and cancel_wait_task in done:
+            enhanced_logger.logger.info(
+                f"⛔ BRANCH_CANCEL | {agent_name} | 原因: 用户主动取消 (cancel_event 被触发)"
+            )
+            await _silently_cancel(agent_task)
+            await _silently_cancel(heartbeat_task)
             agent_exec_duration = time.time() - agent_exec_start_time
             enhanced_logger.logger.info(
-                f"⛔ AGENT_CANCELLED | {agent_name} | 客户端断连，已中止 agent | 耗时: {agent_exec_duration:.2f}s"
+                f"⛔ AGENT_CANCELLED | {agent_name} | 已中止 agent | 耗时: {agent_exec_duration:.2f}s"
             )
             for step in plan_steps:
                 if not step.execution_res:
@@ -378,22 +383,18 @@ async def _execute_agent_step(
 
         # 分支 2：超时。agent_task 仍在 pending，抑 TimeoutError
         if agent_task not in done:
-            agent_task.cancel()
-            if cancel_wait_task is not None:
-                cancel_wait_task.cancel()
-            try:
-                await agent_task
-            except (asyncio.CancelledError, Exception):
-                pass
+            enhanced_logger.logger.info(
+                f"⏰ BRANCH_TIMEOUT | {agent_name} | 原因: 超过 step_timeout={step_timeout:.0f}s"
+            )
+            await _silently_cancel(agent_task)
+            await _silently_cancel(cancel_wait_task)
             raise asyncio.TimeoutError()
 
         # 分支 3：正常完成
-        if cancel_wait_task is not None:
-            cancel_wait_task.cancel()
-            try:
-                await cancel_wait_task
-            except (asyncio.CancelledError, Exception):
-                pass
+        enhanced_logger.logger.info(
+            f"✅ BRANCH_NORMAL | {agent_name} | 原因: agent 正常完成"
+        )
+        await _silently_cancel(cancel_wait_task)
         result = agent_task.result()
 
         # 取消心跳任务
