@@ -83,18 +83,21 @@ class EllmApiKeyManager:
         refresh_interval: int = DEFAULT_REFRESH_INTERVAL,
         refresh_ahead: int = DEFAULT_REFRESH_AHEAD,
         request_timeout: int = DEFAULT_REQUEST_TIMEOUT,
+        force_refresh_min_interval: int = 600,
     ) -> None:
         self._api_key_url = api_key_url
         self._scene_code = scene_code
         self._refresh_interval = refresh_interval
         self._refresh_ahead = refresh_ahead
         self._request_timeout = request_timeout
+        self._force_refresh_min_interval = force_refresh_min_interval
 
         # Internal state
         self._current_key: str = ""
         self._key_obtained_at: float = 0.0  # timestamp when key was obtained
         self._key_ttl_ms: int = 0  # Raw timeToLive value from the response (for logging)
         self._key_expiry_time: float = 0.0  # Absolute Unix timestamp (seconds) when key expires
+        self._last_forced_refresh_at: float = 0.0  # timestamp of last forced refresh
         self._lock = threading.Lock()
         self._refresh_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -111,6 +114,7 @@ class EllmApiKeyManager:
         refresh_interval: int = DEFAULT_REFRESH_INTERVAL,
         refresh_ahead: int = DEFAULT_REFRESH_AHEAD,
         request_timeout: int = DEFAULT_REQUEST_TIMEOUT,
+        force_refresh_min_interval: int = 600,
     ) -> EllmApiKeyManager:
         """Get or create the singleton manager for a given scene_code.
 
@@ -125,6 +129,7 @@ class EllmApiKeyManager:
                     refresh_interval=refresh_interval,
                     refresh_ahead=refresh_ahead,
                     request_timeout=request_timeout,
+                    force_refresh_min_interval=force_refresh_min_interval,
                 )
                 cls._instances[scene_code] = instance
             return cls._instances[scene_code]
@@ -585,6 +590,50 @@ class EllmApiKeyManager:
                 )
 
     # --- Testing helpers ---
+
+    def force_refresh_on_failure(self) -> bool:
+        """Attempt a forced key refresh on auth failure, with throttle.
+
+        Called when a model request returns an authentication error.
+        Will only perform the actual HTTP refresh if at least
+        ``force_refresh_min_interval`` seconds have elapsed since the last
+        forced refresh. Otherwise returns False (throttled).
+
+        Returns:
+            True if a refresh was performed; False if throttled.
+        """
+        now = time.time()
+        with self._lock:
+            elapsed = now - self._last_forced_refresh_at
+            if elapsed < self._force_refresh_min_interval:
+                logger.debug(
+                    "ELLM ApiKeyManager: force_refresh_on_failure throttled "
+                    "(scene_code=%s, elapsed=%.1fs < min_interval=%ss)",
+                    self._scene_code,
+                    elapsed,
+                    self._force_refresh_min_interval,
+                )
+                return False
+            self._last_forced_refresh_at = now
+
+        logger.info(
+            "ELLM ApiKeyManager: force_refresh_on_failure triggered "
+            "(pid=%s, scene_code=%s, elapsed_since_last=%.1fs)",
+            os.getpid(),
+            self._scene_code,
+            elapsed,
+        )
+        try:
+            self.refresh_key()
+            return True
+        except Exception as e:
+            logger.error(
+                "ELLM ApiKeyManager: force_refresh_on_failure failed "
+                "(scene_code=%s, error=%s)",
+                self._scene_code,
+                e,
+            )
+            return False
 
     @classmethod
     def _reset_instances(cls) -> None:

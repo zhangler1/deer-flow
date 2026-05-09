@@ -29,10 +29,12 @@ Configuration example (``conf.internal.yaml``)::
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Iterator, AsyncIterator
 
 from pydantic import Field, SecretStr
 from langchain_core.language_models import LanguageModelInput
+from langchain_core.messages import BaseMessage
+from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_openai import ChatOpenAI
 
 from src.llms.providers.ellm_apikey_manager import EllmApiKeyManager
@@ -69,6 +71,7 @@ class EllmChatModel(ChatOpenAI):
     scene_code: str = ""
     api_key_refresh_interval: int = 1800
     api_key_refresh_ahead: int = 300
+    force_refresh_min_interval: int = 600  # 失败后强制刷新最小间隔（秒）
 
     # 必须在父类初始化校验前就存在一个占位 api_key
     openai_api_key: SecretStr = Field(
@@ -93,6 +96,7 @@ class EllmChatModel(ChatOpenAI):
             scene_code=self.scene_code,
             refresh_interval=self.api_key_refresh_interval,
             refresh_ahead=self.api_key_refresh_ahead,
+            force_refresh_min_interval=self.force_refresh_min_interval,
         )
 
         # Start the manager (initial key fetch + background refresh thread)
@@ -152,3 +156,108 @@ class EllmChatModel(ChatOpenAI):
         payload = super()._get_request_payload(input_, stop=stop, **kwargs)
 
         return payload
+
+    # ------------------------------------------------------------------
+    # 鉴权失败自动重试
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_auth_error(exc: BaseException) -> bool:
+        """Detect authentication/permission errors from the ELLM gateway."""
+        # openai SDK typed errors
+        name = type(exc).__name__
+        if name in ("AuthenticationError", "PermissionDeniedError"):
+            return True
+        # Fall back to HTTP status code
+        status = getattr(exc, "status_code", None) or getattr(
+            getattr(exc, "response", None), "status_code", None
+        )
+        return status in (401, 403)
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        """Override to retry once on auth failure after forced key refresh."""
+        try:
+            return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+        except Exception as e:
+            if self._is_auth_error(e) and self._key_manager.force_refresh_on_failure():
+                logger.info(
+                    "EllmChatModel: retrying _generate after forced key refresh "
+                    "(scene_code=%s)",
+                    self.scene_code,
+                )
+                self._inject_latest_api_key()
+                return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+            raise
+
+    async def _agenerate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        """Override to retry once on auth failure after forced key refresh."""
+        try:
+            return await super()._agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
+        except Exception as e:
+            if self._is_auth_error(e) and self._key_manager.force_refresh_on_failure():
+                logger.info(
+                    "EllmChatModel: retrying _agenerate after forced key refresh "
+                    "(scene_code=%s)",
+                    self.scene_code,
+                )
+                self._inject_latest_api_key()
+                return await super()._agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
+            raise
+
+    def _stream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ) -> Iterator[ChatGenerationChunk]:
+        """Override to retry once on auth failure after forced key refresh."""
+        try:
+            yield from super()._stream(messages, stop=stop, run_manager=run_manager, **kwargs)
+        except Exception as e:
+            if self._is_auth_error(e) and self._key_manager.force_refresh_on_failure():
+                logger.info(
+                    "EllmChatModel: retrying _stream after forced key refresh "
+                    "(scene_code=%s)",
+                    self.scene_code,
+                )
+                self._inject_latest_api_key()
+                yield from super()._stream(messages, stop=stop, run_manager=run_manager, **kwargs)
+            else:
+                raise
+
+    async def _astream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[ChatGenerationChunk]:
+        """Override to retry once on auth failure after forced key refresh."""
+        try:
+            async for chunk in super()._astream(messages, stop=stop, run_manager=run_manager, **kwargs):
+                yield chunk
+        except Exception as e:
+            if self._is_auth_error(e) and self._key_manager.force_refresh_on_failure():
+                logger.info(
+                    "EllmChatModel: retrying _astream after forced key refresh "
+                    "(scene_code=%s)",
+                    self.scene_code,
+                )
+                self._inject_latest_api_key()
+                async for chunk in super()._astream(messages, stop=stop, run_manager=run_manager, **kwargs):
+                    yield chunk
+            else:
+                raise
