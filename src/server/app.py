@@ -743,11 +743,30 @@ async def _stream_graph_events(
 
     except Exception as e:
         logger.exception(f"[STREAM_ERROR] thread_id={thread_id} | 图执行出错 | 已处理事件数: {event_count}")
+        # 错误分类：给前端友好文案，同时在聊天区追加一条系统消息
+        error_type, user_message = _classify_stream_error(e)
+        import uuid as _uuid
+        error_msg_id = f"error-{_uuid.uuid4().hex[:12]}"
+        # 1) 向聊天区追加一条 coordinator 消息（用户能直接看到原因）
+        yield _make_event(
+            "message_chunk",
+            {
+                "thread_id": thread_id,
+                "agent": "coordinator",
+                "id": error_msg_id,
+                "role": "assistant",
+                "content": user_message,
+                "finish_reason": "stop",
+            },
+        )
+        # 2) 再发一个 error 事件（带分类）供前端弹 toast
         yield _make_event(
             "error",
             {
                 "thread_id": thread_id,
-                "error": str(e),
+                "error": user_message,
+                "error_type": error_type,
+                "raw": str(e)[:500],  # 原始异常文本，方便排查（截断）
             },
         )
     finally:
@@ -868,6 +887,54 @@ async def _astream_workflow_generator(
             graph, workflow_input, workflow_config, thread_id
         ):
             yield event
+
+
+def _classify_stream_error(exc: Exception) -> tuple[str, str]:
+    """将流式图执行错误分类并给出前端友好文案。
+
+    Returns:
+        (error_type, user_message)
+        - error_type: 错误分类标识（前端可据此分支展示 UI）
+        - user_message: 面向用户的友好文案（将作为 coordinator 消息在聊天区显示）
+    """
+    text = (str(exc) or "").lower()
+    exc_name = type(exc).__name__
+    # 1) LLM 网络/鉴权问题（ELLM / DeepSeek / OpenAI 等大模型服务不通）
+    llm_markers = (
+        "ellm apikeymanager",
+        "no api key available",
+        "name resolution",
+        "temporary failure in name resolution",
+        "connection refused",
+        "connect call failed",
+        "read timed out",
+        "connecttimeout",
+        "connecterror",
+    )
+    if any(m in text for m in llm_markers) or exc_name in (
+        "ConnectError", "ConnectTimeout", "ReadTimeout",
+    ):
+        return (
+            "llm_unavailable",
+            "⚠️ 大模型服务暂时不可用（连接失败或鉴权异常），请稍后重试。如持续出现请联系管理员。",
+        )
+    # 2) 模型返回体解析出错
+    if "json" in text and ("parse" in text or "decode" in text):
+        return (
+            "llm_output_invalid",
+            "⚠️ 大模型返回的内容无法解析，已中断本次研究。请重试；若问题较复杂可尝试简化提问。",
+        )
+    # 3) 推理/调用超时
+    if "timeout" in text or exc_name == "TimeoutError":
+        return (
+            "timeout",
+            "⚠️ 本次研究执行超时，可能是模型或搜索响应较慢，请重试。",
+        )
+    # 4) 其他未知错误
+    return (
+        "unknown",
+        f"⚠️ 本次研究执行失败：{str(exc)[:200]}",
+    )
 
 
 def _make_event(event_type: str, data: Dict[str, Any]):

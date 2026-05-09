@@ -282,18 +282,29 @@ export async function sendMessage(
       // 处理后端发来的 error 事件
       if (type === "error") {
         const errorMsg = data.error ?? "服务端发生错误";
+        // 后端可能携带 error_type（llm_unavailable / timeout / llm_output_invalid / unknown）
+        const errorType = (data as { error_type?: string }).error_type;
         console.error("[sendMessage] Backend error event received", {
           thread_id: data.thread_id,
           error: errorMsg,
-          errorType: typeof data.error,
-          errorLength: data.error?.length,
-          fullData: data,
-          allKeys: Object.keys(data),
-          allValues: Object.values(data),
+          error_type: errorType,
+          raw: (data as { raw?: string }).raw,
         });
-        // 只有当确实有错误信息时才显示 toast
-        if (data.error && data.error.length > 0) {
-          toast(`后端错误: ${errorMsg}`);
+        // 根据分类显示更友好的 toast
+        if (errorType === "llm_unavailable") {
+          toast.error("大模型服务不可用", {
+            description: "连接失败或鉴权异常，请稍后重试。",
+          });
+        } else if (errorType === "timeout") {
+          toast.warning("本次研究超时", {
+            description: "请重试，或简化提问后再试。",
+          });
+        } else if (errorType === "llm_output_invalid") {
+          toast.warning("模型返回内容无法解析", {
+            description: "请重试。",
+          });
+        } else if (errorMsg && errorMsg.length > 0) {
+          toast.error(errorMsg);
         }
         // 不 break，继续处理后续事件
         continue;

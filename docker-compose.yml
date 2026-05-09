@@ -38,6 +38,7 @@ services:
       - "8000"
     volumes:
       - ./conf.yaml:/app/conf.yaml:ro
+      - ./conf.internal.yaml:/app/conf.internal.yaml:ro
       - ./pyproject.toml:/app/pyproject.toml
       - ./src:/app/src
       - ./tests:/app/tests
