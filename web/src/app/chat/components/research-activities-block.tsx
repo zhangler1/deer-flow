@@ -23,6 +23,9 @@ type SearchResult = {
   content?: string;
   image_url?: string;
   image_description?: string;
+  // —— 内网知识库类检索结果常无 url，充当“不可点文档”展示的关键字段 ——
+  source?: string;
+  docGuid?: string;
 };
 
 // ── 爬虫结果类型 ──────────────────────────────────
@@ -85,6 +88,8 @@ function isSearchTool(name: string): boolean {
     "online_search",
     "bocomsearch",
     "budget_controlled_bocomsearch",
+    "searchknowledge_standard",
+    "budget_controlled_searchknowledge_standard",
     "industry_report_search",
     "product_search",
     "product_instance_search",
@@ -124,15 +129,26 @@ function extractToolCallTags(toolCall: ToolCallRuntime): ToolCallTag[] {
       try {
         const results = parseJSON<SearchResult[]>(toolCall.result, []);
         if (Array.isArray(results)) {
+          let docCount = 0; // 限制无URL文档卡片的显示数量
           results
-            .filter((r) => r.type !== "image" && r.url)
+            .filter((r) => r.type !== "image")
             .slice(0, 5)
             .forEach((r) => {
-              tags.push({
-                type: "source",
-                url: r.url!,
-                domain: extractDomain(r.url!),
-              });
+              if (r.url) {
+                tags.push({
+                  type: "source",
+                  url: r.url,
+                  domain: extractDomain(r.url),
+                });
+              } else if ((r.title || r.source) && docCount < 5) {
+                // 无 URL 的内网知识库类结果，使用不可点文档卡片展示
+                tags.push({
+                  type: "doc",
+                  title: r.source ?? r.title ?? "未命名文档",
+                  subtitle: r.source && r.title ? r.title : undefined,
+                });
+                docCount += 1;
+              }
             });
         }
       } catch {

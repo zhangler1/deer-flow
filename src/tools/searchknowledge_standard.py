@@ -26,6 +26,7 @@ EUVD 段落级标准知识检索工具（searchknowledge_standard）
 import json
 import logging
 import os
+import time
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -222,6 +223,8 @@ def call_searchknowledge_standard(
         f"max_results={max_results} | timeout={timeout}"
     )
 
+    start_time = time.time()
+
     headers = dict(SearchKnowledgeStandardConfig.HEADERS_BASE)
     form_data = _build_form_payload(
         query, vector_topn=vector_topn, text_topn=text_topn, threshold=threshold,
@@ -273,12 +276,16 @@ def call_searchknowledge_standard(
 
         results = _parse_response(data)
         trimmed = results[:max_results] if (max_results and max_results > 0) else results
-        logger.info(f"✅ searchknowledge_standard | 完成 | 结果={len(trimmed)}")
+        duration = time.time() - start_time
+        logger.info(
+            f"✅ searchknowledge_standard | 完成 | 结果={len(trimmed)} | 耗时={duration:.2f}s"
+        )
         return trimmed
 
     except requests.exceptions.RequestException as e:
+        duration = time.time() - start_time
         logger.error(
-            f"❌ searchknowledge_standard | 请求失败 | type={type(e).__name__} | error={e}"
+            f"❌ searchknowledge_standard | 请求失败 | type={type(e).__name__} | 耗时={duration:.2f}s | error={e}"
         )
         return [
             {
@@ -297,8 +304,9 @@ def call_searchknowledge_standard(
             }
         ]
     except Exception as e:
+        duration = time.time() - start_time
         logger.error(
-            f"❌ searchknowledge_standard | 异常 | type={type(e).__name__} | error={e}"
+            f"❌ searchknowledge_standard | 异常 | type={type(e).__name__} | 耗时={duration:.2f}s | error={e}"
         )
         return [
             {

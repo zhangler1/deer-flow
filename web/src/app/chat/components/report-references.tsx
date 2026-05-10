@@ -36,6 +36,10 @@ const SEARCH_TOOLS = new Set([
   "web_search",
   "domain_fin_search",
   "online_search",
+  "bocomsearch",
+  "budget_controlled_bocomsearch",
+  "searchknowledge_standard",
+  "budget_controlled_searchknowledge_standard",
   "industry_report_search",
   "product_search",
   "product_instance_search",
@@ -65,19 +69,36 @@ function extractReferences(
       if (tc.result?.startsWith("Error")) continue;
 
       if (SEARCH_TOOLS.has(tc.name)) {
-        // 从搜索结果中提取链接
+        // 从搜索结果中提取链接/文档
         try {
           const results = parseJSON<Record<string, unknown>[]>(tc.result, []);
           if (Array.isArray(results)) {
             for (const r of results) {
+              if (r.type === "image") continue;
               const url = (r.url as string) ?? "";
-              if (!url || r.type === "image" || seen.has(url)) continue;
-              seen.add(url);
-              refs.push({
-                url,
-                title: (r.title as string) ?? extractDomain(url),
-                domain: extractDomain(url),
-              });
+              if (url) {
+                if (seen.has(url)) continue;
+                seen.add(url);
+                refs.push({
+                  url,
+                  title: (r.title as string) ?? extractDomain(url),
+                  domain: extractDomain(url),
+                });
+              } else {
+                // —— 无 URL 的内网知识库结果，用 docGuid 去重，不渲染跳转 ——
+                const docGuid = (r.docGuid as string) ?? "";
+                const source = (r.source as string) ?? "";
+                const title = (r.title as string) ?? source;
+                const key = `doc:${docGuid || source || title}`;
+                if (!key || key === "doc:" || seen.has(key)) continue;
+                if (!title && !source) continue;
+                seen.add(key);
+                refs.push({
+                  url: "",  // 空 URL 表示不可点
+                  title: title || source || "未命名文档",
+                  domain: source || "内部文档",
+                });
+              }
             }
           }
         } catch {
@@ -146,30 +167,44 @@ export function ReportReferences({
       {/* 参考资料列表 */}
       <ol className="flex flex-col gap-2">
         {references.map((ref, i) => (
-          <li key={ref.url} className="group flex items-start gap-2 text-sm">
+          <li key={`${ref.url}-${ref.title}-${i}`} className="group flex items-start gap-2 text-sm">
             {/* 序号 */}
             <span className="mt-0.5 shrink-0 text-xs text-muted-foreground/60 tabular-nums">
               [{i + 1}]
             </span>
 
-            {/* favicon + 链接 */}
-            <a
-              href={ref.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <FavIcon
-                url={ref.url}
-                className="h-4 w-4 shrink-0"
+            {ref.url ? (
+              /* 有 URL：favicon + 链接 */
+              <a
+                href={ref.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <FavIcon
+                  url={ref.url}
+                  className="h-4 w-4 shrink-0"
+                  title={ref.title}
+                />
+                <span className="truncate">{ref.title}</span>
+                <span className="shrink-0 text-xs text-muted-foreground/50">
+                  {ref.domain}
+                </span>
+                <ExternalLink className="ml-auto h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-50" />
+              </a>
+            ) : (
+              /* 无 URL：不可点文档卡片 */
+              <div
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground"
                 title={ref.title}
-              />
-              <span className="truncate">{ref.title}</span>
-              <span className="shrink-0 text-xs text-muted-foreground/50">
-                {ref.domain}
-              </span>
-              <ExternalLink className="ml-auto h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-50" />
-            </a>
+              >
+                <BookOpen className="h-4 w-4 shrink-0" />
+                <span className="truncate">{ref.title}</span>
+                <span className="shrink-0 text-xs text-muted-foreground/50">
+                  {ref.domain}
+                </span>
+              </div>
+            )}
           </li>
         ))}
       </ol>

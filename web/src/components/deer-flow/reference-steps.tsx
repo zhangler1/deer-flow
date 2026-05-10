@@ -33,8 +33,17 @@ export interface SourceLink {
   favicon?: string;
 }
 
+/** 内网文档标签（不可点，用于无 URL 的知识库结果） */
+export interface DocTag {
+  type: "doc";
+  /** 文档标题或文件名 */
+  title: string;
+  /** 可选：补充说明（一般是段落小标题） */
+  subtitle?: string;
+}
+
 /** 工具调用标签联合类型 */
-export type ToolCallTag = SearchTag | ReadTag | SourceLink;
+export type ToolCallTag = SearchTag | ReadTag | SourceLink | DocTag;
 
 /** 思考步骤 */
 export interface ThinkingStep {
@@ -113,6 +122,20 @@ function SourceLinkBadge({ url, domain, favicon }: SourceLink) {
   );
 }
 
+/** 内网文档胶囊（不可点） */
+function DocBadge({ title, subtitle }: DocTag) {
+  const display = subtitle ? `${title} · ${subtitle}` : title;
+  return (
+    <span
+      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-0.5 text-sm text-muted-foreground"
+      title={display}
+    >
+      <BookOpen className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{title}</span>
+    </span>
+  );
+}
+
 /** 步骤左侧竖线图标 */
 function StepIcon({ isLast, isCompleted, isPlanStep }: { isLast: boolean; isCompleted?: boolean; isPlanStep?: boolean }) {
   return (
@@ -175,13 +198,16 @@ function StepRow({
   isLast: boolean;
   maxVisibleSources: number;
 }) {
-  // 分离搜索/阅读标签和来源链接
+  // 分离搜索/阅读标签和来源链接/文档
   const searchTags = step.toolCalls.filter(
     (t) => t.type === "search" || t.type === "read",
   );
   const sourceLinks = step.toolCalls.filter(
     (t) => t.type === "source",
   ) as SourceLink[];
+  const docTags = step.toolCalls.filter(
+    (t) => t.type === "doc",
+  ) as DocTag[];
 
   const [expanded, setExpanded] = useState(false);
   const hasMore = sourceLinks.length > maxVisibleSources;
@@ -218,7 +244,7 @@ function StepRow({
             </p>
 
             {/* 工具调用标签 */}
-            {(searchTags.length > 0 || sourceLinks.length > 0) && (
+            {(searchTags.length > 0 || sourceLinks.length > 0 || docTags.length > 0) && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {/* 搜索/阅读标签 */}
                 {searchTags.map((tag, i) => {
@@ -235,6 +261,11 @@ function StepRow({
                 {/* 来源链接 */}
                 {visibleSources.map((source, i) => (
                   <SourceLinkBadge key={`source-${i}`} {...source} />
+                ))}
+
+                {/* 内网文档胶囊（不可点） */}
+                {docTags.map((doc, i) => (
+                  <DocBadge key={`doc-${i}`} {...doc} />
                 ))}
 
                 {/* 展开/收起按钮 */}

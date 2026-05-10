@@ -31,6 +31,7 @@ from src.tools import (
     budget_controlled_product_instance_search_tool,
     budget_controlled_financial_summary_tool,
     budget_controlled_bocomsearch_tool,
+    budget_controlled_searchknowledge_standard_tool,
     get_budget_manager,
     clear_budget_manager,
     bocomsearch,
@@ -117,11 +118,9 @@ async def researcher_node(
 
     # 根据报告风格动态配置工具
     if report_style == "industry_report":
-        # 行业研报：bocomsearch + online_search（与学术共用同样的预算控制搜索工具）
+        # 行业研报：searchknowledge_standard(段落级标准知识检索) + online_search
         session_id = state.get("session_id", "default")
-        guwp_token = state.get("guwp_token", None)
-        token_preview = (guwp_token[:8] + "...") if guwp_token and len(guwp_token) > 8 else guwp_token
-        logger.info(f"🔑 industry_report | guwp_token={token_preview} | session_id={session_id}")
+        logger.info(f"📚 industry_report | session_id={session_id}")
         tools = [
             research_skill_prompt_search,
         ]
@@ -135,16 +134,15 @@ async def researcher_node(
                 max_tokens=max_tokens,
             ))
             tool_name_list.append("budget_controlled_online_search")
-        # 根据开关决定是否添加交行搜索工具
+        # 行业研报沿用 use_budget_bocom 开关控制内部知识库检索（语义复用：内网知识库开关）
         if use_budget_bocom:
-            tools.append(budget_controlled_bocomsearch_tool(
+            tools.append(budget_controlled_searchknowledge_standard_tool(
                 session_id=session_id,
                 max_search_calls=researcher_limit,
                 max_tokens=max_tokens,
                 max_results=configurable.max_search_results,
-                guwp_token=guwp_token,
             ))
-            tool_name_list.append("budget_controlled_bocomsearch")
+            tool_name_list.append("budget_controlled_searchknowledge_standard")
         tool_names = ", ".join(tool_name_list)
 
     elif report_style == "business_marketing":
