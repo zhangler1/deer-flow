@@ -80,7 +80,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 3. **行业聚焦**: 每个步骤都要聚焦于目标行业的具体情况
 4. **深度分析**: 每个步骤都要进行深入、专业的分析，避免表面化
 5. **数据驱动**: 强调使用研报知识库搜索获取真实数据
-6. **工具限制**: 明确每个步骤只能使用 report_search 工具，且最多调用3次
+6. **工具限制**: 明确每个步骤仅能使用 budget_controlled_searchknowledge_standard 和 budget_controlled_online_search 两个搜索工具，且两者合计最多调用 5 次
 7. **步骤类型**: ⚠️ **极其重要** - 所有步骤的 step_type 必须设置为 "research"，否则系统无法正确路由到研究员节点
 
 # 当前任务
@@ -93,7 +93,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 
 **重要提醒**:
 - 每个步骤都必须设置 step_type 为 "research"
-- 每个步骤都将使用 report_search 工具从研报知识库中搜索相关信息
+- 每个步骤都将使用 budget_controlled_searchknowledge_standard（行业标准知识库）和 budget_controlled_online_search（在线搜索）进行信息检索
 - 每个步骤的搜索次数限制为3次
 
 # 输出格式

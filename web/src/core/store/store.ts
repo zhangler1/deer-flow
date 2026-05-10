@@ -479,8 +479,8 @@ export async function sendMessage(
             threadId: store.threadId,
             role: "assistant",
             agent: "system",
-            content: "⛔ 研究已停止",
-            contentChunks: ["⛔ 研究已停止"],
+            content: "● 研究已停止",
+            contentChunks: ["● 研究已停止"],
             isStreaming: false,
             finishReason: "stop",
           });
