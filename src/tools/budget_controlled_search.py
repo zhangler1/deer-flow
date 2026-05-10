@@ -630,3 +630,67 @@ def budget_controlled_bocomsearch_tool(
 
 # 向后兼容别名
 create_budget_controlled_bocomsearch_tool = budget_controlled_bocomsearch_tool
+
+
+# ============================================================================
+# searchknowledge_standard（EUVD 段落级标准知识检索）适配
+# ============================================================================
+
+class SearchKnowledgeStandardBaseTool(BaseTool):
+    """EUVD 段落级标准知识检索基础工具，适配 BudgetControlledSearchTool 包装
+
+    封装 call_searchknowledge_standard 函数为 LangChain BaseTool 接口，
+    使其可被 BudgetControlledSearchTool 包装并纳入预算控制。
+    """
+    name: str = "searchknowledge_standard"
+    description: str = (
+        "段落级标准知识检索（EUVD）。适用于查询行业政策、研报段落级语义片段等结构化知识库内容。"
+        "输入应为完整的检索关键词，返回带相关度评分的段落列表。"
+    )
+    repository: str = "searchknowledge_standard"
+    max_results: int = 10
+
+    def _run(
+        self,
+        query: str,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+        **kwargs
+    ) -> List[Dict[str, Any]]:
+        """执行 EUVD 标准知识检索"""
+        from src.tools.searchknowledge_standard import call_searchknowledge_standard
+        logger.info(
+            f"🔍 searchknowledge_standard | max_results={self.max_results}"
+        )
+        return call_searchknowledge_standard(
+            query=query,
+            max_results=self.max_results,
+        )
+
+
+def budget_controlled_searchknowledge_standard_tool(
+    session_id: str = "default",
+    max_search_calls: int = 5,
+    max_tokens: int = 10000,
+    max_results: int = 10,
+) -> BudgetControlledSearchTool:
+    """创建预算控制的 EUVD 标准知识检索工具
+
+    与 budget_controlled_online_search 、budget_controlled_bocomsearch 共用同一个预算管理器（同一 session_id），
+    确保该会话下总搜索量不超限。
+
+    Args:
+        session_id: 会话 ID
+        max_search_calls: 最大调用次数（与同 session 其他检索共享）
+        max_tokens: 最大 token 预算（与同 session 其他检索共享）
+        max_results: 单次检索返回的最大结果数
+
+    Returns:
+        BudgetControlledSearchTool: 带预算控制的标准知识检索工具实例
+    """
+    base_tool = SearchKnowledgeStandardBaseTool(max_results=max_results)
+    return create_budget_controlled_search_tool(
+        wrapped_tool=base_tool,
+        session_id=session_id,
+        max_search_calls=max_search_calls,
+        max_tokens=max_tokens,
+    )

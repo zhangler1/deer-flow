@@ -229,6 +229,122 @@ ONLINE_MOCK_RESULTS = [
 ]
 
 
+# ============================================================
+# Mock 数据 searchknowledge_standard（EUVD 段落级标准知识检索）
+# 格式参照：api——info/searchknowledgeStandard/response.txt
+# ============================================================
+SEARCHKNOWLEDGE_MOCK_RESULTS = [
+    {
+        "paraId": "mock-para-001",
+        "content": "安徽省2026年发布《半导体产业高质量发展三年行动方案》，重点支持化合物半导体、第三代半导体材料、先进封装测试等方向，目标到2028年全省半导体产业规模突破3000亿元。合肥、芜湖、滁州被列为三大产业集聚区，给予最高3000万元的研发补贴及场地租金减免。",
+        "score": 0.6892,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_001",
+        "fileName": "安徽省半导体产业政策汇编（2026版）",
+        "customizedTags": [
+            "SP0000036_行业知识",
+            "半导体",
+        ],
+        "createTime": "Mon Mar 03 10:00:00 CST 2026",
+        "updateTime": "Tue Mar 04 11:00:00 CST 2026",
+        "validTimeStart": "Mon Mar 03 10:00:00 CST 2026",
+        "validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+        "pubTime": "Mon Mar 03 12:00:00 CST 2026",
+        "taskId": "TASK_MOCK_001",
+        "page": -1,
+        "sorted": 1,
+        "paraTitle": "# 1. 安徽省2026年半导体产业三年行动方案概述",
+        "mainTaskId": None,
+        "knType": 3,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0999999", "SP0000036"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-002",
+        "content": "2026年Q1全国半导体行业规模以上企业实现营业收入约4200亿元，同比增长12.5%。其中，集成电路设计业增长18.3%，制造业增长9.7%，封测业增长7.2%。下游应用主要集中在汽车电子、AI算力芯片、消费电子三大领域。",
+        "score": 0.6541,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_002",
+        "fileName": "2026年Q1半导体行业运行分析报告",
+        "customizedTags": [
+            "SP0000036_行业知识",
+            "行业类报告",
+        ],
+        "createTime": "Wed Apr 09 09:00:00 CST 2026",
+        "updateTime": "Wed Apr 09 18:00:00 CST 2026",
+        "validTimeStart": "Wed Apr 09 09:00:00 CST 2026",
+        "validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+        "pubTime": "Wed Apr 09 14:30:00 CST 2026",
+        "taskId": "TASK_MOCK_002",
+        "page": -1,
+        "sorted": 2,
+        "paraTitle": "# 2026年Q1半导体行业运行情况",
+        "mainTaskId": None,
+        "knType": 3,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0999999", "SP0000036"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-003",
+        "content": "交通银行2026年行业信贷政策对半导体产业链给予重点支持，将其纳入战略新兴产业目录。授信原则：优先支持已纳入工信部'专精特新'名单的设计、设备、材料类企业；中短期流动资金贷款利率下浮10-20BP；技改贷款给予不超过3年的宽限期。",
+        "score": 0.6213,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_003",
+        "fileName": "交通银行2026年行业信贷政策及投向指引",
+        "customizedTags": [
+            "SP0000100_内网_办发文",
+            "内网_办发文",
+        ],
+        "createTime": "Fri Feb 20 09:00:00 CST 2026",
+        "updateTime": "Mon Feb 23 10:00:00 CST 2026",
+        "validTimeStart": "Fri Feb 20 09:00:00 CST 2026",
+        "validTimeEnd": "Fri Jan 01 08:00:00 CST 2038",
+        "pubTime": "Fri Feb 20 16:00:00 CST 2026",
+        "taskId": "TASK_MOCK_003",
+        "page": -1,
+        "sorted": 3,
+        "paraTitle": "# 半导体产业链信贷支持政策",
+        "mainTaskId": None,
+        "knType": 2,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0000100", "SP0999999"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+]
+
+
+def _build_searchknowledge_response(query: str) -> dict:
+    """构造 searchknowledge_standard 响应（EUVD 段落级标准知识检索格式）"""
+    return {
+        "RSP_BODY": {
+            "result": {
+                "groupPagination": None,
+                "vectorGroupList": SEARCHKNOWLEDGE_MOCK_RESULTS,
+                "textGroupList": None,
+                "graphGroupList": None,
+                "rerankResultList": None,
+                "rerankResultStatus": None,
+            },
+            "param": {"keyword": query},
+        },
+        "RSP_HEAD": {
+            "TRAN_SUCCESS": "1",
+            "TRACE_NO": "mock-searchknowledge-trace-001",
+            "TRACE_ID": "mock.1.00.searchknowledge",
+            "PROCESS_STATUS_CODE": "N",
+            "BIZ_TRACE_NO": None,
+        },
+    }
+
+
 def _build_bocom_response(query: str) -> dict:
     """构造 bocomsearch 响应（内网知识库格式）"""
     return {
@@ -277,6 +393,36 @@ def _build_online_response(query: str, muwp_user: dict) -> dict:
 # ============================================================
 # 核心接口：统一处理 bocomsearch 和 online_search
 # ============================================================
+# ============================================================
+# 路由：searchknowledge_standard（EUVD 段落级标准知识检索）
+# ============================================================
+@app.post("/EUVD.EUVD-ADAPTER.V-1.0/searchKnowledgeStandard.do")
+async def searchknowledge_standard(request: Request):
+    """EUVD 段落级标准知识检索 mock 接口。
+
+    与真实接口一致：application/x-www-form-urlencoded，REQ_MESSAGE 字段为 JSON 字符串。
+    """
+    query = ""
+    try:
+        form = await request.form()
+        req_message_str = form.get("REQ_MESSAGE", "{}")
+        try:
+            req_message = json.loads(req_message_str)
+        except json.JSONDecodeError:
+            req_message = {}
+        param = req_message.get("REQ_BODY", {}).get("param", {})
+        query = param.get("keyword", "")
+        response_data = _build_searchknowledge_response(query)
+        logger.info(
+            "[searchknowledge_standard] query=%r -> %d 条段落结果",
+            query, len(SEARCHKNOWLEDGE_MOCK_RESULTS),
+        )
+        return JSONResponse(content=response_data)
+    except Exception as e:
+        logger.error("[searchknowledge_standard] 处理请求异常: %s", e)
+        return JSONResponse(content=_build_searchknowledge_response(""))
+
+
 @app.post("/ELLM.ELLM-OFFICE.V-1.0/querySources.do")
 async def unified_search(request: Request):
     """
@@ -336,5 +482,7 @@ if __name__ == "__main__":
     print("  POST /ELLM.ELLM-OFFICE.V-1.0/querySources.do")
     print("       form-urlencoded -> bocomsearch（内网知识库，5条）")
     print("       application/json -> online_search（互联网新闻，5条）")
+    print("  POST /EUVD.EUVD-ADAPTER.V-1.0/searchKnowledgeStandard.do")
+    print("       form-urlencoded -> searchknowledge_standard（段落级标准知识检索，3条）")
     print("  GET  /health")
     uvicorn.run("mock_search_api:app", host="0.0.0.0", port=8010, reload=True)

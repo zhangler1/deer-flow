@@ -36,6 +36,10 @@ export function ResearchBlock({
   const reportStreaming = useStore((state) =>
     reportId ? (state.messages.get(reportId)?.isStreaming ?? false) : false,
   );
+  // 当前研究是否正在进行中（用于判断点击“报告”时的提示文案）
+  const researchOngoing = useStore(
+    (state) => !!researchId && state.ongoingResearchId === researchId,
+  );
   const { isReplay } = useReplay();
   useEffect(() => {
     if (hasReport) {
@@ -218,13 +222,30 @@ export function ResearchBlock({
         >
           <div className="flex w-full justify-center">
             <TabsList className="">
-              <TabsTrigger
-                className="px-8"
-                value="report"
-                disabled={!hasReport}
-              >
-                {t("report")}
-              </TabsTrigger>
+              {/* 报告未就绪时：disabled + 悬停 Tooltip 提示；外层 span 捕获 hover */}
+              {!hasReport ? (
+                <Tooltip
+                  title={
+                    researchOngoing
+                      ? "报告正在生成中，请稍候……"
+                      : "暂无报告"
+                  }
+                >
+                  <span className="inline-flex">
+                    <TabsTrigger
+                      className="px-8"
+                      value="report"
+                      disabled
+                    >
+                      {t("report")}
+                    </TabsTrigger>
+                  </span>
+                </Tooltip>
+              ) : (
+                <TabsTrigger className="px-8" value="report">
+                  {t("report")}
+                </TabsTrigger>
+              )}
               <TabsTrigger className="px-8" value="activities">
                 {t("activities")}
               </TabsTrigger>

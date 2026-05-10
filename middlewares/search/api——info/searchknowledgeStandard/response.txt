@@ -1,0 +1,108 @@
+{
+	"RSP_BODY": {
+		"result": {
+			"groupPagination": null,
+			"vectorGroupList": [
+				{
+					"paraId": "05138129-176f-4944-936d-b54ab7534611",
+					"content": "1.2026年2月半导体行业市场表现情况\n1.1.2月半导体行业股票市场表现情况\n国内2026年2月半导体行业表现相对较弱，走势弱于沪深300。2026年2月电子行业（中信）上涨  $2.97\\%$  ，2月沪深300上涨  $0.09\\%$  ，电子行业走势强于沪深300指数。半导体行业（中信）2026年2月下跌  $1.30\\%$  ，走势大幅弱于沪深300，其中集成电路下跌  $2.90\\%$  分立器件下跌  $1.90\\%$  ，半导体材料上涨  $7.30\\%$  ，半导体设备上涨  $2.59\\%$  ；半导体行业（中信）2026年初至今上涨  $17.09\\%$  。\n图1：2026年2月中信一级行业涨跌幅情况  $(\\%)$  \n资料来源：Wind，中原证券研究所\n图2：中信半导体指数与沪深300涨跌幅情况  $(\\%)$  \n资料来源：Wind，中原证券研究所\n\n2026年2月半导体板块上涨家数少于下跌家数，2026年2月涨幅排名前十的公司分别为新相微（  $54\\%$  ）、江丰电子（  $43\\%$  ）、盛科通信- U（  $27\\%$  ）、芯原股份（  $25\\%$  ）、长光华芯 $23\\%$  ）、有研硅（  $22\\%$  ）、耐科装备（  $18\\%$  ）、有研新材（  $17\\%$  ）、派瑞股份（  $14\\%$  ）、国科微 $13\\%$  。\n表1：2026年2月A股中信半导体行业部分个股涨跌幅情况  \n<table><tr><td>证券,",
+					"score": 0.627996,
+					"rerankScore": null,
+					"fileId": "FILE793687427768709",
+					"fileName": "半导体行业月报：海外模拟厂商陆续发布涨价函，国内存储模组厂商26Q1业绩超预期",
+					"customizedTags": [
+						"SP0000036_行业知识",
+						"非行业类报告"
+					],
+					"createTime": "Sat Apr 11 19:52:53 CST 2026",
+					"updateTime": "Wed Apr 15 22:05:30 CST 2026",
+					"validTimeStart": "Fri Mar 13 08:00:00 CST 2026",
+					"validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+					"pubTime": "Sun Apr 12 03:42:27 CST 2026",
+					"taskId": "TASK793685748774725",
+					"page": -1,
+					"sorted": 8,
+					"paraTitle": "# 1.1.2月半导体行业股票市场表现情况——半导体行业股票市场表现概述 半导体板块个股涨跌幅情况",
+					"mainTaskId": null,
+					"knType": 3,
+					"sourceOrgId": "-1.0.1000000002.1000004067.5000002331",
+					"domainTags": null,
+					"sceneCodes": [
+						"SP0999999",
+						"SP0000036",
+						"SP0999997"
+					],
+					"qaType": "QP",
+					"fromAttachment": false
+				},
+				{
+					"paraId": "7e4faeca-cbfc-4099-b3be-a576b8a770cf",
+					"content": "2026年专项策略指引政策框架及覆盖领域\n<table><tr><td>序号</td><td>专项政策</td><td>政策覆盖范围</td></tr><tr><td>1</td><td>光伏产业链</td><td>上游原材料采集加工、中游电池片组件制造、下游电站建设运营</td></tr><tr><td>2</td><td>风能产业链</td><td>风电核心设备及关键零部件(整机、叶片、塔筒、主轴、轴承)、风能电站项目</td></tr><tr><td>3</td><td>智能电网产业链</td><td>上游核心设备及零部件制造;中游控制系统及电网施工建设;下游输配电及电力供应</td></tr><tr><td>4</td><td>储能产业链</td><td>抽水蓄能、电化学储能、电网储氢</td></tr><tr><td>5</td><td>氢能产业链</td><td>上游制氢、制氢设备;中游氢气储存、运输和加注;下游td>24</td><td>养老产业</td><td>养老机构和服务体系建设、智慧康养技术应用和产品开发、适老享老服务和相关消费</td></tr><tr><td>25</td><td>自贸区（港）（新）</td><td>上海、海南等22个自贸区（港）内跨境贸易、跨境投融资、创新链产业链提升、现代服务业发展</td></tr></table>",
+					"score": 0.62559652,
+					"rerankScore": null,
+					"fileId": "FILE774382466480197",
+					"fileName": "关于印发《交通银行行业信贷政策及投向指引（2026年2月版）》的通知",
+					"customizedTags": [
+						"SP0000100_内网_办发文",
+						"SP0999997_内网_办发文",
+						"内网_办发文",
+						"内网_办发文"
+					],
+					"createTime": "Fri Apr 10 22:20:52 CST 2026",
+					"updateTime": "Wed Apr 15 18:14:35 CST 2026",
+					"validTimeStart": "Sat Feb 14 08:00:00 CST 2026",
+					"validTimeEnd": "Fri Jan 01 08:00:00 CST 2038",
+					"pubTime": "Sat Apr 11 06:10:38 CST 2026",
+					"taskId": "TASK793369949092101",
+					"page": -1,
+					"sorted": 5,
+					"paraTitle": "# 2026年专项策略指引政策框架及覆盖领域",
+					"mainTaskId": null,
+					"knType": 2,
+					"sourceOrgId": "-1.0.1000000002.1000022527.6200000052",
+					"domainTags": null,
+					"sceneCodes": [
+						"SP0000100",
+						"SP0999999",
+						"SP0999997"
+					],
+					"qaType": "QP",
+					"fromAttachment": false
+				}
+			],
+			"textGroupList": null,
+			"graphGroupList": null,
+			"rerankResultList": null,
+			"rerankResultStatus": null
+		},
+		"param": {
+			"keyword": "安徽省半导体产业政策 2026",
+			"caller": "P2024146",
+			"userCode": "9855835",
+			"searchType": "2",
+			"qaType": [
+				1
+			],
+			"domainTagList": [],
+			"spaceCodeList": [
+				"SP0999999"
+			],
+			"customizedTagList": [],
+			"vectorTopN": 2,
+			"textTopN": 0,
+			"model": 0,
+			"attachFlag": 1,
+			"threshold": 0.1,
+			"publishedFlag": 0,
+			"latestFlag": null,
+			"delFlag": 0
+		}
+	},
+	"RSP_HEAD": {
+		"TRAN_SUCCESS": "1",
+		"TRACE_NO": "adapter-prd-euvd-785dd9fb5-26hmn-3818592138",
+		"TRACE_ID": "0c541bb2.1.438990.4v3uirgp2pr",
+		"PROCESS_STATUS_CODE": "N",
+		"BIZ_TRACE_NO": null
+	}
+}
