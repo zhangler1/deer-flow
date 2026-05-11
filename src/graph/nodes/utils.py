@@ -295,6 +295,8 @@ async def _execute_agent_step(
                 f"已耗时: {current_duration:.1f}s / 超时: {step_timeout:.0f}s | 时间: {time.strftime('%H:%M:%S')}"
             )
 
+    # 预先声明心跳任务变量，保证 finally 一定能访问（即便 try 内未执行到创建处）
+    heartbeat_task = None
     try:
         # 应用工具结果压缩（如果启用，使用异步版本支持 summarize 模式）
         if tool_compression_middleware is not None:
@@ -500,6 +502,16 @@ async def _execute_agent_step(
         )
         logger.exception(f"Agent {agent_name} LLM调用异常: {e}")
         raise
+    finally:
+        # 🔒 最终兜底：无论正常完成、TimeoutError、Exception 还是 CancelledError 传入，
+        # 都确保心跳任务被取消，避免孤儿协程持续打印 HEARTBEAT 日志。
+        if heartbeat_task is not None and not heartbeat_task.done():
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except BaseException:
+                # 吞掉 CancelledError 以及等待期间的任何异常，不影响原异常传播
+                pass
     
     # Agent 响应分析：正常路径汇总成一行，异常保留详细告警
     if isinstance(result, dict):
