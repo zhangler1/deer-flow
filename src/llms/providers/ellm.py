@@ -128,12 +128,45 @@ class EllmChatModel(ChatOpenAI):
                 **(self.default_headers or {}),
                 "api-key": current_key,
             }
-            logger.debug(
-                "EllmChatModel: injected api-key into request headers "
-                "(scene_code=%s, model=%s)",
-                self.scene_code,
-                self.model_name,
-            )
+            # Observability: surface key age / remaining TTL / refresh-thread health.
+            # At DEBUG for normal calls; escalate to WARNING when the key is
+            # about to expire or the background refresh thread has died —
+            # these are exactly the signals needed to diagnose the
+            # "apikey 已过期" family of problems.
+            try:
+                status = self._key_manager.describe_status()
+                expires_in = status.get("expires_in_sec", -1)
+                thread_alive = status.get("thread_alive", False)
+                if not thread_alive:
+                    logger.warning(
+                        "EllmChatModel: refresh thread DEAD at injection time "
+                        "(scene_code=%s, model=%s, key_age=%.0fs, expires_in=%.0fs)",
+                        self.scene_code,
+                        self.model_name,
+                        status.get("key_age_sec", -1),
+                        expires_in,
+                    )
+                elif 0 < expires_in < 120:
+                    logger.warning(
+                        "EllmChatModel: api-key near expiry "
+                        "(scene_code=%s, model=%s, expires_in=%.0fs)",
+                        self.scene_code,
+                        self.model_name,
+                        expires_in,
+                    )
+                else:
+                    logger.debug(
+                        "EllmChatModel: api-key injected "
+                        "(scene_code=%s, model=%s, key_age=%.0fs, expires_in=%.0fs, thread_alive=%s)",
+                        self.scene_code,
+                        self.model_name,
+                        status.get("key_age_sec", -1),
+                        expires_in,
+                        thread_alive,
+                    )
+            except Exception:
+                # Observability must never break the request path.
+                pass
         except Exception as e:
             logger.warning(
                 "EllmChatModel: failed to refresh api-key header, "

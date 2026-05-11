@@ -33,7 +33,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # Default refresh configuration
-DEFAULT_REFRESH_INTERVAL = 1800  # 25 minutes in seconds
+DEFAULT_REFRESH_INTERVAL = 1800  # 30 minutes in seconds
 DEFAULT_REFRESH_AHEAD = 300  # Refresh 5 minutes before expiry
 DEFAULT_REQUEST_TIMEOUT = 30  # 30 seconds timeout for key request
 
@@ -196,9 +196,10 @@ class EllmApiKeyManager:
     def get_api_key(self) -> str:
         """Get the current valid API key.
 
-        If the key is near expiry (within ``refresh_ahead`` seconds), a
-        synchronous refresh is attempted before returning. If no key is
-        available at all, a synchronous refresh is forced.
+        Also performs self-healing: if the background refresh thread has
+        died silently (漏洞 5), it will be restarted here before returning.
+        When the key is near expiry, a **forced** refresh is issued to
+        bypass the cache fast path (漏洞 2/3).
 
         Returns:
             The current valid API key string.
@@ -206,6 +207,9 @@ class EllmApiKeyManager:
         Raises:
             RuntimeError: If no key is available and refresh fails.
         """
+        # Self-heal the background refresh thread if it died silently
+        self._ensure_refresh_thread_alive()
+
         with self._lock:
             if self._current_key and not self._is_near_expiry():
                 return self._current_key
@@ -218,9 +222,9 @@ class EllmApiKeyManager:
             reason,
         )
 
-        # Key is near expiry or missing — try synchronous refresh
+        # Near expiry / missing — force a real HTTP refresh (skip stale cache)
         try:
-            return self.refresh_key()
+            return self.refresh_key(force=True)
         except Exception as e:
             # If we still have a key (even near-expiry), return it
             with self._lock:
@@ -238,14 +242,69 @@ class EllmApiKeyManager:
                 f"(scene_code={self._scene_code})"
             ) from e
 
-    def refresh_key(self) -> str:
+    def _ensure_refresh_thread_alive(self) -> None:
+        """Restart the background refresh thread if it has died silently.
+
+        Rationale: threads can die from unexpected exceptions, OOM, or
+        interpreter shutdown races. If that happens, key refresh stops
+        forever until process restart — exactly the "运行久了不再获取"
+        symptom. Calling this on every get_api_key() costs just one
+        ``is_alive()`` check.
+        """
+        with self._lock:
+            if not self._started:
+                return
+            thread = self._refresh_thread
+            if thread is not None and thread.is_alive():
+                return
+            logger.error(
+                "ELLM ApiKeyManager: background refresh thread is DEAD, restarting "
+                "(pid=%s, scene_code=%s)",
+                os.getpid(),
+                self._scene_code,
+            )
+            self._stop_event.clear()
+            self._refresh_thread = threading.Thread(
+                target=self._refresh_loop,
+                name=f"ellm-apikey-refresh-{self._scene_code}-pid{os.getpid()}",
+                daemon=True,
+            )
+            self._refresh_thread.start()
+
+    def describe_status(self) -> dict[str, Any]:
+        """Return current key status for observability (no refresh)."""
+        with self._lock:
+            now = time.time()
+            age = now - self._key_obtained_at if self._key_obtained_at > 0 else -1.0
+            expires_in = self._key_expiry_time - now if self._key_expiry_time > 0 else -1.0
+            thread_alive = (
+                self._refresh_thread.is_alive() if self._refresh_thread else False
+            )
+            return {
+                "scene_code": self._scene_code,
+                "has_key": bool(self._current_key),
+                "key_age_sec": round(age, 1),
+                "expires_in_sec": round(expires_in, 1),
+                "expiry_bj": _fmt_bj(self._key_expiry_time),
+                "thread_alive": thread_alive,
+            }
+
+    def refresh_key(self, force: bool = False) -> str:
         """Fetch a new API key, using the cross-process shared cache when possible.
 
         Flow:
-          1. Try to read a fresh key from the shared cache file (no lock).
-          2. If cache is fresh → load into memory and return.
-          3. If cache is stale/missing → acquire file lock, double-check cache,
-             then HTTP-refresh if still stale, and write back to cache.
+          1. Fast path (``force=False`` only): try the shared cache → return.
+          2. Slow path: acquire the file lock, double-check the cache
+             (skipped when ``force=True``), HTTP-refresh, write cache back.
+
+        Args:
+            force: When True, completely bypass the cache fast path AND
+                the post-lock double-check. This is mandatory when the
+                caller already knows the cache is stale — typically after
+                a 401 from the ELLM gateway, or when ``get_api_key`` has
+                detected near-expiry. Without this flag, a short-TTL key
+                could remain trapped in the cache for a full
+                ``cache_validity_seconds`` window.
 
         Returns:
             The current valid API key string.
@@ -253,13 +312,14 @@ class EllmApiKeyManager:
         Raises:
             Exception: If the HTTP request fails or the response is invalid.
         """
-        # Step 1: Fast path — read cache without lock
-        cached = self._load_from_cache()
-        if cached:
-            return cached
+        # Step 1: Fast path — only when caller allows trusting the cache
+        if not force:
+            cached = self._load_from_cache()
+            if cached:
+                return cached
 
-        # Step 2: Cache miss or stale — acquire lock and refresh
-        return self._acquire_lock_and_refresh()
+        # Step 2: Slow path — acquire lock, possibly skip double-check, HTTP refresh
+        return self._acquire_lock_and_refresh(force=force)
 
     def _fetch_key_from_server(self) -> str:
         """Pure HTTP fetch — call the ELLM gateway and parse the response.
@@ -430,16 +490,35 @@ class EllmApiKeyManager:
         return max(self._refresh_interval - self._refresh_ahead, 60)
 
     def _read_cache(self) -> dict[str, Any] | None:
-        """Read the shared cache file; return None if missing or invalid."""
+        """Read the shared cache file; return None if missing, stale, or near expiry.
+
+        Double-gate freshness check (fix for the "apikey 已过期" death loop):
+
+          1. ``obtained_at`` must be within ``cache_validity_seconds`` of now
+             — this is the classic thundering-herd guard.
+          2. ``expiry_time`` (if known) must be more than ``refresh_ahead``
+             seconds in the future — this guards against short-TTL keys.
+
+        The original implementation only checked gate 1. If the ELLM gateway
+        issued a key whose TTL was shorter than ``cache_validity_seconds``,
+        the cache would keep handing out an expired key for the remainder
+        of that window, even after 401 responses.
+        """
         try:
             path = self._cache_path()
             if not path.exists():
                 return None
             data = json.loads(path.read_text(encoding="utf-8"))
             obtained_at = data.get("obtained_at", 0)
-            if time.time() - obtained_at < self._cache_validity_seconds():
-                return data
-            return None  # stale
+            expiry_time = data.get("expiry_time", 0.0)
+            now = time.time()
+            # Gate 1: writeback freshness
+            if now - obtained_at >= self._cache_validity_seconds():
+                return None
+            # Gate 2: real key validity — must have > refresh_ahead seconds left
+            if expiry_time > 0 and (expiry_time - now) <= self._refresh_ahead:
+                return None
+            return data
         except Exception:
             return None
 
@@ -504,12 +583,18 @@ class EllmApiKeyManager:
         )
         return api_key
 
-    def _acquire_lock_and_refresh(self) -> str:
+    def _acquire_lock_and_refresh(self, force: bool = False) -> str:
         """Acquire the file lock, double-check cache, then HTTP refresh if needed.
 
-        This prevents thundering herd: multiple processes discovering a stale
-        cache at the same time will serialize behind the lock; only the first
-        one makes the HTTP request; the rest read the fresh cache.
+        Thundering-herd protection: multiple processes discovering a stale
+        cache at the same time serialize behind the lock; only the first
+        one makes the HTTP request, the rest read the fresh cache.
+
+        Args:
+            force: When True, skip the double-check step. The caller has
+                already determined the cache is untrustworthy (401 retry
+                or near-expiry), so reading the cache again would only
+                re-hand the same dead key.
         """
         lock_path = self._lock_path()
         lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -518,21 +603,23 @@ class EllmApiKeyManager:
         try:
             fcntl.flock(lock_fd, fcntl.LOCK_EX)
 
-            # Double-check: another process may have refreshed while we waited
-            cached = self._read_cache()
-            if cached is not None:
-                api_key = cached.get("api_key", "")
-                if api_key:
-                    # Load the fresh cache into memory
-                    result = self._load_from_cache()
-                    if result:
-                        logger.info(
-                            "ELLM ApiKeyManager: another process refreshed while we waited "
-                            "(pid=%s, scene_code=%s)",
-                            os.getpid(),
-                            self._scene_code,
-                        )
-                        return result
+            # Double-check: another process may have refreshed while we waited.
+            # Skipped when force=True — caller signalled the cache is untrustworthy.
+            if not force:
+                cached = self._read_cache()
+                if cached is not None:
+                    api_key = cached.get("api_key", "")
+                    if api_key:
+                        # Load the fresh cache into memory
+                        result = self._load_from_cache()
+                        if result:
+                            logger.info(
+                                "ELLM ApiKeyManager: another process refreshed while we waited "
+                                "(pid=%s, scene_code=%s)",
+                                os.getpid(),
+                                self._scene_code,
+                            )
+                            return result
 
             # We are the chosen process — do the HTTP refresh
             api_key = self._fetch_key_from_server()
@@ -558,8 +645,18 @@ class EllmApiKeyManager:
         return self._http_client
 
     def _refresh_loop(self) -> None:
-        """Background refresh loop that periodically fetches a new key."""
-        logger.debug(
+        """Background refresh loop that periodically fetches a new key.
+
+        Two hardening improvements over the original:
+
+        - **Adaptive sleep** (``_compute_next_sleep``): wake-up time is now
+          derived from the key's actual ``_key_expiry_time`` instead of a
+          fixed 1500s. Short-TTL keys will be refreshed before they expire.
+        - **Outer BaseException guard**: unexpected errors (KeyError,
+          AttributeError, etc.) no longer silently kill the thread. They
+          are logged and the loop resumes after a 60s backoff.
+        """
+        logger.info(
             "ELLM ApiKeyManager: background refresh loop started "
             "(pid=%s, scene_code=%s, interval=%ss, ahead=%ss)",
             os.getpid(),
@@ -568,26 +665,60 @@ class EllmApiKeyManager:
             self._refresh_ahead,
         )
         while not self._stop_event.is_set():
-            # Sleep for (refresh_interval - refresh_ahead) seconds
-            sleep_duration = max(self._refresh_interval - self._refresh_ahead, 60)
-            if self._stop_event.wait(timeout=sleep_duration):
-                break
-
-            logger.debug(
-                "ELLM ApiKeyManager: background tick — checking key freshness "
-                "(pid=%s, scene_code=%s)",
-                os.getpid(),
-                self._scene_code,
-            )
             try:
-                self.refresh_key()
-            except Exception as e:
-                logger.error(
-                    "ELLM ApiKeyManager: background refresh failed "
-                    "(scene_code=%s, error=%s), will retry in next cycle",
+                sleep_duration = self._compute_next_sleep()
+                if self._stop_event.wait(timeout=sleep_duration):
+                    break
+
+                logger.debug(
+                    "ELLM ApiKeyManager: background tick — checking key freshness "
+                    "(pid=%s, scene_code=%s, slept=%.0fs)",
+                    os.getpid(),
+                    self._scene_code,
+                    sleep_duration,
+                )
+                try:
+                    # Background tick trusts the cache (force=False) — the cache
+                    # is now reliable thanks to the double-gate check in _read_cache.
+                    self.refresh_key(force=False)
+                except Exception as e:
+                    logger.error(
+                        "ELLM ApiKeyManager: background refresh failed "
+                        "(scene_code=%s, error=%s), will retry in next cycle",
+                        self._scene_code,
+                        e,
+                    )
+            except BaseException as e:  # noqa: BLE001
+                # Catastrophic: protect the thread itself from dying silently.
+                logger.exception(
+                    "ELLM ApiKeyManager: refresh loop caught unexpected error, "
+                    "sleeping 60s then continuing (scene_code=%s, error=%s)",
                     self._scene_code,
                     e,
                 )
+                if self._stop_event.wait(timeout=60):
+                    break
+
+    def _compute_next_sleep(self) -> float:
+        """Adaptive sleep duration for the background refresh loop.
+
+        Returns the number of seconds the loop should sleep before the
+        next refresh attempt. Bounded to ``[60, refresh_interval -
+        refresh_ahead]`` so we neither hammer the key-service nor miss
+        a short-TTL expiry.
+        """
+        with self._lock:
+            expiry = self._key_expiry_time
+        default_sleep = max(self._refresh_interval - self._refresh_ahead, 60)
+        if expiry <= 0:
+            # No expiry info yet (first run or degraded API) — use default.
+            return default_sleep
+        # Aim to wake up refresh_ahead seconds before the key expires.
+        remaining = expiry - time.time() - self._refresh_ahead
+        if remaining <= 0:
+            # Already past wake-up time — refresh very soon (but throttle).
+            return 60.0
+        return min(float(default_sleep), max(float(remaining), 60.0))
 
     # --- Testing helpers ---
 
@@ -624,7 +755,10 @@ class EllmApiKeyManager:
             elapsed,
         )
         try:
-            self.refresh_key()
+            # Must be force=True: caller just got a 401, so the cached key
+            # is known bad. Without force, refresh_key would short-circuit
+            # on the stale cache and hand back the same dead key.
+            self.refresh_key(force=True)
             return True
         except Exception as e:
             logger.error(
