@@ -423,7 +423,6 @@ def get_llm_by_type(llm_type: LLMType) -> Union[BaseChatModel, 'EnhancedLLMWrapp
         wrapped_llm = EnhancedLLMWrapper(llm, llm_type)
         
         duration = time.time() - start_time
-        enhanced_logger.logger.info(f"🤖 LLM_READY | {llm_type} | LLM实例创建完成 | 耗时: {duration:.2f}s")
         return wrapped_llm
         
     except Exception as e:

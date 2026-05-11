@@ -219,8 +219,7 @@ def call_searchknowledge_standard(
         DeerFlow 标准结构的检索结果列表
     """
     logger.info(
-        f"🔍 searchknowledge_standard | 入参 | query='{query}' | "
-        f"max_results={max_results} | timeout={timeout}"
+        f"🔍 searchknowledge_standard | 搜索 | 查询='{query}'"
     )
 
     start_time = time.time()
@@ -257,10 +256,6 @@ def call_searchknowledge_standard(
             data=form_data,
             timeout=timeout,
         )
-        logger.info(
-            f"📡 searchknowledge_standard | 响应 | status={resp.status_code} | "
-            f"content-length={len(resp.content)}"
-        )
         resp.raise_for_status()
         data = resp.json()
 
@@ -274,8 +269,12 @@ def call_searchknowledge_standard(
         results = _parse_response(data)
         trimmed = results[:max_results] if (max_results and max_results > 0) else results
         duration = time.time() - start_time
+        # 对齐 online_search 的日志格式：成功时仅输出一条 HTTP响应汇总日志
         logger.info(
-            f"✅ searchknowledge_standard | 完成 | 结果={len(trimmed)} | 耗时={duration:.2f}s"
+            f"📡 searchknowledge_standard | HTTP响应 | status={resp.status_code} | "
+            f"content-length={len(resp.content)} | encoding={resp.encoding} | "
+            f"result条数={len(trimmed)} | "
+            f"耗时={duration:.1f}s"
         )
         return trimmed
 

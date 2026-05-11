@@ -40,9 +40,9 @@ export function ThemeProviderWrapper({
   return (
     <ThemeProvider
       attribute="class"
-      defaultTheme={"jiaoxin"}
+      defaultTheme={"light"}
       enableSystem={isChatPage}
-      forcedTheme={isChatPage ? undefined : "jiaoxin"}
+      forcedTheme={isChatPage ? undefined : "light"}
       disableTransitionOnChange
     >
       <ThemeClassApplier>{children}</ThemeClassApplier>
