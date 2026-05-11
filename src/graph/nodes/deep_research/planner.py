@@ -71,11 +71,10 @@ def planner_node(
         llm = get_llm_by_type("reasoning")
     elif AGENT_LLM_MAP["planner"] == "basic":
         llm = get_llm_by_type("basic")
-        enhanced_logger.logger.info("🔧 PLANNER_CONFIG | 使用basic LLM不带structured_output，启用字段修复机制")
     else:
         llm = get_llm_by_type(AGENT_LLM_MAP["planner"])
 
-    logger.info(f"Planner input: {messages[:100]}")
+    logger.debug(f"Planner input: {messages}")
     enhanced_logger.logger.info(f"📝 PLANNER_INPUT | 输入消息数: {len(messages)} | 背景调研: {'是' if state.get('enable_background_investigation') and state.get('background_investigation_results') else '否'}")
 
     # 超过最大计划迭代次数，直接进入 reporter

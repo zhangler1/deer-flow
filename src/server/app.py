@@ -183,7 +183,7 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
         finally:
             cancel_event.set()  # 确保无论如何都通知下游停止
             _cancel_registry.unregister(thread_id)
-            logger.info(f"[STREAM_CLEANUP] thread_id={thread_id} | cancel_event 已设置, registry 已清理")
+            logger.debug(f"[STREAM_CLEANUP] thread_id={thread_id} | cancel_event 已设置, registry 已清理")
 
     return StreamingResponse(
         _cancellable_stream(),
@@ -599,7 +599,6 @@ async def _stream_graph_events(
     """
     event_count = 0
     last_event_time = time.time()
-    logger.info(f"[STREAM_START] thread_id={thread_id} | 开始流式传输事件")
 
     # 心跳间隔（秒）：每 30 秒发送一次 ping，远小于 nginx proxy_read_timeout
     HEARTBEAT_INTERVAL = 30
@@ -644,7 +643,6 @@ async def _stream_graph_events(
 
                 # 1) 中断事件优先处理
                 if "__interrupt__" in event_data:
-                    logger.info(f"[STREAM_EVENT] thread_id={thread_id} | 事件类型: interrupt | 事件数: {event_count}")
                     yield _create_interrupt_event(thread_id, event_data)
                     continue
 
@@ -664,9 +662,8 @@ async def _stream_graph_events(
                         "iteration": iteration,
                         "reason": reason,
                     }
-                    logger.info(f"[STREAM_EVENT] thread_id={thread_id} | 事件类型: node_transition | 事件数: {event_count} | payload: {event_payload}")
+                    logger.info(f"[STREAM_EVENT] thread_id={thread_id} | 事件类型: node_transition |  payload: {event_payload}")
                     sse_event = _make_event("node_transition", event_payload)
-                    logger.info(f"[SSE调试] 生成的 SSE 事件内容: {sse_event[:200]}...")
                     yield sse_event
 
                 # 3) 从 updates 事件中提取 plan step 信息
@@ -770,7 +767,7 @@ async def _stream_graph_events(
         )
     finally:
         total_duration = time.time() - last_event_time
-        logger.info(f"[STREAM_END] thread_id={thread_id} | 流式传输结束 | 总事件数: {event_count} | 总耗时: {total_duration:.2f}s")
+
 
 
 

@@ -59,7 +59,6 @@ def _read_prompt_file(filepath: str) -> str:
         with open(full_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        logger.info(f"✅ 成功读取提示词文件: {filepath}")
         return content
 
     except Exception as e:
@@ -167,10 +166,8 @@ def _match_skill_by_query(
             if score > best_score:
                 best_score = score
                 best_match = skill
-                logger.info(f"  ✓ 潜在匹配: {name} (分数: {score})")
 
         if best_match:
-            logger.info(f"  ✅ 最佳匹配: {best_match.get('name')} (分数: {best_score})")
             return best_match
 
         # 如果没有匹配到,返回第一个作为默认

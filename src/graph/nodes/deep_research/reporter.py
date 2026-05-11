@@ -36,7 +36,6 @@ def reporter_node(state: State, config: RunnableConfig):
     start_time = time.time()
     enhanced_logger.logger.info(f"🔄 NODE_ENTRY | reporter | 开始执行报告生成节点")
     
-    logger.info("Reporter write final report")
     configurable = Configuration.from_runnable_config(config)
     
     # 记录报告生成的基本信息
@@ -151,31 +150,31 @@ def reporter_node(state: State, config: RunnableConfig):
         _resp_preview = _resp_str
     logger.info(f"reporter response: {_resp_preview}")
 
-    # 保存 observations 为 markdown 文件
-    if observations:
-        try:
-            examples_dir = "md_output"
-            os.makedirs(examples_dir, exist_ok=True)
+    # # 保存 observations 为 markdown 文件
+    # if observations:
+    #     try:
+    #         examples_dir = "md_output"
+    #         os.makedirs(examples_dir, exist_ok=True)
 
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            filename = f"{examples_dir}/research_observations_{timestamp}.md"
+    #         timestamp = time.strftime("%Y%m%d_%H%M%S")
+    #         filename = f"{examples_dir}/research_observations_{timestamp}.md"
 
-            md_content = f"# 研究观察结果\n\n"
-            md_content += f"## 研究主题\n\n{plan_title}\n\n"
-            md_content += f"---\n\n"
+    #         md_content = f"# 研究观察结果\n\n"
+    #         md_content += f"## 研究主题\n\n{plan_title}\n\n"
+    #         md_content += f"---\n\n"
 
-            for i, observation in enumerate(observations):
-                md_content += f"{observation}\n\n"
+    #         for i, observation in enumerate(observations):
+    #             md_content += f"{observation}\n\n"
 
-            with open(filename, 'w', encoding='utf-8') as f:
-                f.write(md_content)
+    #         with open(filename, 'w', encoding='utf-8') as f:
+    #             f.write(md_content)
 
-            enhanced_logger.logger.info(f"📄 OBSERVATIONS_SAVED | 观察结果已保存到文件: {filename} | 大小: {len(md_content)} 字节")
-            logger.info(f"Observations saved to: {filename}")
+    #         enhanced_logger.logger.info(f"📄 OBSERVATIONS_SAVED | 观察结果已保存到文件: {filename} | 大小: {len(md_content)} 字节")
+    #         logger.info(f"Observations saved to: {filename}")
 
-        except Exception as e:
-            enhanced_logger.logger.error(f"❌ SAVE_OBSERVATIONS_FAILED | 保存观察结果失败: {str(e)}")
-            logger.error(f"Failed to save observations: {e}")
+    #     except Exception as e:
+    #         enhanced_logger.logger.error(f"❌ SAVE_OBSERVATIONS_FAILED | 保存观察结果失败: {str(e)}")
+    #         logger.error(f"Failed to save observations: {e}")
 
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | reporter | 节点执行完成 | 总耗时: {duration:.2f}s")

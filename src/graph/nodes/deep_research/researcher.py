@@ -50,7 +50,6 @@ async def researcher_node(
     start_time = time.time()
     enhanced_logger.logger.info(f"🔄 NODE_ENTRY | researcher | 开始执行研究节点 (Middleware 模式)")
     
-    logger.info("Researcher node is researching (with middleware support).")
     configurable = Configuration.from_runnable_config(config)
     
     # 🔥 每个 researcher 节点开始时清零预算，确保每个节点独立计算预算
@@ -110,10 +109,7 @@ async def researcher_node(
         use_budget_online = use_budget_online.lower() not in ('false', '0', 'no', '')
     if isinstance(use_budget_bocom, str):
         use_budget_bocom = use_budget_bocom.lower() not in ('false', '0', 'no', '')
-    enhanced_logger.logger.info(
-        f"🔧 BUDGET_SWITCH | use_budget_controlled_online_search: {use_budget_online} | "
-        f"use_budget_controlled_bocom_search: {use_budget_bocom}"
-    )
+
 
     # 根据报告风格动态配置工具
     if report_style == "industry_report":

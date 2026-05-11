@@ -72,7 +72,6 @@ def continue_to_running_research_team(state: State):
         if all_completed:
             enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → reporter | 原因: 所有步骤已完成，生成最终报告")
             duration = time.time() - start_time
-            enhanced_logger.logger.info(f"⏱️ TRANSITION_TIME | research_team 跳转逻辑 | 耗时: {duration:.2f}s")
             return "reporter"
     except (AttributeError, TypeError) as e:
         enhanced_logger.logger.warning(f"无法检查步骤完成状态: {e}，默认返回planner")

@@ -245,7 +245,7 @@ def call_searchknowledge_standard(
         f"REQ_MESSAGE=\n{req_message_pretty}\n"
         f"────────────────────────────────────────\n"
     )
-    logger.info(
+    logger.debug(
         f"📡 searchknowledge_standard | 发起请求 | url={SearchKnowledgeStandardConfig.API_URL}"
         f"{debug_block}"
     )
@@ -269,10 +269,7 @@ def call_searchknowledge_standard(
         vector_count = len(
             (data.get("RSP_BODY", {}) or {}).get("result", {}).get("vectorGroupList", []) or []
         )
-        logger.info(
-            f"📡 searchknowledge_standard | 解析 | TRAN_SUCCESS={tran_success} | "
-            f"vector条数={vector_count}"
-        )
+
 
         results = _parse_response(data)
         trimmed = results[:max_results] if (max_results and max_results > 0) else results

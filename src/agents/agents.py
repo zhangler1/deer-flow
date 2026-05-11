@@ -25,12 +25,10 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
         configurable: Optional Configuration object containing report_style and other settings
     """
     # 🆕 添加工具诊断日志
-    logger.info(f"🔧 CREATE_AGENT | {agent_name} ({agent_type}) | 开始创建智能体")
     logger.info(f"🔧 TOOLS_INPUT | 接收到的工具列表:")
     for i, tool in enumerate(tools):
         tool_name = getattr(tool, 'name', 'unknown')
-        tool_desc = getattr(tool, 'description', 'no description')[:80]
-        logger.info(f"   [{i}] {tool_name}: {tool_desc}")
+        logger.info(f"   [{i}] {tool_name}")
     logger.info(f"🔧 TOOLS_COUNT | 工具总数: {len(tools)}")
 
     if len(tools) == 0:

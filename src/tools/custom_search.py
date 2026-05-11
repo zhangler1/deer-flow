@@ -160,7 +160,7 @@ class CustomSearchTool(BaseTool):
             f"Body (application/json):\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
             f"───────────────────────────────────────────────────────────────────────\n"
         )
-        logger.info(
+        logger.debug(
             f"📡 {self.name} | 发起请求 | url={self.api_url} | "
             f"repository={self.repository} | channelId={self.channel_id} | query='{query}'"
            
@@ -297,8 +297,8 @@ class CustomSearchTool(BaseTool):
             logger.info(
                 f"✅ {self.name} | 搜索完成 | status={meta.get('status')} | "
                 f"content-length={meta.get('content_length')} | encoding={meta.get('encoding')} | "
-                f"TRAN_SUCCESS={meta.get('tran_success')} | result条数={meta.get('result_count')} | "
-                f"结果={len(results)} | 耗时={duration:.1f}s"
+                f"result条数={meta.get('result_count')} | "
+                f"耗时={duration:.1f}s"
             )
             
             # 恢复原始配置

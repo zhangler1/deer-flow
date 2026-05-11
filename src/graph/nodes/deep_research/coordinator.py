@@ -182,7 +182,7 @@ def coordinator_node(
         enhanced_logger.logger.info(f"🔧 COORDINATOR_TOOL_CALLS | 工具调用数量: {len(tool_calls)}")
         
         for i, tool_call in enumerate(tool_calls):
-            enhanced_logger.logger.info(f"🔧 TOOL_CALL_{i+1} | 完整内容: {tool_call}")
+            enhanced_logger.logger.debug(f"🔧 TOOL_CALL_{i+1} | 完整内容: {tool_call}")
             enhanced_logger.logger.debug(f"  - name: {tool_call.get('name', 'N/A')}")
             enhanced_logger.logger.debug(f"  - args: {tool_call.get('args', {})}")
         

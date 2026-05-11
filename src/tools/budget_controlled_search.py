@@ -104,10 +104,7 @@ class BudgetManagerStore:
                 'last_accessed': now,
                 'session_id': session_id,
             }
-            logger.info(
-                f"🔧 BudgetManager created for session: {session_id} | "
-                f"Total sessions: {len(self._store)}/{self._max_sessions}"
-            )
+
             return manager
     
     def get(self, session_id: str) -> Optional[SearchBudgetManager]:

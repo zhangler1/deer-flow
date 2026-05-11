@@ -202,7 +202,6 @@ class EnhancedToolBoundLLMWrapper:
         start_time = time.time()
         char_len, token_est = get_messages_context_stats(messages)
         
-        self.enhanced_logger.logger.info(f"🤖 LLM_TOOLS | {self.llm_type} | 开始工具思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
         
         try:
             result = self.tool_bound_llm.invoke(messages, **kwargs)
@@ -212,12 +211,11 @@ class EnhancedToolBoundLLMWrapper:
             tool_calls = getattr(result, 'tool_calls', [])
             tool_count = len(tool_calls) if tool_calls else 0
             
-            self.enhanced_logger.logger.info(f"🤖 LLM_TOOLS_COMPLETE | {self.llm_type} | 工具思考完成 | 工具调用数: {tool_count} | 耗时: {duration:.2f}s")
+            
             
             if tool_calls:
                 for i, tool_call in enumerate(tool_calls):
                     tool_name = tool_call.get('name', '未知工具')
-                    self.enhanced_logger.logger.info(f"🔧 TOOL_CALL_PLANNED | {tool_name} | 计划调用工具 #{i+1}")
             
             return result
             
@@ -411,12 +409,10 @@ def get_llm_by_type(llm_type: LLMType) -> Union[BaseChatModel, 'EnhancedLLMWrapp
     Get LLM instance by type. Returns cached instance if available.
     """
     start_time = time.time()
-    enhanced_logger.logger.info(f"🤖 LLM_INIT | {llm_type} | 初始化LLM实例")
     
     try:
         if llm_type in _llm_cache:
             duration = time.time() - start_time
-            enhanced_logger.logger.info(f"🤖 LLM_CACHE_HIT | {llm_type} | 使用缓存实例 | 耗时: {duration:.2f}s")
             return _llm_cache[llm_type]
 
         conf = load_yaml_config(_get_config_file_path())

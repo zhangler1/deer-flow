@@ -169,7 +169,7 @@ async def _execute_agent_step(
         tool_names = [getattr(t, 'name', 'unknown') for t in agent.tools]
         enhanced_logger.logger.info(f"🔧 Agent.tools属性存在: {tool_names} (共{len(agent.tools)}个)")
     elif hasattr(agent, 'nodes'):
-        enhanced_logger.logger.info(f"🔧 工具已通过create_react_agent绑定到LLM")
+        enhanced_logger.logger.debug(f"🔧 工具已通过create_react_agent绑定到LLM")
     else:
         enhanced_logger.logger.warning(f"⚠️  Agent对象类型异常: {type(agent)}")
         enhanced_logger.logger.warning(f"   Agent属性: {dir(agent)[:10]}...")
@@ -216,7 +216,6 @@ async def _execute_agent_step(
             logger.warning(f"⚠️ 无法获取压缩用 LLM: {e}")
         
         tool_compression_middleware = ToolResultCompressionMiddleware(llm=compression_llm)
-        enhanced_logger.logger.info(f"🗜️  COMPRESSION_ENABLED | {agent_name} | 工具结果压缩中间件已启用 | 模式: {tool_compression_middleware.config.mode}")
 
     # 检查 state 中的消息
     state_messages = state.get("messages", [])
@@ -271,7 +270,6 @@ async def _execute_agent_step(
         f"🎛️  RECURSION_LIMIT | {agent_name} | LangGraph递归限制: {actual_recursion_limit} 次 | "
         f"软限制(建议): {soft_limit} 次"
     )
-    logger.info(f"Agent input: {agent_input}")
 
     # 记录Agent执行过程
     agent_exec_start_time = time.time()
@@ -390,9 +388,7 @@ async def _execute_agent_step(
             raise asyncio.TimeoutError()
 
         # 分支 3：正常完成
-        enhanced_logger.logger.info(
-            f"✅ BRANCH_NORMAL | {agent_name} | 原因: agent 正常完成"
-        )
+
         await _silently_cancel(cancel_wait_task)
         result = agent_task.result()
 
@@ -555,7 +551,6 @@ async def _execute_agent_step(
     # Update the step with the execution result
     current_step.execution_res = response_content
     enhanced_logger.logger.info(f"✅ STEP_COMPLETE | {agent_name} | 步骤执行完成: '{current_step.title}'")
-    logger.info(f"Step '{current_step.title}' execution completed by {agent_name}")
     
     step_duration = time.time() - step_start_time
     enhanced_logger.logger.info(f"✅ AGENT_STEP_EXIT | {agent_name} | 步骤执行总耗时: {step_duration:.2f}s")
@@ -609,7 +604,6 @@ async def _setup_and_execute_agent_step(
         Command 对象，用于更新状态并转到 research_team
     """
     setup_start_time = time.time()
-    enhanced_logger.logger.info(f"🔄 AGENT_SETUP_ENTRY | {agent_type} | 开始配置智能体")
 
     # 提取取消信号（统一封装，一行搞定）
     from src.graph.cancellation import get_from_config as _get_cancel_event
@@ -669,7 +663,6 @@ async def _setup_and_execute_agent_step(
 
         return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit, cancel_event=cancel_event)
     else:
-        enhanced_logger.logger.info(f"🔧 DEFAULT_TOOLS | {agent_type} | 使用默认工具 | 工具数: {len(default_tools)}")
         # Use default tools if no MCP servers are configured
         agent = create_agent(agent_type, agent_type, default_tools, agent_type, configurable)
 
