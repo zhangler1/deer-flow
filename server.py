@@ -10,6 +10,15 @@ import argparse
 import logging
 import signal
 import sys
+import warnings
+
+# 屏蔽 langchain_tavily 中 TavilyResearch 的 pydantic 字段遮蔽告警
+# （output_schema / stream 会覆盖 BaseTool 同名属性，属已知且无害的告警）
+warnings.filterwarnings(
+    "ignore",
+    message=r'Field name "(output_schema|stream)" in "TavilyResearch" shadows an attribute in parent "BaseTool"',
+    category=UserWarning,
+)
 
 import uvicorn
 

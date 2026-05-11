@@ -99,8 +99,19 @@ class CustomSearchTool(BaseTool):
         if not self.api_url:
             raise ValueError("ONLINE_SEARCH_API_URL environment variable is required")
     
-    def _call_search_api(self, query: str) -> List[Dict[str, Any]]:
-        """调用交通银行内部搜索 API"""
+    def _call_search_api(self, query: str) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """调用交通银行内部搜索 API
+
+        返回 (results, meta)，meta 包含响应/解析的关键调试信息，
+        供上层统一汇总成一条日志打印。
+        """
+        meta: Dict[str, Any] = {
+            "status": None,
+            "content_length": None,
+            "encoding": None,
+            "tran_success": None,
+            "result_count": None,
+        }
         headers = {
             "Content-Type": "application/json",
             "Accept": "*/*",
@@ -152,8 +163,9 @@ class CustomSearchTool(BaseTool):
         logger.info(
             f"📡 {self.name} | 发起请求 | url={self.api_url} | "
             f"repository={self.repository} | channelId={self.channel_id} | query='{query}'"
-            f"{debug_block}"
+           
         )
+        logger.debug( f"{debug_block}")
         
         try:
             response = requests.post(
@@ -162,40 +174,34 @@ class CustomSearchTool(BaseTool):
                 json=payload,
                 timeout=self.timeout
             )
-            
-            # ── 调试日志: 响应状态 ──
-            logger.info(
-                f"📡 {self.name} | 响应 | status={response.status_code} | "
-                f"content-length={len(response.content)} | encoding={response.encoding}"
-            )
-            
+
+            # 记录响应元信息（不单独打印，汇总到 _run 的完成日志）
+            meta["status"] = response.status_code
+            meta["content_length"] = len(response.content)
+            meta["encoding"] = response.encoding
+
             response.raise_for_status()
-            
+
             # 解析响应
             data = response.json()
-            
-            # ── 调试日志: 响应结构 ──
+
             rsp_head = data.get("RSP_HEAD", {})
-            tran_success = rsp_head.get("TRAN_SUCCESS")
-            result_count = len(data.get("RSP_BODY", {}).get("result", []))
-            logger.info(
-                f"📡 {self.name} | 解析 | TRAN_SUCCESS={tran_success} | "
-                f"result条数={result_count}"
-            )
-            
+            meta["tran_success"] = rsp_head.get("TRAN_SUCCESS")
+            meta["result_count"] = len(data.get("RSP_BODY", {}).get("result", []))
+
             # 将API响应格式转换为标准格式
             results = self._parse_response(data)
-            return results
-            
+            return results, meta
+
         except requests.exceptions.RequestException as e:
             logger.error(f"❌ {self.name} | 请求失败 | url={self.api_url} | error={e}")
-            return []
+            return [], meta
         except json.JSONDecodeError as e:
             logger.error(f"❌ {self.name} | JSON解析失败 | error={e}")
-            return []
+            return [], meta
         except Exception as e:
             logger.error(f"❌ {self.name} | 未知错误 | error={e}")
-            return []
+            return [], meta
     
     def _validate_search_results(self, results: List[Dict[str, Any]], context: str = "") -> None:
         """验证检索结果是否符合 Pydantic 模型定义，不符合则打印日志但不抛异常"""
@@ -285,10 +291,15 @@ class CustomSearchTool(BaseTool):
         logger.info(f"🔍 {self.name} | 搜索 | 仓库={self.repository} | 查询='{query}'")
         
         try:
-            results = self._call_search_api(query)
+            results, meta = self._call_search_api(query)
             duration = time.time() - start_time
-            
-            logger.info(f"✅ {self.name} | 搜索完成 | 结果={len(results)} | 耗时={duration:.1f}s")
+
+            logger.info(
+                f"✅ {self.name} | 搜索完成 | status={meta.get('status')} | "
+                f"content-length={meta.get('content_length')} | encoding={meta.get('encoding')} | "
+                f"TRAN_SUCCESS={meta.get('tran_success')} | result条数={meta.get('result_count')} | "
+                f"结果={len(results)} | 耗时={duration:.1f}s"
+            )
             
             # 恢复原始配置
             if repository:

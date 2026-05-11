@@ -76,7 +76,6 @@ enhanced_logger = get_enhanced_logger("deer-flow.api")
 
 # 加载工具结果压缩配置
 load_tool_compression_config()
-enhanced_logger.logger.info("✅ COMPRESSION_CONFIG_LOADED | 工具结果压缩配置已加载")
 
 # Track active tool calls for search status
 _active_search_calls: Dict[str, Dict[str, str]] = {}
