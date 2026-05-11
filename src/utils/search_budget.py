@@ -217,11 +217,6 @@ class SearchBudgetManager:
     def record_search_call(self) -> None:
         """记录一次搜索调用"""
         self._search_calls_used += 1
-        logger.info(
-            f"📊 BUDGET_SEARCH_RECORDED | 记录搜索调用 | "
-            f"已使用: {self._search_calls_used}/{self.config.max_search_calls} | "
-            f"剩余: {self.config.max_search_calls - self._search_calls_used}次"
-        )
 
     def get_warning_message(self, messages: list[BaseMessage]) -> Optional[str]:
         """根据当前状态获取警告消息

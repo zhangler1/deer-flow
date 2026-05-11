@@ -118,6 +118,7 @@ services:
     volumes:
       - venv_data:/app/.venv
       - shared_tmp:/tmp/shared_all
+      - ../easyparse:/app
     restart: unless-stopped
     healthcheck:
       # 改为 TCP 端口探测，不依赖具体 HTTP 路径
@@ -153,6 +154,7 @@ services:
     volumes:
       - venv_data:/app/.venv
       - shared_tmp:/tmp/shared_all
+      - ../easyparse:/app
     restart: unless-stopped
     healthcheck:
       # 改为 TCP 端口探测，不依赖具体 HTTP 路径

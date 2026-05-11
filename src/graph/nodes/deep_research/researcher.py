@@ -73,11 +73,16 @@ async def researcher_node(
         f"token_chars_ratio: {token_chars_ratio}"
     )
 
-    # 读取 researcher 特定的递归限制配置
-    researcher_limit = getattr(configurable, 'researcher_recursion_limit', None)
-    if researcher_limit is None:
-        researcher_limit = int(os.environ.get('RESEARCHER_RECURSION_LIMIT', '5'))
-    enhanced_logger.logger.info(f"🎛️  RECURSION_LIMIT_CONFIG | researcher | 配置值: {researcher_limit}")
+    # 读取 researcher 每步的搜索工具调用预算
+    # 说明：该值主要作为 researcher 节点内搜索工具的 max_search_calls（即每步最多可调用的搜索次数）；
+    # 同时兼作 LangGraph agent recursion 的软建议值，实际硬上限 = max(budget * 10, 50)。
+    # 为保持向后兼容，配置字段名 `researcher_recursion_limit` 与环境变量 `RESEARCHER_RECURSION_LIMIT` 保留不变。
+    researcher_search_budget = getattr(configurable, 'researcher_recursion_limit', None)
+    if researcher_search_budget is None:
+        researcher_search_budget = int(os.environ.get('RESEARCHER_RECURSION_LIMIT', '5'))
+    enhanced_logger.logger.info(
+        f"🎛️  SEARCH_BUDGET_CONFIG | researcher | 每步搜索调用预算: {researcher_search_budget}"
+    )
     
     # 获取当前要执行的步骤信息用于日志
     current_plan = state.get("current_plan")
@@ -125,7 +130,7 @@ async def researcher_node(
             tools.append(budget_controlled_online_search_tool(
                 max_results=configurable.max_search_results,
                 session_id=session_id,
-                max_search_calls=researcher_limit,
+                max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
             ))
             tool_name_list.append("budget_controlled_online_search")
@@ -133,7 +138,7 @@ async def researcher_node(
         if use_budget_bocom:
             tools.append(budget_controlled_searchknowledge_standard_tool(
                 session_id=session_id,
-                max_search_calls=researcher_limit,
+                max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
                 max_results=configurable.max_search_results,
             ))
@@ -153,7 +158,7 @@ async def researcher_node(
             tools.append(budget_controlled_online_search_tool(
                 max_results=configurable.max_search_results,
                 session_id=session_id,
-                max_search_calls=researcher_limit,
+                max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
             ))
             tool_name_list.append("budget_controlled_online_search")
@@ -161,7 +166,7 @@ async def researcher_node(
         if use_budget_bocom:
             tools.append(budget_controlled_bocomsearch_tool(
                 session_id=session_id,
-                max_search_calls=researcher_limit,
+                max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
                 max_results=configurable.max_search_results,
                 guwp_token=guwp_token,
@@ -172,12 +177,12 @@ async def researcher_node(
             sentiment_search,
             budget_controlled_financial_summary_tool(
                 session_id=session_id,
-                max_search_calls=researcher_limit,
+                max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
             ),
             budget_controlled_product_instance_search_tool(
                 session_id=session_id,
-                max_search_calls=researcher_limit,
+                max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
             ),
         ]
@@ -194,7 +199,7 @@ async def researcher_node(
             tools.append(budget_controlled_online_search_tool(
                 max_results=configurable.max_search_results,
                 session_id=session_id,
-                max_search_calls=researcher_limit,
+                max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
             ))
             tool_name_list.append("budget_controlled_online_search")
@@ -210,7 +215,7 @@ async def researcher_node(
             tools.append(budget_controlled_online_search_tool(
                 max_results=configurable.max_search_results,
                 session_id=session_id,
-                max_search_calls=researcher_limit,
+                max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
             ))
             tool_name_list.append("budget_controlled_online_search")
@@ -235,7 +240,7 @@ async def researcher_node(
         config,
         "researcher",
         tools,
-        recursion_limit=researcher_limit,
+        recursion_limit=researcher_search_budget,
     )
     
     duration = time.time() - start_time

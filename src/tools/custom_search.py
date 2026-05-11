@@ -288,14 +288,16 @@ class CustomSearchTool(BaseTool):
             self.channel_id = kwargs.get("channel_id", self.channel_id)
         
         # 记录检索开始
-        logger.info(f"🔍 {self.name} | 搜索 | 仓库={self.repository} | 查询='{query}'")
+        logger.info(f"🔍 {self.name} | 搜索 | 查询='{query}'")
         
         try:
             results, meta = self._call_search_api(query)
             duration = time.time() - start_time
 
+            # 内层：仅报 HTTP 响应与性能指标（结果数/耗时）；
+            # 预算维度的说明由外层 BudgetControlledSearchTool 输出，避免重复“搜索完成”。
             logger.info(
-                f"✅ {self.name} | 搜索完成 | status={meta.get('status')} | "
+                f"📡 {self.name} | HTTP响应 | status={meta.get('status')} | "
                 f"content-length={meta.get('content_length')} | encoding={meta.get('encoding')} | "
                 f"result条数={meta.get('result_count')} | "
                 f"耗时={duration:.1f}s"

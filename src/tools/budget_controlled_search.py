@@ -165,7 +165,7 @@ class BudgetManagerStore:
             del self._store[key]
         
         if expired_keys:
-            logger.info(
+            logger.debug(
                 f"🧹 CLEANUP_EXPIRED | Cleared {len(expired_keys)} expired sessions | "
                 f"Remaining: {len(self._store)}/{self._max_sessions}"
             )
@@ -394,7 +394,7 @@ class BudgetControlledSearchTool(BaseTool):
         # ── 2. 执行搜索 ──
         try:
             logger.info(
-                f"🔍 {self.name} | 搜索 | 仓库={self.repository} | "
+                f"🔍 {self.name} | 搜索 |"
                 f"session={self.session_id} | 查询='{query}'"
             )
             result = self.wrapped_tool._run(query, run_manager=run_manager, config=config, **kwargs)
@@ -404,9 +404,11 @@ class BudgetControlledSearchTool(BaseTool):
             status = budget.get_budget_status(messages)
             remaining = budget.get_remaining_budget(messages)
             
+            # 外层：仅报预算扣减结果（剩余额度/警告级别）；
+            # HTTP 响应与结果条数已由内层 wrapped_tool 输出，避免重复“搜索完成”。
             logger.info(
-                f"✅ {self.name} | 搜索完成 | 结果={len(result) if isinstance(result, list) else 1} | "
-                f"剩余={remaining['remaining_search_calls']} | 警告级别={remaining['warning_level']}"
+                f"💰 {self.name} | 预算扣减 | "
+                f"剩余={remaining['remaining_search_calls']}/{self.max_search_calls}"
             )
             
             # 接近预算上限时，在结果中附加警告

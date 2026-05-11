@@ -40,7 +40,6 @@ def reporter_node(state: State, config: RunnableConfig):
     
     # 记录报告生成的基本信息
     observations = state.get("observations", [])
-    enhanced_logger.logger.info(f"📊 REPORT_INIT | 开始生成最终报告 | 研究步骤数: {len(observations)}")
     current_plan = state.get("current_plan")
     
     # 处理 current_plan 的类型差异
@@ -148,7 +147,7 @@ def reporter_node(state: State, config: RunnableConfig):
         _resp_preview = f"{_resp_str[:300]}\n...[省略 {len(_resp_str) - 600} 字]...\n{_resp_str[-300:]}"
     else:
         _resp_preview = _resp_str
-    logger.info(f"reporter response: {_resp_preview}")
+    logger.info(f"reporter response: /n{_resp_preview}")
 
     # # 保存 observations 为 markdown 文件
     # if observations:

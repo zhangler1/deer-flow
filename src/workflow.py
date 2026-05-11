@@ -13,6 +13,7 @@ from src.utils.enhanced_logger import get_enhanced_logger, setup_enhanced_loggin
 logging.basicConfig(
     level=logging.INFO,  # Default level is INFO
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
 # 获取增强日志记录器

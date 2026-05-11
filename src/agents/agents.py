@@ -29,7 +29,6 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
     for i, tool in enumerate(tools):
         tool_name = getattr(tool, 'name', 'unknown')
         logger.info(f"   [{i}] {tool_name}")
-    logger.info(f"🔧 TOOLS_COUNT | 工具总数: {len(tools)}")
 
     if len(tools) == 0:
         logger.warning(f"⚠️  NO_TOOLS | {agent_name} | 警告：没有工具被传递给Agent！")
@@ -62,6 +61,5 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
         prompt=lambda state: apply_prompt_template(prompt_template, state, configurable),
     )
 
-    logger.info(f"✅ AGENT_CREATED | {agent_name} | Agent创建成功 | 类型: {type(agent).__name__}")
 
     return agent

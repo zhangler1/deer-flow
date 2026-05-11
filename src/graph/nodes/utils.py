@@ -24,7 +24,6 @@ from langgraph.types import Command
 
 from src.agents import create_agent
 from src.config.configuration import Configuration
-from src.graph.tool_limit_middleware import ToolCallLimitMiddleware
 from src.middlewares.tool_result_compression import ToolResultCompressionMiddleware
 from src.graph.types import State
 from src.utils.enhanced_logger import get_enhanced_logger
@@ -84,7 +83,9 @@ async def _execute_agent_step(
         state: 当前状态
         agent: 智能体实例
         agent_name: 智能体名称
-        recursion_limit: 递归限制
+        recursion_limit: 每步搜索工具调用预算（兼作 LangGraph agent recursion 的软建议值），
+            真正传给 LangGraph 的硬上限 = max(recursion_limit * 10, 50)。
+            参数名保留 `recursion_limit` 以保持向后兼容。
         cancel_event: 可选的 asyncio.Event，客户端断连时被 set
         
     Returns:
@@ -92,7 +93,7 @@ async def _execute_agent_step(
     """
     step_start_time = time.time()
     enhanced_logger.logger.info(f"🔄 AGENT_STEP_ENTRY | {agent_name} | 开始执行研究步骤")
-    enhanced_logger.logger.info(f"🎛️  RECURSION_LIMIT_PARAM | {agent_name} | 限制: {recursion_limit}")
+    enhanced_logger.logger.info(f"🎛️  SEARCH_BUDGET_PARAM | {agent_name} | 每步搜索调用预算: {recursion_limit}")
     
     current_plan = state.get("current_plan")
     plan_title = current_plan.title
@@ -162,7 +163,6 @@ async def _execute_agent_step(
 
     # 🆕 添加详细的工具调用前日志
     enhanced_logger.logger.info("="*80)
-    enhanced_logger.logger.info(f"🤖 AGENT_INVOKE_PREPARE | {agent_name} | 准备调用LLM")
     enhanced_logger.logger.info(f"📋 输入消息内容 (前200字): {agent_input['messages'][0].content[:200]}...")
     
     if hasattr(agent, 'tools'):
@@ -186,8 +186,11 @@ async def _execute_agent_step(
         )
 
     # 🔥 核心：使用中间件检查工具调用次数和压缩工具结果
-    soft_limit = recursion_limit
-    hard_limit = max(soft_limit * 10, 50)
+    # 语义说明：
+    #   search_budget_soft_limit：每步搜索工具调用预算（软建议），用于中间件拦截与提示大模型停手
+    #   langgraph_recursion_hard_limit：LangGraph agent 内部 tool-call 循环硬上限，防止失控
+    search_budget_soft_limit = recursion_limit
+    langgraph_recursion_hard_limit = max(search_budget_soft_limit * 10, 50)
 
     # 初始化搜索预算管理器（用于更精细的预算控制）
     # 参数优先从 yaml 的 SEARCH_BUDGET 段读取（随 LLM_NETWORK 切换同步），
@@ -195,16 +198,13 @@ async def _execute_agent_step(
     # 可以在state中持久化budget_manager以跨步骤跟踪
     _budget_conf = _load_search_budget_config()
     budget_manager = SearchBudgetManager(
-        max_search_calls=_safe_int(_budget_conf.get("max_search_calls"), soft_limit),
+        max_search_calls=_safe_int(_budget_conf.get("max_search_calls"), search_budget_soft_limit),
         max_tokens=_safe_int(_budget_conf.get("max_tokens"), 10000),
         hard_token_limit=_safe_int(_budget_conf.get("hard_token_limit"), 14000),
         token_chars_ratio=_safe_float(_budget_conf.get("token_chars_ratio"), 2.5),
     )
 
-    # 1. 工具调用限制中间件
-    tool_limit_middleware = ToolCallLimitMiddleware(max_calls=soft_limit)
-    
-    # 2. 工具结果压缩中间件（只对 researcher 启用）
+    # 工具结果压缩中间件（只对 researcher 启用）
     tool_compression_middleware = None
     compression_llm = None
     if agent_name == "researcher":
@@ -217,58 +217,24 @@ async def _execute_agent_step(
         
         tool_compression_middleware = ToolResultCompressionMiddleware(llm=compression_llm)
 
-    # 检查 state 中的消息
-    state_messages = state.get("messages", [])
-    tool_call_count = tool_limit_middleware.count_tool_calls_in_messages(state_messages)
-
     # 使用预算管理器检查状态
+    state_messages = state.get("messages", [])
     budget_status = budget_manager.get_budget_status(state_messages)
     budget_info = budget_manager.get_remaining_budget(state_messages)
 
     enhanced_logger.logger.info(
-        f"📊 TOOL_CALL_COUNT | {agent_name} | 当前工具调用: {tool_call_count} | "
-        f"软限制(建议): {soft_limit} | 硬限制(LangGraph): {hard_limit}"
-    )
-    enhanced_logger.logger.info(
         f"📊 BUDGET_STATUS | {agent_name} | "
-        f"搜索: {budget_info['search_calls_used']}/{soft_limit} | "
+        f"搜索: {budget_info['search_calls_used']}/{search_budget_soft_limit} | "
         f"Tokens: {budget_info['estimated_tokens']}/{budget_manager.config.max_tokens} | "
         f"警告级别: {budget_info['warning_level']} | "
         f"可搜索: {budget_info['remaining_search_calls'] > 0}"
     )
 
-    # 如果工具调用次数已经接近软限制（>= 80%），在输入中插入提示消息
-    if tool_call_count >= int(soft_limit * 0.8):
-        enhanced_logger.logger.warning(
-            f"⚠️  TOOL_LIMIT_WARNING | {agent_name} | 工具调用 {tool_call_count}/{soft_limit} | "
-            f"已达到建议限制的 80%，将在输入中插入停止建议"
-        )
-
-        stop_advice_msg = HumanMessage(
-            content=(
-                f"\n\n【系统提示 - 请完成分析并输出答案】\n\n"
-                f"你已经调用了 {tool_call_count} 次工具，已经收集了足够的信息。\n\n"
-                f"**请立即停止搜索，开始输出最终答案**：\n\n"
-                f"✅ 现在请执行：\n"
-                f"   1. 综合分析已收集的所有搜索结果\n"
-                f"   2. 整理关键信息和数据\n"
-                f"   3. 输出完整、结构化的最终答案\n\n"
-                f"❌ 不要继续操作：\n"
-                f"   - 不要再调用任何搜索工具\n"
-                f"   - 不要获取更多信息\n\n"
-                f"请现在就开始输出你的最终答案。"
-            ),
-            name="tool_limit_advisor"
-        )
-
-        agent_input["messages"].append(stop_advice_msg)
-        enhanced_logger.logger.info(f"✅ STOP_ADVICE_ADDED | 已在输入中添加停止建议消息")
-
-    actual_recursion_limit = hard_limit
+    actual_recursion_limit = langgraph_recursion_hard_limit
 
     enhanced_logger.logger.info(
-        f"🎛️  RECURSION_LIMIT | {agent_name} | LangGraph递归限制: {actual_recursion_limit} 次 | "
-        f"软限制(建议): {soft_limit} 次"
+        f"🎛️  LANGGRAPH_RECURSION_LIMIT | {agent_name} | LangGraph递归硬上限: {actual_recursion_limit} 次 | "
+        f"每步搜索预算(软建议): {search_budget_soft_limit} 次"
     )
 
     # 记录Agent执行过程
