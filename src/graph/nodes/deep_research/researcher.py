@@ -233,7 +233,6 @@ async def researcher_node(
         f"报告风格: {report_style} | 工具数: {len(tools)} | 包含: {tool_names}"
     )
     
-    logger.info(f"Researcher tools: {tools}")
     
     # 执行研究节点
     result = await _setup_and_execute_agent_step(

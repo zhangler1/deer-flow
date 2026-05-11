@@ -83,7 +83,7 @@ def reporter_node(state: State, config: RunnableConfig):
         )
     logger.debug(f"Current invoke messages: {invoke_messages}")
     
-    logger.info(f"Reporter input: {invoke_messages}")
+    logger.debug(f"Reporter input: {invoke_messages}")
     enhanced_logger.logger.info(f"📝 REPORTER_INPUT | 输入消息数: {len(invoke_messages)} | 观察结果数: {len(observations)} | 计划标题: {plan_title}")
     
     llm_start_time = time.time()
