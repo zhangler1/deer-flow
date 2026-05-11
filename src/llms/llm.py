@@ -91,10 +91,6 @@ class EnhancedLLMWrapper:
             start_time = time.time()
             char_len, token_est = get_messages_context_stats(messages)
 
-            if attempt == 0:
-                self.enhanced_logger.logger.info(f"🤖 LLM_STREAM | {self.llm_type} | 开始流式思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
-            else:
-                self.enhanced_logger.logger.warning(f"🔄 LLM_STREAM_RETRY | {self.llm_type} | 流式第 {attempt} 次重试 | 上下文长度: chars={char_len} | tokens≈{token_est}")
 
             try:
                 stream = self.llm.stream(messages, **kwargs)

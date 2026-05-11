@@ -28,13 +28,12 @@ enhanced_logger = get_enhanced_logger('graph.builder')
 def continue_to_running_research_team(state: State):
     """决定从research_team节点跳转到哪个下一个节点"""
     start_time = time.time()
-    enhanced_logger.logger.info(f"🔀 TRANSITION_LOGIC | research_team | 开始评估下一步跳转")
     
     current_plan = state.get("current_plan")
     
     # 处理current_plan可能是字符串或对象的情况
     if not current_plan:
-        enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → planner | 原因: 无当前计划")
+        enhanced_logger.logger.info(f"🔀 TRANSITION | research_team → planner | 原因: 无当前计划")
         return "planner"
         
     # 检查是否有steps属性
@@ -43,11 +42,11 @@ def continue_to_running_research_team(state: State):
     elif isinstance(current_plan, dict) and 'steps' in current_plan:
         plan_steps = current_plan['steps']
     else:
-        enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → planner | 原因: 计划格式错误或无步骤")
+        enhanced_logger.logger.info(f"🔀 TRANSITION| research_team → planner | 原因: 计划格式错误或无步骤")
         return "planner"
 
     if not plan_steps:
-        enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → planner | 原因: 无计划步骤")
+        enhanced_logger.logger.info(f"🔀 TRANSITION | research_team → planner | 原因: 无计划步骤")
         return "planner"
 
     # 检查所有步骤是否完成

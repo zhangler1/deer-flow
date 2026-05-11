@@ -10,6 +10,7 @@ import logging
 import time
 import json
 import os
+import sys
 from typing import Any, Dict, List, Optional, Union
 from functools import wraps
 from contextlib import contextmanager
@@ -35,6 +36,35 @@ def get_log_level_from_env() -> int:
 
 # 全局日志级别
 CURRENT_LOG_LEVEL = get_log_level_from_env()
+
+
+def should_use_colors(enable_colors: bool = True) -> bool:
+    """判定控制台日志是否应使用 ANSI 彩色。
+
+    优先级：
+    1. 环境变量 NO_COLOR 存在（任意值）或 LOG_COLORS 在 {0,false,no,off} 中 → 强制关闭
+    2. LOG_COLORS 在 {1,true,yes,on} 中 → 强制开启
+    3. stdout 不是 TTY（被重定向/管道/docker logs 采集）→ 关闭
+    4. 其余情况使用传入的 enable_colors 参数
+    """
+    # NO_COLOR 是行业标准（https://no-color.org/）
+    if os.getenv("NO_COLOR") is not None:
+        return False
+
+    log_colors = os.getenv("LOG_COLORS", "").strip().lower()
+    if log_colors in ("0", "false", "no", "off"):
+        return False
+    if log_colors in ("1", "true", "yes", "on"):
+        return True
+
+    # 非 TTY 环境（重定向或 docker/nohup 采集）自动关闭彩色
+    try:
+        if not sys.stdout.isatty():
+            return False
+    except Exception:
+        return False
+
+    return enable_colors
 
 
 def should_log(level: int = logging.INFO) -> bool:
@@ -118,8 +148,9 @@ class EnhancedLogger:
         """
         # 设置控制台输出
         console_handler = logging.StreamHandler()
-        
-        if enable_colors:
+
+        use_colors = should_use_colors(enable_colors)
+        if use_colors:
             console_formatter = ColoredFormatter(
                 '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                 datefmt='%H:%M:%S'

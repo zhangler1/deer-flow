@@ -56,8 +56,7 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
     chat_model = cast(BaseChatModel, raw_llm)
     logger.info(f"🤖 LLM_MODEL | 使用模型: {getattr(chat_model, 'model_name', 'unknown')}")
 
-    # 创建 React Agent
-    logger.info(f"⚙️  CREATING_REACT_AGENT | 调用create_react_agent...")
+
     agent = create_react_agent(
         name=agent_name,
         model=chat_model,
