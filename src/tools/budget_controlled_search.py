@@ -393,10 +393,8 @@ class BudgetControlledSearchTool(BaseTool):
         
         # ── 2. 执行搜索 ──
         try:
-            logger.info(
-                f"🔍 {self.name} | 搜索 |"
-                f"session={self.session_id} | 查询='{query}'"
-            )
+            # 外层不再重复输出“🔍 搜索”日志，由内层 wrapped_tool 统一报告搜索入口；
+            # session 信息随后随“💰 预算扣减”一起输出，避免重复。
             result = self.wrapped_tool._run(query, run_manager=run_manager, config=config, **kwargs)
             
             # ── 3. 扣减预算 ──
@@ -404,10 +402,11 @@ class BudgetControlledSearchTool(BaseTool):
             status = budget.get_budget_status(messages)
             remaining = budget.get_remaining_budget(messages)
             
-            # 外层：仅报预算扣减结果（剩余额度/警告级别）；
+            # 外层：仅报预算扣减结果（剩余额度/session）；
             # HTTP 响应与结果条数已由内层 wrapped_tool 输出，避免重复“搜索完成”。
             logger.info(
                 f"💰 {self.name} | 预算扣减 | "
+                f"session={self.session_id} | "
                 f"剩余={remaining['remaining_search_calls']}/{self.max_search_calls}"
             )
             

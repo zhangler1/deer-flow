@@ -33,8 +33,6 @@ def background_investigation_node(state, config: RunnableConfig):
     configurable = Configuration.from_runnable_config(config)
     query = state.get("research_topic")
     
-    enhanced_logger.log_search_process(query, "background_investigation")
-    
     background_investigation_results = None
     if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
         enhanced_logger.logger.info(f"🔍 使用Tavily搜索引擎进行背景调研 | 查询: '{query}'")

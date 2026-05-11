@@ -104,9 +104,6 @@ class EnhancedLLMWrapper:
                     yield chunk
 
                 duration = time.time() - start_time
-                self.enhanced_logger.logger.info(
-                    f"🤖 LLM_STREAM_COMPLETE | {self.llm_type} | 流式思考完成 | 块数: {chunks_count} | 总长度: {total_content_length} | 耗时: {duration:.2f}s"
-                )
                 return  # 成功完成，退出重试循环
 
             except (RemoteProtocolError, ConnectError, TimeoutException) as e:
