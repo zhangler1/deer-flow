@@ -81,17 +81,14 @@ def reporter_node(state: State, config: RunnableConfig):
                 name="observation",
             )
         )
-    logger.debug(f"Current invoke messages: {invoke_messages}")
     
-    logger.debug(f"Reporter input: {invoke_messages}")
     enhanced_logger.logger.info(f"📝 REPORTER_INPUT | 输入消息数: {len(invoke_messages)} | 观察结果数: {len(observations)} | 计划标题: {plan_title}")
     
     llm_start_time = time.time()
-    enhanced_logger.logger.info(f"🤖 LLM_INVOKE | reporter | 开始生成最终报告 | 提示消息数: {len(invoke_messages)}")
+    enhanced_logger.logger.info(f"🤖 LLM_INVOKE | reporter | 开始生成最终报告 | 消息数: {len(invoke_messages)}")
 
     try:
         reporter_llm = get_llm_by_type(AGENT_LLM_MAP["reporter"])
-        enhanced_logger.logger.info(f"🔍 LLM_INFO | reporter | 模型类型: {type(reporter_llm).__name__} | 模型名称: {getattr(reporter_llm, 'model_name', 'unknown')}")
 
         # 获取取消事件（统一封装，一行搞定）
         from src.graph.cancellation import get_from_config as _get_cancel_event
@@ -105,7 +102,6 @@ def reporter_node(state: State, config: RunnableConfig):
             enhanced_logger.logger.info(f"⛔ LLM_SKIPPED | reporter | 客户端已断连，跳过报告生成")
             return {"final_report": "报告生成已被用户取消。"}
 
-        enhanced_logger.logger.info(f"⏳ LLM_CALL_START | reporter | 准备调用LLM.stream() | 时间: {time.strftime('%H:%M:%S')}")
 
         # 使用 stream() 替代 invoke()，允许在 chunk 之间检测取消信号
         chunks = []
@@ -135,10 +131,7 @@ def reporter_node(state: State, config: RunnableConfig):
             if not response_content:
                 response_content = "报告生成已被用户取消。"
         else:
-            enhanced_logger.logger.info(
-                f"✅ LLM_CALL_END | reporter | LLM调用成功返回 | "
-                f"时间: {time.strftime('%H:%M:%S')} | 耗时: {llm_call_end_time - llm_start_time:.2f}s"
-            )
+            pass
 
         llm_duration = time.time() - llm_start_time
         report_length = len(response_content) if response_content else 0
@@ -192,5 +185,4 @@ def reporter_node(state: State, config: RunnableConfig):
 
 def research_team_node(state: State):
     """研究团队节点，协调多智能体协作完成任务"""
-    logger.info("研究团队正在协作执行任务")
     pass

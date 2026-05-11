@@ -169,7 +169,6 @@ async def _execute_agent_step(
         tool_names = [getattr(t, 'name', 'unknown') for t in agent.tools]
         enhanced_logger.logger.info(f"🔧 Agent.tools属性存在: {tool_names} (共{len(agent.tools)}个)")
     elif hasattr(agent, 'nodes'):
-        enhanced_logger.logger.info(f"🔧 Agent类型: LangGraph编译图 (这是正常的)")
         enhanced_logger.logger.info(f"🔧 工具已通过create_react_agent绑定到LLM")
     else:
         enhanced_logger.logger.warning(f"⚠️  Agent对象类型异常: {type(agent)}")
@@ -506,34 +505,31 @@ async def _execute_agent_step(
         logger.exception(f"Agent {agent_name} LLM调用异常: {e}")
         raise
     
-    # 🆕 添加详细的响应分析日志
+    # Agent 响应分析：正常路径汇总成一行，异常保留详细告警
     if isinstance(result, dict):
         messages = result.get("messages", [])
-        enhanced_logger.logger.info(f"📨 AGENT_RESPONSE | {agent_name} | 返回消息数: {len(messages)}")
-        
-        # 检查是否有工具调用
-        tool_calls_found = False
-        tool_call_count_in_response = 0
-        for msg_idx, msg in enumerate(messages):
-            if hasattr(msg, 'tool_calls') and msg.tool_calls:
-                tool_calls_found = True
-                tool_call_count_in_response += len(msg.tool_calls)
-                enhanced_logger.logger.info(f"🔧 TOOL_CALLS_DETECTED | {agent_name} | 消息[{msg_idx}]中的工具调用数: {len(msg.tool_calls)}")
-                for tc_idx, tc in enumerate(msg.tool_calls):
-                    tool_name = tc.get('name', 'unknown') if isinstance(tc, dict) else getattr(tc, 'name', 'unknown')
-                    tool_args = tc.get('args', {}) if isinstance(tc, dict) else getattr(tc, 'args', {})
-                    args_summary = str(tool_args)[:100] + '...' if len(str(tool_args)) > 100 else str(tool_args)
-                    enhanced_logger.logger.info(f"   ⚙️  工具调用[{tc_idx}]: {tool_name} | 参数: {args_summary}")
-        
-        if not tool_calls_found:
-            enhanced_logger.logger.warning(f"⚠️  NO_TOOL_CALLS | {agent_name} | LLM没有调用任何工具！")
-            for i, msg in enumerate(messages):
-                content = getattr(msg, 'content', '')
-                if content:
-                    content_preview = content[:300] + '...' if len(content) > 300 else content
-                    enhanced_logger.logger.warning(f"   📄 LLM直接响应[{i}]: {content_preview}")
+        tool_call_names: list = []
+        for msg in messages:
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    name = tc.get("name", "unknown") if isinstance(tc, dict) else getattr(tc, "name", "unknown")
+                    tool_call_names.append(name)
+
+        if tool_call_names:
+            enhanced_logger.logger.info(
+                f"✅ AGENT_RESPONSE | {agent_name} | msgs={len(messages)} | "
+                f"tool_calls={len(tool_call_names)} | names={tool_call_names}"
+            )
         else:
-            enhanced_logger.logger.info(f"✅ TOOL_CALLS_SUCCESS | {agent_name} | 共检测到 {tool_call_count_in_response} 个工具调用")
+            # 异常：LLM 未调用任何工具，详细打印便于排查
+            enhanced_logger.logger.warning(
+                f"⚠️  NO_TOOL_CALLS | {agent_name} | msgs={len(messages)} | LLM没有调用任何工具！"
+            )
+            for i, msg in enumerate(messages):
+                content = getattr(msg, "content", "")
+                if content:
+                    content_preview = content[:300] + "..." if len(content) > 300 else content
+                    enhanced_logger.logger.warning(f"   📄 LLM直接响应[{i}]: {content_preview}")
     else:
         enhanced_logger.logger.warning(f"⚠️  UNEXPECTED_RESULT_TYPE | {agent_name} | result类型: {type(result)}")
 
