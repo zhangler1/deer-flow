@@ -75,7 +75,7 @@ def planner_node(
     else:
         llm = get_llm_by_type(AGENT_LLM_MAP["planner"])
 
-    logger.info(f"Planner input: {messages}")
+    logger.info(f"Planner input: {messages[:100]}")
     enhanced_logger.logger.info(f"📝 PLANNER_INPUT | 输入消息数: {len(messages)} | 背景调研: {'是' if state.get('enable_background_investigation') and state.get('background_investigation_results') else '否'}")
 
     # 超过最大计划迭代次数，直接进入 reporter
@@ -108,7 +108,7 @@ def planner_node(
     thinking_duration = time.time() - llm_start_time
     logger.debug(f"Current state messages: {state['messages']}")
     enhanced_logger.log_llm_thinking("planner", len(str(messages)), len(full_response), thinking_duration)
-    logger.info(f"Planner response: {full_response}")
+    # logger.info(f"Planner response: {full_response}")
 
     try:
         curr_plan = json.loads(repair_json_output(full_response))
@@ -247,7 +247,7 @@ def human_feedback_node(
                 f"【当前研究计划】\n{plan_content}\n\n"
                 f"【用户修改意见】\n{edit_instruction}"
             )
-            enhanced_logger.logger.info(f"📝 EDIT_PLAN_FEEDBACK | 用户修改意见: {edit_instruction[:200]}")
+            enhanced_logger.logger.info(f"📝 EDIT_PLAN_FEEDBACK | 用户修改意见: {edit_instruction[:100]}")
 
             return Command(
                 update={

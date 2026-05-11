@@ -43,7 +43,6 @@ from src.graph.nodes.utils import _setup_and_execute_agent_step
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.researcher')
 
-
 async def researcher_node(
     state, config: RunnableConfig
 ) -> Command[Literal["research_team"]]:
