@@ -65,6 +65,7 @@ async def researcher_node(
         max_search_calls=getattr(configurable, 'search_budget_max_calls', 5),
         max_tokens=max_tokens,
         token_chars_ratio=token_chars_ratio,
+        hard_token_limit=hard_token_limit,
     )
     budget_manager.reset()  # 清零计数器
     enhanced_logger.logger.info(
@@ -135,6 +136,7 @@ async def researcher_node(
                 session_id=session_id,
                 max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
+                hard_token_limit=hard_token_limit,
             ))
             tool_name_list.append("budget_controlled_online_search")
         # 行业研报沿用 use_budget_bocom 开关控制内部知识库检索（语义复用：内网知识库开关）
@@ -144,6 +146,7 @@ async def researcher_node(
                 max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
                 max_results=configurable.max_search_results,
+                hard_token_limit=hard_token_limit,
             ))
             tool_name_list.append("budget_controlled_searchknowledge_standard")
         tool_names = ", ".join(tool_name_list)
@@ -163,6 +166,7 @@ async def researcher_node(
                 session_id=session_id,
                 max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
+                hard_token_limit=hard_token_limit,
             ))
             tool_name_list.append("budget_controlled_online_search")
         # 根据开关决定是否添加交行搜索工具
@@ -173,6 +177,7 @@ async def researcher_node(
                 max_tokens=max_tokens,
                 max_results=configurable.max_search_results,
                 guwp_token=guwp_token,
+                hard_token_limit=hard_token_limit,
             ))
             tool_name_list.append("budget_controlled_bocomsearch")
         tools += [
@@ -182,11 +187,13 @@ async def researcher_node(
                 session_id=session_id,
                 max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
+                hard_token_limit=hard_token_limit,
             ),
             budget_controlled_product_instance_search_tool(
                 session_id=session_id,
                 max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
+                hard_token_limit=hard_token_limit,
             ),
         ]
         tool_name_list += ["business_opportunity_search", "sentiment_search", "budget_controlled_financial_summary", "budget_controlled_product_instance_search"]
@@ -204,6 +211,7 @@ async def researcher_node(
                 session_id=session_id,
                 max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
+                hard_token_limit=hard_token_limit,
             ))
             tool_name_list.append("budget_controlled_online_search")
         tool_names = ", ".join(tool_name_list)
@@ -220,6 +228,7 @@ async def researcher_node(
                 session_id=session_id,
                 max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
+                hard_token_limit=hard_token_limit,
             ))
             tool_name_list.append("budget_controlled_online_search")
         tool_names = ", ".join(tool_name_list) if tool_name_list else "(无搜索工具)"

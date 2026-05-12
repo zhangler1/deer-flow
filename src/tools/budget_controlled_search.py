@@ -72,14 +72,16 @@ class BudgetManagerStore:
         max_search_calls: int = 10, 
         max_tokens: int = 12000,
         token_chars_ratio: float = 3.0,
+        hard_token_limit: int = 16000,
     ) -> SearchBudgetManager:
         """获取或创建预算管理器（线程安全）
         
         Args:
             session_id: 会话ID
             max_search_calls: 最大搜索调用次数
-            max_tokens: 最大token数量
+            max_tokens: 最大token数量（软警告阈值）
             token_chars_ratio: 字符数/token比例，用于估算token消耗
+            hard_token_limit: 硬token限制（超过此值强制拦截搜索）
             
         Returns:
             SearchBudgetManager: 预算管理器实例
@@ -105,6 +107,7 @@ class BudgetManagerStore:
             manager = SearchBudgetManager(
                 max_search_calls=max_search_calls,
                 max_tokens=max_tokens,
+                hard_token_limit=hard_token_limit,
                 token_chars_ratio=token_chars_ratio,
             )
             self._store[session_id] = {
@@ -236,19 +239,27 @@ def get_budget_manager(
     max_search_calls: int = 10, 
     max_tokens: int = 12000,
     token_chars_ratio: float = 2.5,
+    hard_token_limit: int = 16000,
 ) -> SearchBudgetManager:
     """获取或创建预算管理器（线程安全）
     
     Args:
         session_id: 会话ID
         max_search_calls: 最大搜索调用次数
-        max_tokens: 最大token数量
+        max_tokens: 最大token数量（软警告阈值）
         token_chars_ratio: 字符数/token比例，用于估算token消耗
+        hard_token_limit: 硬token限制（超过此值强制拦截搜索）
         
     Returns:
         SearchBudgetManager: 预算管理器实例
     """
-    return _budget_store.get_or_create(session_id, max_search_calls, max_tokens, token_chars_ratio)
+    return _budget_store.get_or_create(
+        session_id,
+        max_search_calls=max_search_calls,
+        max_tokens=max_tokens,
+        token_chars_ratio=token_chars_ratio,
+        hard_token_limit=hard_token_limit,
+    )
 
 
 def clear_budget_manager(session_id: str) -> bool:
@@ -356,16 +367,19 @@ class BudgetControlledSearchTool(BaseTool):
     session_id: str = Field(default="default")
     max_search_calls: int = Field(default=10)
     max_tokens: int = Field(default=12000)
+    hard_token_limit: int = Field(default=16000)
     
     def __init__(self, wrapped_tool: BaseTool, session_id: str = "default", 
-                 max_search_calls: int = 10, max_tokens: int = 12000, **kwargs):
+                 max_search_calls: int = 10, max_tokens: int = 12000,
+                 hard_token_limit: int = 16000, **kwargs):
         """初始化预算控制工具
         
         Args:
             wrapped_tool: 被包装的原始搜索工具（online_search / bocomsearch 等）
             session_id: 会话ID，用于隔离不同会话的预算
             max_search_calls: 最大搜索调用次数
-            max_tokens: 最大token数量
+            max_tokens: 最大token数量（软警告阈值）
+            hard_token_limit: 硬token限制（超过此值强制拦截搜索）
         """
         # 从被包装工具继承 name / description，对外保持透明
         kwargs['name'] = wrapped_tool.name
@@ -374,11 +388,17 @@ class BudgetControlledSearchTool(BaseTool):
         kwargs['session_id'] = session_id
         kwargs['max_search_calls'] = max_search_calls
         kwargs['max_tokens'] = max_tokens
+        kwargs['hard_token_limit'] = hard_token_limit
         
         super().__init__(**kwargs)
         
-        # 确保预算管理器存在
-        get_budget_manager(session_id, max_search_calls, max_tokens)
+        # 确保预算管理器存在（将 hard_token_limit 一并透传）
+        get_budget_manager(
+            session_id,
+            max_search_calls=max_search_calls,
+            max_tokens=max_tokens,
+            hard_token_limit=hard_token_limit,
+        )
         
         logger.info(
             f"🔧 BudgetControlledSearchTool 初始化 | "
@@ -412,7 +432,10 @@ class BudgetControlledSearchTool(BaseTool):
                 自动回退为空消息列表（行为同修复前一致）。
         """
         budget = get_budget_manager(
-            self.session_id, self.max_search_calls, self.max_tokens
+            self.session_id,
+            max_search_calls=self.max_search_calls,
+            max_tokens=self.max_tokens,
+            hard_token_limit=self.hard_token_limit,
         )
 
         # 🔧 从 InjectedState 提取真实消息，驱动 token 硬限检查
@@ -500,6 +523,7 @@ def create_budget_controlled_search_tool(
     session_id: str = "default",
     max_search_calls: int = 10,
     max_tokens: int = 12000,
+    hard_token_limit: int = 16000,
 ) -> BudgetControlledSearchTool:
     """创建预算控制的搜索工具
     
@@ -509,7 +533,8 @@ def create_budget_controlled_search_tool(
         wrapped_tool: 原始搜索工具
         session_id: 会话ID
         max_search_calls: 最大搜索调用次数
-        max_tokens: 最大token数量
+        max_tokens: 最大token数量（软警告阈值）
+        hard_token_limit: 硬token限制（超过此值强制拦截搜索）
         
     Returns:
         BudgetControlledSearchTool: 预算控制工具
@@ -519,6 +544,7 @@ def create_budget_controlled_search_tool(
         session_id=session_id,
         max_search_calls=max_search_calls,
         max_tokens=max_tokens,
+        hard_token_limit=hard_token_limit,
     )
 
 
@@ -526,17 +552,9 @@ def budget_controlled_financial_summary_tool(
     session_id: str = "default",
     max_search_calls: int = 10,
     max_tokens: int = 12000,
+    hard_token_limit: int = 16000,
 ) -> BudgetControlledSearchTool:
-    """创建预算控制的财务数据汇总工具
-    
-    Args:
-        session_id: 会话ID
-        max_search_calls: 最大搜索调用次数
-        max_tokens: 最大token数量
-        
-    Returns:
-        BudgetControlledSearchTool: 预算控制的财务数据汇总工具
-    """
+    """创建预算控制的财务数据汇总工具"""
     from src.tools.financial_summary import financial_summary
     
     original_tool = financial_summary
@@ -546,6 +564,7 @@ def budget_controlled_financial_summary_tool(
         session_id=session_id,
         max_search_calls=max_search_calls,
         max_tokens=max_tokens,
+        hard_token_limit=hard_token_limit,
     )
 
 
@@ -553,17 +572,9 @@ def budget_controlled_product_instance_search_tool(
     session_id: str = "default",
     max_search_calls: int = 10,
     max_tokens: int = 12000,
+    hard_token_limit: int = 16000,
 ) -> BudgetControlledSearchTool:
-    """创建预算控制的产品实例搜索工具
-    
-    Args:
-        session_id: 会话ID
-        max_search_calls: 最大搜索调用次数
-        max_tokens: 最大token数量
-        
-    Returns:
-        BudgetControlledSearchTool: 预算控制的产品实例搜索工具
-    """
+    """创建预算控制的产品实例搜索工具"""
     from src.tools.product_instance_search import product_instance_search
     
     original_tool = product_instance_search
@@ -573,6 +584,7 @@ def budget_controlled_product_instance_search_tool(
         session_id=session_id,
         max_search_calls=max_search_calls,
         max_tokens=max_tokens,
+        hard_token_limit=hard_token_limit,
     )
 
 
@@ -580,17 +592,9 @@ def budget_controlled_product_search_tool(
     session_id: str = "default",
     max_search_calls: int = 10,
     max_tokens: int = 12000,
+    hard_token_limit: int = 16000,
 ) -> BudgetControlledSearchTool:
-    """创建预算控制的产品搜索工具
-    
-    Args:
-        session_id: 会话ID
-        max_search_calls: 最大搜索调用次数
-        max_tokens: 最大token数量
-        
-    Returns:
-        BudgetControlledSearchTool: 预算控制的产品搜索工具
-    """
+    """创建预算控制的产品搜索工具"""
     from src.tools.product_search import product_search
     
     original_tool = product_search
@@ -600,6 +604,7 @@ def budget_controlled_product_search_tool(
         session_id=session_id,
         max_search_calls=max_search_calls,
         max_tokens=max_tokens,
+        hard_token_limit=hard_token_limit,
     )
 
 
@@ -609,18 +614,9 @@ def budget_controlled_online_search_tool(
     session_id: str = "default",
     max_search_calls: int = 10,
     max_tokens: int = 12000,
+    hard_token_limit: int = 16000,
 ) -> BudgetControlledSearchTool:
-    """创建预算控制的联网搜索工具
-    
-    Args:
-        max_results: 最大搜索结果数
-        session_id: 会话ID
-        max_search_calls: 最大搜索调用次数
-        max_tokens: 最大token数量
-        
-    Returns:
-        BudgetControlledSearchTool: 预算控制的搜索工具
-    """
+    """创建预算控制的联网搜索工具"""
     from src.tools.online_search import online_search_tool
     
     original_tool = online_search_tool(max_results=max_results)
@@ -630,6 +626,7 @@ def budget_controlled_online_search_tool(
         session_id=session_id,
         max_search_calls=max_search_calls,
         max_tokens=max_tokens,
+        hard_token_limit=hard_token_limit,
     )
 
 
@@ -639,20 +636,11 @@ def budget_controlled_bocomsearch_tool(
     max_tokens: int = 10000,
     max_results: int = 10,
     guwp_token: Optional[str] = None,
+    hard_token_limit: int = 16000,
 ) -> BudgetControlledSearchTool:
     """创建预算控制的交行搜索工具
     
     与 budget_controlled_online_search 共用预算管理器，确保总搜索量不超限
-    
-    Args:
-        session_id: 会话ID，用于隔离不同用户的预算
-        max_search_calls: 最大搜索调用次数（与 online_search 共享）
-        max_tokens: 最大token预算（与 online_search 共享）
-        max_results: 单次搜索返回的最大结果数
-        guwp_token: GUWP认证令牌，未提供时从环境变量读取
-        
-    Returns:
-        BudgetControlledSearchTool: 带预算控制的搜索工具实例
     """
     base_tool = BocomSearchBaseTool(max_results=max_results, guwp_token=guwp_token)
     
@@ -661,6 +649,7 @@ def budget_controlled_bocomsearch_tool(
         session_id=session_id,
         max_search_calls=max_search_calls,
         max_tokens=max_tokens,
+        hard_token_limit=hard_token_limit,
     )
 
 
@@ -708,20 +697,12 @@ def budget_controlled_searchknowledge_standard_tool(
     max_search_calls: int = 5,
     max_tokens: int = 10000,
     max_results: int = 10,
+    hard_token_limit: int = 16000,
 ) -> BudgetControlledSearchTool:
     """创建预算控制的 EUVD 标准知识检索工具
 
     与 budget_controlled_online_search 、budget_controlled_bocomsearch 共用同一个预算管理器（同一 session_id），
     确保该会话下总搜索量不超限。
-
-    Args:
-        session_id: 会话 ID
-        max_search_calls: 最大调用次数（与同 session 其他检索共享）
-        max_tokens: 最大 token 预算（与同 session 其他检索共享）
-        max_results: 单次检索返回的最大结果数
-
-    Returns:
-        BudgetControlledSearchTool: 带预算控制的标准知识检索工具实例
     """
     base_tool = SearchKnowledgeStandardBaseTool(max_results=max_results)
     return create_budget_controlled_search_tool(
@@ -729,4 +710,5 @@ def budget_controlled_searchknowledge_standard_tool(
         session_id=session_id,
         max_search_calls=max_search_calls,
         max_tokens=max_tokens,
+        hard_token_limit=hard_token_limit,
     )

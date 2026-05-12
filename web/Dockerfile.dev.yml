@@ -3,10 +3,12 @@ FROM node:20-bookworm
 
 # 安装必要的系统依赖
 # 先更新包索引，再安装对应依赖（--no-install-recommends 减少冗余依赖）
+# curl 用于容器内健康探测（health-monitor.sh 通过 docker exec 调用）
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        libc6 \                
-        openssl \                
+        libc6 \
+        openssl \
+        curl \
     && rm -rf /var/lib/apt/lists/*  # 清理缓存，减小镜像体积
 
 # 设置工作目录

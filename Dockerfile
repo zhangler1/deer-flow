@@ -3,9 +3,10 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm
 # Install uv.
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Install system dependencies including libpq
+# Install system dependencies including libpq and curl (for container health probes)
 RUN apt-get update && apt-get install -y \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
     
 WORKDIR /app

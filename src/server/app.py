@@ -119,6 +119,16 @@ in_memory_store = InMemoryStore()
 graph = build_graph_with_memory()
 
 
+@app.get("/health")
+async def health_check():
+    """Lightweight health probe for container-level liveness checks.
+
+    Returns 200 quickly without touching heavy dependencies; the external
+    health-monitor script (scripts/health-monitor.sh) polls this endpoint.
+    """
+    return {"status": "ok", "service": "deer-flow-backend"}
+
+
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatRequest, raw_request: Request):
     # Check if MCP server configuration is enabled

@@ -64,6 +64,12 @@ COPY --from=builder /app/.next/static ./.next/static
 EXPOSE 3000
 ENV PORT=3000
 
+# 健康探测说明：
+# distroless 镜像不包含 shell / curl / wget，但包含 node。
+# scripts/health-monitor.sh 对本容器采用 `docker exec ... node -e "..."` 探测，
+# 绕开对 curl 的依赖。若需用 HEALTHCHECK 指令，可写：
+#   HEALTHCHECK CMD ["node", "-e", "require('http').get('http://localhost:3000/',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+
 CMD ["server.js"]
 
 
