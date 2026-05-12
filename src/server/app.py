@@ -163,7 +163,7 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                 request.resources or [],
                 request.max_plan_iterations or 2,
                 request.max_step_num or 5,
-                request.max_search_results or 3,
+                request.max_search_results or 2,
                 request.max_iteration or 5,
                 request.search_engine or "custom_search",
                 request.auto_accepted_plan or False,

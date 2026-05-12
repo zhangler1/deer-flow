@@ -28,7 +28,7 @@ def online_search_tool(max_results: int = 10) -> CustomSearchTool:
         CustomSearchTool: 配置好的联网搜索工具实例
     """
     tool = CustomSearchTool(
-        repository="online_search",
+        repository="online-search",
         max_results=max_results
     )
     # 自定义工具名称和描述，让模型能够识别这是互联网搜索工具

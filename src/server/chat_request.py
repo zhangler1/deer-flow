@@ -45,7 +45,7 @@ class ChatRequest(BaseModel):
         3, description="The maximum number of steps in a plan"
     )
     max_search_results: Optional[int] = Field(
-        3, description="The maximum number of search results"
+        2, description="The maximum number of search results"
     )
     max_iteration: Optional[int] = Field(
         5, description="The maximum number of iterations for iterative research"
