@@ -47,7 +47,7 @@ RUN \
 
 ##### RUNNER
 
-FROM gcr.io/distroless/nodejs20-debian12 AS runner
+FROM node:20-bookworm AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -73,5 +73,6 @@ ENV PORT=3000
 CMD ["server.js"]
 
 
-# docker build . -t deer-flow-front.prd:latest --build-arg NEXT_PUBLIC_API_URL=http://192.168.0.112:8000/api  
-# 子路径部署示例：--build-arg NEXT_PUBLIC_BASE_PATH=/deep-research-deerflow
+# docker build . -t deer-flow-front.prd:latest --build-arg NEXT_PUBLIC_BASE_PATH=/deep-research-deerflow
+# 后端路径默认走前端相同地址（通过 NEXT_PUBLIC_BASE_PATH 拼接 /api）
+# 如需自定义后端地址：--build-arg NEXT_PUBLIC_API_URL=http://192.168.0.112:8000/api

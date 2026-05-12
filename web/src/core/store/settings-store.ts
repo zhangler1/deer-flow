@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     searchEngine: "custom_search",
     useBudgetControlledOnlineSearch: true,  // 默认使用budget控制的在线检索
     useBudgetControlledBocomSearch: true,   // 默认使用budget控制的bocom搜索
-    reportStyle: "academic",  // 默认为学术报告
+    reportStyle: "industry_report",  // 默认为行业研报
     forceRoutingPath: "deep_research", // 调试模式默认路由设置为交心深度研究
   },
   mcp: {
