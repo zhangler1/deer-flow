@@ -137,17 +137,21 @@ SEARCH_BUDGET:
   # - business_marketing: 5次（对公营销报告）
   # - industry_report: 3次（行业研报）
   # - academic: 5次（学术研究）
-  max_search_calls: 5
+  search_budget_max_calls: 5
   
   # 最大token数量（预警阈值）
   # 当消息历史达到此token数时会发出警告
-  max_tokens: 10000
+  search_budget_max_tokens: 10000
   
   # 硬token限制（强制停止）
   # 超过此限制后将强制停止搜索
-  hard_token_limit: 14000
+  search_budget_hard_limit: 14000
   
   # Token估算比例（字符数/token）
   # 用于估算消息的token消耗，中文通常在2-3之间，英文在4左右
   # 默认值2.5适合纯中文场景，中英混合建议3.0，纯英文建议4.0
-  token_chars_ratio: 2.5
+  search_budget_token_chars_ratio: 2.5
+
+  # （可选）researcher 节点每步搜索工具调用预算
+  # 未设置时 Configuration 默认 5；也可用环境变量 RESEARCHER_RECURSION_LIMIT 覆盖
+  # researcher_recursion_limit: 5

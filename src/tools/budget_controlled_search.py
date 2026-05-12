@@ -16,7 +16,7 @@
 import logging
 import threading
 import time
-from typing import Any, Dict, List, Optional, Type
+from typing import Annotated, Any, Dict, List, Optional, Type
 from functools import wraps
 from datetime import datetime, timedelta
 
@@ -25,6 +25,15 @@ from langchain_core.callbacks import CallbackManagerForToolRun
 from pydantic import BaseModel, Field
 
 from src.utils.search_budget import SearchBudgetManager
+
+# 尝试导入 LangGraph 的 InjectedState；导入失败时用占位，
+# 保证非 LangGraph 环境下原有行为不被破坏。
+try:
+    from langgraph.prebuilt import InjectedState  # type: ignore
+    _INJECTED_STATE_AVAILABLE = True
+except Exception:  # noqa: BLE001
+    InjectedState = None  # type: ignore
+    _INJECTED_STATE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -263,9 +272,22 @@ def get_budget_store_stats() -> Dict[str, Any]:
     return _budget_store.get_stats()
 
 
-class BudgetControlledSearchInput(BaseModel):
-    """预算控制搜索工具的输入"""
-    query: str = Field(description="搜索查询字符串")
+if _INJECTED_STATE_AVAILABLE:
+    class BudgetControlledSearchInput(BaseModel):
+        """预算控制搜索工具的输入
+
+        state 字段由 LangGraph ToolNode 自动注入，不暴露给 LLM。
+        作用：拿到真实的 state["messages"]，以便计算 token 消耗并触发 token 硬限。
+        """
+        query: str = Field(description="搜索查询字符串")
+        state: Annotated[Optional[dict], InjectedState] = Field(
+            default=None,
+            description="(内部) LangGraph 自动注入的 agent state",
+        )
+else:
+    class BudgetControlledSearchInput(BaseModel):
+        """预算控制搜索工具的输入（无 LangGraph 环境回退版）"""
+        query: str = Field(description="搜索查询字符串")
 
 
 class BocomSearchBaseTool(BaseTool):
@@ -371,6 +393,7 @@ class BudgetControlledSearchTool(BaseTool):
     def _run(
         self,
         query: str,
+        state: Optional[dict] = None,
         run_manager: Optional[CallbackManagerForToolRun] = None,
         config: Optional[Dict[str, Any]] = None,
         **kwargs
@@ -378,44 +401,59 @@ class BudgetControlledSearchTool(BaseTool):
         """执行搜索（带预算控制）
         
         流程：
-        1. 检查预算状态 → 不足则拦截，返回预算耗尽提示
+        1. 检查预算状态（包含 token 硬限）→ 不足则拦截
         2. 预算充足 → 执行原始搜索工具
         3. 扣减预算 → 在结果中附加预算警告（如接近上限）
+
+        参数说明：
+            state: 由 LangGraph ToolNode 通过 InjectedState 自动注入的 agent state，
+                LLM 不可见。用于提取当前消息历史以计算 token 消耗，
+                触发 hard_token_limit 拦截。非 LangGraph 环境时为 None，
+                自动回退为空消息列表（行为同修复前一致）。
         """
         budget = get_budget_manager(
             self.session_id, self.max_search_calls, self.max_tokens
         )
-        messages = []  # 简化处理，实际应从state获取
-        
-        # ── 1. 预算检查 ──
+
+        # 🔧 从 InjectedState 提取真实消息，驱动 token 硬限检查
+        # 回退策略：无 state（直调 / 旧环境 / InjectedState 未生效）时仍然可用，
+        # 仅 token 硬限检查退化（与原行为一致）。
+        messages: list = []
+        if state:
+            raw_msgs = state.get("messages") if isinstance(state, dict) else getattr(state, "messages", None)
+            if raw_msgs:
+                messages = list(raw_msgs)
+
+        # ── 1. 预算检查（同时检查次数与 token） ──
         if not budget.can_search(messages):
             return self._build_budget_exhausted_response(budget, messages)
-        
+
         # ── 2. 执行搜索 ──
+        # 注意：state 不透传给 wrapped_tool（其大多数不认识该参数）
         try:
             # 外层不再重复输出“🔍 搜索”日志，由内层 wrapped_tool 统一报告搜索入口；
             # session 信息随后随“💰 预算扣减”一起输出，避免重复。
             result = self.wrapped_tool._run(query, run_manager=run_manager, config=config, **kwargs)
-            
+
             # ── 3. 扣减预算 ──
             budget.record_search_call()
             status = budget.get_budget_status(messages)
             remaining = budget.get_remaining_budget(messages)
-            
-            # 外层：仅报预算扣减结果（剩余额度/session）；
-            # HTTP 响应与结果条数已由内层 wrapped_tool 输出，避免重复“搜索完成”。
+
+            # 外层：报预算扣减结果；同时输出 token 估算，便于观测 token 硬限工作情况。
             logger.info(
                 f"💰 {self.name} | 预算扣减 | "
                 f"session={self.session_id} | "
-                f"剩余={remaining['remaining_search_calls']}/{self.max_search_calls}"
+                f"剩余={remaining['remaining_search_calls']}/{self.max_search_calls} | "
+                f"tokens~{status.estimated_tokens}/{budget.config.hard_token_limit}"
             )
-            
+
             # 接近预算上限时，在结果中附加警告
             if remaining['warning_level'] >= 1:
                 self._attach_budget_warning(result, budget, messages, remaining)
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"❌ {self.name} | 搜索异常 | session={self.session_id} | error={e}")
             raise

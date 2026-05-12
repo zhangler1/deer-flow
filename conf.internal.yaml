@@ -63,7 +63,7 @@ REPORTER_MODEL:
 
 
 SEARCH_BUDGET:
-  max_search_calls: 5
-  max_tokens: 10000
-  hard_token_limit: 14000
-  token_chars_ratio: 2.5
+  search_budget_max_calls: 5
+  search_budget_max_tokens: 10000
+  search_budget_hard_limit: 14000
+  search_budget_token_chars_ratio: 2.5

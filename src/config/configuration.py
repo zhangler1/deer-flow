@@ -15,6 +15,43 @@ from src.config.loader import get_str_env, get_int_env, get_bool_env
 logger = logging.getLogger(__name__)
 
 
+# 加载 yaml 的 SEARCH_BUDGET 段时，yaml 字段名与 Configuration 字段名完全一致（带 search_budget_ / researcher_ 前缀），
+# 不再做映射。仅保留白名单避免误激活同名字段。
+_SEARCH_BUDGET_ALLOWED_FIELDS = {
+    "search_budget_max_calls",
+    "search_budget_max_tokens",
+    "search_budget_hard_limit",
+    "search_budget_token_chars_ratio",
+    "researcher_recursion_limit",
+}
+
+
+def _load_search_budget_yaml() -> dict:
+    """从当前激活的 yaml (conf.yaml / conf.internal.yaml) 加载 SEARCH_BUDGET 段。
+
+    yaml 字段名已与 Configuration 字段名对齐，无需映射。缺失或解析失败时返回空 dict。
+    使用 lazy import 避免循环依赖。
+    """
+    try:
+        from src.llms.llm import _get_config_file_path
+        from src.config import load_yaml_config
+        raw = load_yaml_config(_get_config_file_path()).get("SEARCH_BUDGET", {}) or {}
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"读取 SEARCH_BUDGET 配置失败，将使用默认值: {e}")
+        return {}
+    result: dict = {}
+    for key, val in raw.items():
+        if val is None:
+            continue
+        if key in _SEARCH_BUDGET_ALLOWED_FIELDS:
+            result[key] = val
+        else:
+            logger.warning(
+                f"SEARCH_BUDGET 中的未知字段 '{key}' 已忽略（请使用带前缀的 Configuration 字段名）"
+            )
+    return result
+
+
 def get_recursion_limit(default: int = 25) -> int:
     """Get the recursion limit from environment variable or use default.
 
@@ -63,17 +100,34 @@ class Configuration:
     search_budget_hard_limit: int = 14000  # 硬token限制（强制停止）
     search_budget_token_chars_ratio: float = 2.5  # Token估算比例（字符数/token，纯中文场景）
 
+    # researcher 节点每步的搜索工具调用预算（也作为 LangGraph recursion 的软建议值）
+    researcher_recursion_limit: int = 5
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None
     ) -> "Configuration":
-        """Create a Configuration instance from a RunnableConfig."""
+        """Create a Configuration instance from a RunnableConfig.
+
+        配置优先级：env > configurable > yaml(SEARCH_BUDGET) > dataclass 默认值
+        """
         configurable = (
             config["configurable"] if config and "configurable" in config else {}
         )
-        values: dict[str, Any] = {
-            f.name: os.environ.get(f.name.upper(), configurable.get(f.name))
-            for f in fields(cls)
-            if f.init
-        }
-        return cls(**{k: v for k, v in values.items() if v})
+        yaml_values = _load_search_budget_yaml()
+
+        values: dict[str, Any] = {}
+        for f in fields(cls):
+            if not f.init:
+                continue
+            env_val = os.environ.get(f.name.upper())
+            cfg_val = configurable.get(f.name)
+            yaml_val = yaml_values.get(f.name)
+            if env_val is not None and env_val != "":
+                values[f.name] = env_val
+            elif cfg_val is not None:
+                values[f.name] = cfg_val
+            elif yaml_val is not None:
+                values[f.name] = yaml_val
+
+        return cls(**{k: v for k, v in values.items() if v not in (None, "")})
