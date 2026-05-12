@@ -76,10 +76,13 @@ async def researcher_node(
     # 读取 researcher 每步的搜索工具调用预算
     # 说明：该值主要作为 researcher 节点内搜索工具的 max_search_calls（即每步最多可调用的搜索次数）；
     # 同时兼作 LangGraph agent recursion 的软建议值，实际硬上限 = max(budget * 10, 50)。
-    # 为保持向后兼容，配置字段名 `researcher_recursion_limit` 与环境变量 `RESEARCHER_RECURSION_LIMIT` 保留不变。
-    researcher_search_budget = getattr(configurable, 'researcher_recursion_limit', None)
-    if researcher_search_budget is None:
-        researcher_search_budget = int(os.environ.get('RESEARCHER_RECURSION_LIMIT', '5'))
+    # 配置来源优先级：env(RESEARCHER_RECURSION_LIMIT) > configurable > yaml(SEARCH_BUDGET.researcher_per_step_budget) > 默认值 5
+    # 由 Configuration 统一解析。
+    researcher_search_budget = getattr(configurable, 'researcher_recursion_limit', 5)
+    try:
+        researcher_search_budget = int(researcher_search_budget)
+    except (TypeError, ValueError):
+        researcher_search_budget = 5
     enhanced_logger.logger.info(
         f"🎛️  SEARCH_BUDGET_CONFIG | researcher | 每步搜索调用预算: {researcher_search_budget}"
     )
