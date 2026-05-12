@@ -148,15 +148,11 @@ export function MessageListView({
   
   // 按轮次组织迭代研究消息
   const organizedMessages = useMemo(() => {
-    const result: Array<{
-      type: 'round' | 'normal';
-      iteration?: number;
-      messageIds?: string[];
-      collapsed?: boolean;
-      messageId?: string;
-      message?: Message;
-      startOfResearch?: boolean;
-    }> = [];
+    // 鉴别联合类型：TS 可以根据 type 自动收窄、避免逐个打 `!`
+    type OrganizedItem =
+      | { type: 'round'; iteration: number; messageIds: string[]; collapsed: boolean }
+      | { type: 'normal'; messageId: string; message: Message; startOfResearch: boolean };
+    const result: OrganizedItem[] = [];
     
     // 创建一个set来跟踪已经在轮次中的消息
     const messagesInRounds = new Set<string>();
@@ -219,9 +215,9 @@ export function MessageListView({
             return (
               <IterativeResearchRoundContainer
                 key={`round_${item.iteration}`}
-                iteration={item.iteration!}
-                messageIds={item.messageIds!}
-                collapsed={item.collapsed!}
+                iteration={item.iteration}
+                messageIds={item.messageIds}
+                collapsed={item.collapsed}
                 _onFeedback={onFeedback}
                 _onSendMessage={onSendMessage}
               />

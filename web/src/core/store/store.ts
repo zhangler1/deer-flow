@@ -334,6 +334,11 @@ export async function sendMessage(
         continue;
       }
       
+      // Handle ping events (仅心跳，无 id，直接跳过；同时让后续代码 TS 可收窄 data 到含 id 的事件类型)
+      if (type === "ping") {
+        continue;
+      }
+
       // Handle node transition events (迭代研究节点跳转)
       if (type === "node_transition") {
         // removed verbose: node transition log
@@ -476,7 +481,7 @@ export async function sendMessage(
         if (!lastMsg || lastMsg.agent !== "system" || !lastMsg.content?.includes("研究已停止")) {
           store.appendMessage({
             id: nanoid(),
-            threadId: store.threadId,
+            threadId: store.threadId ?? "",
             role: "assistant",
             agent: "system",
             content: "● 研究已停止",

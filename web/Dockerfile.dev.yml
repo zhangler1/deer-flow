@@ -7,8 +7,6 @@ FROM node:20-bookworm
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libc6 \
-        openssl \
-        curl \
     && rm -rf /var/lib/apt/lists/*  # 清理缓存，减小镜像体积
 
 # 设置工作目录

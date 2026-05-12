@@ -45,6 +45,17 @@ const config = {
   output: "standalone",
   basePath,
   assetPrefix: basePath || undefined,
+
+  // Docker 构建优先跟通运行时正确性，此处关闭构建阶段的 ESLint / 类型检查阻断。
+  // lint 和严格类型检查由 `pnpm lint` / `pnpm typecheck` 在 CI 中独立执行，
+  // 避免本地/镜像打包被非阻断性问题卡住。
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // 着急时可打开；TS 类型错误建议还是修，默认不关闭。
+    ignoreBuildErrors: false,
+  },
 };
 
 export default withNextIntl(config);

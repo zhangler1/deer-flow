@@ -76,3 +76,5 @@ CMD ["server.js"]
 # docker build . -t deer-flow-front.prd:latest --build-arg NEXT_PUBLIC_BASE_PATH=/deep-research-deerflow
 # 后端路径默认走前端相同地址（通过 NEXT_PUBLIC_BASE_PATH 拼接 /api）
 # 如需自定义后端地址：--build-arg NEXT_PUBLIC_API_URL=http://192.168.0.112:8000/api
+
+#docker build . -t deer-flow-front.prd:latest --build-arg NEXT_PUBLIC_BASE_PATH=/deep-research-deerflow --build-arg https_proxy=http://192.168.0.106:1087  --build-arg http_proxy=http://192.168.0.106:1087 --build-arg no_proxy=localhost,192.168.0.106,.local  

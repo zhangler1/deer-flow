@@ -208,7 +208,7 @@ function buildStepsFromActivityIds(
 
     // planner 消息：解析 Plan JSON 获取 title 和 steps
     if (message.agent === "planner") {
-      const plan = parseJSON<Plan>(message.content, null);
+      const plan = parseJSON<Plan | null>(message.content, null);
       if (plan) {
         title = plan.title || "深度研究";
         planSteps = plan.steps || [];
