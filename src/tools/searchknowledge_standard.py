@@ -21,6 +21,9 @@ EUVD 段落级标准知识检索工具（searchknowledge_standard）
 - SEARCHKNOWLEDGE_VECTOR_TOPN 向量召回TopN（默认 3）
 - SEARCHKNOWLEDGE_TEXT_TOPN  文本召回TopN（默认 0）
 - SEARCHKNOWLEDGE_THRESHOLD  匹配分阈值（默认 0.1）
+- SEARCHKNOWLEDGE_MAX_RESULTS 最大返回条数（默认 2，作用于本地截断）
+
+返回条数优先级：调用显式传入 max_results > 环境变量 SEARCHKNOWLEDGE_MAX_RESULTS > 硬编码默认 2
 """
 
 import json
@@ -85,6 +88,14 @@ class SearchKnowledgeStandardConfig:
             return float(os.getenv("SEARCHKNOWLEDGE_THRESHOLD", "0.1"))
         except (TypeError, ValueError):
             return 0.1
+
+    @classmethod
+    def default_max_results(cls) -> int:
+        """最大返回条数：env SEARCHKNOWLEDGE_MAX_RESULTS > 硬编码默认 2"""
+        try:
+            return int(os.getenv("SEARCHKNOWLEDGE_MAX_RESULTS", "2"))
+        except (TypeError, ValueError):
+            return 2
 
 
 def _build_form_payload(
@@ -267,7 +278,13 @@ def call_searchknowledge_standard(
 
 
         results = _parse_response(data)
-        trimmed = results[:max_results] if (max_results and max_results > 0) else results
+        # 优先级：调用显式传入 > env SEARCHKNOWLEDGE_MAX_RESULTS > 默认 2
+        effective_max = (
+            max_results
+            if (max_results and max_results > 0)
+            else SearchKnowledgeStandardConfig.default_max_results()
+        )
+        trimmed = results[:effective_max]
         duration = time.time() - start_time
         # 对齐 online_search 的日志格式：成功时仅输出一条 HTTP响应汇总日志
         logger.info(
@@ -328,8 +345,9 @@ def searchknowledge_standard(query: str) -> List[Dict[str, Any]]:
 
     适用于查询行业政策、研报段落级语义片段等结构化知识库内容。
     输入应为完整的检索关键词，返回带相关度评分的段落列表。
+    返回条数由 env SEARCHKNOWLEDGE_MAX_RESULTS 控制，默认 2。
     """
-    return call_searchknowledge_standard(query=query, max_results=10)
+    return call_searchknowledge_standard(query=query)
 
 
 __all__ = [

@@ -610,15 +610,20 @@ def budget_controlled_product_search_tool(
 
 # 便捷函数：创建预算控制的 online_search 工具
 def budget_controlled_online_search_tool(
-    max_results: int = 10,
+    max_results: Optional[int] = None,
     session_id: str = "default",
     max_search_calls: int = 10,
     max_tokens: int = 12000,
     hard_token_limit: int = 16000,
 ) -> BudgetControlledSearchTool:
-    """创建预算控制的联网搜索工具"""
+    """创建预算控制的联网搜索工具
+
+    max_results 优先级：显式传入 > env ONLINE_SEARCH_MAX_RESULTS > 默认 2
+    将负责返回条数的处理委托给 online_search_tool 内部的默认值解析。
+    """
     from src.tools.online_search import online_search_tool
-    
+
+    # max_results=None 时 online_search_tool 会读 env / 默认
     original_tool = online_search_tool(max_results=max_results)
     
     return create_budget_controlled_search_tool(
@@ -661,6 +666,24 @@ create_budget_controlled_bocomsearch_tool = budget_controlled_bocomsearch_tool
 # searchknowledge_standard（EUVD 段落级标准知识检索）适配
 # ============================================================================
 
+
+def _resolve_searchknowledge_max_results() -> int:
+    """解析 searchknowledge 最大返回条数的默认值
+
+    优先级：env SEARCHKNOWLEDGE_MAX_RESULTS > 硬编码默认 2
+    避免模块导入时循环，采用延迟导入 SearchKnowledgeStandardConfig。
+    """
+    try:
+        from src.tools.searchknowledge_standard import SearchKnowledgeStandardConfig
+        return SearchKnowledgeStandardConfig.default_max_results()
+    except Exception:  # noqa: BLE001
+        import os
+        try:
+            return int(os.getenv("SEARCHKNOWLEDGE_MAX_RESULTS", "2"))
+        except (TypeError, ValueError):
+            return 2
+
+
 class SearchKnowledgeStandardBaseTool(BaseTool):
     """EUVD 段落级标准知识检索基础工具，适配 BudgetControlledSearchTool 包装
 
@@ -673,7 +696,8 @@ class SearchKnowledgeStandardBaseTool(BaseTool):
         "输入应为完整的检索关键词，返回带相关度评分的段落列表。"
     )
     repository: str = "searchknowledge_standard"
-    max_results: int = 10
+    # 默认值通过 default_factory 动态读 env（SEARCHKNOWLEDGE_MAX_RESULTS），兵底 2
+    max_results: int = Field(default_factory=lambda: _resolve_searchknowledge_max_results())
 
     def _run(
         self,
@@ -696,15 +720,22 @@ def budget_controlled_searchknowledge_standard_tool(
     session_id: str = "default",
     max_search_calls: int = 5,
     max_tokens: int = 10000,
-    max_results: int = 10,
+    max_results: Optional[int] = None,
     hard_token_limit: int = 16000,
 ) -> BudgetControlledSearchTool:
     """创建预算控制的 EUVD 标准知识检索工具
 
     与 budget_controlled_online_search 、budget_controlled_bocomsearch 共用同一个预算管理器（同一 session_id），
     确保该会话下总搜索量不超限。
+
+    max_results 优先级：显式传入 > env SEARCHKNOWLEDGE_MAX_RESULTS > 默认 2
     """
-    base_tool = SearchKnowledgeStandardBaseTool(max_results=max_results)
+    effective_max = (
+        max_results
+        if (max_results and max_results > 0)
+        else _resolve_searchknowledge_max_results()
+    )
+    base_tool = SearchKnowledgeStandardBaseTool(max_results=effective_max)
     return create_budget_controlled_search_tool(
         wrapped_tool=base_tool,
         session_id=session_id,
