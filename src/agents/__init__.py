@@ -3,5 +3,6 @@
 
 from .agents import create_agent
 from .react_loop import ReactLoop
+from .middleware import ReactMiddleware
 
-__all__ = ["create_agent", "ReactLoop"]
+__all__ = ["create_agent", "ReactLoop", "ReactMiddleware"]

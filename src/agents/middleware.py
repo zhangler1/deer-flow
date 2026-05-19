@@ -1,0 +1,131 @@
+# Copyright (c) 2025
+# SPDX-License-Identifier: MIT
+
+"""
+ReactLoop 中间件基类
+
+参考 DeerFlow 2.0 的 AgentMiddleware 设计，为 ReactLoop 提供钩子机制。
+中间件通过继承 ReactMiddleware 并重写钩子方法来扩展 ReactLoop 的行为。
+
+执行顺序:
+    before_loop(所有中间件, 仅一次)
+        for iteration:
+            before_model(所有中间件) -> LLM调用 -> after_model(所有中间件)
+            -> 工具执行 -> after_tool(所有中间件)
+    after_loop(所有中间件, 仅一次)
+"""
+
+import logging
+from typing import Any
+
+from langchain_core.messages import AIMessage
+
+logger = logging.getLogger(__name__)
+
+
+class ReactMiddleware:
+    """ReactLoop 中间件基类
+    
+    所有钩子方法都有默认的 no-op 实现，子类只需重写需要的钩子。
+    所有钩子均为异步方法，支持在内部执行异步操作（如 LLM 调用）。
+    
+    Usage:
+        class MyMiddleware(ReactMiddleware):
+            async def before_model(self, messages, iteration, context):
+                # 修改消息列表
+                return messages
+    """
+    
+    @property
+    def name(self) -> str:
+        """中间件名称（用于日志）"""
+        return self.__class__.__name__
+    
+    async def before_loop(self, messages: list, context: dict) -> list:
+        """循环开始前执行（仅一次）
+        
+        适用场景:
+        - 初始化中间件内部状态
+        - 对初始消息做预处理
+        
+        Args:
+            messages: 初始消息列表
+            context: 共享上下文字典，可在此存入中间件需要的状态
+            
+        Returns:
+            处理后的消息列表
+        """
+        return messages
+    
+    async def before_model(self, messages: list, iteration: int, context: dict) -> list:
+        """每轮 LLM 调用前执行
+        
+        适用场景:
+        - 上下文压缩（检查 token 数，超限则压缩）
+        - 注入动态提示
+        - 审计/过滤消息
+        
+        Args:
+            messages: 当前消息列表
+            iteration: 当前迭代轮次（从 0 开始）
+            context: 共享上下文字典
+            
+        Returns:
+            处理后的消息列表（将传递给 LLM）
+        """
+        return messages
+    
+    async def after_model(self, response: AIMessage, messages: list, iteration: int, context: dict) -> bool:
+        """每轮 LLM 响应后执行
+        
+        适用场景:
+        - 循环检测（检查重复 tool_calls）
+        - 内容审查
+        - 自定义停止条件
+        
+        Args:
+            response: LLM 返回的 AIMessage
+            messages: 包含 response 在内的完整消息列表
+            iteration: 当前迭代轮次
+            context: 共享上下文字典
+            
+        Returns:
+            True = 强制停止循环, False = 继续
+        """
+        return False
+    
+    async def after_tool(self, messages: list, tool_results: list[Any], iteration: int, context: dict) -> list:
+        """每轮工具执行后执行
+        
+        适用场景:
+        - 即时压缩工具返回结果（避免 token 爆炸）
+        - 过滤或转换工具结果
+        - 记录工具调用统计
+        
+        Args:
+            messages: 包含工具结果在内的完整消息列表
+            tool_results: 本轮新增的 ToolMessage 列表
+            iteration: 当前迭代轮次
+            context: 共享上下文字典
+            
+        Returns:
+            处理后的消息列表
+        """
+        return messages
+    
+    async def after_loop(self, messages: list, context: dict) -> list:
+        """循环结束后执行（仅一次）
+        
+        适用场景:
+        - 最终清理
+        - 统计汇总
+        - 后处理（如移除系统注入的消息）
+        
+        Args:
+            messages: 最终消息列表
+            context: 共享上下文字典
+            
+        Returns:
+            处理后的消息列表
+        """
+        return messages

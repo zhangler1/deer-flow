@@ -2,17 +2,17 @@
 # SPDX-License-Identifier: MIT
 
 """
-ReactLoop - 可控的 ReAct 循环实现
+ReactLoop - 可控的 ReAct 循环引擎
 
 替代 langgraph.prebuilt.create_react_agent，提供：
-1. 每轮循环前/后的钩子拦截
-2. 循环检测（重复 tool_calls 哈希）
-3. 软提示停止（注入消息让 LLM 主动停止）
-4. 硬限制（max_iterations 达到后强制总结）
-5. 与现有 agent.ainvoke(input, config) 接口完全兼容
+1. 中间件链机制（before_loop / before_model / after_model / after_tool / after_loop）
+2. 硬限制（max_iterations 达到后强制总结）
+3. 与现有 agent.ainvoke(input, config) 接口完全兼容
+
+所有控制逻辑（循环检测、软提示、上下文压缩）均通过中间件实现。
+ReactLoop 本身只是纯粹的循环引擎 + 回调机制。
 """
 
-import hashlib
 import logging
 import time
 from typing import Any, Callable, Optional
@@ -20,28 +20,32 @@ from typing import Any, Callable, Optional
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
+from src.agents.middleware import ReactMiddleware
+
 logger = logging.getLogger(__name__)
 
 
 class ReactLoop:
-    """可控的 ReAct Agent 循环
+    """可控的 ReAct Agent 循环引擎
     
-    用法:
+    ReactLoop 只负责：
+    1. LLM 调用循环
+    2. 工具执行
+    3. 中间件链调度
+    4. 硬上限保护 + 强制总结
+    
+    所有控制逻辑（循环检测、软提示、压缩）通过中间件实现。
+    on_before_model / on_after_model 为轻量级回调机制（逃生舱）。
+    
+    Usage:
         agent = ReactLoop(
             model=chat_model,
             tools=tools,
             prompt=prompt_fn,
-            max_iterations=5,
-            warn_at=3,
+            middlewares=[LoopDetectionMiddleware(), ...],
+            max_iterations=8,
         )
         result = await agent.ainvoke(input={"messages": [...]}, config={...})
-    
-    控制机制:
-        - max_iterations: 硬上限，达到后强制让 LLM 总结
-        - warn_at: 软警告，达到后注入提示消息
-        - 循环检测: 相同 tool_calls 组合重复 N 次后强制停止
-        - on_before_model: 自定义钩子，每轮 LLM 调用前执行
-        - on_after_model: 自定义钩子，每轮 LLM 调用后执行
     """
     
     def __init__(
@@ -51,8 +55,7 @@ class ReactLoop:
         prompt: Optional[Callable] = None,
         *,
         max_iterations: int = 8,
-        warn_at: int = 5,
-        loop_detect_threshold: int = 3,
+        middlewares: Optional[list[ReactMiddleware]] = None,
         on_before_model: Optional[Callable] = None,
         on_after_model: Optional[Callable] = None,
     ):
@@ -62,10 +65,9 @@ class ReactLoop:
             tools: 工具列表
             prompt: 可选的 prompt 函数，接收 state dict，返回消息列表作为前缀
             max_iterations: 最大迭代次数（硬上限）
-            warn_at: 第几轮开始注入停止警告
-            loop_detect_threshold: 相同 tool_calls 重复多少次判定为循环
-            on_before_model: 自定义钩子 fn(messages, iteration, context) -> messages
-            on_after_model: 自定义钩子 fn(response, iteration, context) -> bool (True=强制停止)
+            middlewares: 中间件列表，按顺序执行
+            on_before_model: 轻量级回调 fn(messages, iteration, context) -> messages|None
+            on_after_model: 轻量级回调 fn(response, iteration, context) -> bool|None
         """
         # bind_tools 让 LLM 知道有哪些工具可用
         self.model = model.bind_tools(tools) if tools else model
@@ -76,10 +78,11 @@ class ReactLoop:
         
         # 控制参数
         self.max_iterations = max_iterations
-        self.warn_at = warn_at
-        self.loop_detect_threshold = loop_detect_threshold
         
-        # 自定义钩子
+        # 中间件链
+        self.middlewares: list[ReactMiddleware] = middlewares or []
+        
+        # 轻量级回调（逃生舱，不想写中间件时用）
         self.on_before_model = on_before_model
         self.on_after_model = on_after_model
     
@@ -104,21 +107,25 @@ class ReactLoop:
             except Exception as e:
                 logger.warning(f"⚠️ prompt 函数执行失败: {e}")
         
-        # 循环检测状态
-        tool_call_hashes: list[str] = []
         context = {
             "tool_calls_count": 0,
             "iterations": 0,
             "start_time": time.time(),
+            "max_iterations": self.max_iterations,
         }
         
         forced_final = False  # 标记是否需要强制最终总结
         
+        # === 中间件: before_loop ===
+        messages = await self._run_middleware_before_loop(messages, context)
+        
         for iteration in range(self.max_iterations):
             context["iterations"] = iteration
             
-            # === 钩子1: 循环前 - 软提示 + 自定义逻辑 ===
-            messages = self._before_model(messages, iteration, context)
+            # === 中间件: before_model ===
+            messages = await self._run_middleware_before_model(messages, iteration, context)
+            # === 轻量级回调: on_before_model ===
+            messages = self._call_on_before_model(messages, iteration, context)
             
             # === LLM 调用 ===
             try:
@@ -134,15 +141,18 @@ class ReactLoop:
                 logger.info(f"✅ ReactLoop 自然结束 | 第 {iteration+1} 轮 | LLM 未请求工具调用")
                 break
             
-            # === 钩子2: 循环后 - 循环检测 + 自定义逻辑 ===
-            should_stop = self._after_model(response, iteration, context, tool_call_hashes)
+            # === 中间件: after_model ===
+            middleware_stop = await self._run_middleware_after_model(response, messages, iteration, context)
+            # === 轻量级回调: on_after_model ===
+            callback_stop = self._call_on_after_model(response, iteration, context)
             
-            if should_stop:
-                logger.warning(f"🛑 ReactLoop 强制停止 | 第 {iteration+1} 轮 | 原因: 循环检测或自定义钩子")
+            if middleware_stop or callback_stop:
+                logger.warning(f"🛑 ReactLoop 强制停止 | 第 {iteration+1} 轮 | middleware={middleware_stop}, callback={callback_stop}")
                 forced_final = True
                 break
             
             # === 执行工具 ===
+            tool_results = []
             for tool_call in response.tool_calls:
                 tool_name = tool_call["name"]
                 tool_args = tool_call["args"]
@@ -160,11 +170,17 @@ class ReactLoop:
                     logger.warning(f"⚠️ 未知工具: {tool_name}")
                     result = f"错误: 未知工具 '{tool_name}'，可用工具: {list(self.tools.keys())}"
                 
-                messages.append(ToolMessage(
+                tool_msg = ToolMessage(
                     content=str(result) if result else "工具执行完成（无返回内容）",
                     tool_call_id=tool_call_id,
                     name=tool_name,
-                ))
+                )
+                messages.append(tool_msg)
+                tool_results.append(tool_msg)
+            
+            # === 中间件: after_tool ===
+            messages = await self._run_middleware_after_tool(messages, tool_results, iteration, context)
+            
         else:
             # for-else: 达到 max_iterations 但未 break
             logger.warning(
@@ -177,10 +193,14 @@ class ReactLoop:
         if forced_final:
             messages = await self._force_final_answer(messages, context)
         
+        # === 中间件: after_loop ===
+        messages = await self._run_middleware_after_loop(messages, context)
+        
         elapsed = time.time() - context["start_time"]
         logger.info(
             f"📊 ReactLoop 完成 | 迭代: {context['iterations']+1}/{self.max_iterations} | "
-            f"工具调用: {context['tool_calls_count']} | 耗时: {elapsed:.2f}s"
+            f"工具调用: {context['tool_calls_count']} | 耗时: {elapsed:.2f}s | "
+            f"中间件: {[m.name for m in self.middlewares]}"
         )
         
         return {"messages": messages}
@@ -204,80 +224,85 @@ class ReactLoop:
             return asyncio.run(self.ainvoke(input, config))
     
     # ============================================================
-    # 内置钩子实现
+    # 中间件链执行方法
     # ============================================================
     
-    def _before_model(self, messages: list, iteration: int, context: dict) -> list:
-        """每轮 LLM 调用前执行
-        
-        内置行为:
-        - 接近上限时注入软停止提示
-        
-        可通过 on_before_model 扩展
-        """
-        # 软提示：接近上限时警告 LLM
-        if iteration >= self.warn_at:
-            remaining = self.max_iterations - iteration
-            messages.append(HumanMessage(
-                content=(
-                    f"⚠️ 系统提示：你已经进行了 {iteration} 轮工具调用（共计 {context['tool_calls_count']} 次工具使用），"
-                    f"剩余 {remaining} 轮机会。"
-                    f"请尽快基于已收集的信息总结结果，停止继续搜索。"
-                    f"如果信息已经足够，请直接输出最终答案。"
-                ),
-                name="system",
-            ))
-            logger.info(f"💡 ReactLoop 软提示已注入 | 第 {iteration+1} 轮 | 剩余 {remaining} 轮")
-        
-        # 调用自定义钩子
+    async def _run_middleware_before_loop(self, messages: list, context: dict) -> list:
+        """执行所有中间件的 before_loop 钩子"""
+        for mw in self.middlewares:
+            try:
+                messages = await mw.before_loop(messages, context)
+            except Exception as e:
+                logger.warning(f"⚠️ 中间件 {mw.name}.before_loop 异常: {e}")
+        return messages
+    
+    async def _run_middleware_before_model(self, messages: list, iteration: int, context: dict) -> list:
+        """执行所有中间件的 before_model 钩子"""
+        for mw in self.middlewares:
+            try:
+                messages = await mw.before_model(messages, iteration, context)
+            except Exception as e:
+                logger.warning(f"⚠️ 中间件 {mw.name}.before_model 异常 (第{iteration+1}轮): {e}")
+        return messages
+    
+    async def _run_middleware_after_model(
+        self, response: AIMessage, messages: list, iteration: int, context: dict
+    ) -> bool:
+        """执行所有中间件的 after_model 钩子，任一返回 True 则强制停止"""
+        for mw in self.middlewares:
+            try:
+                should_stop = await mw.after_model(response, messages, iteration, context)
+                if should_stop:
+                    logger.info(f"🛑 中间件 {mw.name}.after_model 要求停止 (第{iteration+1}轮)")
+                    return True
+            except Exception as e:
+                logger.warning(f"⚠️ 中间件 {mw.name}.after_model 异常 (第{iteration+1}轮): {e}")
+        return False
+    
+    async def _run_middleware_after_tool(
+        self, messages: list, tool_results: list, iteration: int, context: dict
+    ) -> list:
+        """执行所有中间件的 after_tool 钩子"""
+        for mw in self.middlewares:
+            try:
+                messages = await mw.after_tool(messages, tool_results, iteration, context)
+            except Exception as e:
+                logger.warning(f"⚠️ 中间件 {mw.name}.after_tool 异常 (第{iteration+1}轮): {e}")
+        return messages
+    
+    async def _run_middleware_after_loop(self, messages: list, context: dict) -> list:
+        """执行所有中间件的 after_loop 钩子"""
+        for mw in self.middlewares:
+            try:
+                messages = await mw.after_loop(messages, context)
+            except Exception as e:
+                logger.warning(f"⚠️ 中间件 {mw.name}.after_loop 异常: {e}")
+        return messages
+    
+    # ============================================================
+    # 轻量级回调（逃生舱）
+    # ============================================================
+    
+    def _call_on_before_model(self, messages: list, iteration: int, context: dict) -> list:
+        """调用 on_before_model 回调（如果有）"""
         if self.on_before_model:
             try:
                 result = self.on_before_model(messages, iteration, context)
                 if result is not None:
                     messages = result
             except Exception as e:
-                logger.warning(f"⚠️ on_before_model 钩子异常: {e}")
-        
+                logger.warning(f"⚠️ on_before_model 回调异常: {e}")
         return messages
     
-    def _after_model(
-        self, response: AIMessage, iteration: int, context: dict, hash_history: list
-    ) -> bool:
-        """每轮 LLM 响应后执行
-        
-        内置行为:
-        - 循环检测（相同 tool_calls 哈希重复 N 次）
-        
-        Returns:
-            True = 强制停止, False = 继续
-        """
-        # === 循环检测 ===
-        if response.tool_calls:
-            # 计算当前轮 tool_calls 的哈希（顺序无关）
-            call_signature = self._hash_tool_calls(response.tool_calls)
-            hash_history.append(call_signature)
-            
-            # 检查最近 N 次是否有重复
-            recent_window = hash_history[-(self.loop_detect_threshold + 2):]
-            repeat_count = recent_window.count(call_signature)
-            
-            if repeat_count >= self.loop_detect_threshold:
-                logger.warning(
-                    f"🔄 ReactLoop 循环检测触发 | 第 {iteration+1} 轮 | "
-                    f"相同工具调用组合重复 {repeat_count} 次 | "
-                    f"工具: {[tc['name'] for tc in response.tool_calls]}"
-                )
-                return True
-        
-        # 调用自定义钩子
+    def _call_on_after_model(self, response: AIMessage, iteration: int, context: dict) -> bool:
+        """调用 on_after_model 回调（如果有），返回 True 表示要求停止"""
         if self.on_after_model:
             try:
                 result = self.on_after_model(response, iteration, context)
                 if result:
                     return True
             except Exception as e:
-                logger.warning(f"⚠️ on_after_model 钩子异常: {e}")
-        
+                logger.warning(f"⚠️ on_after_model 回调异常: {e}")
         return False
     
     async def _force_final_answer(self, messages: list, context: dict) -> list:
@@ -311,27 +336,8 @@ class ReactLoop:
         return messages
     
     # ============================================================
-    # 工具方法
+    # 属性
     # ============================================================
-    
-    @staticmethod
-    def _hash_tool_calls(tool_calls: list) -> str:
-        """生成 tool_calls 的顺序无关哈希
-        
-        相同的工具+参数组合，无论顺序如何，都会生成相同哈希。
-        """
-        # 提取 (name, sorted_args_str) 的列表
-        signatures = []
-        for tc in tool_calls:
-            name = tc.get("name", "")
-            args = tc.get("args", {})
-            # 对 args 排序序列化，确保顺序无关
-            args_str = str(sorted(args.items())) if isinstance(args, dict) else str(args)
-            signatures.append(f"{name}:{args_str}")
-        
-        # 排序后拼接，确保顺序无关
-        combined = "|".join(sorted(signatures))
-        return hashlib.md5(combined.encode()).hexdigest()[:12]
     
     @property
     def name(self) -> str:

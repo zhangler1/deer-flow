@@ -24,7 +24,6 @@ from langgraph.types import Command
 
 from src.agents import create_agent
 from src.config.configuration import Configuration
-from src.middlewares.tool_result_compression import ToolResultCompressionMiddleware
 from src.graph.types import State
 from src.utils.enhanced_logger import get_enhanced_logger
 from src.utils.text_utils import remove_think_tags
@@ -159,18 +158,13 @@ async def _execute_agent_step(
             )
         )
 
-    # 🔥 核心：使用中间件检查工具调用次数和压缩工具结果
+    # 🔥 核心：ReactLoop 中间件已内置循环控制和上下文压缩
     # 语义说明：
-    #   search_budget_soft_limit：每步搜索工具调用预算（软建议），用于中间件拦截与提示大模型停手
-    #   langgraph_recursion_hard_limit：LangGraph agent 内部 tool-call 循环硬上限，防止失控
+    #   search_budget_soft_limit：每步搜索工具调用预算（软建议），用于日志观察
+    #   ReactLoop 中间件链负责实际的循环检测和压缩
     search_budget_soft_limit = recursion_limit
-    langgraph_recursion_hard_limit = max(search_budget_soft_limit * 10, 50)
 
     # 初始化搜索预算观察器（仅用于日志观察，非实际拦截器）
-    # 真正拦截的 budget_manager 由 BudgetControlledSearchTool / researcher.py 的
-    # get_budget_manager(session_id, ...) 创建、共享。
-    # 为保持日志数字与真实拦截参数一致，统一从 Configuration 读取
-    # （优先级 env > configurable > yaml(SEARCH_BUDGET) > 默认值）。
     _obs_conf = Configuration.from_runnable_config(None)
     budget_manager = SearchBudgetManager(
         max_search_calls=_obs_conf.search_budget_max_calls,
@@ -179,36 +173,20 @@ async def _execute_agent_step(
         token_chars_ratio=_obs_conf.search_budget_token_chars_ratio,
     )
 
-    # 工具结果压缩中间件（只对 researcher 启用）
-    tool_compression_middleware = None
-    compression_llm = None
-    if agent_name == "researcher":
-        # 获取用于压缩的 LLM（使用 BASIC_MODEL）
-        from src.llms.llm import get_llm_by_type
-        try:
-            compression_llm = get_llm_by_type("basic")
-        except Exception as e:
-            logger.warning(f"⚠️ 无法获取压缩用 LLM: {e}")
-        
-        tool_compression_middleware = ToolResultCompressionMiddleware(llm=compression_llm)
-
-    # 使用预算管理器检查状态
+    # 使用预算管理器检查状态（仅日志）
     state_messages = state.get("messages", [])
-    budget_status = budget_manager.get_budget_status(state_messages)
     budget_info = budget_manager.get_remaining_budget(state_messages)
 
     enhanced_logger.logger.info(
         f"📊 BUDGET_STATUS | {agent_name} | "
         f"搜索: {budget_info['search_calls_used']}/{search_budget_soft_limit} | "
         f"Tokens: {budget_info['estimated_tokens']}/{budget_manager.config.max_tokens} | "
-        f"警告级别: {budget_info['warning_level']} | "
-        f"可搜索: {budget_info['remaining_search_calls'] > 0}"
+        f"警告级别: {budget_info['warning_level']}"
     )
 
-    actual_recursion_limit = langgraph_recursion_hard_limit
-
     enhanced_logger.logger.info(
-        f"🎛️  LANGGRAPH_RECURSION_LIMIT | {agent_name} | LangGraph递归硬上限: {actual_recursion_limit} 次 | "
+        f"🎛️  REACT_LOOP_CONTROL | {agent_name} | "
+        f"循环控制由 ReactLoop 中间件链管理 | "
         f"每步搜索预算(软建议): {search_budget_soft_limit} 次"
     )
 
@@ -220,7 +198,7 @@ async def _execute_agent_step(
     except ValueError:
         step_timeout = 900.0
     enhanced_logger.logger.info(
-        f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | 递归限制: {actual_recursion_limit} | "
+        f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | "
         f"超时阈值: {step_timeout:.0f}s | 开始时间: {time.strftime('%H:%M:%S')}"
     )
 
@@ -239,21 +217,8 @@ async def _execute_agent_step(
     # 预先声明心跳任务变量，保证 finally 一定能访问（即便 try 内未执行到创建处）
     heartbeat_task = None
     try:
-        # 应用工具结果压缩（如果启用，使用异步版本支持 summarize 模式）
-        if tool_compression_middleware is not None:
-            original_msg_count = len(agent_input["messages"])
-            # 使用异步版本，支持 summarize 模式
-            compressed_messages = await tool_compression_middleware.process_messages_before_invoke_async(
-                agent_input["messages"]
-            )
-            
-            if compressed_messages != agent_input["messages"]:
-                agent_input["messages"] = compressed_messages
-                enhanced_logger.logger.info(
-                    f"🔄 COMPRESSION_APPLIED | {agent_name} | "
-                    f"消息列表已压缩 | 原始: {original_msg_count} 条 → 压缩后: {len(compressed_messages)} 条 | "
-                    f"模式: {tool_compression_middleware.config.mode}"
-                )
+        # 注意：工具结果压缩已移入 ReactLoop 中间件链（ContextCompressionMiddleware）
+        # 此处不再需要手动调用 tool_compression_middleware
         
         # 启动心跳任务
         heartbeat_task = asyncio.create_task(log_agent_progress())
@@ -261,7 +226,7 @@ async def _execute_agent_step(
         # 并发等待：agent 执行 vs 客户端断连，先到先得（硬性中断）
         agent_task = asyncio.create_task(
             agent.ainvoke(
-                input=agent_input, config={"recursion_limit": actual_recursion_limit}
+                input=agent_input, config={}
             )
         )
         wait_set = {agent_task}

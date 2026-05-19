@@ -7,6 +7,8 @@ from typing import cast
 from langchain_core.language_models import BaseChatModel
 
 from src.agents.react_loop import ReactLoop
+from src.agents.middlewares.loop_detection import LoopDetectionMiddleware, LoopDetectionConfig
+from src.agents.middlewares.context_compression import ContextCompressionMiddleware, ContextCompressionConfig
 from src.config.agents import AGENT_LLM_MAP
 from src.llms.llm import get_llm_by_type
 from src.prompts import apply_prompt_template
@@ -17,6 +19,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_ITERATIONS = int(os.getenv("REACT_MAX_ITERATIONS", "8"))
 DEFAULT_WARN_AT = int(os.getenv("REACT_WARN_AT", "5"))
 DEFAULT_LOOP_DETECT_THRESHOLD = int(os.getenv("REACT_LOOP_DETECT_THRESHOLD", "3"))
+
+# 上下文压缩配置
+DEFAULT_MAX_CONTEXT_TOKENS = int(os.getenv("REACT_MAX_CONTEXT_TOKENS", "80000"))
+DEFAULT_TOOL_RESULT_MAX_CHARS = int(os.getenv("REACT_TOOL_RESULT_MAX_CHARS", "3000"))
+DEFAULT_COMPRESSION_MODE = os.getenv("REACT_COMPRESSION_MODE", "summarize")
 
 
 # Create agents using configured LLM types
@@ -61,21 +68,47 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
     chat_model = cast(BaseChatModel, raw_llm)
     logger.info(f"🤖 LLM_MODEL | 使用模型: {getattr(chat_model, 'model_name', 'unknown')}")
 
-    # 🆕 使用 ReactLoop 替代 create_react_agent
+    # === 装配中间件链 ===
+    middlewares = []
+    
+    # 1. 上下文压缩中间件（仅对 researcher 类型启用）
+    if agent_type in ("researcher", "iterative_researcher"):
+        compression_llm = None
+        if DEFAULT_COMPRESSION_MODE == "summarize":
+            try:
+                compression_llm = get_llm_by_type("basic")
+            except Exception as e:
+                logger.warning(f"⚠️ 无法获取压缩用 LLM，回退到 truncate 模式: {e}")
+        
+        compression_config = ContextCompressionConfig(
+            enabled=True,
+            max_context_tokens=DEFAULT_MAX_CONTEXT_TOKENS,
+            tool_result_max_chars=DEFAULT_TOOL_RESULT_MAX_CHARS,
+            compression_mode=DEFAULT_COMPRESSION_MODE if compression_llm else "truncate",
+        )
+        middlewares.append(ContextCompressionMiddleware(llm=compression_llm, config=compression_config))
+    
+    # 2. 循环检测中间件（所有 agent 都启用）
+    loop_config = LoopDetectionConfig(
+        hash_threshold=DEFAULT_LOOP_DETECT_THRESHOLD,
+        warn_at=DEFAULT_WARN_AT,
+    )
+    middlewares.append(LoopDetectionMiddleware(config=loop_config))
+
+    # === 创建 ReactLoop ===
     agent = ReactLoop(
         model=chat_model,
         tools=tools,
         prompt=lambda state: apply_prompt_template(prompt_template, state, configurable),
         max_iterations=DEFAULT_MAX_ITERATIONS,
-        warn_at=DEFAULT_WARN_AT,
-        loop_detect_threshold=DEFAULT_LOOP_DETECT_THRESHOLD,
+        middlewares=middlewares,
     )
 
     logger.info(
         f"🔁 REACT_LOOP | {agent_name} | "
         f"max_iterations={DEFAULT_MAX_ITERATIONS} | "
         f"warn_at={DEFAULT_WARN_AT} | "
-        f"loop_detect={DEFAULT_LOOP_DETECT_THRESHOLD}"
+        f"middlewares={[m.name for m in middlewares]}"
     )
 
     return agent
