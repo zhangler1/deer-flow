@@ -2,5 +2,6 @@
 # SPDX-License-Identifier: MIT
 
 from .agents import create_agent
+from .react_loop import ReactLoop
 
-__all__ = ["create_agent"]
+__all__ = ["create_agent", "ReactLoop"]

@@ -136,9 +136,12 @@ async def _execute_agent_step(
     enhanced_logger.logger.info("="*80)
     enhanced_logger.logger.info(f"📋 输入消息内容 (前200字): {agent_input['messages'][0].content[:200]}...")
     
-    if hasattr(agent, 'tools'):
-        tool_names = [getattr(t, 'name', 'unknown') for t in agent.tools]
-        enhanced_logger.logger.info(f"🔧 Agent.tools属性存在: {tool_names} (共{len(agent.tools)}个)")
+    if hasattr(agent, 'tools') and isinstance(agent.tools, dict):
+        tool_names = list(agent.tools.keys())
+        enhanced_logger.logger.info(f"🔧 ReactLoop.tools: {tool_names} (共{len(agent.tools)}个)")
+    elif hasattr(agent, 'tool_list'):
+        tool_names = [getattr(t, 'name', 'unknown') for t in agent.tool_list]
+        enhanced_logger.logger.info(f"🔧 Agent.tool_list: {tool_names} (共{len(agent.tool_list)}个)")
     elif hasattr(agent, 'nodes'):
         enhanced_logger.logger.debug(f"🔧 工具已通过create_react_agent绑定到LLM")
     else:

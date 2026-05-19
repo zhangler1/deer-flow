@@ -2,20 +2,29 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+import os
 from typing import cast
 from langchain_core.language_models import BaseChatModel
-from langgraph.prebuilt import create_react_agent
 
+from src.agents.react_loop import ReactLoop
 from src.config.agents import AGENT_LLM_MAP
 from src.llms.llm import get_llm_by_type
 from src.prompts import apply_prompt_template
 
 logger = logging.getLogger(__name__)
 
+# 默认参数（可通过环境变量覆盖）
+DEFAULT_MAX_ITERATIONS = int(os.getenv("REACT_MAX_ITERATIONS", "8"))
+DEFAULT_WARN_AT = int(os.getenv("REACT_WARN_AT", "5"))
+DEFAULT_LOOP_DETECT_THRESHOLD = int(os.getenv("REACT_LOOP_DETECT_THRESHOLD", "3"))
+
 
 # Create agents using configured LLM types
 def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template: str, configurable=None):
     """Factory function to create agents with consistent configuration.
+
+    使用 ReactLoop 替代 langgraph.prebuilt.create_react_agent，
+    提供可控的 ReAct 循环（循环检测、软提示停止、硬上限保护）。
 
     Args:
         agent_name: Name of the agent
@@ -24,7 +33,7 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
         prompt_template: Name of the prompt template to use
         configurable: Optional Configuration object containing report_style and other settings
     """
-    # 🆕 添加工具诊断日志
+    # 工具诊断日志
     logger.info(f"🔧 TOOLS_INPUT | 接收到的工具列表:")
     for i, tool in enumerate(tools):
         tool_name = getattr(tool, 'name', 'unknown')
@@ -35,12 +44,11 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
 
     llm = get_llm_by_type(AGENT_LLM_MAP[agent_type])
 
-    # 解包LLM包装器以获取原始LLM对象，确保与LangGraph兼容
+    # 解包LLM包装器以获取原始LLM对象
     raw_llm = llm
 
     # 安全检测并提取原始LLM对象
     if hasattr(llm, '__class__') and hasattr(llm, 'llm'):
-        # 检测EnhancedLLMWrapper类型
         class_name = llm.__class__.__name__
         if 'EnhancedLLMWrapper' in class_name:
             raw_llm = getattr(llm, 'llm', llm)
@@ -53,13 +61,21 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
     chat_model = cast(BaseChatModel, raw_llm)
     logger.info(f"🤖 LLM_MODEL | 使用模型: {getattr(chat_model, 'model_name', 'unknown')}")
 
-
-    agent = create_react_agent(
-        name=agent_name,
+    # 🆕 使用 ReactLoop 替代 create_react_agent
+    agent = ReactLoop(
         model=chat_model,
         tools=tools,
         prompt=lambda state: apply_prompt_template(prompt_template, state, configurable),
+        max_iterations=DEFAULT_MAX_ITERATIONS,
+        warn_at=DEFAULT_WARN_AT,
+        loop_detect_threshold=DEFAULT_LOOP_DETECT_THRESHOLD,
     )
 
+    logger.info(
+        f"🔁 REACT_LOOP | {agent_name} | "
+        f"max_iterations={DEFAULT_MAX_ITERATIONS} | "
+        f"warn_at={DEFAULT_WARN_AT} | "
+        f"loop_detect={DEFAULT_LOOP_DETECT_THRESHOLD}"
+    )
 
     return agent
