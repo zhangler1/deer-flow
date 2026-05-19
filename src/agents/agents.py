@@ -7,8 +7,9 @@ from typing import cast
 from langchain_core.language_models import BaseChatModel
 
 from src.agents.react_loop import ReactLoop
-from src.agents.middlewares.loop_detection import LoopDetectionMiddleware, LoopDetectionConfig
-from src.agents.middlewares.context_compression import ContextCompressionMiddleware, ContextCompressionConfig
+from src.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware, LoopDetectionConfig
+from src.agents.middlewares.summarization_middleware import SummarizationMiddleware, SummarizationConfig
+from src.agents.middlewares.dynamic_context_middleware import DynamicContextMiddleware
 from src.config.agents import AGENT_LLM_MAP
 from src.llms.llm import get_llm_by_type
 from src.prompts import apply_prompt_template
@@ -24,6 +25,9 @@ DEFAULT_LOOP_DETECT_THRESHOLD = int(os.getenv("REACT_LOOP_DETECT_THRESHOLD", "3"
 DEFAULT_MAX_CONTEXT_TOKENS = int(os.getenv("REACT_MAX_CONTEXT_TOKENS", "80000"))
 DEFAULT_TOOL_RESULT_MAX_CHARS = int(os.getenv("REACT_TOOL_RESULT_MAX_CHARS", "3000"))
 DEFAULT_COMPRESSION_MODE = os.getenv("REACT_COMPRESSION_MODE", "summarize")
+
+# 动态上下文配置
+DEFAULT_SYSTEM_HINT = os.getenv("REACT_SYSTEM_HINT", "")
 
 
 # Create agents using configured LLM types
@@ -71,6 +75,9 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
     # === 装配中间件链 ===
     middlewares = []
     
+    # 0. 动态上下文注入（最先执行，注入系统提示，标记为 protected）
+    middlewares.append(DynamicContextMiddleware(system_hint=DEFAULT_SYSTEM_HINT))
+    
     # 1. 上下文压缩中间件（仅对 researcher 类型启用）
     if agent_type in ("researcher", "iterative_researcher"):
         compression_llm = None
@@ -80,13 +87,13 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
             except Exception as e:
                 logger.warning(f"⚠️ 无法获取压缩用 LLM，回退到 truncate 模式: {e}")
         
-        compression_config = ContextCompressionConfig(
+        compression_config = SummarizationConfig(
             enabled=True,
             max_context_tokens=DEFAULT_MAX_CONTEXT_TOKENS,
             tool_result_max_chars=DEFAULT_TOOL_RESULT_MAX_CHARS,
             compression_mode=DEFAULT_COMPRESSION_MODE if compression_llm else "truncate",
         )
-        middlewares.append(ContextCompressionMiddleware(llm=compression_llm, config=compression_config))
+        middlewares.append(SummarizationMiddleware(llm=compression_llm, config=compression_config))
     
     # 2. 循环检测中间件（所有 agent 都启用）
     loop_config = LoopDetectionConfig(

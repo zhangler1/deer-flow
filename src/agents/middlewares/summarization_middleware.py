@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: MIT
 
 """
-上下文压缩中间件
+上下文摘要中间件（对齐 DeerFlow 2.0 SummarizationMiddleware 命名）
 
-参考 DeerFlow 2.0 的 SummarizationMiddleware 设计，在 ReactLoop 循环中动态压缩上下文。
+在 ReactLoop 循环中动态压缩上下文，防止 token 溢出。
 
 两个压缩时机：
 1. before_model: 检查总 token 数，超限则对旧消息做全局摘要压缩
@@ -18,14 +18,14 @@ from typing import Any, Optional
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from src.agents.middleware import ReactMiddleware
+from src.agents.middleware import AgentMiddleware
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ContextCompressionConfig:
-    """上下文压缩配置"""
+class SummarizationConfig:
+    """上下文摘要配置（对齐 DeerFlow 2.0 命名）"""
     # 是否启用
     enabled: bool = True
     # 触发全局压缩的 token 阈值（估算）
@@ -55,37 +55,37 @@ SUMMARIZATION_PROMPT = """请将以下对话历史压缩为简洁摘要。保留
 请输出简洁的中文摘要（不超过{max_chars}字）："""
 
 
-class ContextCompressionMiddleware(ReactMiddleware):
-    """上下文压缩中间件
+class SummarizationMiddleware(AgentMiddleware):
+    """上下文摘要中间件（对齐 DeerFlow 2.0 命名）
     
     功能：
     1. before_model: 检查消息总 token 数，超过阈值时对旧消息做摘要压缩
     2. after_tool: 对刚返回的工具结果做即时截断，防止 token 爆炸
     
     Usage:
-        middleware = ContextCompressionMiddleware(
+        middleware = SummarizationMiddleware(
             llm=compression_llm,
-            config=ContextCompressionConfig(max_context_tokens=80000)
+            config=SummarizationConfig(max_context_tokens=80000)
         )
     """
     
     def __init__(
         self,
         llm: Optional[BaseChatModel] = None,
-        config: Optional[ContextCompressionConfig] = None,
+        config: Optional[SummarizationConfig] = None,
     ):
         """
         Args:
             llm: 用于生成摘要的 LLM（如果为 None 则回退到 truncate 模式）
-            config: 压缩配置
+            config: 摘要配置
         """
         self.llm = llm
-        self.config = config or ContextCompressionConfig()
+        self.config = config or SummarizationConfig()
         # 统计
         self._compressions_count = 0
         self._tool_truncations_count = 0
     
-    async def before_loop(self, messages: list, context: dict) -> list:
+    async def before_agent(self, messages: list, context: dict) -> list:
         """重置统计"""
         self._compressions_count = 0
         self._tool_truncations_count = 0
@@ -103,7 +103,7 @@ class ContextCompressionMiddleware(ReactMiddleware):
             return messages
         
         logger.info(
-            f"📦 ContextCompression 触发 | 第 {iteration+1} 轮 | "
+            f"📦 Summarization 触发 | 第 {iteration+1} 轮 | "
             f"当前 tokens: ~{total_tokens} > 阈值: {self.config.max_context_tokens}"
         )
         
@@ -113,7 +113,7 @@ class ContextCompressionMiddleware(ReactMiddleware):
         self._compressions_count += 1
         new_tokens = self._estimate_tokens(compressed)
         logger.info(
-            f"✅ ContextCompression 完成 | "
+            f"✅ Summarization 完成 | "
             f"压缩前: ~{total_tokens} tokens ({len(messages)} 条) → "
             f"压缩后: ~{new_tokens} tokens ({len(compressed)} 条) | "
             f"第 {self._compressions_count} 次压缩"
@@ -148,11 +148,11 @@ class ContextCompressionMiddleware(ReactMiddleware):
         
         return messages
     
-    async def after_loop(self, messages: list, context: dict) -> list:
+    async def after_agent(self, messages: list, context: dict) -> list:
         """记录统计"""
         if self._compressions_count > 0 or self._tool_truncations_count > 0:
             logger.info(
-                f"📊 ContextCompression 统计 | "
+                f"📊 Summarization 统计 | "
                 f"全局压缩: {self._compressions_count} 次 | "
                 f"工具截断: {self._tool_truncations_count} 次"
             )
@@ -162,19 +162,62 @@ class ContextCompressionMiddleware(ReactMiddleware):
     # 内部方法
     # ============================================================
     
+    @staticmethod
+    def _get_content(msg) -> str:
+        """安全获取消息内容，兼容 Message 对象和 dict 格式"""
+        if isinstance(msg, dict):
+            return msg.get("content", "") or ""
+        return getattr(msg, "content", "") or ""
+    
+    @staticmethod
+    def _is_protected(msg) -> bool:
+        """判断消息是否受保护（不可压缩）
+        
+        保护标记通过 additional_kwargs["protected"] = True 设置。
+        未来技能系统加载的内容也可以通过这个标记避免被压缩。
+        """
+        if isinstance(msg, dict):
+            return msg.get("additional_kwargs", {}).get("protected", False)
+        return getattr(msg, "additional_kwargs", {}).get("protected", False)
+    
+    def _preserve_protected_messages(self, to_compress: list, to_keep: list) -> tuple:
+        """从待压缩列表中提取受保护的消息，前置到保留列表头部
+        
+        借鉴 DeerFlow 2.0 的 _preserve_dynamic_context_reminders 逻辑。
+        受保护的消息不会被摘要压缩，而是原样保留。
+        """
+        protected = [msg for msg in to_compress if self._is_protected(msg)]
+        if not protected:
+            return to_compress, to_keep
+        
+        remaining = [msg for msg in to_compress if not self._is_protected(msg)]
+        logger.debug(f"🛡️ 保护消息提取 | {len(protected)} 条受保护消息从压缩列表移至保留列表")
+        return remaining, protected + to_keep
+    
     async def _compress_messages(self, messages: list) -> list:
         """对消息列表执行压缩
         
-        策略：保留最近 N 条消息不压缩，对旧消息生成摘要。
+        策略：
+        1. 计算安全切割点（保护 AI/Tool 消息对不被拆散）
+        2. 保留最近 N 条消息不压缩
+        3. 对旧消息生成摘要
         """
         keep_count = self.config.keep_recent_messages
         
         if len(messages) <= keep_count:
             return messages
         
-        # 分区：待压缩的旧消息 + 保留的新消息
-        to_compress = messages[:-keep_count]
-        to_keep = messages[-keep_count:]
+        # 找到安全的切割点（参考 2.0 的 AI/Tool 对保护）
+        cutoff = self._find_safe_cutoff(messages, keep_count)
+        
+        if cutoff <= 0:
+            return messages
+        
+        to_compress = messages[:cutoff]
+        to_keep = messages[cutoff:]
+        
+        # 提取受保护的消息（不参与压缩）
+        to_compress, to_keep = self._preserve_protected_messages(to_compress, to_keep)
         
         # 根据模式选择压缩方法
         if self.config.compression_mode == "summarize" and self.llm:
@@ -190,15 +233,39 @@ class ContextCompressionMiddleware(ReactMiddleware):
         
         return [summary_msg] + to_keep
     
+    def _find_safe_cutoff(self, messages: list, keep_count: int) -> int:
+        """找到安全的消息切割点，确保不拆散 AI/Tool 消息对
+        
+        借鉴 DeerFlow 2.0 的 _partition_messages 逻辑：
+        - 切割点不能落在 AIMessage(有tool_calls) 和它对应的 ToolMessage 之间
+        - 如果候选切割点不安全，向前移动到 AIMessage 之前
+        """
+        n = len(messages)
+        candidate = n - keep_count
+        
+        if candidate <= 0:
+            return 0
+        
+        # 向前搜索安全点：不拆散 AI + Tool 对
+        idx = candidate
+        while idx > 0:
+            msg = messages[idx]
+            if isinstance(msg, ToolMessage):
+                idx -= 1
+                continue
+            if isinstance(msg, AIMessage) and hasattr(msg, 'tool_calls') and msg.tool_calls:
+                break
+            break
+        
+        return idx
+    
     async def _summarize(self, messages: list) -> str:
         """使用 LLM 生成消息摘要"""
-        # 将消息转为文本
         content_parts = []
         for msg in messages:
-            role = msg.__class__.__name__.replace("Message", "")
-            text = msg.content or ""
+            role = msg.__class__.__name__.replace("Message", "") if not isinstance(msg, dict) else msg.get("role", "unknown")
+            text = self._get_content(msg)
             if text:
-                # 限制单条消息长度避免 prompt 过长
                 if len(text) > 500:
                     text = text[:500] + "..."
                 content_parts.append(f"[{role}] {text}")
@@ -218,7 +285,6 @@ class ContextCompressionMiddleware(ReactMiddleware):
         try:
             response = await self.llm.ainvoke([HumanMessage(content=prompt)])
             summary = response.content or ""
-            # 限制摘要长度
             if len(summary) > self.config.summary_max_chars:
                 summary = summary[:self.config.summary_max_chars] + "..."
             return summary
@@ -233,12 +299,11 @@ class ContextCompressionMiddleware(ReactMiddleware):
         max_total = self.config.summary_max_chars
         
         for msg in messages:
-            content = msg.content or ""
+            content = self._get_content(msg)
             if not content:
                 continue
             
-            role = msg.__class__.__name__.replace("Message", "")
-            # 每条消息最多保留 200 字符
+            role = msg.__class__.__name__.replace("Message", "") if not isinstance(msg, dict) else msg.get("role", "unknown")
             snippet = content[:200] + ("..." if len(content) > 200 else "")
             line = f"[{role}] {snippet}"
             
@@ -255,11 +320,11 @@ class ContextCompressionMiddleware(ReactMiddleware):
         """估算消息列表的 token 数"""
         total_chars = 0
         for msg in messages:
-            content = msg.content or ""
+            content = self._get_content(msg)
             total_chars += len(content)
-            # tool_calls 也占 token
-            if hasattr(msg, "tool_calls") and msg.tool_calls:
-                for tc in msg.tool_calls:
-                    total_chars += len(str(tc.get("args", {})))
+            tool_calls = msg.get("tool_calls", []) if isinstance(msg, dict) else getattr(msg, "tool_calls", None)
+            if tool_calls:
+                for tc in tool_calls:
+                    total_chars += len(str(tc.get("args", {}) if isinstance(tc, dict) else tc))
         
         return int(total_chars / self.config.token_chars_ratio)

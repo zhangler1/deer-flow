@@ -7,7 +7,7 @@
 检测 Agent 重复调用相同工具组合的情况，防止无限循环。
 
 状态分层：
-- loop 级：单次 ainvoke 调用内的状态，每次 before_loop 重置
+- loop 级：单次 ainvoke 调用内的状态，每次 before_agent 重置
 - session 级：跨多次 ainvoke 调用的累计状态，不自动重置
 
 检测机制：
@@ -22,7 +22,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from src.agents.middleware import ReactMiddleware
+from src.agents.middleware import AgentMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class LoopDetectionConfig:
     session_max_iterations: int = 0
 
 
-class LoopDetectionMiddleware(ReactMiddleware):
+class LoopDetectionMiddleware(AgentMiddleware):
     """循环检测 + 软提示中间件
     
     功能：
@@ -65,7 +65,7 @@ class LoopDetectionMiddleware(ReactMiddleware):
     def __init__(self, config: LoopDetectionConfig = None):
         self.config = config or LoopDetectionConfig()
         
-        # --- loop 级状态（每次 before_loop 重置） ---
+        # --- loop 级状态（每次 before_agent 重置） ---
         self._loop_hash_history: list[str] = []
         
         # --- session 级状态（跨多次 ainvoke，不自动重置） ---
@@ -83,8 +83,8 @@ class LoopDetectionMiddleware(ReactMiddleware):
         self._session_total_iterations = 0
         self._session_loop_count = 0
     
-    async def before_loop(self, messages: list, context: dict) -> list:
-        """循环开始前：重置 loop 级状态，session 级累加"""
+    async def before_agent(self, messages: list, context: dict) -> list:
+        """Agent 执行前：重置 loop 级状态，session 级累加"""
         # loop 级重置
         self._loop_hash_history = []
         # session 级累加

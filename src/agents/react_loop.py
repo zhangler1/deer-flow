@@ -5,7 +5,7 @@
 ReactLoop - 可控的 ReAct 循环引擎
 
 替代 langgraph.prebuilt.create_react_agent，提供：
-1. 中间件链机制（before_loop / before_model / after_model / after_tool / after_loop）
+1. 中间件链机制（before_agent / before_model / after_model / after_tool / after_agent）
 2. 硬限制（max_iterations 达到后强制总结）
 3. 与现有 agent.ainvoke(input, config) 接口完全兼容
 
@@ -20,7 +20,7 @@ from typing import Any, Callable, Optional
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from src.agents.middleware import ReactMiddleware
+from src.agents.middleware import AgentMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class ReactLoop:
         prompt: Optional[Callable] = None,
         *,
         max_iterations: int = 8,
-        middlewares: Optional[list[ReactMiddleware]] = None,
+        middlewares: Optional[list[AgentMiddleware]] = None,
         on_before_model: Optional[Callable] = None,
         on_after_model: Optional[Callable] = None,
     ):
@@ -80,7 +80,7 @@ class ReactLoop:
         self.max_iterations = max_iterations
         
         # 中间件链
-        self.middlewares: list[ReactMiddleware] = middlewares or []
+        self.middlewares: list[AgentMiddleware] = middlewares or []
         
         # 轻量级回调（逃生舱，不想写中间件时用）
         self.on_before_model = on_before_model
@@ -116,8 +116,8 @@ class ReactLoop:
         
         forced_final = False  # 标记是否需要强制最终总结
         
-        # === 中间件: before_loop ===
-        messages = await self._run_middleware_before_loop(messages, context)
+        # === 中间件: before_agent ===
+        messages = await self._run_middleware_before_agent(messages, context)
         
         for iteration in range(self.max_iterations):
             context["iterations"] = iteration
@@ -193,8 +193,8 @@ class ReactLoop:
         if forced_final:
             messages = await self._force_final_answer(messages, context)
         
-        # === 中间件: after_loop ===
-        messages = await self._run_middleware_after_loop(messages, context)
+        # === 中间件: after_agent ===
+        messages = await self._run_middleware_after_agent(messages, context)
         
         elapsed = time.time() - context["start_time"]
         logger.info(
@@ -227,13 +227,13 @@ class ReactLoop:
     # 中间件链执行方法
     # ============================================================
     
-    async def _run_middleware_before_loop(self, messages: list, context: dict) -> list:
-        """执行所有中间件的 before_loop 钩子"""
+    async def _run_middleware_before_agent(self, messages: list, context: dict) -> list:
+        """执行所有中间件的 before_agent 钩子"""
         for mw in self.middlewares:
             try:
-                messages = await mw.before_loop(messages, context)
+                messages = await mw.before_agent(messages, context)
             except Exception as e:
-                logger.warning(f"⚠️ 中间件 {mw.name}.before_loop 异常: {e}")
+                logger.warning(f"⚠️ 中间件 {mw.name}.before_agent 异常: {e}")
         return messages
     
     async def _run_middleware_before_model(self, messages: list, iteration: int, context: dict) -> list:
@@ -270,13 +270,13 @@ class ReactLoop:
                 logger.warning(f"⚠️ 中间件 {mw.name}.after_tool 异常 (第{iteration+1}轮): {e}")
         return messages
     
-    async def _run_middleware_after_loop(self, messages: list, context: dict) -> list:
-        """执行所有中间件的 after_loop 钩子"""
+    async def _run_middleware_after_agent(self, messages: list, context: dict) -> list:
+        """执行所有中间件的 after_agent 钩子"""
         for mw in self.middlewares:
             try:
-                messages = await mw.after_loop(messages, context)
+                messages = await mw.after_agent(messages, context)
             except Exception as e:
-                logger.warning(f"⚠️ 中间件 {mw.name}.after_loop 异常: {e}")
+                logger.warning(f"⚠️ 中间件 {mw.name}.after_agent 异常: {e}")
         return messages
     
     # ============================================================

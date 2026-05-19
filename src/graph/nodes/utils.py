@@ -217,7 +217,7 @@ async def _execute_agent_step(
     # 预先声明心跳任务变量，保证 finally 一定能访问（即便 try 内未执行到创建处）
     heartbeat_task = None
     try:
-        # 注意：工具结果压缩已移入 ReactLoop 中间件链（ContextCompressionMiddleware）
+        # 注意：工具结果压缩已移入 ReactLoop 中间件链（SummarizationMiddleware）
         # 此处不再需要手动调用 tool_compression_middleware
         
         # 启动心跳任务

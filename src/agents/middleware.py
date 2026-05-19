@@ -2,17 +2,17 @@
 # SPDX-License-Identifier: MIT
 
 """
-ReactLoop 中间件基类
+Agent 中间件基类
 
-参考 DeerFlow 2.0 的 AgentMiddleware 设计，为 ReactLoop 提供钩子机制。
-中间件通过继承 ReactMiddleware 并重写钩子方法来扩展 ReactLoop 的行为。
+对齐 DeerFlow 2.0 的 AgentMiddleware 设计，为 ReactLoop 提供钩子机制。
+中间件通过继承 AgentMiddleware 并重写钩子方法来扩展 ReactLoop 的行为。
 
 执行顺序:
-    before_loop(所有中间件, 仅一次)
+    before_agent(所有中间件, 仅一次)
         for iteration:
             before_model(所有中间件) -> LLM调用 -> after_model(所有中间件)
             -> 工具执行 -> after_tool(所有中间件)
-    after_loop(所有中间件, 仅一次)
+    after_agent(所有中间件, 仅一次)
 """
 
 import logging
@@ -23,14 +23,14 @@ from langchain_core.messages import AIMessage
 logger = logging.getLogger(__name__)
 
 
-class ReactMiddleware:
-    """ReactLoop 中间件基类
+class AgentMiddleware:
+    """Agent 中间件基类（对齐 DeerFlow 2.0 命名）
     
     所有钩子方法都有默认的 no-op 实现，子类只需重写需要的钩子。
     所有钩子均为异步方法，支持在内部执行异步操作（如 LLM 调用）。
     
     Usage:
-        class MyMiddleware(ReactMiddleware):
+        class MyMiddleware(AgentMiddleware):
             async def before_model(self, messages, iteration, context):
                 # 修改消息列表
                 return messages
@@ -41,8 +41,8 @@ class ReactMiddleware:
         """中间件名称（用于日志）"""
         return self.__class__.__name__
     
-    async def before_loop(self, messages: list, context: dict) -> list:
-        """循环开始前执行（仅一次）
+    async def before_agent(self, messages: list, context: dict) -> list:
+        """Agent 执行前（仅一次）
         
         适用场景:
         - 初始化中间件内部状态
@@ -113,8 +113,8 @@ class ReactMiddleware:
         """
         return messages
     
-    async def after_loop(self, messages: list, context: dict) -> list:
-        """循环结束后执行（仅一次）
+    async def after_agent(self, messages: list, context: dict) -> list:
+        """Agent 执行后（仅一次）
         
         适用场景:
         - 最终清理
