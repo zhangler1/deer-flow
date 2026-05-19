@@ -2,40 +2,23 @@
 # SPDX-License-Identifier: MIT
 
 import logging
-import os
 from typing import cast
 from langchain_core.language_models import BaseChatModel
 
 from src.agents.react_loop import ReactLoop
+from src.agents.react_config import get_react_loop_config
 from src.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware, LoopDetectionConfig
 from src.agents.middlewares.summarization_middleware import SummarizationMiddleware, SummarizationConfig
 from src.agents.middlewares.dynamic_context_middleware import DynamicContextMiddleware
 from src.agents.middlewares.dangling_tool_call_middleware import DanglingToolCallMiddleware
 from src.agents.middlewares.llm_error_handling_middleware import LLMErrorHandlingMiddleware, LLMRetryConfig
-from src.agents.middlewares.tool_error_handling_middleware import ToolErrorHandlingMiddleware
+from src.agents.middlewares.tool_error_handling_middleware import ToolErrorHandlingMiddleware, ToolErrorConfig
 from src.agents.middlewares.token_usage_middleware import TokenUsageMiddleware
 from src.config.agents import AGENT_LLM_MAP
 from src.llms.llm import get_llm_by_type
 from src.prompts import apply_prompt_template
 
 logger = logging.getLogger(__name__)
-
-# 默认参数（可通过环境变量覆盖）
-DEFAULT_MAX_ITERATIONS = int(os.getenv("REACT_MAX_ITERATIONS", "8"))
-DEFAULT_WARN_AT = int(os.getenv("REACT_WARN_AT", "5"))
-DEFAULT_LOOP_DETECT_THRESHOLD = int(os.getenv("REACT_LOOP_DETECT_THRESHOLD", "3"))
-
-# 上下文压缩配置
-DEFAULT_MAX_CONTEXT_TOKENS = int(os.getenv("REACT_MAX_CONTEXT_TOKENS", "80000"))
-DEFAULT_TOOL_RESULT_MAX_CHARS = int(os.getenv("REACT_TOOL_RESULT_MAX_CHARS", "3000"))
-DEFAULT_COMPRESSION_MODE = os.getenv("REACT_COMPRESSION_MODE", "summarize")
-
-# LLM 重试配置（已移入 LLMErrorHandlingMiddleware 内部默认值）
-DEFAULT_LLM_MAX_RETRIES = int(os.getenv("REACT_LLM_MAX_RETRIES", "3"))
-DEFAULT_LLM_BASE_DELAY = float(os.getenv("REACT_LLM_BASE_DELAY", "1.0"))
-
-# 动态上下文配置
-DEFAULT_SYSTEM_HINT = os.getenv("REACT_SYSTEM_HINT", "")
 
 
 # Create agents using configured LLM types
@@ -80,64 +63,86 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
     chat_model = cast(BaseChatModel, raw_llm)
     logger.info(f"🤖 LLM_MODEL | 使用模型: {getattr(chat_model, 'model_name', 'unknown')}")
 
+    # === 从统一配置加载（对齐 DeerFlow 2.0） ===
+    cfg = get_react_loop_config()
+    
     # === 装配中间件链 ===
     middlewares = []
     
     # 0. 动态上下文注入（最先执行，注入系统提示，标记为 protected）
-    middlewares.append(DynamicContextMiddleware(system_hint=DEFAULT_SYSTEM_HINT))
+    middlewares.append(DynamicContextMiddleware(
+        system_hint=cfg.dynamic_context.system_hint,
+    ))
     
     # 1. 悬空工具调用修复（P0，防止消息链断裂导致 LLM 报错）
     middlewares.append(DanglingToolCallMiddleware())
     
     # 2. LLM 错误处理（P0，重试+熔断，生产必备）
     middlewares.append(LLMErrorHandlingMiddleware(config=LLMRetryConfig(
-        max_retries=DEFAULT_LLM_MAX_RETRIES,
-        base_delay=DEFAULT_LLM_BASE_DELAY,
+        max_retries=cfg.llm_error_handling.max_retries,
+        base_delay=cfg.llm_error_handling.base_delay,
+        max_delay=cfg.llm_error_handling.max_delay,
+        backoff_factor=cfg.llm_error_handling.backoff_factor,
+        circuit_breaker_threshold=cfg.llm_error_handling.circuit_breaker_threshold,
+        circuit_breaker_recovery_seconds=cfg.llm_error_handling.circuit_breaker_recovery_seconds,
     )))
     
     # 3. 上下文压缩中间件（仅对 researcher 类型启用）
     if agent_type in ("researcher", "iterative_researcher"):
         compression_llm = None
-        if DEFAULT_COMPRESSION_MODE == "summarize":
+        if cfg.summarization.compression_mode == "summarize":
             try:
                 compression_llm = get_llm_by_type("basic")
             except Exception as e:
                 logger.warning(f"⚠️ 无法获取压缩用 LLM，回退到 truncate 模式: {e}")
         
         compression_config = SummarizationConfig(
-            enabled=True,
-            max_context_tokens=DEFAULT_MAX_CONTEXT_TOKENS,
-            tool_result_max_chars=DEFAULT_TOOL_RESULT_MAX_CHARS,
-            compression_mode=DEFAULT_COMPRESSION_MODE if compression_llm else "truncate",
+            enabled=cfg.summarization.enabled,
+            max_context_tokens=cfg.summarization.max_context_tokens,
+            keep_recent_messages=cfg.summarization.keep_recent_messages,
+            tool_result_max_chars=cfg.summarization.tool_result_max_chars,
+            compression_mode=cfg.summarization.compression_mode if compression_llm else "truncate",
+            summary_max_chars=cfg.summarization.summary_max_chars,
+            token_chars_ratio=cfg.summarization.token_chars_ratio,
         )
         middlewares.append(SummarizationMiddleware(llm=compression_llm, config=compression_config))
     
     # 4. 工具错误处理（P1，增强工具错误的容错）
-    middlewares.append(ToolErrorHandlingMiddleware())
+    middlewares.append(ToolErrorHandlingMiddleware(config=ToolErrorConfig(
+        consecutive_error_warn=cfg.tool_error_handling.consecutive_error_warn,
+        error_max_chars=cfg.tool_error_handling.error_max_chars,
+        add_suggestions=cfg.tool_error_handling.add_suggestions,
+    )))
     
     # 5. 循环检测中间件（所有 agent 都启用）
     loop_config = LoopDetectionConfig(
-        hash_threshold=DEFAULT_LOOP_DETECT_THRESHOLD,
-        warn_at=DEFAULT_WARN_AT,
+        hash_threshold=cfg.loop_detection.hash_threshold,
+        hash_window_size=cfg.loop_detection.hash_window_size,
+        warn_at=cfg.loop_detection.warn_at,
+        freq_warn_threshold=cfg.loop_detection.freq_warn_threshold,
+        freq_hard_threshold=cfg.loop_detection.freq_hard_threshold,
+        session_max_tool_calls=cfg.loop_detection.session_max_tool_calls,
+        session_max_iterations=cfg.loop_detection.session_max_iterations,
     )
     middlewares.append(LoopDetectionMiddleware(config=loop_config))
     
     # 6. Token 用量统计（P2，成本监控）
-    middlewares.append(TokenUsageMiddleware())
+    if cfg.token_usage.enabled:
+        middlewares.append(TokenUsageMiddleware())
 
     # === 创建 ReactLoop ===
     agent = ReactLoop(
         model=chat_model,
         tools=tools,
         prompt=lambda state: apply_prompt_template(prompt_template, state, configurable),
-        max_iterations=DEFAULT_MAX_ITERATIONS,
+        max_iterations=cfg.max_iterations,
         middlewares=middlewares,
     )
 
     logger.info(
         f"🔁 REACT_LOOP | {agent_name} | "
-        f"max_iterations={DEFAULT_MAX_ITERATIONS} | "
-        f"warn_at={DEFAULT_WARN_AT} | "
+        f"max_iterations={cfg.max_iterations} | "
+        f"warn_at={cfg.loop_detection.warn_at} | "
         f"middlewares={[m.name for m in middlewares]}"
     )
 

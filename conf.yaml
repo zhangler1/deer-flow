@@ -155,3 +155,76 @@ SEARCH_BUDGET:
   # （可选）researcher 节点每步搜索工具调用预算
   # 未设置时 Configuration 默认 5；也可用环境变量 RESEARCHER_RECURSION_LIMIT 覆盖
   # researcher_recursion_limit: 5
+
+# ============================================================================
+# ReactLoop 中间件配置（对齐 DeerFlow 2.0 配置结构）
+# ============================================================================
+# 配置 ReactLoop 循环引擎及其中间件链。
+# 所有中间件均有合理默认值，无需配置即可工作。
+# 仅在需要调优时取消注释并修改。
+
+REACT_LOOP:
+  # 最大迭代次数（硬上限，达到后强制总结）
+  max_iterations: 8
+
+  # --- 循环检测中间件 ---
+  loop_detection:
+    # 哈希检测：相同 tool_calls 组合重复多少次触发强停
+    hash_threshold: 3
+    # 哈希历史窗口大小
+    hash_window_size: 20
+    # 软提示：第几轮开始注入停止警告（0=禁用）
+    warn_at: 5
+    # session 级频率检测：同一工具累计调用多少次警告
+    freq_warn_threshold: 15
+    # session 级频率检测：同一工具累计调用多少次强停
+    freq_hard_threshold: 25
+
+  # --- 上下文摘要中间件 ---
+  summarization:
+    enabled: true
+    # 触发全局压缩的 token 阈值
+    max_context_tokens: 80000
+    # 保留最近 N 条消息不压缩
+    keep_recent_messages: 6
+    # 单个工具结果最大字符数（即时截断）
+    tool_result_max_chars: 3000
+    # 压缩模式: summarize（LLM摘要）或 truncate（直接截断）
+    compression_mode: summarize
+    # 摘要最大长度（字符数）
+    summary_max_chars: 1500
+    # token 估算比率（字符数 / token）
+    token_chars_ratio: 4.0
+
+  # --- LLM 错误处理中间件 ---
+  llm_error_handling:
+    # 最大重试次数（不含首次）
+    max_retries: 3
+    # 基础延迟（秒）
+    base_delay: 1.0
+    # 最大延迟（秒）
+    max_delay: 8.0
+    # 退避倍数
+    backoff_factor: 2.0
+    # 熔断器：连续失败多少次后熔断
+    circuit_breaker_threshold: 5
+    # 熔断器：熔断后多少秒尝试恢复
+    circuit_breaker_recovery_seconds: 30.0
+
+  # --- 工具错误处理中间件 ---
+  tool_error_handling:
+    # 单个工具连续错误多少次后注入引导提示
+    consecutive_error_warn: 3
+    # 错误消息最大长度（截断过长的 traceback）
+    error_max_chars: 500
+    # 是否在错误消息中添加建议
+    add_suggestions: true
+
+  # --- Token 用量统计中间件 ---
+  token_usage:
+    enabled: true
+
+  # --- 动态上下文注入中间件 ---
+  dynamic_context:
+    # 自定义系统提示（如角色说明），为空则只注入日期
+    system_hint: ""
