@@ -10,15 +10,18 @@ Agent 中间件基类
 执行顺序:
     before_agent(所有中间件, 仅一次)
         for iteration:
-            before_model(所有中间件) -> LLM调用 -> after_model(所有中间件)
-            -> 工具执行 -> after_tool(所有中间件)
+            before_model(所有中间件)
+            -> wrap_model_call(洋葱链) -> LLM调用
+            -> after_model(所有中间件)
+            -> wrap_tool_call(洋葱链) -> 工具执行
+            -> after_tool(所有中间件)
     after_agent(所有中间件, 仅一次)
 """
 
 import logging
-from typing import Any
+from typing import Any, Callable
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +115,61 @@ class AgentMiddleware:
             处理后的消息列表
         """
         return messages
+    
+    async def wrap_model_call(
+        self, messages: list, call_next: Callable, context: dict
+    ) -> AIMessage:
+        """包装 LLM 调用（洋葱模型）
+        
+        通过装饰器模式包装实际的 LLM 调用，可在调用前后执行任意逻辑，
+        也可以完全替换调用行为（如重试、熔断）。
+        
+        多个中间件的 wrap_model_call 形成洋葱链：
+            mw1.wrap -> mw2.wrap -> ... -> 实际 LLM 调用
+        
+        适用场景:
+        - 重试 + 熔断（LLMErrorHandlingMiddleware）
+        - 调用耗时统计
+        - 请求/响应日志
+        
+        Args:
+            messages: 传递给 LLM 的消息列表
+            call_next: 下一层调用（下一个中间件的 wrap 或实际 LLM 调用）
+            context: 共享上下文字典
+            
+        Returns:
+            LLM 返回的 AIMessage
+        """
+        return await call_next(messages)
+    
+    async def wrap_tool_call(
+        self, tool_name: str, tool_args: dict, tool_call_id: str,
+        call_next: Callable, context: dict
+    ) -> ToolMessage:
+        """包装工具调用（洋葱模型）
+        
+        通过装饰器模式包装实际的工具调用，可在调用前后执行任意逻辑，
+        也可以捕获异常并转换为错误 ToolMessage。
+        
+        多个中间件的 wrap_tool_call 形成洋葱链：
+            mw1.wrap -> mw2.wrap -> ... -> 实际工具调用
+        
+        适用场景:
+        - 工具异常捕获与错误转换（ToolErrorHandlingMiddleware）
+        - 工具调用超时控制
+        - 工具调用日志
+        
+        Args:
+            tool_name: 工具名称
+            tool_args: 工具参数
+            tool_call_id: 工具调用 ID
+            call_next: 下一层调用（下一个中间件的 wrap 或实际工具调用）
+            context: 共享上下文字典
+            
+        Returns:
+            工具返回的 ToolMessage
+        """
+        return await call_next(tool_name, tool_args, tool_call_id)
     
     async def after_agent(self, messages: list, context: dict) -> list:
         """Agent 执行后（仅一次）

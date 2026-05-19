@@ -10,6 +10,10 @@ from src.agents.react_loop import ReactLoop
 from src.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware, LoopDetectionConfig
 from src.agents.middlewares.summarization_middleware import SummarizationMiddleware, SummarizationConfig
 from src.agents.middlewares.dynamic_context_middleware import DynamicContextMiddleware
+from src.agents.middlewares.dangling_tool_call_middleware import DanglingToolCallMiddleware
+from src.agents.middlewares.llm_error_handling_middleware import LLMErrorHandlingMiddleware, LLMRetryConfig
+from src.agents.middlewares.tool_error_handling_middleware import ToolErrorHandlingMiddleware
+from src.agents.middlewares.token_usage_middleware import TokenUsageMiddleware
 from src.config.agents import AGENT_LLM_MAP
 from src.llms.llm import get_llm_by_type
 from src.prompts import apply_prompt_template
@@ -25,6 +29,10 @@ DEFAULT_LOOP_DETECT_THRESHOLD = int(os.getenv("REACT_LOOP_DETECT_THRESHOLD", "3"
 DEFAULT_MAX_CONTEXT_TOKENS = int(os.getenv("REACT_MAX_CONTEXT_TOKENS", "80000"))
 DEFAULT_TOOL_RESULT_MAX_CHARS = int(os.getenv("REACT_TOOL_RESULT_MAX_CHARS", "3000"))
 DEFAULT_COMPRESSION_MODE = os.getenv("REACT_COMPRESSION_MODE", "summarize")
+
+# LLM 重试配置（已移入 LLMErrorHandlingMiddleware 内部默认值）
+DEFAULT_LLM_MAX_RETRIES = int(os.getenv("REACT_LLM_MAX_RETRIES", "3"))
+DEFAULT_LLM_BASE_DELAY = float(os.getenv("REACT_LLM_BASE_DELAY", "1.0"))
 
 # 动态上下文配置
 DEFAULT_SYSTEM_HINT = os.getenv("REACT_SYSTEM_HINT", "")
@@ -78,7 +86,16 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
     # 0. 动态上下文注入（最先执行，注入系统提示，标记为 protected）
     middlewares.append(DynamicContextMiddleware(system_hint=DEFAULT_SYSTEM_HINT))
     
-    # 1. 上下文压缩中间件（仅对 researcher 类型启用）
+    # 1. 悬空工具调用修复（P0，防止消息链断裂导致 LLM 报错）
+    middlewares.append(DanglingToolCallMiddleware())
+    
+    # 2. LLM 错误处理（P0，重试+熔断，生产必备）
+    middlewares.append(LLMErrorHandlingMiddleware(config=LLMRetryConfig(
+        max_retries=DEFAULT_LLM_MAX_RETRIES,
+        base_delay=DEFAULT_LLM_BASE_DELAY,
+    )))
+    
+    # 3. 上下文压缩中间件（仅对 researcher 类型启用）
     if agent_type in ("researcher", "iterative_researcher"):
         compression_llm = None
         if DEFAULT_COMPRESSION_MODE == "summarize":
@@ -95,12 +112,18 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
         )
         middlewares.append(SummarizationMiddleware(llm=compression_llm, config=compression_config))
     
-    # 2. 循环检测中间件（所有 agent 都启用）
+    # 4. 工具错误处理（P1，增强工具错误的容错）
+    middlewares.append(ToolErrorHandlingMiddleware())
+    
+    # 5. 循环检测中间件（所有 agent 都启用）
     loop_config = LoopDetectionConfig(
         hash_threshold=DEFAULT_LOOP_DETECT_THRESHOLD,
         warn_at=DEFAULT_WARN_AT,
     )
     middlewares.append(LoopDetectionMiddleware(config=loop_config))
+    
+    # 6. Token 用量统计（P2，成本监控）
+    middlewares.append(TokenUsageMiddleware())
 
     # === 创建 ReactLoop ===
     agent = ReactLoop(
