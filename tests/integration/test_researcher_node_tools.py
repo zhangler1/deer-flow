@@ -38,7 +38,7 @@ class TestResearcherNodeTools:
         with patch('src.graph.nodes.get_web_search_tool') as mock_get_search:
             with patch('src.graph.nodes.crawl_tool') as mock_crawl:
                 with patch('src.graph.nodes.get_retriever_tool', return_value=None):
-                    with patch('src.graph.nodes._setup_and_execute_agent_step') as mock_execute:
+                    with patch('src.graph.nodes._execute_agent_step') as mock_execute:
                         # 配置返回值
                         mock_search_tool = Mock()
                         mock_search_tool.name = "web_search"
@@ -85,7 +85,7 @@ class TestResearcherNodeTools:
         with patch('src.graph.nodes.get_web_search_tool') as mock_get_search:
             with patch('src.graph.nodes.crawl_tool') as mock_crawl:
                 with patch('src.graph.nodes.get_retriever_tool', return_value=None):
-                    with patch('src.graph.nodes._setup_and_execute_agent_step') as mock_execute:
+                    with patch('src.graph.nodes._execute_agent_step') as mock_execute:
                         mock_get_search.return_value = Mock(name="web_search")
                         mock_crawl.name = "crawl_tool"
                         
@@ -134,7 +134,7 @@ class TestResearcherNodeTools:
     #     with patch('src.graph.nodes.get_web_search_tool'):
     #         with patch('src.graph.nodes.crawl_tool'):
     #             with patch('src.graph.nodes.get_retriever_tool') as mock_get_retriever:
-    #                 with patch('src.graph.nodes._setup_and_execute_agent_step') as mock_execute:
+    #                 with patch('src.graph.nodes._execute_agent_step') as mock_execute:
     #                     # 配置本地检索工具返回
     #                     mock_local_tool = Mock(name="local_search_tool")
     #                     mock_get_retriever.return_value = mock_local_tool
@@ -184,7 +184,7 @@ class TestResearcherNodeTools:
         with patch('src.graph.nodes.get_web_search_tool'):
             with patch('src.graph.nodes.crawl_tool'):
                 with patch('src.graph.nodes.get_retriever_tool', return_value=None):
-                    with patch('src.graph.nodes._setup_and_execute_agent_step') as mock_execute:
+                    with patch('src.graph.nodes._execute_agent_step') as mock_execute:
                         from langgraph.types import Command
                         from langchain_core.messages import AIMessage
                         mock_execute.return_value = Command(

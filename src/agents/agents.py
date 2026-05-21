@@ -14,6 +14,10 @@ from src.agents.middlewares.dangling_tool_call_middleware import DanglingToolCal
 from src.agents.middlewares.llm_error_handling_middleware import LLMErrorHandlingMiddleware, LLMRetryConfig
 from src.agents.middlewares.tool_error_handling_middleware import ToolErrorHandlingMiddleware, ToolErrorConfig
 from src.agents.middlewares.token_usage_middleware import TokenUsageMiddleware
+from src.agents.middlewares.budget_enforcement_middleware import (
+    BudgetEnforcementMiddleware,
+    BudgetEnforcementConfig as BudgetEnforcementMWConfig,
+)
 from src.config.agents import AGENT_LLM_MAP
 from src.llms.llm import get_llm_by_type
 from src.prompts import apply_prompt_template
@@ -106,6 +110,21 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
             token_chars_ratio=cfg.summarization.token_chars_ratio,
         )
         middlewares.append(SummarizationMiddleware(llm=compression_llm, config=compression_config))
+
+        # 3.1 预算执行中间件（方案 C：原生工具 + wrap_tool_call 拦截）
+        # 仅 researcher 类型装配；bocomsearch 仍由 BudgetControlledSearchTool 包装器控制（guwp_token 线程安全）
+        if cfg.budget_enforcement.enabled:
+            middlewares.append(BudgetEnforcementMiddleware(
+                config=BudgetEnforcementMWConfig(
+                    enabled=True,
+                    max_search_calls=cfg.budget_enforcement.max_search_calls,
+                    max_tokens=cfg.budget_enforcement.max_tokens,
+                    hard_token_limit=cfg.budget_enforcement.hard_token_limit,
+                    token_chars_ratio=cfg.budget_enforcement.token_chars_ratio,
+                    controlled_tool_names=set(cfg.budget_enforcement.controlled_tool_names),
+                    attach_warning=cfg.budget_enforcement.attach_warning,
+                )
+            ))
     
     # 4. 工具错误处理（P1，增强工具错误的容错）
     middlewares.append(ToolErrorHandlingMiddleware(config=ToolErrorConfig(

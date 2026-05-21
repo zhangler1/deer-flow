@@ -13,16 +13,6 @@ BASIC_MODEL:
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
-# To use Google Ai Studio as your basic platform:
-# BASIC_MODEL:
-#   platform: "google_aistudio"
-#   model: "gemini-2.5-flash"  # or "gemini-1.5-pro", "gemini-2.5-flash-exp", etc.
-#   api_key: your_gemini_api_key  # Get from https://aistudio.google.com/app/apikey
-#   max_retries: 3
- 
-# Reasoning model is optional.
-# Uncomment the following settings if you want to use reasoning model
-# for planning.
 
 REASONING_MODEL:
   base_url: https://api.deepseek.com/v1
@@ -231,3 +221,26 @@ REACT_LOOP:
   dynamic_context:
     # 自定义系统提示（如角色说明），为空则只注入日期
     system_hint: ""
+
+  # --- 预算执行中间件（方案 C：原生工具 + wrap_tool_call 拦截） ---
+  # 仅对 researcher / iterative_researcher 生效
+  # 控制 researcher 节点中原生搜索工具的调用预算。
+  # bocomsearch 仍由 BudgetControlledSearchTool 包装器控制（guwp_token 需从 state 注入，线程安全）
+  budget_enforcement:
+    enabled: true
+    # 每个 researcher 节点的最大搜索调用次数（与 SEARCH_BUDGET.search_budget_max_calls 保持一致）
+    max_search_calls: 5
+    # 软预警 token 阈值
+    max_tokens: 10000
+    # 硬 token 上限（达到后拒绝后续受控工具调用）
+    hard_token_limit: 14000
+    # 字符数/token 估算比例（中英混合 3.0，与 SEARCH_BUDGET、summarization 一致）
+    token_chars_ratio: 3.0
+    # 受预算控制的原生工具白名单
+    controlled_tool_names:
+      - online_search
+      - searchknowledge_standard
+      - financial_summary
+      - product_instance_search
+    # 是否在每次成功调用后给工具结果附加预算警告
+    attach_warning: true

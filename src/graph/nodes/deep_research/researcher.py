@@ -27,18 +27,15 @@ from src.tools import (
     financial_summary,
     product_instance_search,
     report_search,
-    budget_controlled_online_search_tool,
-    budget_controlled_product_instance_search_tool,
-    budget_controlled_financial_summary_tool,
+    searchknowledge_standard,
     budget_controlled_bocomsearch_tool,
-    budget_controlled_searchknowledge_standard_tool,
     get_budget_manager,
     clear_budget_manager,
     bocomsearch,
 )
 from src.utils.enhanced_logger import get_enhanced_logger
 
-from src.graph.nodes.utils import _setup_and_execute_agent_step
+from src.graph.nodes.utils import _execute_agent_step
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.researcher')
@@ -121,6 +118,9 @@ async def researcher_node(
 
 
     # 根据报告风格动态配置工具
+    # 说明：预算控制现已下沉到 BudgetEnforcementMiddleware（方案 C），
+    # 所以 researcher 节点下发到 ReactLoop 的是原生工具。
+    # 例外：bocomsearch 因 guwp_token 线程安全需从 state 注入，仍用 BudgetControlledSearchTool 包装器。
     if report_style == "industry_report":
         # 行业研报：searchknowledge_standard(段落级标准知识检索) + online_search
         session_id = state.get("session_id", "default")
@@ -131,24 +131,12 @@ async def researcher_node(
         tool_name_list = ["research_skill_prompt_search"]
         # 根据开关决定是否添加在线搜索工具
         if use_budget_online:
-            tools.append(budget_controlled_online_search_tool(
-                max_results=configurable.max_search_results,
-                session_id=session_id,
-                max_search_calls=researcher_search_budget,
-                max_tokens=max_tokens,
-                hard_token_limit=hard_token_limit,
-            ))
-            tool_name_list.append("budget_controlled_online_search")
+            tools.append(online_search_tool(configurable.max_search_results))
+            tool_name_list.append("online_search")
         # 行业研报沿用 use_budget_bocom 开关控制内部知识库检索（语义复用：内网知识库开关）
         if use_budget_bocom:
-            tools.append(budget_controlled_searchknowledge_standard_tool(
-                session_id=session_id,
-                max_search_calls=researcher_search_budget,
-                max_tokens=max_tokens,
-                max_results=configurable.max_search_results,
-                hard_token_limit=hard_token_limit,
-            ))
-            tool_name_list.append("budget_controlled_searchknowledge_standard")
+            tools.append(searchknowledge_standard)
+            tool_name_list.append("searchknowledge_standard")
         tool_names = ", ".join(tool_name_list)
 
     elif report_style == "business_marketing":
@@ -161,15 +149,9 @@ async def researcher_node(
         tool_name_list = []
         # 根据开关决定是否添加在线搜索工具
         if use_budget_online:
-            tools.append(budget_controlled_online_search_tool(
-                max_results=configurable.max_search_results,
-                session_id=session_id,
-                max_search_calls=researcher_search_budget,
-                max_tokens=max_tokens,
-                hard_token_limit=hard_token_limit,
-            ))
-            tool_name_list.append("budget_controlled_online_search")
-        # 根据开关决定是否添加交行搜索工具
+            tools.append(online_search_tool(configurable.max_search_results))
+            tool_name_list.append("online_search")
+        # bocomsearch 保留 BudgetControlledSearchTool 包装器（guwp_token 线程安全注入）
         if use_budget_bocom:
             tools.append(budget_controlled_bocomsearch_tool(
                 session_id=session_id,
@@ -183,20 +165,10 @@ async def researcher_node(
         tools += [
             business_opportunity_search,
             sentiment_search,
-            budget_controlled_financial_summary_tool(
-                session_id=session_id,
-                max_search_calls=researcher_search_budget,
-                max_tokens=max_tokens,
-                hard_token_limit=hard_token_limit,
-            ),
-            budget_controlled_product_instance_search_tool(
-                session_id=session_id,
-                max_search_calls=researcher_search_budget,
-                max_tokens=max_tokens,
-                hard_token_limit=hard_token_limit,
-            ),
+            financial_summary,
+            product_instance_search,
         ]
-        tool_name_list += ["business_opportunity_search", "sentiment_search", "budget_controlled_financial_summary", "budget_controlled_product_instance_search"]
+        tool_name_list += ["business_opportunity_search", "sentiment_search", "financial_summary", "product_instance_search"]
         tool_names = ", ".join(tool_name_list)
 
     elif report_style == "business_marketing_client":
@@ -206,14 +178,8 @@ async def researcher_node(
         tool_name_list = ["research_skill_prompt_search"]
         # 根据开关决定是否添加在线搜索工具
         if use_budget_online:
-            tools.append(budget_controlled_online_search_tool(
-                max_results=configurable.max_search_results,
-                session_id=session_id,
-                max_search_calls=researcher_search_budget,
-                max_tokens=max_tokens,
-                hard_token_limit=hard_token_limit,
-            ))
-            tool_name_list.append("budget_controlled_online_search")
+            tools.append(online_search_tool(configurable.max_search_results))
+            tool_name_list.append("online_search")
         tool_names = ", ".join(tool_name_list)
 
     elif report_style == "academic":
@@ -223,14 +189,8 @@ async def researcher_node(
         tool_name_list = []
         # 根据开关决定是否添加在线搜索工具
         if use_budget_online:
-            tools.append(budget_controlled_online_search_tool(
-                max_results=configurable.max_search_results,
-                session_id=session_id,
-                max_search_calls=researcher_search_budget,
-                max_tokens=max_tokens,
-                hard_token_limit=hard_token_limit,
-            ))
-            tool_name_list.append("budget_controlled_online_search")
+            tools.append(online_search_tool(configurable.max_search_results))
+            tool_name_list.append("online_search")
         tool_names = ", ".join(tool_name_list) if tool_name_list else "(无搜索工具)"
     
     else:
@@ -247,7 +207,7 @@ async def researcher_node(
     
     
     # 执行研究节点
-    result = await _setup_and_execute_agent_step(
+    result = await _execute_agent_step(
         state,
         config,
         "researcher",
@@ -266,7 +226,7 @@ async def coder_node(
 ) -> Command[Literal["research_team"]]:
     """执行代码分析的编码员节点"""
     logger.info("编码员节点正在编写代码")
-    return await _setup_and_execute_agent_step(
+    return await _execute_agent_step(
         state,
         config,
         "coder",

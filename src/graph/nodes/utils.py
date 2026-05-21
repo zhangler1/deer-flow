@@ -5,9 +5,8 @@
 节点工具函数模块
 
 提供节点执行所需的辅助函数，包括：
-- Agent 执行步骤
-- Agent 设置和配置
-- 工具函数（handoff_to_planner）
+- _execute_agent_step: Agent 设置 + 执行步骤（含 MCP 配置和 Agent 创建）
+- handoff_to_planner: 移交给规划智能体的工具
 """
 
 import asyncio
@@ -24,10 +23,10 @@ from langgraph.types import Command
 
 from src.agents import create_agent
 from src.config.configuration import Configuration
+from src.graph.cancellation import get_from_config as _get_cancel_event
 from src.graph.types import State
 from src.utils.enhanced_logger import get_enhanced_logger
 from src.utils.text_utils import remove_think_tags
-from src.utils.search_budget import SearchBudgetManager
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.utils')
@@ -39,50 +38,145 @@ def handoff_to_planner(
     locale: Annotated[str, "用户检测到的语言区域设置（例如：en-US, zh-CN）"],
 ):
     """移交给规划智能体进行计划制定"""
-    # 此工具不返回任何内容：我们只是用它作为LLM信号表示需要移交给规划智能体
     return
 
 
+# ─── 内部辅助函数 ───────────────────────────────────────────────────────────
+
+
+def _get_plan_steps(current_plan):
+    """从计划对象中提取步骤列表"""
+    if hasattr(current_plan, 'steps'):
+        return current_plan.steps
+    if isinstance(current_plan, dict) and 'steps' in current_plan:
+        return current_plan['steps']
+    return None
+
+
+async def _load_mcp_tools(agent_type: str, default_tools: list, configurable) -> list:
+    """加载 MCP 工具并与默认工具合并，无 MCP 配置时直接返回默认工具"""
+    if not configurable.mcp_settings:
+        return default_tools
+
+    mcp_servers = {}
+    enabled_tools = {}
+    for server_name, server_config in configurable.mcp_settings["servers"].items():
+        if server_config["enabled_tools"] and agent_type in server_config["add_to_agents"]:
+            mcp_servers[server_name] = {
+                k: v for k, v in server_config.items()
+                if k in ("transport", "command", "args", "url", "env", "headers")
+            }
+            for tool_name in server_config["enabled_tools"]:
+                enabled_tools[tool_name] = server_name
+
+    if not mcp_servers:
+        return default_tools
+
+    client = MultiServerMCPClient(mcp_servers)
+    loaded_tools = default_tools[:]
+    for t in await client.get_tools():
+        if t.name in enabled_tools:
+            t.description = f"Powered by '{enabled_tools[t.name]}'.\n{t.description}"
+            loaded_tools.append(t)
+
+    enhanced_logger.logger.info(
+        f"🔌 MCP_TOOLS | {agent_type} | 加载完成 | 总工具数: {len(loaded_tools)}"
+    )
+    return loaded_tools
+
+
+def _build_cancel_command(agent_name, current_step, plan_steps, observations):
+    """构建用户取消时的 Command，标记所有未完成步骤"""
+    for step in plan_steps:
+        if not step.execution_res:
+            step.execution_res = "[用户取消]"
+    return Command(
+        update={
+            "messages": [HumanMessage(content=f"⛔ 步骤 '{current_step.title}' 被用户取消", name=agent_name)],
+            "observations": observations + ["[研究被用户取消]"],
+            "current_step_index": len(plan_steps) - 1,
+            "current_step_title": current_step.title,
+            "next_step_index": -1,
+            "next_step_title": "",
+        },
+        goto="research_team",
+    )
+
+
+def _build_skip_command(agent_name, current_step, completed_steps, plan_steps, observations, reason):
+    """构建步骤跳过时的 Command"""
+    next_idx = len(completed_steps) + 1
+    has_next = next_idx < len(plan_steps)
+    return Command(
+        update={
+            "messages": [HumanMessage(content=f"⚠️ 步骤 '{current_step.title}' {reason}", name=agent_name)],
+            "observations": observations + [current_step.execution_res],
+            "current_step_index": len(completed_steps),
+            "current_step_title": current_step.title,
+            "next_step_index": next_idx if has_next else -1,
+            "next_step_title": plan_steps[next_idx].title if has_next else "",
+        },
+        goto="research_team",
+    )
+
+
+async def _silently_cancel(t):
+    """静默取消一个 asyncio.Task"""
+    if t is None or t.done():
+        return
+    t.cancel()
+    try:
+        await t
+    except (asyncio.CancelledError, Exception):
+        pass
+
+
+# ─── 核心执行函数 ───────────────────────────────────────────────────────────
+
+
 async def _execute_agent_step(
-    state: State, agent: Any, agent_name: str, recursion_limit: int = 10,
-    cancel_event=None,
+    state: State,
+    config: RunnableConfig,
+    agent_type: str,
+    default_tools: list,
+    recursion_limit: int = 10,
 ) -> Command[Literal["research_team"]]:
-    """使用指定智能体执行步骤的辅助函数
-    
+    """设置智能体并执行当前研究步骤
+
+    包含 Agent 创建（含 MCP 配置）和步骤执行逻辑：
+    1. 从 config 提取取消信号
+    2. 加载 MCP 工具并创建 Agent
+    3. 执行 Agent（支持超时、取消、心跳监控）
+    4. 处理结果并返回 Command
+
     Args:
         state: 当前状态
-        agent: 智能体实例
-        agent_name: 智能体名称
-        recursion_limit: 每步搜索工具调用预算（兼作 LangGraph agent recursion 的软建议值），
-            真正传给 LangGraph 的硬上限 = max(recursion_limit * 10, 50)。
-            参数名保留 `recursion_limit` 以保持向后兼容。
-        cancel_event: 可选的 asyncio.Event，客户端断连时被 set
-        
+        config: RunnableConfig
+        agent_type: 智能体类型（"researcher" / "coder"）
+        default_tools: 默认工具列表
+        recursion_limit: 每步搜索工具调用预算
+
     Returns:
         Command 对象，用于更新状态并转到 research_team
     """
     step_start_time = time.time()
-    enhanced_logger.logger.info(f"🔄 AGENT_STEP_ENTRY | {agent_name} | 开始执行研究步骤")
-    enhanced_logger.logger.info(f"🎛️  SEARCH_BUDGET_PARAM | {agent_name} | 每步搜索调用预算: {recursion_limit}")
-    
+    enhanced_logger.logger.info(f"🔄 AGENT_STEP | {agent_type} | 开始执行 | 搜索预算: {recursion_limit}")
+
+    # ─── 1. 提取取消信号 ───
+    cancel_event = _get_cancel_event(config)
+
+    # ─── 2. 解析计划和当前步骤 ───
     current_plan = state.get("current_plan")
     plan_title = current_plan.title
     observations = state.get("observations", [])
-    
-    enhanced_logger.logger.info(f"📝 STEP_CONTEXT | {agent_name} | 计划标题: {plan_title} | 已完成步骤: {len(observations)}")
 
-    # Find the first unexecuted step
-    current_step = None
-    completed_steps = []
-    # 处理current_plan.steps的访问问题
-    if hasattr(current_plan, 'steps'):
-        plan_steps = current_plan.steps
-    elif isinstance(current_plan, dict) and 'steps' in current_plan:
-        plan_steps = current_plan['steps']
-    else:
+    plan_steps = _get_plan_steps(current_plan)
+    if plan_steps is None:
         logger.warning("在当前计划中未找到步骤")
         return Command(goto="research_team")
-        
+
+    current_step = None
+    completed_steps = []
     for step in plan_steps:
         if not step.execution_res:
             current_step = step
@@ -91,500 +185,143 @@ async def _execute_agent_step(
             completed_steps.append(step)
 
     if not current_step:
-        enhanced_logger.logger.warning(f"⚠️ STEP_NOT_FOUND | {agent_name} | 未找到未执行的步骤")
         logger.warning("未找到未执行的步骤")
         return Command(goto="research_team")
 
-    # ─── 取消信号检查：如果客户端已断连，标记所有剩余 step 为 cancelled ───
+    # ─── 3. 取消信号检查 ───
     if cancel_event and cancel_event.is_set():
-        enhanced_logger.logger.info(
-            f"⛔ STEP_CANCELLED | {agent_name} | 客户端已断连，跳过剩余步骤"
-        )
-        # 标记所有未完成步骤为 cancelled，使路由函数认为全部完成 → 进入 reporter
-        for step in plan_steps:
-            if not step.execution_res:
-                step.execution_res = "[用户取消]"
-        return Command(
-            update={
-                "observations": observations + ["[研究被用户取消]"],
-                "current_step_index": len(plan_steps) - 1,
-                "current_step_title": current_step.title,
-                "next_step_index": -1,
-                "next_step_title": "",
-            },
-            goto="research_team",
-        )
-    # ─────────────────────────────────────────────────────────────────────
+        enhanced_logger.logger.info(f"⛔ CANCELLED | {agent_type} | 客户端已断连")
+        return _build_cancel_command(agent_type, current_step, plan_steps, observations)
 
-    enhanced_logger.logger.info(f"🎯 STEP_SELECTED | {agent_name} | 正在执行: {current_step.title}")
-    logger.info(f"Executing step: {current_step.title}, agent: {agent_name}")
+    enhanced_logger.logger.info(f"🎯 STEP | {agent_type} | 执行: {current_step.title}")
 
-    # 格式化已完成步骤信息
-    completed_steps_info = ""
+    # ─── 4. 创建 Agent（含 MCP 工具加载）───
+    configurable = Configuration.from_runnable_config(config)
+    tools = await _load_mcp_tools(agent_type, default_tools, configurable)
+    agent = create_agent(agent_type, agent_type, tools, agent_type, configurable)
 
-    # 为智能体准备包含已完成步骤信息的输入
+    # ─── 5. 准备输入消息 ───
     agent_input = {
         "messages": [
             HumanMessage(
-                content=f"# 研究主题\n\n{plan_title}\n\n{completed_steps_info}# 当前步骤\n\n## 标题\n\n{current_step.title}\n\n## 描述\n\n{current_step.description}\n\n## 语言区域\n\n{state.get('locale', 'zh-CN')}"
+                content=(
+                    f"# 研究主题\n\n{plan_title}\n\n"
+                    f"# 当前步骤\n\n## 标题\n\n{current_step.title}\n\n"
+                    f"## 描述\n\n{current_step.description}\n\n"
+                    f"## 语言区域\n\n{state.get('locale', 'zh-CN')}"
+                )
             )
         ]
     }
-
-    # 🆕 添加详细的工具调用前日志
-    enhanced_logger.logger.info("="*80)
-    enhanced_logger.logger.info(f"📋 输入消息内容 (前200字): {agent_input['messages'][0].content[:200]}...")
-    
-    if hasattr(agent, 'tools') and isinstance(agent.tools, dict):
-        tool_names = list(agent.tools.keys())
-        enhanced_logger.logger.info(f"🔧 ReactLoop.tools: {tool_names} (共{len(agent.tools)}个)")
-    elif hasattr(agent, 'tool_list'):
-        tool_names = [getattr(t, 'name', 'unknown') for t in agent.tool_list]
-        enhanced_logger.logger.info(f"🔧 Agent.tool_list: {tool_names} (共{len(agent.tool_list)}个)")
-    elif hasattr(agent, 'nodes'):
-        enhanced_logger.logger.debug(f"🔧 工具已通过create_react_agent绑定到LLM")
-    else:
-        enhanced_logger.logger.warning(f"⚠️  Agent对象类型异常: {type(agent)}")
-        enhanced_logger.logger.warning(f"   Agent属性: {dir(agent)[:10]}...")
-    
-    enhanced_logger.logger.info("="*80)
-
-    # 为研究智能体添加引用提醒
-    if agent_name == "researcher":
+    if agent_type == "researcher":
         agent_input["messages"].append(
             HumanMessage(
-                content="重要提示：不要在正文中包含内联引用。而是跟踪所有来源，并在末尾使用链接引用格式包含参考文献部分。在每个引用之间包含一个空行以提高可读性。每个引用使用以下格式：\n- [来源标题](URL)\n\n- [另一个来源](URL)",
+                content=(
+                    "重要提示：不要在正文中包含内联引用。而是跟踪所有来源，"
+                    "并在末尾使用链接引用格式包含参考文献部分。在每个引用之间包含一个空行以提高可读性。"
+                    "每个引用使用以下格式：\n- [来源标题](URL)\n\n- [另一个来源](URL)"
+                ),
                 name="system",
             )
         )
 
-    # 🔥 核心：ReactLoop 中间件已内置循环控制和上下文压缩
-    # 语义说明：
-    #   search_budget_soft_limit：每步搜索工具调用预算（软建议），用于日志观察
-    #   ReactLoop 中间件链负责实际的循环检测和压缩
-    search_budget_soft_limit = recursion_limit
-
-    # 初始化搜索预算观察器（仅用于日志观察，非实际拦截器）
-    _obs_conf = Configuration.from_runnable_config(None)
-    budget_manager = SearchBudgetManager(
-        max_search_calls=_obs_conf.search_budget_max_calls,
-        max_tokens=_obs_conf.search_budget_max_tokens,
-        hard_token_limit=_obs_conf.search_budget_hard_limit,
-        token_chars_ratio=_obs_conf.search_budget_token_chars_ratio,
-    )
-
-    # 使用预算管理器检查状态（仅日志）
-    state_messages = state.get("messages", [])
-    budget_info = budget_manager.get_remaining_budget(state_messages)
-
-    enhanced_logger.logger.info(
-        f"📊 BUDGET_STATUS | {agent_name} | "
-        f"搜索: {budget_info['search_calls_used']}/{search_budget_soft_limit} | "
-        f"Tokens: {budget_info['estimated_tokens']}/{budget_manager.config.max_tokens} | "
-        f"警告级别: {budget_info['warning_level']}"
-    )
-
-    enhanced_logger.logger.info(
-        f"🎛️  REACT_LOOP_CONTROL | {agent_name} | "
-        f"循环控制由 ReactLoop 中间件链管理 | "
-        f"每步搜索预算(软建议): {search_budget_soft_limit} 次"
-    )
-
-    # 记录Agent执行过程
-    agent_exec_start_time = time.time()
-    # 整步超时（秒），默认 900s，可通过 AGENT_STEP_TIMEOUT 环境变量覆盖
+    # ─── 6. 执行 Agent（超时 + 取消 + 心跳）───
     try:
         step_timeout = float(os.getenv("AGENT_STEP_TIMEOUT", "900"))
     except ValueError:
         step_timeout = 900.0
-    enhanced_logger.logger.info(
-        f"⏳ AGENT_INVOKING | {agent_name} | 正在调用LLM... | "
-        f"超时阈值: {step_timeout:.0f}s | 开始时间: {time.strftime('%H:%M:%S')}"
-    )
 
-    # 添加定期心跳日志的异步任务
-    async def log_agent_progress():
-        """在agent执行期间定期输出进度日志"""
-        progress_interval = 30  # 每30秒输出一次进度
+    agent_exec_start = time.time()
+    enhanced_logger.logger.info(f"⏳ INVOKING | {agent_type} | 超时: {step_timeout:.0f}s")
+
+    async def _heartbeat():
         while True:
-            await asyncio.sleep(progress_interval)
-            current_duration = time.time() - agent_exec_start_time
+            await asyncio.sleep(30)
             enhanced_logger.logger.info(
-                f"💓 AGENT_HEARTBEAT | {agent_name} | Agent仍在执行中... | "
-                f"已耗时: {current_duration:.1f}s / 超时: {step_timeout:.0f}s | 时间: {time.strftime('%H:%M:%S')}"
+                f"💓 HEARTBEAT | {agent_type} | 已耗时: {time.time() - agent_exec_start:.1f}s / {step_timeout:.0f}s"
             )
 
-    # 预先声明心跳任务变量，保证 finally 一定能访问（即便 try 内未执行到创建处）
     heartbeat_task = None
     try:
-        # 注意：工具结果压缩已移入 ReactLoop 中间件链（SummarizationMiddleware）
-        # 此处不再需要手动调用 tool_compression_middleware
-        
-        # 启动心跳任务
-        heartbeat_task = asyncio.create_task(log_agent_progress())
+        heartbeat_task = asyncio.create_task(_heartbeat())
+        agent_task = asyncio.create_task(agent.ainvoke(input=agent_input, config={}))
 
-        # 并发等待：agent 执行 vs 客户端断连，先到先得（硬性中断）
-        agent_task = asyncio.create_task(
-            agent.ainvoke(
-                input=agent_input, config={}
-            )
-        )
         wait_set = {agent_task}
         cancel_wait_task = None
         if cancel_event is not None:
             cancel_wait_task = asyncio.create_task(cancel_event.wait())
             wait_set.add(cancel_wait_task)
 
-        done, _pending = await asyncio.wait(
-            wait_set,
-            timeout=step_timeout,
-            return_when=asyncio.FIRST_COMPLETED,
-        )
+        done, _ = await asyncio.wait(wait_set, timeout=step_timeout, return_when=asyncio.FIRST_COMPLETED)
 
-        # 辅助：静默取消任务（吞掉 CancelledError / 一般异常）
-        async def _silently_cancel(t):
-            if t is None or t.done():
-                return
-            t.cancel()
-            try:
-                await t
-            except (asyncio.CancelledError, Exception):
-                pass
-
-        # 分支 1：客户端断连 / 显式 cancel 触发
+        # 分支 1：用户取消
         if cancel_wait_task is not None and cancel_wait_task in done:
-            enhanced_logger.logger.info(
-                f"⛔ BRANCH_CANCEL | {agent_name} | 原因: 用户主动取消 (cancel_event 被触发)"
-            )
             await _silently_cancel(agent_task)
-            await _silently_cancel(heartbeat_task)
-            agent_exec_duration = time.time() - agent_exec_start_time
-            enhanced_logger.logger.info(
-                f"⛔ AGENT_CANCELLED | {agent_name} | 已中止 agent | 耗时: {agent_exec_duration:.2f}s"
-            )
-            for step in plan_steps:
-                if not step.execution_res:
-                    step.execution_res = "[用户取消]"
-            step_duration = time.time() - step_start_time
-            enhanced_logger.logger.info(
-                f"⛔ STEP_CANCELLED_MID | {agent_name} | 步骤执行中被中止 | 总耗时: {step_duration:.2f}s"
-            )
-            return Command(
-                update={
-                    "messages": [
-                        HumanMessage(
-                            content=f"⛔ 步骤 '{current_step.title}' 被用户取消",
-                            name=agent_name,
-                        )
-                    ],
-                    "observations": observations + ["[研究被用户取消]"],
-                    "current_step_index": len(plan_steps) - 1,
-                    "current_step_title": current_step.title,
-                    "next_step_index": -1,
-                    "next_step_title": "",
-                },
-                goto="research_team",
-            )
+            enhanced_logger.logger.info(f"⛔ CANCELLED_MID | {agent_type} | 耗时: {time.time() - agent_exec_start:.2f}s")
+            return _build_cancel_command(agent_type, current_step, plan_steps, observations)
 
-        # 分支 2：超时。agent_task 仍在 pending，抑 TimeoutError
+        # 分支 2：超时
         if agent_task not in done:
-            enhanced_logger.logger.info(
-                f"⏰ BRANCH_TIMEOUT | {agent_name} | 原因: 超过 step_timeout={step_timeout:.0f}s"
-            )
             await _silently_cancel(agent_task)
             await _silently_cancel(cancel_wait_task)
             raise asyncio.TimeoutError()
 
         # 分支 3：正常完成
-
         await _silently_cancel(cancel_wait_task)
         result = agent_task.result()
-
-        # 取消心跳任务
-        heartbeat_task.cancel()
-        try:
-            await heartbeat_task
-        except asyncio.CancelledError:
-            pass
-
-        agent_exec_duration = time.time() - agent_exec_start_time
-        enhanced_logger.logger.info(f"✅ AGENT_INVOKED | {agent_name} | LLM调用成功完成 | 耗时: {agent_exec_duration:.2f}s | 结束时间: {time.strftime('%H:%M:%S')}")
+        enhanced_logger.logger.info(f"✅ INVOKED | {agent_type} | 耗时: {time.time() - agent_exec_start:.2f}s")
 
     except asyncio.TimeoutError:
-        # 取消心跳任务
-        if 'heartbeat_task' in locals():
-            heartbeat_task.cancel()
-            try:
-                await heartbeat_task
-            except asyncio.CancelledError:
-                pass
-
-        agent_exec_duration = time.time() - agent_exec_start_time
-        enhanced_logger.logger.warning(
-            f"⏰ AGENT_TIMEOUT | {agent_name} | 超过 {step_timeout:.0f}s 阈值，跳过当前步骤 | "
-            f"已耗时: {agent_exec_duration:.2f}s | 时间: {time.strftime('%H:%M:%S')}"
-        )
-        logger.warning(
-            f"Agent {agent_name} 执行超时({step_timeout:.0f}s)，跳过步骤 '{current_step.title}'"
-        )
-
-        # 标记当前步骤为因超时跳过
+        enhanced_logger.logger.warning(f"⏰ TIMEOUT | {agent_type} | 超过 {step_timeout:.0f}s")
         current_step.execution_res = f"⚠️ 由于执行超时({step_timeout:.0f}s)，此步骤被跳过。"
-
-        step_duration = time.time() - step_start_time
-        enhanced_logger.logger.info(
-            f"⏭️  STEP_SKIPPED | {agent_name} | 步骤因超时跳过，继续下一步 | 总耗时: {step_duration:.2f}s"
-        )
-
-        return Command(
-            update={
-                "messages": [
-                    HumanMessage(
-                        content=f"⚠️ 步骤 '{current_step.title}' 由于执行超时({step_timeout:.0f}s)被跳过",
-                        name=agent_name,
-                    )
-                ],
-                "observations": observations + [current_step.execution_res],
-                "current_step_index": len(completed_steps),
-                "current_step_title": current_step.title,
-                "next_step_index": (
-                    len(completed_steps) + 1
-                    if len(completed_steps) + 1 < len(plan_steps)
-                    else -1
-                ),
-                "next_step_title": (
-                    plan_steps[len(completed_steps) + 1].title
-                    if len(completed_steps) + 1 < len(plan_steps)
-                    else ""
-                ),
-            },
-            goto="research_team",
+        return _build_skip_command(
+            agent_type, current_step, completed_steps, plan_steps, observations,
+            f"由于执行超时({step_timeout:.0f}s)被跳过",
         )
 
     except Exception as e:
-        # 取消心跳任务
-        if 'heartbeat_task' in locals():
-            heartbeat_task.cancel()
-            try:
-                await heartbeat_task
-            except asyncio.CancelledError:
-                pass
-
-        agent_exec_duration = time.time() - agent_exec_start_time
-        
-        # 🔥 处理网络连接异常 - 跳过当前节点继续执行
+        # 网络异常 - 跳过当前步骤继续执行
         import httpcore
         if isinstance(e, (httpcore.RemoteProtocolError, httpcore.ConnectError, httpcore.ReadTimeout)):
-            enhanced_logger.logger.warning(
-                f"⚠️  AGENT_NETWORK_ERROR | {agent_name} | 网络连接异常，跳过当前节点 | 耗时: {agent_exec_duration:.2f}s | "
-                f"错误类型: {type(e).__name__} | 错误信息: {str(e)} | 时间: {time.strftime('%H:%M:%S')}"
-            )
-            logger.warning(f"Agent {agent_name} 网络连接异常，跳过当前步骤: {e}")
-            
-            # 标记当前步骤为部分完成（带错误信息）
+            enhanced_logger.logger.warning(f"⚠️ NETWORK_ERROR | {agent_type} | {type(e).__name__}: {e}")
             current_step.execution_res = f"⚠️ 由于网络连接异常，此步骤被跳过。错误信息: {str(e)[:200]}"
-            
-            step_duration = time.time() - step_start_time
-            enhanced_logger.logger.info(f"⏭️  STEP_SKIPPED | {agent_name} | 步骤已跳过，继续下一步 | 总耗时: {step_duration:.2f}s")
-            
-            # 返回 Command 继续执行流程
-            return Command(
-                update={
-                    "messages": [
-                        HumanMessage(
-                            content=f"⚠️ 步骤 '{current_step.title}' 由于网络异常被跳过",
-                            name=agent_name,
-                        )
-                    ],
-                    "observations": observations + [current_step.execution_res],
-                },
-                goto="research_team",
+            return _build_skip_command(
+                agent_type, current_step, completed_steps, plan_steps, observations,
+                "由于网络异常被跳过",
             )
-        
-        # 其他异常仍然抛出
-        enhanced_logger.logger.error(
-            f"❌ AGENT_INVOKE_ERROR | {agent_name} | LLM调用失败 | 耗时: {agent_exec_duration:.2f}s | "
-            f"错误类型: {type(e).__name__} | 错误信息: {str(e)} | 时间: {time.strftime('%H:%M:%S')}"
-        )
-        logger.exception(f"Agent {agent_name} LLM调用异常: {e}")
+        enhanced_logger.logger.error(f"❌ ERROR | {agent_type} | {type(e).__name__}: {e}")
         raise
+
     finally:
-        # 🔒 最终兜底：无论正常完成、TimeoutError、Exception 还是 CancelledError 传入，
-        # 都确保心跳任务被取消，避免孤儿协程持续打印 HEARTBEAT 日志。
         if heartbeat_task is not None and not heartbeat_task.done():
             heartbeat_task.cancel()
             try:
                 await heartbeat_task
             except BaseException:
-                # 吞掉 CancelledError 以及等待期间的任何异常，不影响原异常传播
                 pass
-    
-    # Agent 响应分析：正常路径汇总成一行，异常保留详细告警
-    if isinstance(result, dict):
-        messages = result.get("messages", [])
-        tool_call_names: list = []
-        for msg in messages:
-            if hasattr(msg, "tool_calls") and msg.tool_calls:
-                for tc in msg.tool_calls:
-                    name = tc.get("name", "unknown") if isinstance(tc, dict) else getattr(tc, "name", "unknown")
-                    tool_call_names.append(name)
 
-        if tool_call_names:
-            enhanced_logger.logger.info(
-                f"✅ AGENT_RESPONSE | {agent_name} | msgs={len(messages)} | "
-                f"tool_calls={len(tool_call_names)} | names={tool_call_names}"
-            )
-        else:
-            # 异常：LLM 未调用任何工具，详细打印便于排查
-            enhanced_logger.logger.warning(
-                f"⚠️  NO_TOOL_CALLS | {agent_name} | msgs={len(messages)} | LLM没有调用任何工具！"
-            )
-            for i, msg in enumerate(messages):
-                content = getattr(msg, "content", "")
-                if content:
-                    content_preview = content[:300] + "..." if len(content) > 300 else content
-                    enhanced_logger.logger.warning(f"   📄 LLM直接响应[{i}]: {content_preview}")
-    else:
-        enhanced_logger.logger.warning(f"⚠️  UNEXPECTED_RESULT_TYPE | {agent_name} | result类型: {type(result)}")
-
-    # Process the result
+    # ─── 7. 处理结果 ───
     response_content = result["messages"][-1].content
-    
-    # 防止空 content 导致 LLM 报错 "content len should not be 0"
     if not response_content or not str(response_content).strip():
         response_content = "（步骤已完成，工具调用未产生文本响应）"
-    
-    # 移除思考标签（如果存在）
     if response_content and '<think>' in response_content.lower():
-        original_length = len(response_content)
         response_content = remove_think_tags(response_content)
-        cleaned_length = len(response_content)
-        enhanced_logger.logger.info(f"🧹 CLEAN_THINK_TAGS | {agent_name} | 移除思考标签 | 原始长度: {original_length} | 清理后长度: {cleaned_length} | 减少: {original_length - cleaned_length}")
-    
-    response_length = len(response_content) if response_content else 0
-    enhanced_logger.logger.info(f"📊 STEP_RESULT | {agent_name} | 步骤结果处理完成 | 响应长度: {response_length}")
-    
-    logger.debug(f"{agent_name.capitalize()} full response: {response_content}")
 
-    # Update the step with the execution result
     current_step.execution_res = response_content
-    enhanced_logger.logger.info(f"✅ STEP_COMPLETE | {agent_name} | 步骤执行完成: '{current_step.title}'")
-    
+    next_idx = len(completed_steps) + 1
+    has_next = next_idx < len(plan_steps)
+
     step_duration = time.time() - step_start_time
-    enhanced_logger.logger.info(f"✅ AGENT_STEP_EXIT | {agent_name} | 步骤执行总耗时: {step_duration:.2f}s")
+    enhanced_logger.logger.info(f"✅ STEP_DONE | {agent_type} | '{current_step.title}' | 耗时: {step_duration:.2f}s")
 
     return Command(
         update={
-            "messages": [
-                HumanMessage(
-                    content=response_content,
-                    name=agent_name,
-                )
-            ],
+            "messages": [HumanMessage(content=response_content, name=agent_type)],
             "observations": observations + [response_content],
-            # 当前步骤信息（刚完成的步骤）
             "current_step_index": len(completed_steps),
             "current_step_title": current_step.title,
-            # 下一步信息（供 SSE 层直接使用，无需 +1 推算）
-            "next_step_index": len(completed_steps) + 1 if len(completed_steps) + 1 < len(plan_steps) else -1,
-            "next_step_title": (plan_steps[len(completed_steps) + 1].title
-                                if len(completed_steps) + 1 < len(plan_steps)
-                                else ""),
+            "next_step_index": next_idx if has_next else -1,
+            "next_step_title": plan_steps[next_idx].title if has_next else "",
         },
         goto="research_team",
     )
-
-
-async def _setup_and_execute_agent_step(
-    state: State,
-    config: RunnableConfig,
-    agent_type: str,
-    default_tools: list,
-    recursion_limit: int = 10,
-    agent_executor: Any = None,
-) -> Command[Literal["research_team"]]:
-    """设置智能体并使用适当工具执行步骤的辅助函数
-
-    此函数处理 researcher_node 和 coder_node 的通用逻辑：
-    1. 根据智能体类型配置 MCP 服务器和工具
-    2. 使用适当的工具创建智能体或使用默认智能体
-    3. 在当前步骤上执行智能体
-
-    参数：
-        state: 当前状态
-        config: 可运行配置
-        agent_type: 智能体类型（"researcher" 或 "coder"）
-        default_tools: 要添加到智能体的默认工具
-        recursion_limit: 递归限制
-        agent_executor: 可选的自定义 agent 执行器（支持 middleware）
-
-    返回：
-        Command 对象，用于更新状态并转到 research_team
-    """
-    setup_start_time = time.time()
-
-    # 提取取消信号（统一封装，一行搞定）
-    from src.graph.cancellation import get_from_config as _get_cancel_event
-    cancel_event = _get_cancel_event(config)
-    enhanced_logger.logger.info(
-        f"🔍 CANCEL_EVENT_STATUS | {agent_type} | cancel_event={'已注册' if cancel_event is not None else 'None'}"
-    )
-
-    # 如果提供了自定义 agent_executor，直接使用（跳过 MCP 配置）
-    if agent_executor is not None:
-        enhanced_logger.logger.info(f"✅ CUSTOM_AGENT | {agent_type} | 使用自定义 agent executor (middleware 支持)")
-        setup_duration = time.time() - setup_start_time
-        enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | 自定义智能体配置完成 | 耗时: {setup_duration:.2f}s")
-        return await _execute_agent_step(state, agent_executor, agent_type, recursion_limit=recursion_limit, cancel_event=cancel_event)
-    
-    configurable = Configuration.from_runnable_config(config)
-    mcp_servers = {}
-    enabled_tools = {}
-
-    enhanced_logger.logger.info(f"🔧 TOOL_CONFIG | {agent_type} | 默认工具数: {len(default_tools)}")
-
-    # Extract MCP server configuration for this agent type
-    if configurable.mcp_settings:
-        for server_name, server_config in configurable.mcp_settings["servers"].items():
-            if (
-                server_config["enabled_tools"]
-                and agent_type in server_config["add_to_agents"]
-            ):
-                mcp_servers[server_name] = {
-                    k: v
-                    for k, v in server_config.items()
-                    if k in ("transport", "command", "args", "url", "env", "headers")
-                }
-                for tool_name in server_config["enabled_tools"]:
-                    enabled_tools[tool_name] = server_name
-
-    # Create and execute agent with MCP tools if available
-    if mcp_servers:
-        enhanced_logger.logger.info(f"🔌 MCP_ENABLED | {agent_type} | 检测到MCP服务器 | 服务器数: {len(mcp_servers)}")
-        client = MultiServerMCPClient(mcp_servers)
-        loaded_tools = default_tools[:]
-        all_tools = await client.get_tools()
-        mcp_tool_count = 0
-        for tool in all_tools:
-            if tool.name in enabled_tools:
-                tool.description = (
-                    f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
-                )
-                loaded_tools.append(tool)
-                mcp_tool_count += 1
-        
-        enhanced_logger.logger.info(f"🔧 MCP_TOOLS_LOADED | {agent_type} | MCP工具加载完成 | 新增工具: {mcp_tool_count} | 总工具数: {len(loaded_tools)}")
-        agent = create_agent(agent_type, agent_type, loaded_tools, agent_type, configurable)
-
-        setup_duration = time.time() - setup_start_time
-        enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | MCP智能体配置完成 | 耗时: {setup_duration:.2f}s")
-
-        return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit, cancel_event=cancel_event)
-    else:
-        # Use default tools if no MCP servers are configured
-        agent = create_agent(agent_type, agent_type, default_tools, agent_type, configurable)
-
-        setup_duration = time.time() - setup_start_time
-        enhanced_logger.logger.info(f"✅ AGENT_SETUP_COMPLETE | {agent_type} | 默认智能体配置完成 | 耗时: {setup_duration:.2f}s")
-
-        return await _execute_agent_step(state, agent, agent_type, recursion_limit=recursion_limit, cancel_event=cancel_event)

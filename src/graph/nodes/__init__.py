@@ -5,7 +5,7 @@
 图节点包（重构版）
 
 按功能模块组织的节点：
-- utils.py: 工具函数（handoff_to_planner, _execute_agent_step, _setup_and_execute_agent_step）
+- utils.py: 工具函数（handoff_to_planner, _execute_agent_step）
 - routing.py: 路由节点（router_node）
 - simple_nodes.py: 简单节点（direct_answer_node, simple_search_node）
 - iterative_research.py: 迭代研究节点（iterative_research_node, iterative_reporter_node）
@@ -24,7 +24,6 @@
 from src.graph.nodes.utils import (
     handoff_to_planner,
     _execute_agent_step,
-    _setup_and_execute_agent_step,
 )
 
 # 路由节点
@@ -81,5 +80,4 @@ __all__ = [
     # 辅助函数
     "handoff_to_planner",
     "_execute_agent_step",
-    "_setup_and_execute_agent_step",
 ]

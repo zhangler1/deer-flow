@@ -113,6 +113,8 @@ class ReactLoop:
             "iterations": 0,
             "start_time": time.time(),
             "max_iterations": self.max_iterations,
+            "input": input,  # ✨ 将 state 整体暴露给中间件（供读取 session_id / guwp_token 等）
+            "tools": self.tools,  # ✨ 工具名字典，中间件可依名字裁定行为
         }
         
         forced_final = False  # 标记是否需要强制最终总结

@@ -90,6 +90,25 @@ class DynamicContextConfig(BaseModel):
     system_hint: str = Field(default="", description="自定义系统提示")
 
 
+class BudgetEnforcementConfig(BaseModel):
+    """搜索预算执行中间件配置（方案 C：原生工具 + 中间件接管预算）"""
+    enabled: bool = Field(default=True, description="是否启用预算执行中间件（仅 researcher 类型生效）")
+    max_search_calls: int = Field(default=5, ge=1, description="每个 researcher 节点的最大搜索调用次数")
+    max_tokens: int = Field(default=10000, ge=1000, description="软预警 token 阈值")
+    hard_token_limit: int = Field(default=14000, ge=1000, description="硬 token 上限，达到立即拦截")
+    token_chars_ratio: float = Field(default=3.0, gt=0, description="字符数/token 估算比例（与 SEARCH_BUDGET、summarization 保持一致）")
+    controlled_tool_names: list[str] = Field(
+        default_factory=lambda: [
+            "online_search",
+            "searchknowledge_standard",
+            "financial_summary",
+            "product_instance_search",
+        ],
+        description="受预算控制的原生工具白名单。bocomsearch 因 guwp_token 线程安全保留独立包装器，不在此处",
+    )
+    attach_warning: bool = Field(default=True, description="是否在每次成功调用后给工具结果附加预算警告")
+
+
 # ============================================================
 # 聚合配置（对齐 2.0 的 AppConfig 模式）
 # ============================================================
@@ -108,6 +127,7 @@ class ReactLoopConfig(BaseModel):
     tool_error_handling: ToolErrorHandlingConfig = Field(default_factory=ToolErrorHandlingConfig)
     token_usage: TokenUsageConfig = Field(default_factory=TokenUsageConfig)
     dynamic_context: DynamicContextConfig = Field(default_factory=DynamicContextConfig)
+    budget_enforcement: BudgetEnforcementConfig = Field(default_factory=BudgetEnforcementConfig)
 
 
 # ============================================================

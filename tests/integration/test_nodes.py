@@ -6,7 +6,6 @@ import pytest
 
 from src.graph.nodes import (
     _execute_agent_step,
-    _setup_and_execute_agent_step,
     coordinator_node,
     human_feedback_node,
     planner_node,
@@ -1091,12 +1090,12 @@ def patch_create_agent():
 
 
 @pytest.fixture
-def patch_execute_agent_step():
-    async def fake_execute_agent_step(state, agent, agent_type):
-        return "EXECUTED"
+def patch_load_mcp_tools():
+    async def fake_load_mcp_tools(agent_type, default_tools, configurable):
+        return default_tools
 
     with patch(
-        "src.graph.nodes._execute_agent_step", side_effect=fake_execute_agent_step
+        "src.graph.nodes.utils._load_mcp_tools", side_effect=fake_load_mcp_tools
     ) as mock:
         yield mock
 
@@ -1130,69 +1129,34 @@ def patch_multiserver_mcp_client():
 
 
 @pytest.mark.asyncio
-async def test_setup_and_execute_agent_step_with_mcp(
-    mock_state_with_steps,
-    mock_config,
-    patch_config_from_runnable_config_with_mcp,
-    patch_create_agent,
-    patch_execute_agent_step,
+async def test_load_mcp_tools_with_mcp(
+    mock_configurable_with_mcp,
     patch_multiserver_mcp_client,
 ):
-    # Should use MCP client, load tools, and call create_agent with correct tools
+    from src.graph.nodes.utils import _load_mcp_tools
     default_tools = [MagicMock(name="default_tool")]
-    agent_type = "researcher"
-
-    result = await _setup_and_execute_agent_step(
-        mock_state_with_steps,
-        mock_config,
-        agent_type,
-        default_tools,
-    )
-    # Should call create_agent with loaded_tools including toolA and toolB
-    args, kwargs = patch_create_agent.call_args
-    loaded_tools = args[2]
-    tool_names = [t.name for t in loaded_tools if hasattr(t, "name")]
+    result = await _load_mcp_tools("researcher", default_tools, mock_configurable_with_mcp)
+    tool_names = [t.name for t in result if hasattr(t, "name")]
     assert "toolA" in tool_names
     assert "toolB" in tool_names
-    # Should call _execute_agent_step
-    patch_execute_agent_step.assert_called_once()
-    assert result == "EXECUTED"
 
 
 @pytest.mark.asyncio
-async def test_setup_and_execute_agent_step_without_mcp(
-    mock_state_with_steps,
-    mock_config,
-    patch_config_from_runnable_config_without_mcp,
-    patch_create_agent,
-    patch_execute_agent_step,
+async def test_load_mcp_tools_without_mcp(
+    mock_configurable_without_mcp,
 ):
-    # Should use default tools and not use MCP client
+    from src.graph.nodes.utils import _load_mcp_tools
     default_tools = [MagicMock(name="default_tool")]
-    agent_type = "coder"
-
-    result = await _setup_and_execute_agent_step(
-        mock_state_with_steps,
-        mock_config,
-        agent_type,
-        default_tools,
-    )
-    # Should call create_agent with default_tools
-    args, kwargs = patch_create_agent.call_args
-    assert args[2] == default_tools
-    patch_execute_agent_step.assert_called_once()
-    assert result == "EXECUTED"
+    result = await _load_mcp_tools("coder", default_tools, mock_configurable_without_mcp)
+    assert result == default_tools
 
 
 @pytest.mark.asyncio
-async def test_setup_and_execute_agent_step_with_mcp_no_enabled_tools(
-    mock_state_with_steps,
-    mock_config,
-    patch_create_agent,
-    patch_execute_agent_step,
-):
+async def test_load_mcp_tools_no_enabled_tools_for_agent():
+    from src.graph.nodes.utils import _load_mcp_tools
     # If mcp_settings present but no enabled_tools for agent_type, should fallback to default_tools
-    mcp_settings = {
+    configurable = MagicMock()
+    configurable.mcp_settings = {
         "servers": {
             "server1": {
                 "enabled_tools": ["toolA"],
@@ -1205,39 +1169,19 @@ async def test_setup_and_execute_agent_step_with_mcp_no_enabled_tools(
             }
         }
     }
-    configurable = MagicMock()
-    configurable.mcp_settings = mcp_settings
-    with patch(
-        "src.graph.nodes.Configuration.from_runnable_config",
-        return_value=configurable,
-    ):
-        default_tools = [MagicMock(name="default_tool")]
-        agent_type = "researcher"
-        result = await _setup_and_execute_agent_step(
-            mock_state_with_steps,
-            mock_config,
-            agent_type,
-            default_tools,
-        )
-        args, kwargs = patch_create_agent.call_args
-        assert args[2] == default_tools
-        patch_execute_agent_step.assert_called_once()
-        assert result == "EXECUTED"
+    default_tools = [MagicMock(name="default_tool")]
+    result = await _load_mcp_tools("researcher", default_tools, configurable)
+    assert result == default_tools
 
 
 @pytest.mark.asyncio
-async def test_setup_and_execute_agent_step_with_mcp_tools_description_update(
-    mock_state_with_steps,
-    mock_config,
-    patch_config_from_runnable_config_with_mcp,
-    patch_create_agent,
-    patch_execute_agent_step,
+async def test_load_mcp_tools_description_update(
+    mock_configurable_with_mcp,
 ):
+    from src.graph.nodes.utils import _load_mcp_tools
     # Should update tool.description with Powered by info
     default_tools = [MagicMock(name="default_tool")]
-    agent_type = "researcher"
 
-    # Patch MultiServerMCPClient to check description update
     class FakeTool:
         def __init__(self, name, description="desc"):
             self.name = name
@@ -1253,18 +1197,10 @@ async def test_setup_and_execute_agent_step_with_mcp_tools_description_update(
         async def get_tools(self):
             return [FakeTool("toolA", "descA")]
 
-    with patch("src.graph.nodes.MultiServerMCPClient", return_value=FakeClient()):
-        await _setup_and_execute_agent_step(
-            mock_state_with_steps,
-            mock_config,
-            agent_type,
-            default_tools,
-        )
-        # The tool description should be updated
-        args, kwargs = patch_create_agent.call_args
-        loaded_tools = args[2]
+    with patch("src.graph.nodes.utils.MultiServerMCPClient", return_value=FakeClient()):
+        result = await _load_mcp_tools("researcher", default_tools, mock_configurable_with_mcp)
         found = False
-        for t in loaded_tools:
+        for t in result:
             if hasattr(t, "name") and t.name == "toolA":
                 assert t.description.startswith("Powered by 'server1'.\n")
                 found = True
@@ -1302,13 +1238,13 @@ def patch_get_retriever_tool():
 
 
 @pytest.fixture
-def patch_setup_and_execute_agent_step():
-    async def fake_setup_and_execute_agent_step(state, config, agent_type, tools):
+def patch_execute_agent_step_fixture():
+    async def fake_execute_agent_step(state, config, agent_type, tools, **kwargs):
         return "RESEARCHER_RESULT"
 
     with patch(
-        "src.graph.nodes._setup_and_execute_agent_step",
-        side_effect=fake_setup_and_execute_agent_step,
+        "src.graph.nodes._execute_agent_step",
+        side_effect=fake_execute_agent_step,
     ) as mock:
         yield mock
 
@@ -1321,7 +1257,7 @@ async def test_researcher_node_with_retriever_tool(
     patch_get_web_search_tool,
     # patch_crawl_tool,  # Disabled for intranet deployment
     patch_get_retriever_tool,
-    patch_setup_and_execute_agent_step,
+    patch_execute_agent_step_fixture,
 ):
     # Simulate retriever_tool is returned
     retriever_tool = MagicMock(name="retriever_tool")
@@ -1333,8 +1269,8 @@ async def test_researcher_node_with_retriever_tool(
     patch_get_web_search_tool.assert_called_once_with(7)
     # Should call get_retriever_tool with resources
     patch_get_retriever_tool.assert_called_once_with(["resource1", "resource2"])
-    # Should call _setup_and_execute_agent_step with retriever_tool first
-    args, kwargs = patch_setup_and_execute_agent_step.call_args
+    # Should call _execute_agent_step with retriever_tool first
+    args, kwargs = patch_execute_agent_step_fixture.call_args
     tools = args[3]
     assert tools[0] == retriever_tool
     assert patch_get_web_search_tool.return_value in tools
@@ -1349,7 +1285,7 @@ async def test_researcher_node_without_retriever_tool(
     patch_get_web_search_tool,
     patch_crawl_tool,
     patch_get_retriever_tool,
-    patch_setup_and_execute_agent_step,
+    patch_execute_agent_step_fixture,
 ):
     # Simulate retriever_tool is None
     patch_get_retriever_tool.return_value = None
@@ -1358,7 +1294,7 @@ async def test_researcher_node_without_retriever_tool(
 
     patch_get_web_search_tool.assert_called_once_with(7)
     patch_get_retriever_tool.assert_called_once_with(["resource1", "resource2"])
-    args, kwargs = patch_setup_and_execute_agent_step.call_args
+    args, kwargs = patch_execute_agent_step_fixture.call_args
     tools = args[3]
     # Should not include retriever_tool
     assert all(getattr(t, "name", None) != "retriever_tool" for t in tools)
@@ -1374,7 +1310,7 @@ async def test_researcher_node_without_resources(
     patch_get_web_search_tool,
     # patch_crawl_tool,  # Disabled for intranet deployment
     patch_get_retriever_tool,
-    patch_setup_and_execute_agent_step,
+    patch_execute_agent_step_fixture,
 ):
     patch_get_retriever_tool.return_value = None
 
@@ -1382,7 +1318,7 @@ async def test_researcher_node_without_resources(
 
     patch_get_web_search_tool.assert_called_once_with(7)
     patch_get_retriever_tool.assert_called_once_with([])
-    args, kwargs = patch_setup_and_execute_agent_step.call_args
+    args, kwargs = patch_execute_agent_step_fixture.call_args
     tools = args[3]
     assert patch_get_web_search_tool.return_value in tools
     assert result == "RESEARCHER_RESULT"

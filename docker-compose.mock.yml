@@ -20,7 +20,7 @@ services:
     container_name: deer-flow-mock-search
     # 代码热挂载：改 Mock 数据或新增数据无需重建镜像
     volumes:
-      - ./middlewares/search:/app
+      - ./mockservice/search:/app
     # 宿主机调试用端口映射（可选，仅本机访问 Mock 可删除）
     ports:
       - "8010:8010"
