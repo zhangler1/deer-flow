@@ -149,8 +149,8 @@ SEARCH_BUDGET:
   
   # Token估算比例（字符数/token）
   # 用于估算消息的token消耗，中文通常在2-3之间，英文在4左右
-  # 默认值2.5适合纯中文场景，中英混合建议3.0，纯英文建议4.0
-  search_budget_token_chars_ratio: 2.5
+  # 统一使用 3.0（中英混合场景），与 REACT_LOOP.summarization.token_chars_ratio 保持一致
+  search_budget_token_chars_ratio: 3.0
 
   # （可选）researcher 节点每步搜索工具调用预算
   # 未设置时 Configuration 默认 5；也可用环境变量 RESEARCHER_RECURSION_LIMIT 覆盖
@@ -184,7 +184,9 @@ REACT_LOOP:
   summarization:
     enabled: true
     # 触发全局压缩的 token 阈值
-    max_context_tokens: 80000
+    # 必须 < SEARCH_BUDGET.search_budget_hard_limit (14000)，让压缩先于预算硬限触发
+    # 留出 2000 token 缓冲，允许压缩后继续研究
+    max_context_tokens: 12000
     # 保留最近 N 条消息不压缩
     keep_recent_messages: 6
     # 单个工具结果最大字符数（即时截断）
@@ -194,7 +196,8 @@ REACT_LOOP:
     # 摘要最大长度（字符数）
     summary_max_chars: 1500
     # token 估算比率（字符数 / token）
-    token_chars_ratio: 4.0
+    # 与 SEARCH_BUDGET.search_budget_token_chars_ratio 保持一致（中英混合 3.0）
+    token_chars_ratio: 3.0
 
   # --- LLM 错误处理中间件 ---
   llm_error_handling:

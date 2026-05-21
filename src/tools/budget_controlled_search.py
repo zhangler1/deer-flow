@@ -483,22 +483,43 @@ class BudgetControlledSearchTool(BaseTool):
     
     
     def _build_budget_exhausted_response(self, budget: SearchBudgetManager, messages: list) -> dict:
-        """构建预算耗尽的响应"""
+        """构建预算耗尽的响应
+
+        关键设计：通过 ToolMessage content 明确告知 LLM 预算已耗尽，避免后续重复调用。
+        响应中包含强停止指令（FINAL_NOTICE）和结构化字段（budget_exhausted=True），
+        供下游中间件（如 LoopDetectionMiddleware）识别后强制路由到总结阶段。
+        """
         status = budget.get_budget_status(messages)
         warning_msg = budget.get_warning_message(messages)
-        
+
         logger.warning(
             f"🛑 {self.name} | 预算耗尽 | session={self.session_id} | "
             f"已用={status.search_calls_used}/{self.max_search_calls} | "
             f"tokens={status.estimated_tokens}/{self.max_tokens}"
         )
-        
+
+        # 强停止信号：LLM 看到此消息后必须停止搜索
+        final_notice = (
+            f"⛔ FINAL_NOTICE | 搜索预算已耗尽，禁止再次调用任何搜索工具。\n"
+            f"已用搜索次数: {status.search_calls_used}/{self.max_search_calls}\n"
+            f"已用 tokens: {status.estimated_tokens}/{self.max_tokens}\n"
+            f"任何后续搜索工具调用都将被系统拒绝并返回相同消息。\n"
+            f"请立即基于已收集的信息综合分析并输出最终答案，不要再尝试搜索。"
+        )
+
         return {
             "status": "budget_exhausted",
-            "message": warning_msg or "搜索预算已耗尽，请基于已有信息回答问题。",
+            "budget_exhausted": True,  # 结构化标记，便于中间件识别
+            "message": final_notice,
+            "warning": warning_msg or "搜索预算已耗尽",
             "search_calls_used": status.search_calls_used,
             "max_search_calls": self.max_search_calls,
-            "suggestion": "请立即停止搜索，综合分析已收集的信息并输出最终答案。"
+            "estimated_tokens": status.estimated_tokens,
+            "max_tokens": self.max_tokens,
+            "suggestion": (
+                "严禁再次调用任何搜索工具。请立即综合分析已收集的信息，"
+                "按用户要求的格式输出最终报告。如信息不足，请如实说明缺口而非继续搜索。"
+            ),
         }
     
     

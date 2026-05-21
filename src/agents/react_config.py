@@ -55,12 +55,12 @@ class LoopDetectionConfig(BaseModel):
 class SummarizationConfig(BaseModel):
     """上下文摘要中间件配置"""
     enabled: bool = Field(default=True, description="是否启用")
-    max_context_tokens: int = Field(default=80000, ge=1000, description="触发全局压缩的 token 阈值")
+    max_context_tokens: int = Field(default=12000, ge=1000, description="触发全局压缩的 token 阈值（应 < SEARCH_BUDGET.hard_limit）")
     keep_recent_messages: int = Field(default=6, ge=1, description="保留最近 N 条消息不压缩")
     tool_result_max_chars: int = Field(default=3000, ge=100, description="单个工具结果最大字符数")
     compression_mode: str = Field(default="summarize", description="压缩模式: summarize 或 truncate")
     summary_max_chars: int = Field(default=1500, ge=100, description="摘要最大长度")
-    token_chars_ratio: float = Field(default=4.0, gt=0, description="token 估算比率")
+    token_chars_ratio: float = Field(default=3.0, gt=0, description="token 估算比率（与 SEARCH_BUDGET 保持一致，中英混合 3.0）")
 
 
 class LLMErrorHandlingConfig(BaseModel):
