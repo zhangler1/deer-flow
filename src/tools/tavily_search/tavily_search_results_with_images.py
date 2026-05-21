@@ -11,7 +11,10 @@ from langchain_core.callbacks.manager import (
 )
 
 # from langchain_tavily.tavily_search import TavilySearch
-from langchain_community.tools.tavily_search.tool import TavilySearchResults
+try:
+    from langchain_community.tools.tavily_search.tool import TavilySearchResults
+except ImportError:
+    TavilySearchResults = None  # type: ignore[misc, assignment]
 from pydantic import Field
 
 from src.tools.tavily_search.tavily_search_api_wrapper import (

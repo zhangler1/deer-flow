@@ -23,7 +23,7 @@ from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolMessage
 from langgraph.types import Command
 from langgraph.store.memory import InMemoryStore
-from langgraph.checkpoint.mongodb import AsyncMongoDBSaver
+# from langgraph.checkpoint.mongodb import AsyncMongoDBSaver  # removed: 不再使用 MongoDB checkpoint
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
@@ -39,7 +39,10 @@ from src.prompt_enhancer.graph.builder import build_graph as build_prompt_enhanc
 from src.prompt_enhancer.graph.state import PromptEnhancerState
 from src.prose.graph.builder import build_graph as build_prose_graph
 from src.rag.builder import build_retriever
-from src.rag.milvus import load_examples
+try:
+    from src.rag.milvus import load_examples
+except ImportError:
+    load_examples = None  # type: ignore[assignment]
 from src.rag.retriever import Resource
 from src.server.chat_request import (
     ChatCompletionChoice,
@@ -113,7 +116,8 @@ app.add_middleware(
 )
 
 # Load examples into Milvus if configured
-load_examples()
+if load_examples is not None:
+    load_examples()
 
 in_memory_store = InMemoryStore()
 graph = build_graph_with_memory()
@@ -877,16 +881,12 @@ async def _astream_workflow_generator(
                     yield event
 
         if checkpoint_url.startswith("mongodb://"):
-            logger.info("start async mongodb checkpointer.")
-            async with AsyncMongoDBSaver.from_conn_string(
-                checkpoint_url
-            ) as checkpointer:
-                graph.checkpointer = checkpointer
-                graph.store = in_memory_store
-                async for event in _stream_graph_events(
-                    graph, workflow_input, workflow_config, thread_id
-                ):
-                    yield event
+            logger.warning("MongoDB checkpoint is no longer supported. Falling back to in-memory.")
+            # MongoDB checkpoint has been removed
+            async for event in _stream_graph_events(
+                graph, workflow_input, workflow_config, thread_id
+            ):
+                yield event
     else:
         # Use graph without MongoDB checkpointer
         async for event in _stream_graph_events(

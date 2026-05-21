@@ -6,17 +6,21 @@ import os
 import time
 from typing import List, Optional
 
-from langchain_community.tools import (
-    BraveSearch,
-    DuckDuckGoSearchResults,
-    WikipediaQueryRun,
-)
-from langchain_community.tools.arxiv import ArxivQueryRun
-from langchain_community.utilities import (
-    ArxivAPIWrapper,
-    BraveSearchWrapper,
-    WikipediaAPIWrapper,
-)
+try:
+    from langchain_community.tools import (
+        BraveSearch,
+        DuckDuckGoSearchResults,
+        WikipediaQueryRun,
+    )
+    from langchain_community.tools.arxiv import ArxivQueryRun
+    from langchain_community.utilities import (
+        ArxivAPIWrapper,
+        BraveSearchWrapper,
+        WikipediaAPIWrapper,
+    )
+    HAS_LANGCHAIN_COMMUNITY = True
+except ImportError:
+    HAS_LANGCHAIN_COMMUNITY = False
 from pydantic import SecretStr
 
 from src.config import SELECTED_SEARCH_ENGINE, SearchEngine, load_yaml_config

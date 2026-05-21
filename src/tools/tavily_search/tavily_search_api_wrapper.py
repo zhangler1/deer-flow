@@ -7,10 +7,14 @@ from typing import Dict, List, Optional
 
 import aiohttp
 import requests
-from langchain_tavily._utilities import TAVILY_API_URL
-from langchain_tavily.tavily_search import (
-    TavilySearchAPIWrapper as OriginalTavilySearchAPIWrapper,
-)
+try:
+    from langchain_tavily._utilities import TAVILY_API_URL
+    from langchain_tavily.tavily_search import (
+        TavilySearchAPIWrapper as OriginalTavilySearchAPIWrapper,
+    )
+except ImportError:
+    TAVILY_API_URL = "https://api.tavily.com"  # fallback default
+    OriginalTavilySearchAPIWrapper = None  # type: ignore[misc, assignment]
 
 
 class EnhancedTavilySearchAPIWrapper(OriginalTavilySearchAPIWrapper):

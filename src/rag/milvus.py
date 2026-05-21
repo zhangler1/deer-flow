@@ -6,7 +6,10 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
-from langchain_milvus.vectorstores import Milvus as LangchainMilvus
+try:
+    from langchain_milvus.vectorstores import Milvus as LangchainMilvus
+except ImportError:
+    LangchainMilvus = None  # type: ignore[misc, assignment]
 from pymilvus import MilvusClient, CollectionSchema, FieldSchema, DataType
 from langchain_openai import OpenAIEmbeddings
 from openai import OpenAI

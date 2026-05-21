@@ -5,7 +5,10 @@ from src.config.tools import SELECTED_RAG_PROVIDER, RAGProvider
 from src.rag.ragflow import RAGFlowProvider
 from src.rag.retriever import Retriever
 from src.rag.vikingdb_knowledge_base import VikingDBKnowledgeBaseProvider
-from src.rag.milvus import MilvusProvider
+try:
+    from src.rag.milvus import MilvusProvider
+except ImportError:
+    MilvusProvider = None  # type: ignore[misc, assignment]
 
 
 def build_retriever() -> Retriever | None:
@@ -14,6 +17,11 @@ def build_retriever() -> Retriever | None:
     elif SELECTED_RAG_PROVIDER == RAGProvider.VIKINGDB_KNOWLEDGE_BASE.value:
         return VikingDBKnowledgeBaseProvider()
     elif SELECTED_RAG_PROVIDER == RAGProvider.MILVUS.value:
+        if MilvusProvider is None:
+            raise ImportError(
+                "langchain-milvus is required for Milvus RAG provider. "
+                "Install it with: pip install langchain-milvus"
+            )
         return MilvusProvider()
     elif SELECTED_RAG_PROVIDER:
         raise ValueError(f"Unsupported RAG provider: {SELECTED_RAG_PROVIDER}")
