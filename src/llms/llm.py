@@ -285,6 +285,16 @@ def _get_env_llm_conf(llm_type: str) -> Dict[str, Any]:
     return conf
 
 
+def _attach_langfuse_callback(llm_instance: BaseChatModel) -> BaseChatModel:
+    """Attach Langfuse tracing callback to an LLM instance if configured."""
+    from src.tracing import build_langfuse_callback
+    callback = build_langfuse_callback()
+    if callback:
+        existing_callbacks = llm_instance.callbacks or []
+        llm_instance.callbacks = [*existing_callbacks, callback]
+    return llm_instance
+
+
 def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatModel:
     """Create LLM instance using configuration."""
     llm_type_config_keys = _get_llm_type_config_keys()
@@ -355,7 +365,7 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
         merged_conf.pop("http_client", None)
         merged_conf.pop("http_async_client", None)
         merged_conf.pop("platform", None)
-        return EllmChatModel(**merged_conf)
+        return _attach_langfuse_callback(EllmChatModel(**merged_conf))
 
     is_google_aistudio = platform == "google_aistudio" or platform == "google-aistudio"
 
@@ -375,10 +385,10 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
         gemini_conf.pop("http_client", None)
         gemini_conf.pop("http_async_client", None)
 
-        return ChatGoogleGenerativeAI(**gemini_conf)
+        return _attach_langfuse_callback(ChatGoogleGenerativeAI(**gemini_conf))
 
     if "azure_endpoint" in merged_conf or os.getenv("AZURE_OPENAI_ENDPOINT"):
-        return AzureChatOpenAI(**merged_conf)
+        return _attach_langfuse_callback(AzureChatOpenAI(**merged_conf))
 
     # Check if base_url is dashscope endpoint
     if "base_url" in merged_conf and "dashscope." in merged_conf["base_url"]:
@@ -392,13 +402,13 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
                 "enable_thinking": False,
                 "chat_template_kwargs": {"enable_thinking": False}
             }
-        return ChatDashscope(**merged_conf)
+        return _attach_langfuse_callback(ChatDashscope(**merged_conf))
 
     if llm_type == "reasoning":
         merged_conf["api_base"] = merged_conf.pop("base_url", None)
-        return ChatDeepSeek(**merged_conf)
+        return _attach_langfuse_callback(ChatDeepSeek(**merged_conf))
     else:
-        return ChatOpenAI(**merged_conf)
+        return _attach_langfuse_callback(ChatOpenAI(**merged_conf))
 
 
 def get_llm_by_type(llm_type: LLMType) -> Union[BaseChatModel, 'EnhancedLLMWrapper']:
