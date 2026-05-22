@@ -22,8 +22,9 @@ import logging
 from typing import Any, Callable
 
 from langchain_core.messages import AIMessage, ToolMessage
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 class AgentMiddleware:

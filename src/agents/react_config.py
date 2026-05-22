@@ -25,8 +25,9 @@ import os
 from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 # ============================================================
