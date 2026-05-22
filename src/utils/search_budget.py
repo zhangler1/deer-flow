@@ -139,7 +139,7 @@ class SearchBudgetManager:
                 f"警告级别: {status.warning_level}"
             )
         elif status.warning_level > 0:
-            logger.info(
+            logger.debug(
                 f"💡 BUDGET_WARNING | 预算使用警告 | "
                 f"搜索次数: {status.search_calls_used}/{self.config.max_search_calls} | "
                 f"Tokens: {status.estimated_tokens}/{self.config.max_tokens} | "
