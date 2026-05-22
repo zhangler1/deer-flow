@@ -22,7 +22,6 @@
 """
 
 import json
-import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
@@ -30,9 +29,10 @@ from langchain_core.messages import BaseMessage, ToolMessage
 
 from src.agents.middleware import AgentMiddleware
 from src.tools.budget_controlled_search import get_budget_manager
+from src.utils.enhanced_logger import get_enhanced_logger
 from src.utils.search_budget import SearchBudgetManager
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 # 默认受控工具（白名单）。bocomsearch 不在此处，由 BudgetControlledSearchTool 包装器自行控制。

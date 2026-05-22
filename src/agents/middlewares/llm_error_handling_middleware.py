@@ -23,8 +23,9 @@ from typing import Any, Callable
 from langchain_core.messages import AIMessage
 
 from src.agents.middleware import AgentMiddleware
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 @dataclass

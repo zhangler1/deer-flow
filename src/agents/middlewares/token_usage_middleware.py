@@ -26,8 +26,9 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 from src.agents.middleware import AgentMiddleware
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 # 默认 token 估算比率（字符数 / token），中英混合取 3.5
 DEFAULT_TOKEN_CHARS_RATIO = 3.5
