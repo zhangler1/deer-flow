@@ -8,23 +8,20 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 import psycopg
 from psycopg.rows import dict_row
-from pymongo import MongoClient
+
 from langgraph.store.memory import InMemoryStore
 from src.config.loader import get_bool_env, get_str_env
 
 
 class ChatStreamManager:
-    """
-    Manages chat stream messages with persistent storage and in-memory caching.
-
+    """Manages chat stream messages with persistent storage and in-memory caching.
+    
     This class handles the storage and retrieval of chat messages using both
-    an in-memory store for temporary data and MongoDB or PostgreSQL for persistent storage.
+    an in-memory store for temporary data and PostgreSQL for persistent storage.
     It tracks message chunks and consolidates them when a conversation finishes.
-
+    
     Attributes:
         store (InMemoryStore): In-memory storage for temporary message chunks
-        mongo_client (MongoClient): MongoDB client connection
-        mongo_db (Database): MongoDB database instance
         postgres_conn (psycopg.Connection): PostgreSQL connection
         logger (logging.Logger): Logger instance for this class
     """
@@ -32,11 +29,10 @@ class ChatStreamManager:
     def __init__(
         self, checkpoint_saver: bool = False, db_uri: Optional[str] = None
     ) -> None:
-        """
-        Initialize the ChatStreamManager with database connections.
-
+        """Initialize the ChatStreamManager with database connections.
+        
         Args:
-            db_uri: Database connection URI. Supports MongoDB (mongodb://) and PostgreSQL (postgresql://)
+            db_uri: Database connection URI. Supports PostgreSQL (postgresql://)
                    If None, uses LANGGRAPH_CHECKPOINT_DB_URL env var or defaults to localhost
         """
         self.logger = logging.getLogger(__name__)
@@ -44,38 +40,22 @@ class ChatStreamManager:
         self.checkpoint_saver = checkpoint_saver
         # Use provided URI or fall back to environment variable or default
         self.db_uri = db_uri
-
+        
         # Initialize database connections
-        self.mongo_client = None
-        self.mongo_db = None
         self.postgres_conn = None
-
+        
         if self.checkpoint_saver:
-            if self.db_uri.startswith("mongodb://"):
-                self._init_mongodb()
-            elif self.db_uri.startswith("postgresql://") or self.db_uri.startswith(
+            if self.db_uri.startswith("postgresql://") or self.db_uri.startswith(
                 "postgres://"
             ):
                 self._init_postgresql()
             else:
                 self.logger.warning(
                     f"Unsupported database URI scheme: {self.db_uri}. "
-                    "Supported schemes: mongodb://, postgresql://, postgres://"
+                    "Supported scheme: postgresql://"
                 )
         else:
             self.logger.warning("Checkpoint saver is disabled")
-
-    def _init_mongodb(self) -> None:
-        """Initialize MongoDB connection."""
-
-        try:
-            self.mongo_client = MongoClient(self.db_uri)
-            self.mongo_db = self.mongo_client.checkpointing_db
-            # Test connection
-            self.mongo_client.admin.command("ping")
-            self.logger.info("Successfully connected to MongoDB")
-        except Exception as e:
-            self.logger.error(f"Failed to connect to MongoDB: {e}")
 
     def _init_postgresql(self) -> None:
         """Initialize PostgreSQL connection and create table if needed."""
@@ -118,7 +98,7 @@ class ChatStreamManager:
 
         This method handles individual message chunks during streaming and consolidates
         them into a complete message when the stream finishes. Messages are stored
-        temporarily in memory and permanently in MongoDB when complete.
+        temporarily in memory and permanently in PostgreSQL when complete.
 
         Args:
             thread_id: Unique identifier for the conversation thread
@@ -173,7 +153,7 @@ class ChatStreamManager:
         self, thread_id: str, store_namespace: Tuple[str, str], final_index: int
     ) -> bool:
         """
-        Persist completed conversation to database (MongoDB or PostgreSQL).
+        Persist completed conversation to PostgreSQL.
 
         Retrieves all message chunks from memory store and saves the complete
         conversation to the configured database for permanent storage.
@@ -207,10 +187,8 @@ class ChatStreamManager:
                 self.logger.warning("Checkpoint saver is disabled")
                 return False
 
-            # Choose persistence method based on available connection
-            if self.mongo_db is not None:
-                return self._persist_to_mongodb(thread_id, messages)
-            elif self.postgres_conn is not None:
+            # Persist to PostgreSQL
+            if self.postgres_conn is not None:
                 return self._persist_to_postgresql(thread_id, messages)
             else:
                 self.logger.warning("No database connection available")
@@ -220,46 +198,6 @@ class ChatStreamManager:
             self.logger.error(
                 f"Error persisting conversation for thread {thread_id}: {e}"
             )
-            return False
-
-    def _persist_to_mongodb(self, thread_id: str, messages: List[str]) -> bool:
-        """Persist conversation to MongoDB."""
-        try:
-            # Get MongoDB collection for chat streams
-            collection = self.mongo_db.chat_streams
-
-            # Check if conversation already exists in database
-            existing_document = collection.find_one({"thread_id": thread_id})
-
-            current_timestamp = datetime.now()
-
-            if existing_document:
-                # Update existing conversation with new messages
-                update_result = collection.update_one(
-                    {"thread_id": thread_id},
-                    {"$set": {"messages": messages, "ts": current_timestamp}},
-                )
-                self.logger.info(
-                    f"Updated conversation for thread {thread_id}: "
-                    f"{update_result.modified_count} documents modified"
-                )
-                return update_result.modified_count > 0
-            else:
-                # Create new conversation document
-                new_document = {
-                    "thread_id": thread_id,
-                    "messages": messages,
-                    "ts": current_timestamp,
-                    "id": uuid.uuid4().hex,
-                }
-                insert_result = collection.insert_one(new_document)
-                self.logger.info(
-                    f"Created new conversation: {insert_result.inserted_id}"
-                )
-                return insert_result.inserted_id is not None
-
-        except Exception as e:
-            self.logger.error(f"Error persisting to MongoDB: {e}")
             return False
 
     def _persist_to_postgresql(self, thread_id: str, messages: List[str]) -> bool:
@@ -320,13 +258,6 @@ class ChatStreamManager:
     def close(self) -> None:
         """Close database connections."""
         try:
-            if self.mongo_client is not None:
-                self.mongo_client.close()
-                self.logger.info("MongoDB connection closed")
-        except Exception as e:
-            self.logger.error(f"Error closing MongoDB connection: {e}")
-
-        try:
             if self.postgres_conn is not None:
                 self.postgres_conn.close()
                 self.logger.info("PostgreSQL connection closed")
@@ -346,7 +277,7 @@ class ChatStreamManager:
 # TODO: Consider using dependency injection instead of global instance
 _default_manager = ChatStreamManager(
     checkpoint_saver=get_bool_env("LANGGRAPH_CHECKPOINT_SAVER", False),
-    db_uri=get_str_env("LANGGRAPH_CHECKPOINT_DB_URL", "mongodb://localhost:27017"),
+    db_uri=get_str_env("LANGGRAPH_CHECKPOINT_DB_URL", "postgresql://localhost:5432/deerflow"),
 )
 
 

@@ -166,7 +166,7 @@ def build_graph_with_memory():
 def build_graph():
     """Build and return the agent workflow graph with memory (default)."""
     # 默认使用 MemorySaver 作为 checkpointer，支持对话历史持久化
-    # 如果配置了 PostgreSQL/MongoDB，会在 app.py 中被覆盖
+    # 如果配置了 PostgreSQL，会在 app.py 中被覆盖
     memory = MemorySaver()
     
     # build state graph

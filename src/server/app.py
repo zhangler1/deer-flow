@@ -879,16 +879,14 @@ async def _astream_workflow_generator(
                     graph, workflow_input, workflow_config, thread_id
                 ):
                     yield event
-
-        if checkpoint_url.startswith("mongodb://"):
-            logger.warning("MongoDB checkpoint is no longer supported. Falling back to in-memory.")
-            # MongoDB checkpoint has been removed
+        else:
+            logger.warning(f"Unsupported checkpoint URL scheme: {checkpoint_url}. Only postgresql:// is supported.")
             async for event in _stream_graph_events(
                 graph, workflow_input, workflow_config, thread_id
             ):
                 yield event
     else:
-        # Use graph without MongoDB checkpointer
+        # Use graph without checkpointer
         async for event in _stream_graph_events(
             graph, workflow_input, workflow_config, thread_id
         ):

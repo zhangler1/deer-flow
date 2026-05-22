@@ -25,7 +25,7 @@ services:
     # build:
     #   context: .
     #   dockerfile: Dockerfile
-    image: deer-flow-backend:latest
+    image: deer-flow-backend.prd:latest
     container_name: deer-flow-backend
     # Remove the ports section to not expose to host
     ports:
