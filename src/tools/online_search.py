@@ -16,8 +16,9 @@ import os
 from typing import Optional
 
 from src.tools.custom_search import CustomSearchTool
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 _DEFAULT_MAX_RESULTS_FALLBACK = 2
 

@@ -16,8 +16,7 @@ from src.config.tools import SELECTED_RAG_PROVIDER
 from src.rag import Document, Resource, Retriever, build_retriever
 from src.utils.enhanced_logger import console_print, get_enhanced_logger
 
-logger = logging.getLogger(__name__)
-enhanced_logger = get_enhanced_logger('tools.retriever')
+logger = get_enhanced_logger(__name__).logger
 
 
 class RetrieverInput(BaseModel):
@@ -40,7 +39,7 @@ class RetrieverTool(BaseTool):
         start_time = time.time()
         
         # 记录本地检索开始
-        enhanced_logger.logger.info(
+        logger.info(
             f"📚 RETRIEVAL_START | local_search | 开始本地知识库检索 | "
             f"关键词: '{keywords}' | 资源数: {len(self.resources)}"
         )
@@ -57,7 +56,7 @@ class RetrieverTool(BaseTool):
         duration = time.time() - start_time
         
         if not documents:
-            enhanced_logger.logger.info(
+            logger.info(
                 f"⚠️ RETRIEVAL_EMPTY | local_search | 本地检索无结果 | 耗时: {duration:.2f}s"
             )
             console_print(
@@ -67,7 +66,7 @@ class RetrieverTool(BaseTool):
             return "No results found from the local knowledge base."
         
         # 记录检索完成
-        enhanced_logger.logger.info(
+        logger.info(
             f"✅ RETRIEVAL_COMPLETE | local_search | 本地检索完成 | "
             f"结果数: {len(documents)} | 耗时: {duration:.2f}s"
         )

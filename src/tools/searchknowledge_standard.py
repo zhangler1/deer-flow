@@ -36,8 +36,9 @@ import requests
 from langchain_core.tools import tool  # type: ignore
 
 from src.tools.bocom_search import SearchResultItem, _validate_search_results
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 class SearchKnowledgeStandardConfig:

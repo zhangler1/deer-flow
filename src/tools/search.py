@@ -31,8 +31,7 @@ from src.tools.tavily_search.tavily_search_results_with_images import (
 from src.tools.custom_search import get_custom_search_tool
 from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
-enhanced_logger = get_enhanced_logger('tools.search')
+logger = get_enhanced_logger(__name__).logger
 
 # Create logged versions of the search tools
 LoggedTavilySearch = create_logged_tool(TavilySearchWithImages)
@@ -56,7 +55,7 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None):
     # Use provided engine, or from config file, or fall back to environment variable
     selected_engine = engine or search_config.get("engine") or SELECTED_SEARCH_ENGINE
     
-    enhanced_logger.logger.info(f"🔧 TOOL_INIT | web_search | 初始化搜索工具 | 引擎: {selected_engine} | 最大结果数: {max_search_results}")
+    logger.info(f"🔧 TOOL_INIT | web_search | 初始化搜索工具 | 引擎: {selected_engine} | 最大结果数: {max_search_results}")
     logger.info(f"Using search engine: {selected_engine}")
 
     if selected_engine == SearchEngine.TAVILY.value:
@@ -64,7 +63,7 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None):
         include_domains: Optional[List[str]] = search_config.get("include_domains", [])
         exclude_domains: Optional[List[str]] = search_config.get("exclude_domains", [])
 
-        enhanced_logger.logger.info(
+        logger.info(
             f"🔧 TOOL_CONFIG | Tavily搜索配置 | 包含域名: {include_domains} | 排除域名: {exclude_domains}"
         )
         logger.info(
@@ -81,7 +80,7 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None):
             exclude_domains=exclude_domains or [],
         )
         duration = time.time() - start_time
-        enhanced_logger.logger.info(f"🔧 TOOL_READY | Tavily搜索工具就绪 | 耗时: {duration:.2f}s")
+        logger.info(f"🔧 TOOL_READY | Tavily搜索工具就绪 | 耗时: {duration:.2f}s")
         return tool
     elif selected_engine == SearchEngine.DUCKDUCKGO.value:
         tool = LoggedDuckDuckGoSearch(
@@ -89,7 +88,7 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None):
             num_results=max_search_results,
         )
         duration = time.time() - start_time
-        enhanced_logger.logger.info(f"🔧 TOOL_READY | DuckDuckGo搜索工具就绪 | 耗时: {duration:.2f}s")
+        logger.info(f"🔧 TOOL_READY | DuckDuckGo搜索工具就绪 | 耗时: {duration:.2f}s")
         return tool
     elif selected_engine == SearchEngine.BRAVE_SEARCH.value:
         tool = LoggedBraveSearch(
@@ -100,7 +99,7 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None):
             ),
         )
         duration = time.time() - start_time
-        enhanced_logger.logger.info(f"🔧 TOOL_READY | Brave搜索工具就绪 | 耗时: {duration:.2f}s")
+        logger.info(f"🔧 TOOL_READY | Brave搜索工具就绪 | 耗时: {duration:.2f}s")
         return tool
     elif selected_engine == SearchEngine.ARXIV.value:
         return LoggedArxivSearch(
@@ -132,8 +131,8 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None):
         # 使用默认 repository 的自定义搜索引擎（repository 配置已废弃）
         tool = get_custom_search_tool(max_results=max_search_results)
         duration = time.time() - start_time
-        enhanced_logger.logger.info(f"🔧 TOOL_READY | 默认自定义搜索工具就绪 | 耗时: {duration:.2f}s")
+        logger.info(f"🔧 TOOL_READY | 默认自定义搜索工具就绪 | 耗时: {duration:.2f}s")
         return tool
     else:
-        enhanced_logger.logger.error(f"❌ TOOL_ERROR | 不支持的搜索引擎: {selected_engine}")
+        logger.error(f"❌ TOOL_ERROR | 不支持的搜索引擎: {selected_engine}")
         raise ValueError(f"Unsupported search engine: {selected_engine}")

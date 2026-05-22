@@ -20,8 +20,9 @@ from pydantic import Field
 from src.tools.tavily_search.tavily_search_api_wrapper import (
     EnhancedTavilySearchAPIWrapper,
 )
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 class TavilySearchWithImages(TavilySearchResults):  # type: ignore[override, override]

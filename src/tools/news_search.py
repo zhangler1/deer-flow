@@ -24,8 +24,9 @@ from langchain_core.tools import tool
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from utils.rerank import rerank_news
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 class NewsSearchConfig:

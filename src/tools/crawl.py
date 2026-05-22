@@ -16,8 +16,7 @@ from .decorators import log_io
 
 
 
-logger = logging.getLogger(__name__)
-enhanced_logger = get_enhanced_logger('tools.crawl')
+logger = get_enhanced_logger(__name__).logger
 
 
 class CrawlToolCache:
@@ -121,11 +120,11 @@ URL：{url}
         if len(summary) > 150:
             summary = summary[:147] + "..."
         
-        enhanced_logger.logger.debug(f"🤖 AI_SUMMARY | {summary}")
+        logger.debug(f"🤖 AI_SUMMARY | {summary}")
         return summary
         
     except Exception as e:
-        enhanced_logger.logger.warning(f"⚠️  SUMMARY_ERROR | 生成摘要失败: {str(e)}")
+        logger.warning(f"⚠️  SUMMARY_ERROR | 生成摘要失败: {str(e)}")
         # 如果失败，返回一个简单的默认摘要
         return f"我已精读了这篇文章：{title}。"
 
@@ -183,7 +182,7 @@ async def _crawl_tool_async(
             cached_result['cached'] = True
             cached_result['cache_hit_time'] = time.time() - start_time
             
-            enhanced_logger.logger.info(
+            logger.info(
                 f"💾 CACHE_HIT | 命中缓存 | URL: {url}"
             )
             console_print(
@@ -193,7 +192,7 @@ async def _crawl_tool_async(
             
             return cached_result
     
-    enhanced_logger.logger.info(
+    logger.info(
         f"🔍 READING_TOOL_START | 开始精读原文 | URL: {url}"
     )
     console_print(
@@ -227,7 +226,7 @@ async def _crawl_tool_async(
         
         duration = time.time() - start_time
         
-        enhanced_logger.logger.info(
+        logger.info(
             f"✅ READING_SUCCESS | 精读完成 | "
             f"标题: {article.title} | 内容长度: {len(markdown_content)} | "
             f"截断: {is_truncated} | 耗时: {duration:.2f}s\n"
@@ -254,7 +253,7 @@ async def _crawl_tool_async(
         # 存入缓存
         if use_cache:
             _global_cache.set(url, result.copy())
-            enhanced_logger.logger.debug(f"💾 CACHE_STORED | 已存入缓存 | URL: {url}")
+            logger.debug(f"💾 CACHE_STORED | 已存入缓存 | URL: {url}")
         
         return result
         
@@ -262,7 +261,7 @@ async def _crawl_tool_async(
         duration = time.time() - start_time
         error_msg = f"Failed to crawl. Error: {repr(e)}"
         
-        enhanced_logger.logger.error(
+        logger.error(
             f"❌ READING_ERROR | 精读失败 | "
             f"URL: {url} | 错误: {str(e)} | 耗时: {duration:.2f}s"
         )
@@ -296,7 +295,7 @@ async def batch_crawl_tool(
     """
     start_time = time.time()
     
-    enhanced_logger.logger.info(
+    logger.info(
         f"📦 BATCH_READING_START | 开始批量精读 | 数量: {len(urls)}"
     )
     console_print(
@@ -309,7 +308,7 @@ async def batch_crawl_tool(
     cache_hit_count = 0
     
     for i, url in enumerate(urls, 1):
-        enhanced_logger.logger.info(
+        logger.info(
             f"📄 BATCH_PROGRESS | 进度: {i}/{len(urls)} | URL: {url}"
         )
         console_print(
@@ -334,7 +333,7 @@ async def batch_crawl_tool(
                     "success": False
                 })
         except Exception as e:
-            enhanced_logger.logger.error(
+            logger.error(
                 f"❌ BATCH_ITEM_ERROR | URL处理失败: {url} | 错误: {str(e)}"
             )
             results.append({
@@ -345,7 +344,7 @@ async def batch_crawl_tool(
     
     duration = time.time() - start_time
     
-    enhanced_logger.logger.info(
+    logger.info(
         f"✅ BATCH_READING_COMPLETE | 批量精读完成 | "
         f"成功: {success_count}/{len(urls)} | 缓存命中: {cache_hit_count} | 耗时: {duration:.2f}s"
     )
@@ -368,7 +367,7 @@ def clear_crawl_cache() -> str:
     """
     count = _global_cache.clear()
     
-    enhanced_logger.logger.info(
+    logger.info(
         f"🗑️ CACHE_CLEARED | 已清空缓存 | 清除数量: {count}"
     )
     console_print(

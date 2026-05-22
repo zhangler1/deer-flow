@@ -20,8 +20,9 @@ from utils.rerank import rerank_objects
 from data.research_skills_list import RESEARCH_SKILLS_LIST
 from data.business_marketing_client_research_skills_list import BUSINESS_MARKETING_CLIENT_RESEARCH_SKILLS_LIST
 from data.industry_research_skills_list import INDUSTRY_REPORT_SKILLS_LIST
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 def _read_prompt_file(filepath: str) -> str:

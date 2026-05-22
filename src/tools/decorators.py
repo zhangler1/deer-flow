@@ -8,8 +8,7 @@ from typing import Any, Callable, Type, TypeVar
 
 from src.utils.enhanced_logger import get_enhanced_logger, console_print
 
-logger = logging.getLogger(__name__)
-enhanced_logger = get_enhanced_logger('tools.decorators')
+logger = get_enhanced_logger(__name__).logger
 
 T = TypeVar("T")
 
@@ -63,7 +62,7 @@ class LoggedToolMixin:
         
         # 记录工具调用开始
         query = args[0] if args else kwargs.get('query', '')
-        enhanced_logger.logger.info(f"🔍 TOOL_CALL_START | {tool_name} | 开始检索")
+        logger.info(f"🔍 TOOL_CALL_START | {tool_name} | 开始检索")
         console_print(
             f"\033[32m[开始检索] 工具: {tool_name}\033[0m \033[35m| 查询: '{str(query)[:50]}...'\033[0m",
             level=logging.INFO
@@ -84,7 +83,7 @@ class LoggedToolMixin:
                 result_count = len(result) if result else 0
             
             # 记录工具调用结果
-            enhanced_logger.logger.info(
+            logger.info(
                 f"✅ TOOL_CALL_END | {tool_name} | 检索完成 | "
                 f"耗时: {duration:.2f}s | 结果数: {result_count}"
             )
@@ -136,7 +135,7 @@ class LoggedToolMixin:
             
         except Exception as e:
             duration = time.time() - start_time
-            enhanced_logger.logger.error(
+            logger.error(
                 f"❌ TOOL_CALL_ERROR | {tool_name} | 检索失败 | "
                 f"耗时: {duration:.2f}s | 错误: {str(e)}"
             )

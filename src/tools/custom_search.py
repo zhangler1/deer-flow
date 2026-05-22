@@ -19,8 +19,7 @@ from src.utils.enhanced_logger import console_print, get_enhanced_logger
 
 
 
-logger = logging.getLogger(__name__)
-enhanced_logger = get_enhanced_logger('tools.custom_search')
+logger = get_enhanced_logger(__name__).logger
 
 
 class MuwpUser(BaseModel):
@@ -331,7 +330,7 @@ class CustomSearchTool(BaseTool):
                 self.repository = original_repository
                 self.channel_id = original_channel_id
             
-            enhanced_logger.logger.error(
+            logger.error(
                 f"❌ SEARCH_ERROR | {self.name} | 搜索失败 | "
                 f"耗时: {duration:.2f}s | 错误: {str(e)}"
             )

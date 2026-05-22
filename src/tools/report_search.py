@@ -14,8 +14,9 @@ import requests
 import json
 from typing import Dict, Any, List
 from langchain_core.tools import tool
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 class ReportSearchConfig:

@@ -22,8 +22,9 @@ from src.tools.online_search import call_online_search
 # 导入 LLM 工具
 from src.llms.llm import get_llm_by_type
 from src.config.agents import LLMType
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 def _filter_search_results_by_date(

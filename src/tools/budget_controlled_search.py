@@ -25,6 +25,7 @@ from langchain_core.callbacks import CallbackManagerForToolRun
 from pydantic import BaseModel, Field
 
 from src.utils.search_budget import SearchBudgetManager
+from src.utils.enhanced_logger import get_enhanced_logger
 
 # 尝试导入 LangGraph 的 InjectedState；导入失败时用占位，
 # 保证非 LangGraph 环境下原有行为不被破坏。
@@ -35,7 +36,7 @@ except Exception:  # noqa: BLE001
     InjectedState = None  # type: ignore
     _INJECTED_STATE_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 
 # ============================================================================
