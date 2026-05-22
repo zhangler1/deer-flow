@@ -14,12 +14,8 @@ from src.tools.tavily_search.tavily_search_api_wrapper import (
 class TestEnhancedTavilySearchAPIWrapper:
     @pytest.fixture
     def wrapper(self):
-        with patch(
-            "src.tools.tavily_search.tavily_search_api_wrapper.OriginalTavilySearchAPIWrapper"
-        ):
-            wrapper = EnhancedTavilySearchAPIWrapper(tavily_api_key="dummy-key")
-            # The parent class is mocked, so initialization won't fail
-            return wrapper
+        wrapper = EnhancedTavilySearchAPIWrapper(tavily_api_key="dummy-key")
+        return wrapper
 
     @pytest.fixture
     def mock_response_data(self):

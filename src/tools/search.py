@@ -6,22 +6,32 @@ import os
 import time
 from typing import List, Optional
 
-try:
-    from langchain_community.tools import (
-        BraveSearch,
-        DuckDuckGoSearchResults,
-        WikipediaQueryRun,
-    )
-    from langchain_community.tools.arxiv import ArxivQueryRun
-    from langchain_community.utilities import (
-        ArxivAPIWrapper,
-        BraveSearchWrapper,
-        WikipediaAPIWrapper,
-    )
-    HAS_LANGCHAIN_COMMUNITY = True
-except ImportError:
-    HAS_LANGCHAIN_COMMUNITY = False
-from pydantic import SecretStr
+# DuckDuckGo / Brave / Arxiv / Wikipedia 搜索工具依赖 langchain_community
+# 对齐 2.0：这些工具已注释，如需使用请取消注释并安装 langchain-community
+# try:
+#     from langchain_community.tools import (
+#         BraveSearch,
+#         DuckDuckGoSearchResults,
+#         WikipediaQueryRun,
+#     )
+#     from langchain_community.tools.arxiv import ArxivQueryRun
+#     from langchain_community.utilities import (
+#         ArxivAPIWrapper,
+#         BraveSearchWrapper,
+#         WikipediaAPIWrapper,
+#     )
+#     HAS_LANGCHAIN_COMMUNITY = True
+# except ImportError:
+#     HAS_LANGCHAIN_COMMUNITY = False
+HAS_LANGCHAIN_COMMUNITY = False
+BraveSearch = None  # type: ignore[misc, assignment]
+DuckDuckGoSearchResults = None  # type: ignore[misc, assignment]
+WikipediaQueryRun = None  # type: ignore[misc, assignment]
+ArxivQueryRun = None  # type: ignore[misc, assignment]
+ArxivAPIWrapper = None  # type: ignore[misc, assignment]
+BraveSearchWrapper = None  # type: ignore[misc, assignment]
+WikipediaAPIWrapper = None  # type: ignore[misc, assignment]
+SecretStr = None  # type: ignore[misc, assignment]  # 仅 Brave 使用，已注释
 
 from src.config import SELECTED_SEARCH_ENGINE, SearchEngine, load_yaml_config
 from src.tools.decorators import create_logged_tool
@@ -33,12 +43,14 @@ from src.utils.enhanced_logger import get_enhanced_logger
 
 logger = get_enhanced_logger(__name__).logger
 
-# Create logged versions of the search tools
+# Tavily 已迁移到 tavily-python（对齐 2.0），不再依赖 langchain_community
 LoggedTavilySearch = create_logged_tool(TavilySearchWithImages)
-LoggedDuckDuckGoSearch = create_logged_tool(DuckDuckGoSearchResults)
-LoggedBraveSearch = create_logged_tool(BraveSearch)
-LoggedArxivSearch = create_logged_tool(ArxivQueryRun)
-LoggedWikipediaSearch = create_logged_tool(WikipediaQueryRun)
+
+# langchain_community 工具已注释（对齐 2.0），如需使用请取消上方导入注释并安装 langchain-community
+LoggedDuckDuckGoSearch = None
+LoggedBraveSearch = None
+LoggedArxivSearch = None
+LoggedWikipediaSearch = None
 
 
 def get_search_config():
@@ -59,6 +71,8 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None):
     logger.info(f"Using search engine: {selected_engine}")
 
     if selected_engine == SearchEngine.TAVILY.value:
+        if not LoggedTavilySearch:
+            raise ValueError("Tavily 不可用（tavily-python 未安装或 TAVILY_API_KEY 未配置），请切换搜索引擎")
         # Only get and apply include/exclude domains for Tavily
         include_domains: Optional[List[str]] = search_config.get("include_domains", [])
         exclude_domains: Optional[List[str]] = search_config.get("exclude_domains", [])
@@ -82,51 +96,16 @@ def get_web_search_tool(max_search_results: int, engine: Optional[str] = None):
         duration = time.time() - start_time
         logger.info(f"🔧 TOOL_READY | Tavily搜索工具就绪 | 耗时: {duration:.2f}s")
         return tool
+    # 以下搜索引擎依赖 langchain_community，对齐 2.0 已注释
+    # 如需启用，请取消文件顶部 langchain_community 导入注释并安装 langchain-community
     elif selected_engine == SearchEngine.DUCKDUCKGO.value:
-        tool = LoggedDuckDuckGoSearch(
-            name="web_search",
-            num_results=max_search_results,
-        )
-        duration = time.time() - start_time
-        logger.info(f"🔧 TOOL_READY | DuckDuckGo搜索工具就绪 | 耗时: {duration:.2f}s")
-        return tool
+        raise ValueError("DuckDuckGo 已禁用（对齐 2.0），如需使用请取消 search.py 中 langchain_community 导入注释")
     elif selected_engine == SearchEngine.BRAVE_SEARCH.value:
-        tool = LoggedBraveSearch(
-            name="web_search",
-            search_wrapper=BraveSearchWrapper(
-                api_key=SecretStr(os.getenv("BRAVE_SEARCH_API_KEY", "")),
-                search_kwargs={"count": max_search_results},
-            ),
-        )
-        duration = time.time() - start_time
-        logger.info(f"🔧 TOOL_READY | Brave搜索工具就绪 | 耗时: {duration:.2f}s")
-        return tool
+        raise ValueError("Brave 已禁用（对齐 2.0），如需使用请取消 search.py 中 langchain_community 导入注释")
     elif selected_engine == SearchEngine.ARXIV.value:
-        return LoggedArxivSearch(
-            name="web_search",
-            api_wrapper=ArxivAPIWrapper(
-                top_k_results=max_search_results,
-                load_max_docs=max_search_results,
-                load_all_available_meta=True,
-                arxiv_search=None,
-                arxiv_exceptions=None,
-            ),
-        )
+        raise ValueError("Arxiv 已禁用（对齐 2.0），如需使用请取消 search.py 中 langchain_community 导入注释")
     elif selected_engine == SearchEngine.WIKIPEDIA.value:
-        wiki_lang = search_config.get("wikipedia_lang", "en")
-        wiki_doc_content_chars_max = search_config.get(
-            "wikipedia_doc_content_chars_max", 4000
-        )
-        return LoggedWikipediaSearch(
-            name="web_search",
-            api_wrapper=WikipediaAPIWrapper(
-                lang=wiki_lang,
-                top_k_results=max_search_results,
-                load_all_available_meta=True,
-                doc_content_chars_max=wiki_doc_content_chars_max,
-                wiki_client=None,
-            ),
-        )
+        raise ValueError("Wikipedia 已禁用（对齐 2.0），如需使用请取消 search.py 中 langchain_community 导入注释")
     elif selected_engine == SearchEngine.CUSTOM_SEARCH.value:
         # 使用默认 repository 的自定义搜索引擎（repository 配置已废弃）
         tool = get_custom_search_tool(max_results=max_search_results)
