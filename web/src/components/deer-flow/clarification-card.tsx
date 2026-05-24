@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   HelpCircle,
   Check,
@@ -55,6 +56,8 @@ export function ClarificationCard({
   const total = questions.length;
   const current = questions[currentIndex];
   const isLocked = submitted || disabled;
+  // 记录切换方向，用于动画方向控制
+  const directionRef = useRef<1 | -1>(1);
 
   // 判断所有题是否都已回答
   const allAnswered = useMemo(
@@ -79,7 +82,10 @@ export function ClarificationCard({
 
         // 自动跳转下一题（非最后一题时，短暂延迟让用户看到选中反馈）
         if (currentIndex < total - 1) {
-          setTimeout(() => setCurrentIndex((prev) => Math.min(prev + 1, total - 1)), 300);
+          setTimeout(() => {
+            directionRef.current = 1;
+            setCurrentIndex((prev) => Math.min(prev + 1, total - 1));
+          }, 300);
         }
       } else {
         // 可编辑选项：答案由 customValue 驱动，不自动跳转
@@ -112,11 +118,17 @@ export function ClarificationCard({
 
   // 导航
   const goPrev = useCallback(() => {
-    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+    if (currentIndex > 0) {
+      directionRef.current = -1;
+      setCurrentIndex(currentIndex - 1);
+    }
   }, [currentIndex]);
 
   const goNext = useCallback(() => {
-    if (currentIndex < total - 1) setCurrentIndex(currentIndex + 1);
+    if (currentIndex < total - 1) {
+      directionRef.current = 1;
+      setCurrentIndex(currentIndex + 1);
+    }
   }, [currentIndex, total]);
 
   // 全部提交
@@ -146,13 +158,26 @@ export function ClarificationCard({
         </span>
       </div>
 
-      {/* 当前问题 */}
-      <p className="mb-4 text-base font-medium leading-relaxed">
-        {current.question}
-      </p>
+      {/* 当前问题 + 选项列表（带切换动画） */}
+      <AnimatePresence mode="wait" initial={false}>
+        {/*用 directionRef 记录切换方向（+1 = 前进，-1 = 后退）
+AnimatePresence mode="wait" 确保旧卡片退出完后再进入新卡片
+key={currentIndex} 让 framer-motion 知道"这是不同的内容"从而触发动画
+动画参数：水平偏移 60px + 透明度渐变，持续 250ms，比翻转更自然流畅 */}
+        <motion.div
+          key={currentIndex}
+          initial={{ x: directionRef.current * 60, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: directionRef.current * -60, opacity: 0 }}
+          transition={{ duration: 0.25, ease: "easeInOut" }}
+        >
+          {/* 问题 */}
+          <p className="mb-4 text-base font-medium leading-relaxed">
+            {current.question}
+          </p>
 
-      {/* 选项列表 */}
-      <div className="flex flex-col gap-2">
+          {/* 选项列表 */}
+          <div className="flex flex-col gap-2">
         {current.options.map((option, index) => {
           const isSelected = selectedIndices[currentIndex] === index;
           const label = OPTION_LABELS[index] || String(index + 1);
@@ -221,7 +246,9 @@ export function ClarificationCard({
             </div>
           );
         })}
-      </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
 
       {/* 底部操作栏：导航 + 确认 */}
       <div className="mt-4 flex items-center justify-between">
