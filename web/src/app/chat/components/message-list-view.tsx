@@ -119,7 +119,7 @@ export function MessageListView({
         const startOfResearch = researchIds.includes(messageId);
         
         // 检查是否应该渲染这个消息
-        // 用户消息、coordinator、planner、podcast、深度研究节点、智能路由节点都应该显示
+        // 用户消息、coordinator、planner、podcast、深度研究节点、智能路由节点、问题澄清卡片都应该显示
         if (!(
           message.role === "user" ||
           message.agent === "coordinator" ||
@@ -131,6 +131,7 @@ export function MessageListView({
           message.agent === "iterative_research_node" ||  // 添加迭代研究节点消息显示
           message.agent === "iterative_reporter_node" ||
           message.agent === "system" ||  // 终止提示等系统消息
+          message.tag === "clarification" ||  // 问题澄清卡片始终显示
           startOfResearch
         )) {
           return null;
@@ -242,14 +243,7 @@ export function MessageListView({
         })}
         <div className="flex h-8 w-full shrink-0"></div>
       </ul>
-      {/* 问题澄清卡片：当 interrupt 类型为 clarification 时展示（问卷模式，提交后不消失） */}
-      {interruptMessage?.tag === "clarification" &&
-        interruptMessage?.clarificationQuestions?.length && (
-          <ClarificationCardWrapper
-            questions={interruptMessage.clarificationQuestions}
-            onSendMessage={onSendMessage}
-          />
-        )}
+      {/* 问题澄清卡片渲染已移至 MessageListItem 内联，确保历史消息中卡片不消失 */}
       {responding && (noOngoingResearch || !ongoingResearchIsOpen) && (
         <LoadingAnimation className="ml-4 mb-4" />
       )}
@@ -786,6 +780,19 @@ function MessageListItem({
         <IterativeResearchCard message={message} />
       </div>
     );
+  } else if (message.tag === "clarification" && message.clarificationQuestions?.length) {
+    // 问题澄清卡片：内联渲染，确保提交后卡片不消失
+    // 判断是否仍处于可交互状态（当前 interrupt 未被 resume）
+    const isLive = message.finishReason === "interrupt" && !message.interruptFeedback;
+    content = (
+      <div className="w-full px-4">
+        <ClarificationCardWrapper
+          questions={message.clarificationQuestions}
+          onSendMessage={onSendMessage}
+          alreadySubmitted={!isLive}
+        />
+      </div>
+    );
   } else {
     content = message.content ? (
       <div
@@ -1299,14 +1306,17 @@ function ToolsDisplay({ tools }: { tools: string[] }) {
 function ClarificationCardWrapper({
   questions,
   onSendMessage,
+  alreadySubmitted = false,
 }: {
   questions: ClarificationQuestion[];
   onSendMessage?: (
     message: string,
     options?: { interruptFeedback?: string },
   ) => void;
+  /** 历史消息中已提交的卡片，直接以只读状态展示 */
+  alreadySubmitted?: boolean;
 }) {
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(alreadySubmitted);
 
   const handleSubmit = useCallback(
     (answers: string[]) => {
