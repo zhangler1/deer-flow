@@ -143,7 +143,7 @@ export function ClarificationCard({
     <div
       className={cn(
         "mx-auto my-4 w-full max-w-lg rounded-xl border bg-card p-5 shadow-sm",
-        isLocked && "pointer-events-none opacity-70",
+        isLocked && "opacity-80",
       )}
     >
       {/* 标题栏 */}
@@ -257,7 +257,7 @@ key={currentIndex} 让 framer-motion 知道"这是不同的内容"从而触发�
           <Button
             variant="ghost"
             size="sm"
-            disabled={currentIndex === 0 || isLocked}
+            disabled={currentIndex === 0}
             onClick={goPrev}
             className="gap-1 px-2"
           >
@@ -267,7 +267,7 @@ key={currentIndex} 让 framer-motion 知道"这是不同的内容"从而触发�
           <Button
             variant="ghost"
             size="sm"
-            disabled={currentIndex === total - 1 || isLocked}
+            disabled={currentIndex === total - 1}
             onClick={goNext}
             className="gap-1 px-2"
           >
