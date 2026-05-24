@@ -137,7 +137,7 @@ def clarification_node(
             ]
         }]
     
-    # 3. 构造多问题结构（每个问题 3 AI + 1 自定义）
+    # 3. 构造多问题结构（每个问题 3 AI + "以上都是" + 自定义）
     questions = []
     for q in questions_raw[:3]:  # 最多 3 个问题
         q_text = q.get("question", "请选择")
@@ -148,6 +148,9 @@ def clarification_node(
             {"text": opt, "value": opt, "editable": False}
             for opt in opts_text[:3]
         ]
+        # "以上都是" 选项：将所有 AI 选项拼接为答案
+        all_values = ";".join(opts_text[:3])
+        options.append({"text": "以上都是", "value": all_values, "editable": False})
         options.append({"text": "自定义答案", "value": "", "editable": True})
         questions.append({"question": q_text, "options": options})
     
@@ -191,10 +194,14 @@ def clarification_node(
         f"new_topic='{new_research_topic}' | 耗时={duration:.2f}s"
     )
 
+    # 递增澄清轮次
+    current_rounds = state.get("clarification_rounds", 0)
+
     return Command(
         update={
             "messages": updated_messages,
             "research_topic": new_research_topic,
+            "clarification_rounds": current_rounds + 1,
         },
         goto="coordinator",
     )

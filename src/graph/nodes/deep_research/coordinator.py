@@ -212,8 +212,19 @@ def coordinator_node(
         else:
             # 无工具调用：判断是否需要澄清
             if response.content and "[NEED_CLARIFICATION]" in response.content:
-                goto = "clarification"
-                enhanced_logger.logger.info(f"❓ NEED_CLARIFICATION | Coordinator判定问题需要澄清，进入澄清节点")
+                # 检查澄清轮次是否已达上限（3 轮）
+                clarification_rounds = state.get("clarification_rounds", 0)
+                if clarification_rounds >= 3:
+                    # 超过 3 轮，强制进入 planner，不再澄清
+                    goto = "planner"
+                    if state.get("enable_background_investigation"):
+                        goto = "background_investigator"
+                    enhanced_logger.logger.info(
+                        f"⚠️ CLARIFICATION_LIMIT_REACHED | 澄清已达{clarification_rounds}轮上限，强制进入 {goto}"
+                    )
+                else:
+                    goto = "clarification"
+                    enhanced_logger.logger.info(f"❓ NEED_CLARIFICATION | Coordinator判定问题需要澄清，进入澄清节点 (第{clarification_rounds + 1}轮)")
             else:
                 logger.warning(
                     "Coordinator response contains no tool calls. Terminating workflow execution."

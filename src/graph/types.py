@@ -38,6 +38,9 @@ class State(MessagesState):
     # 报告风格相关字段
     report_style: str = "academic"  # 报告风格: academic(学术) / industry_report(行业研报) / business_marketing(对公营销)
     
+    # 问题澄清轮次计数（最多 3 轮，超过后强制进入 planner）
+    clarification_rounds: int = 0
+    
     # GUWP Token 相关字段（用于交通银行内网搜索鉴权）
     guwp_token: str = None  # GUWP认证令牌，通过 state 传递确保线程安全（避免多用户并发时环境变量覆盖）
 
