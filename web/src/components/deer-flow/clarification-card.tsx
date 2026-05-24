@@ -11,6 +11,7 @@ import {
 
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
+import { Tooltip } from "~/components/deer-flow/tooltip";
 import type { ClarificationQuestion } from "~/core/messages";
 
 interface ClarificationCardProps {
@@ -75,14 +76,19 @@ export function ClarificationCard({
         const newAnswers = [...answers];
         newAnswers[currentIndex] = option.value || option.text;
         setAnswers(newAnswers);
+
+        // 自动跳转下一题（非最后一题时，短暂延迟让用户看到选中反馈）
+        if (currentIndex < total - 1) {
+          setTimeout(() => setCurrentIndex((prev) => Math.min(prev + 1, total - 1)), 300);
+        }
       } else {
-        // 可编辑选项：答案由 customValue 驱动
+        // 可编辑选项：答案由 customValue 驱动，不自动跳转
         const newAnswers = [...answers];
         newAnswers[currentIndex] = customValues[currentIndex] || "";
         setAnswers(newAnswers);
       }
     },
-    [isLocked, selectedIndices, currentIndex, current, answers, customValues],
+    [isLocked, selectedIndices, currentIndex, current, answers, customValues, total],
   );
 
   // 自定义输入变化
@@ -243,15 +249,23 @@ export function ClarificationCard({
           </Button>
         </div>
 
-        {/* 确认按钮 */}
-        <Button
-          size="sm"
-          disabled={!allAnswered || isLocked}
-          onClick={handleSubmit}
-          className="px-6"
+        {/* 确认按钮（未全部回答时显示 tooltip 提示） */}
+        <Tooltip
+          title={!allAnswered && !isLocked ? "请先回答全部问题后再提交" : undefined}
+          side="top"
         >
-          {submitted ? "已提交" : "确认提交"}
-        </Button>
+          <span> 
+            {/* 用 <span> 包裹是因为 disabled 的按钮不触发鼠标事件，需要外层元素承接 hover */}
+            <Button
+              size="sm"
+              disabled={!allAnswered || isLocked}
+              onClick={handleSubmit}
+              className="px-6"
+            >
+              {submitted ? "已提交" : "确认提交"}
+            </Button>
+          </span>
+        </Tooltip>
       </div>
     </div>
   );
