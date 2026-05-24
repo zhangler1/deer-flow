@@ -30,7 +30,7 @@ export interface Message {
   finishReason?: "stop" | "interrupt" | "tool_calls";
   interruptFeedback?: string;
   resources?: Array<Resource>;
-  tag?: "routing" | "planning" | "searching" | "crawling" | "iterative_answering" | "reporting" | "waiting_for_feedback" | "error" | "answering" | "round_progress";
+  tag?: "routing" | "planning" | "searching" | "crawling" | "iterative_answering" | "reporting" | "waiting_for_feedback" | "clarification" | "error" | "answering" | "round_progress";
   roundText?: string;
   /** 当前 plan step 索引（从0开始，由后端 SSE 事件传入） */
   stepIndex?: number;
@@ -41,6 +41,7 @@ export interface Message {
 export interface Option {
   text: string;
   value: string;
+  editable?: boolean;  // 标记是否为可编辑选项（如"自定义答案"）
 }
 
 export interface ToolCallRuntime {

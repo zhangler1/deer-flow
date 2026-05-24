@@ -409,19 +409,32 @@ def _create_interrupt_event(thread_id, event_data):
             content = str(interrupt_obj)
             logger.warning(f"Unable to extract content from interrupt object {type(interrupt_obj)}, using string representation")
         
+        # 区分中断类型：问题澄清 vs 计划确认
+        if isinstance(content, dict) and content.get("type") == "clarification":
+            # 问题澄清中断：使用 clarification 节点生成的动态选项
+            tag = "clarification"
+            options = content.get("options", [])
+            question = content.get("question", "")
+            display_content = question
+        else:
+            # 计划确认中断：保持原有的硬编码选项
+            tag = "waiting_for_feedback"
+            options = [
+                {"text": "编辑计划", "value": "edit_plan"},
+                {"text": "开始研究", "value": "accepted"},
+            ]
+            display_content = content if isinstance(content, str) else str(content)
+        
         return _make_event(
             "interrupt",
             {
                 "thread_id": thread_id,
                 "id": interrupt_id,
                 "role": "assistant",
-                "content": content,
+                "content": display_content,
                 "finish_reason": "interrupt",
-                "tag": "waiting_for_feedback",  # Add tag for interrupt events
-                "options": [
-                    {"text": "编辑计划", "value": "edit_plan"},
-                    {"text": "开始研究", "value": "accepted"},
-                ],
+                "tag": tag,
+                "options": options,
             },
         )
     except Exception as e:

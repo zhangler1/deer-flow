@@ -47,6 +47,7 @@ from src.graph.nodes.background import background_investigation_node
 # 深度研究路径节点
 from src.graph.nodes.deep_research import (
     coordinator_node,
+    clarification_node,
     planner_node,
     human_feedback_node,
     researcher_node,
@@ -69,6 +70,7 @@ __all__ = [
     
     # 深度研究路径节点
     "coordinator_node",
+    "clarification_node",
     "background_investigation_node",
     "planner_node",
     "human_feedback_node",

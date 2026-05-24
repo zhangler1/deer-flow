@@ -13,6 +13,7 @@ from .nodes import (
     background_investigation_node,
     # 暂时注释掉 coder_node 的导入
     # coder_node,
+    clarification_node,
     coordinator_node,
     human_feedback_node,
     planner_node,
@@ -127,6 +128,7 @@ def _build_base_graph():
 
     # 深度研究路径的节点
     builder.add_node("coordinator", coordinator_node)
+    builder.add_node("clarification", clarification_node)
     builder.add_node("background_investigator", background_investigation_node)
     builder.add_node("planner", planner_node)
     builder.add_node("reporter", reporter_node)

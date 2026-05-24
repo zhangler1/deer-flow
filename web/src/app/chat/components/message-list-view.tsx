@@ -15,6 +15,7 @@ import {
 import { useTranslations } from "next-intl";
 import React, { useCallback, useMemo, useRef, useState, useImperativeHandle } from "react";
 
+import { ClarificationCard } from "~/components/deer-flow/clarification-card";
 import { LoadingAnimation } from "~/components/deer-flow/loading-animation";
 import { FlowingText } from "~/components/deer-flow/flowing-text";
 import { Markdown } from "~/components/deer-flow/markdown";
@@ -241,6 +242,18 @@ export function MessageListView({
         })}
         <div className="flex h-8 w-full shrink-0"></div>
       </ul>
+      {/* 问题澄清卡片：当 interrupt 类型为 clarification 时展示 */}
+      {interruptMessage?.tag === "clarification" &&
+        interruptMessage?.options?.length && (
+          <ClarificationCard
+            question={interruptMessage.content}
+            options={interruptMessage.options}
+            onSelect={(value) =>
+              onSendMessage?.(value, { interruptFeedback: value })
+            }
+            disabled={!interruptMessage}
+          />
+        )}
       {responding && (noOngoingResearch || !ongoingResearchIsOpen) && (
         <LoadingAnimation className="ml-4 mb-4" />
       )}
@@ -593,6 +606,8 @@ function IterativeResearchCard({ message }: { message: Message }) {
           return t("reporting");
         case "waiting_for_feedback":
           return t("waitingForFeedback");
+        case "clarification":
+          return "正在澄清问题";
         case "error":
           return t("error");
         case "answering":

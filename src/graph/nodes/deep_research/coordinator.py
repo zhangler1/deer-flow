@@ -108,7 +108,7 @@ def _should_reset_state(state: dict) -> bool:
 
 def coordinator_node(
     state, config: RunnableConfig
-) -> Command[Literal["planner", "background_investigator", "__end__"]]:
+) -> Command[Literal["planner", "background_investigator", "clarification", "__end__"]]:
     """与客户沟通的协调节点"""
     start_time = time.time()
     enhanced_logger.logger.info(f"🔄 NODE_ENTRY | coordinator | 开始执行协调节点")
@@ -210,11 +210,15 @@ def coordinator_node(
                 logger.error(f"Error processing tool calls: {e}")
                 enhanced_logger.logger.error(f"❌ TOOL_CALL_ERROR | 处理工具调用失败: {str(e)}")
         else:
-            logger.warning(
-                "Coordinator response contains no tool calls. Terminating workflow execution."
-            )
-            enhanced_logger.logger.warning(f"⚠️ NO_TOOL_CALLS | Coordinator未返回工具调用，将终止工作流")
-            # logger.debug(f"Coordinator response: {response}")
+            # 无工具调用：判断是否需要澄清
+            if response.content and "[NEED_CLARIFICATION]" in response.content:
+                goto = "clarification"
+                enhanced_logger.logger.info(f"❓ NEED_CLARIFICATION | Coordinator判定问题需要澄清，进入澄清节点")
+            else:
+                logger.warning(
+                    "Coordinator response contains no tool calls. Terminating workflow execution."
+                )
+                enhanced_logger.logger.warning(f"⚠️ NO_TOOL_CALLS | Coordinator未返回工具调用，将终止工作流")
             enhanced_logger.logger.debug(f"📤 FULL_RESPONSE | {response}")
     except Exception as e:
         logger.error(f"Error accessing tool_calls: {e}")
