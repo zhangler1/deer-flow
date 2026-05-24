@@ -138,6 +138,18 @@ const REPORT_STYLES = [
     descriptionKey: "industryReportDesc",
     IconComponent: FileText,
   },
+  {
+    value: "business_marketing" as const,
+    labelKey: "businessMarketing",
+    descriptionKey: "businessMarketingDesc",
+    IconComponent: Building,
+  },
+  {
+    value: "business_marketing_client" as const,
+    labelKey: "businessMarketingClient",
+    descriptionKey: "businessMarketingClientDesc",
+    IconComponent: Building,
+  },
 ];
 
 export function ReportStyleDialog() {
