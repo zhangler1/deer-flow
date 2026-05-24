@@ -27,6 +27,8 @@ export interface Message {
   reasoningContentChunks?: string[];
   toolCalls?: ToolCallRuntime[];
   options?: Option[];
+  /** 问卷模式：多个澄清问题（由后端 clarification 节点生成） */
+  clarificationQuestions?: ClarificationQuestion[];
   finishReason?: "stop" | "interrupt" | "tool_calls";
   interruptFeedback?: string;
   resources?: Array<Resource>;
@@ -42,6 +44,12 @@ export interface Option {
   text: string;
   value: string;
   editable?: boolean;  // 标记是否为可编辑选项（如"自定义答案"）
+}
+
+/** 问卷中的单个澄清问题 */
+export interface ClarificationQuestion {
+  question: string;
+  options: Option[];
 }
 
 export interface ToolCallRuntime {

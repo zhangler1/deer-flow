@@ -39,7 +39,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import type { Message, Option } from "~/core/messages";
+import type { ClarificationQuestion, Message, Option } from "~/core/messages";
 import {
   closeResearch,
   openResearch,
@@ -242,16 +242,12 @@ export function MessageListView({
         })}
         <div className="flex h-8 w-full shrink-0"></div>
       </ul>
-      {/* 问题澄清卡片：当 interrupt 类型为 clarification 时展示 */}
+      {/* 问题澄清卡片：当 interrupt 类型为 clarification 时展示（问卷模式，提交后不消失） */}
       {interruptMessage?.tag === "clarification" &&
-        interruptMessage?.options?.length && (
-          <ClarificationCard
-            question={interruptMessage.content}
-            options={interruptMessage.options}
-            onSelect={(value) =>
-              onSendMessage?.(value, { interruptFeedback: value })
-            }
-            disabled={!interruptMessage}
+        interruptMessage?.clarificationQuestions?.length && (
+          <ClarificationCardWrapper
+            questions={interruptMessage.clarificationQuestions}
+            onSendMessage={onSendMessage}
           />
         )}
       {responding && (noOngoingResearch || !ongoingResearchIsOpen) && (
@@ -1294,5 +1290,39 @@ function ToolsDisplay({ tools }: { tools: string[] }) {
         </span>
       ))}
     </div>
+  );
+}
+
+/**
+ * 问题澄清卡片包装器：管理提交状态，确保卡片提交后不消失
+ */
+function ClarificationCardWrapper({
+  questions,
+  onSendMessage,
+}: {
+  questions: ClarificationQuestion[];
+  onSendMessage?: (
+    message: string,
+    options?: { interruptFeedback?: string },
+  ) => void;
+}) {
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = useCallback(
+    (answers: string[]) => {
+      setSubmitted(true);
+      // 将多个答案序列化为 JSON 传给后端
+      const payload = JSON.stringify(answers);
+      onSendMessage?.(payload, { interruptFeedback: payload });
+    },
+    [onSendMessage],
+  );
+
+  return (
+    <ClarificationCard
+      questions={questions}
+      onSubmit={handleSubmit}
+      submitted={submitted}
+    />
   );
 }

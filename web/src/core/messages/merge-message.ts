@@ -161,4 +161,8 @@ function mergeInterruptMessage(message: Message, event: InterruptEvent) {
   message.isStreaming = false;
   message.finishReason = "interrupt";  // 设置 finishReason 为 interrupt
   message.options = event.data.options;
+  // 问卷模式：多问题结构
+  if (event.data.questions) {
+    message.clarificationQuestions = event.data.questions;
+  }
 }

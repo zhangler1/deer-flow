@@ -411,32 +411,39 @@ def _create_interrupt_event(thread_id, event_data):
         
         # 区分中断类型：问题澄清 vs 计划确认
         if isinstance(content, dict) and content.get("type") == "clarification":
-            # 问题澄清中断：使用 clarification 节点生成的动态选项
+            # 问题澄清中断：传递 questions 数组（问卷模式）
             tag = "clarification"
-            options = content.get("options", [])
-            question = content.get("question", "")
-            display_content = question
+            questions = content.get("questions", [])
+            # 兼容旧的单问题格式
+            if not questions and content.get("question"):
+                questions = [{"question": content["question"], "options": content.get("options", [])}]
+            display_content = questions[0]["question"] if questions else ""
         else:
             # 计划确认中断：保持原有的硬编码选项
             tag = "waiting_for_feedback"
-            options = [
+            questions = None
+            display_content = content if isinstance(content, str) else str(content)
+        
+        event_data = {
+            "thread_id": thread_id,
+            "id": interrupt_id,
+            "role": "assistant",
+            "content": display_content,
+            "finish_reason": "interrupt",
+            "tag": tag,
+        }
+        
+        if tag == "clarification":
+            # 问卷模式：传递 questions 数组
+            event_data["questions"] = questions
+        else:
+            # 计划确认：传递 options 列表
+            event_data["options"] = [
                 {"text": "编辑计划", "value": "edit_plan"},
                 {"text": "开始研究", "value": "accepted"},
             ]
-            display_content = content if isinstance(content, str) else str(content)
         
-        return _make_event(
-            "interrupt",
-            {
-                "thread_id": thread_id,
-                "id": interrupt_id,
-                "role": "assistant",
-                "content": display_content,
-                "finish_reason": "interrupt",
-                "tag": tag,
-                "options": options,
-            },
-        )
+        return _make_event("interrupt", event_data)
     except Exception as e:
         logger.error(f"Error creating interrupt event: {e}, interrupt object type: {type(event_data.get('__interrupt__', [None])[0])}, available attributes: {dir(event_data.get('__interrupt__', [None])[0]) if event_data.get('__interrupt__') else 'N/A'}")
         # 返回一个基本的中断事件作为后备
