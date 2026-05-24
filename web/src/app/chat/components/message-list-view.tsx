@@ -782,8 +782,8 @@ function MessageListItem({
     );
   } else if (message.tag === "clarification" && message.clarificationQuestions?.length) {
     // 问题澄清卡片：内联渲染，确保提交后卡片不消失
-    // 判断是否仍处于可交互状态（当前 interrupt 未被 resume）
-    const isLive = message.finishReason === "interrupt" && !message.interruptFeedback;
+    // 判断是否仍处于可交互状态：当前活跃的 interrupt 消息才是可操作的
+    const isLive = _interruptMessage?.id === message.id;
     content = (
       <div className="w-full px-4">
         <ClarificationCardWrapper
