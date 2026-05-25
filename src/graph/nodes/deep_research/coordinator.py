@@ -13,7 +13,7 @@ import logging
 import time
 from typing import Literal
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
@@ -236,10 +236,12 @@ def coordinator_node(
         enhanced_logger.logger.error(f"❌ TOOL_CALLS_ACCESS_ERROR | 访问tool_calls属性失败: {str(e)}")
     
     # 只有当需要保存上下文时才添加到messages
+    # 注意：必须复用 response.id，否则后端去重逻辑无法匹配
+    # （LangGraph 流式发出的 chunk 用的是 response.id，手动创建的 AIMessage 如果用新 ID 就会绕过去重）
     messages = state.get("messages", [])
     if response.content:
-        messages.append(HumanMessage(content=response.content, name="coordinator"))
-        enhanced_logger.logger.debug(f"📝 ADDED_MESSAGE | 添加coordinator响应到消息列表")
+        messages.append(AIMessage(content=response.content, name="coordinator", id=response.id))
+        enhanced_logger.logger.info(f"📝 ADDED_MESSAGE | 添加coordinator响应到消息列表 | id={response.id}")
     
     enhanced_logger.logger.info(f"🎯 COORDINATOR_FINAL_GOTO | 最终跳转目标: {goto}")
     enhanced_logger.logger.debug(f"📊 COORDINATOR_FINAL_UPDATE | locale: {locale}, research_topic: {research_topic}")

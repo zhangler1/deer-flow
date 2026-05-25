@@ -150,7 +150,7 @@ export function ClarificationCard({
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <HelpCircle className="h-4 w-4" />
-          <span>{submitted ? "AI 确认完毕" : "AI 想确认一下"}</span>
+          <span>{submitted ? "确认完毕" : "问题澄清"}</span>
         </div>
         {/* 进度指示 */}
         <span className="text-xs text-muted-foreground">
