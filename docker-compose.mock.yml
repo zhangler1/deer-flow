@@ -41,8 +41,6 @@ services:
   # 这里的 environment 会合并到 docker-compose.yml 的 backend 配置上，
   # 并且优先级高于 env_file 中的 .env
   backend:
-    env_file:
-      - .env.local
     environment:
       # 搜索接口（8010 单端口，bocomsearch + online_search）
       - BOCOM_SEARCH_API_URL=http://mock-search:8010/ELLM.ELLM-OFFICE.V-1.0/querySources.do
