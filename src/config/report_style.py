@@ -9,3 +9,4 @@ class ReportStyle(enum.Enum):
     BUSINESS_MARKETING = "business_marketing"
     BUSINESS_MARKETING_CLIENT = "business_marketing_client"  # 对公营销报告-战客版
     INDUSTRY_REPORT = "industry_report"  # 行业研报
+    INDUSTRY_RESEARCH = "industry_research"  # 行业研究报告

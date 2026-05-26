@@ -1144,6 +1144,7 @@ async def enhance_prompt(request: EnhancePromptRequest):
                     "SOCIAL_MEDIA": ReportStyle.SOCIAL_MEDIA,
                     "BUSINESS_MARKETING": ReportStyle.BUSINESS_MARKETING,
                     "BUSINESS_MARKETING_CLIENT": ReportStyle.BUSINESS_MARKETING_CLIENT,
+                    "INDUSTRY_RESEARCH": ReportStyle.INDUSTRY_RESEARCH,
                 }
                 report_style = style_mapping.get(
                     request.report_style.upper(), ReportStyle.ACADEMIC

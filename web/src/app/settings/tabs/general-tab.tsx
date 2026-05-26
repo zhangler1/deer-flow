@@ -49,7 +49,7 @@ const generalFormSchema = z.object({
   // Others
   enableBackgroundInvestigation: z.boolean(),
   enableDeepThinking: z.boolean(),
-  reportStyle: z.enum(["academic", "popular_science", "news", "social_media", "business_marketing", "business_marketing_client", "industry_report"]),
+  reportStyle: z.enum(["academic", "popular_science", "news", "social_media", "business_marketing", "business_marketing_client", "industry_report", "industry_research"]),
   // 🐛 Debug Mode
   forceRoutingPath: z.enum(["direct_answer", "simple_search", "iterative_research", "deep_research"]).optional(),
 });

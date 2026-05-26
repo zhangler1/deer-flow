@@ -88,7 +88,9 @@
       "businessMarketingClient": "Business Marketing - Strategic Client",
       "businessMarketingClientDesc": "Professional, comprehensive in-depth analytical reports for strategic clients",
       "industryReport": "Industry Report",
-      "industryReportDesc": "Professional, comprehensive in-depth industry analysis based on a 20-step systematic process"
+      "industryReportDesc": "Professional, comprehensive in-depth industry analysis based on a 20-step systematic process",
+      "industryResearch": "Industry Research",
+      "industryResearchDesc": "6-step structured industry research report focusing on technology roadmaps, value chain analysis, and client expansion"
     },
     "researchType": {
       "researchType": "Research Type",
