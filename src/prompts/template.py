@@ -99,6 +99,15 @@ def apply_prompt_template(
         state_vars.update(dataclasses.asdict(configurable))
         report_style = getattr(configurable, 'report_style', None)
 
+    # Inject skills_section for researcher prompt
+    skills_section = ""
+    try:
+        from src.skills.prompt_builder import get_skills_prompt_section
+        skills_section = get_skills_prompt_section()
+    except Exception:
+        pass  # If skills system fails, continue without skills
+    state_vars["skills_section"] = skills_section
+
     # Get the appropriate environment based on report style
     prompt_env = _get_prompt_env(report_style)
 

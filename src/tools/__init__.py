@@ -42,6 +42,7 @@ from .report_search import (
 )
 
 from .research_skill_prompt_search import research_skill_prompt_search
+from .skill_manage_tool import skill_manage_tool
 from .budget_controlled_search import (
     BudgetControlledSearchTool,
     create_budget_controlled_search_tool,
@@ -93,6 +94,7 @@ __all__ = [
     "financial_summary",
     "call_financial_summary",
     "research_skill_prompt_search",
+    "skill_manage_tool",
     "report_search",
     "BudgetControlledSearchTool",
     "create_budget_controlled_search_tool",

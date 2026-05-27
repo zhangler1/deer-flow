@@ -10,11 +10,22 @@ from .summarization_config import (
     load_summarization_config_from_dict,
 )
 
+from .skills_config import (
+    SkillsConfig,
+    get_skills_config,
+    set_skills_config,
+    reset_skills_config,
+)
+
 __all__ = [
     "SummarizationConfig",
     "get_summarization_config",
     "set_summarization_config",
     "load_summarization_config_from_dict",
+    "SkillsConfig",
+    "get_skills_config",
+    "set_skills_config",
+    "reset_skills_config",
 ]
 
 from dotenv import load_dotenv
