@@ -38,6 +38,7 @@ def _get_prompt_env(report_style: Optional[str] = None) -> Environment:
         "business_marketing": "business_marketing",
         "business_marketing_client": "business_marketing_client",
         "industry_report": "industry_report",
+        "industry_research": "industry_research",
     }
 
     if report_style in style_dirs:

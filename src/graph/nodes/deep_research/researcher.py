@@ -182,6 +182,16 @@ async def researcher_node(
             tool_name_list.append("online_search")
         tool_names = ", ".join(tool_name_list)
 
+    elif report_style == "industry_research":
+        # 行业研究报告：使用 research_skill_prompt_search + online_search
+        tools = [research_skill_prompt_search]
+        tool_name_list = ["research_skill_prompt_search"]
+        # 根据开关决定是否添加在线搜索工具
+        if use_budget_online:
+            tools.append(online_search_tool(configurable.max_search_results))
+            tool_name_list.append("online_search")
+        tool_names = ", ".join(tool_name_list)
+
     elif report_style == "academic":
         # 学术研究：使用基础搜索工具
         session_id = state.get("session_id", "default")

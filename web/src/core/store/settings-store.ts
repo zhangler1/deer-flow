@@ -40,7 +40,7 @@ export type SettingsState = {
     searchEngine: "tavily" | "duckduckgo" | "brave_search" | "arxiv" | "wikipedia" | "custom_search";
     useBudgetControlledOnlineSearch: boolean;  // 是否使用budget控制的在线检索
     useBudgetControlledBocomSearch: boolean;   // 是否使用budget控制的bocom搜索
-    reportStyle: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report";
+    reportStyle: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report" | "industry_research";
     forceRoutingPath?: "direct_answer" | "simple_search" | "iterative_research" | "deep_research"; // 限制调试模式路由路径选项
   };
   mcp: {
@@ -149,7 +149,7 @@ export const getChatStreamSettings = () => {
 };
 
 export function setReportStyle(
-  value: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report",
+  value: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report" | "industry_research",
 ) {
   useSettingsStore.setState((state) => ({
     general: {

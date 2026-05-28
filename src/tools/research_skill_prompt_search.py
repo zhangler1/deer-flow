@@ -19,7 +19,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from utils.rerank import rerank_objects
 from data.research_skills_list import RESEARCH_SKILLS_LIST
 from data.business_marketing_client_research_skills_list import BUSINESS_MARKETING_CLIENT_RESEARCH_SKILLS_LIST
-from data.industry_research_skills_list import INDUSTRY_REPORT_SKILLS_LIST
+from data.industry_research_skills_list import INDUSTRY_REPORT_SKILLS_LIST, INDUSTRY_RESEARCH_SKILLS_LIST
 from src.utils.enhanced_logger import get_enhanced_logger
 
 logger = get_enhanced_logger(__name__).logger
@@ -73,6 +73,8 @@ def _get_skills_list(report_style: str = "business_marketing") -> list:
         return BUSINESS_MARKETING_CLIENT_RESEARCH_SKILLS_LIST
     elif report_style == "industry_report":
         return INDUSTRY_REPORT_SKILLS_LIST
+    elif report_style == "industry_research":
+        return INDUSTRY_RESEARCH_SKILLS_LIST
     else:
         return RESEARCH_SKILLS_LIST
 
@@ -209,6 +211,7 @@ def research_skill_prompt_search(
                       - "business_marketing": 对公营销报告-普客版(默认)
                       - "business_marketing_client": 对公营销报告-战客版
                       - "industry_report": 行业研报
+                      - "industry_research": 行业研究报告
                       如果未指定,默认使用 business_marketing。
 
     Returns:
@@ -226,6 +229,10 @@ def research_skill_prompt_search(
         >>> # 行业研报
         >>> research_skill_prompt_search(query="宏观和行业政策分析", report_style="industry_report")
         >>> research_skill_prompt_search(query="行业运行情况分析", report_style="industry_report")
+
+        >>> # 行业研究报告
+        >>> research_skill_prompt_search(query="优势与技术路线介绍", report_style="industry_research")
+        >>> research_skill_prompt_search(query="产业链全环节拆解", report_style="industry_research")
 
         >>> # 商机分析
         >>> research_skill_prompt_search(query="商机分析")

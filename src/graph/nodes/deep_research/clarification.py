@@ -171,17 +171,31 @@ def clarification_node(
     )
 
     # 5. 用户反馈回来后，将所有答案拼接为新的研究主题
-    # user_answer 可能是字符串（单答案兼容）或 JSON 字符串（多答案）
+    # user_answer 可能是字符串（单答案兼容）、JSON 字符串（多答案）或嵌套列表
+    def _flatten_answers(raw) -> list[str]:
+        """递归展开嵌套列表，返回扁平字符串列表。"""
+        if isinstance(raw, str):
+            return [raw] if raw.strip() else []
+        if isinstance(raw, list):
+            result = []
+            for item in raw:
+                result.extend(_flatten_answers(item))
+            return result
+        return [str(raw)]
+
     if isinstance(user_answer, str):
         try:
-            answers = json.loads(user_answer)
-            if isinstance(answers, list):
-                # 多答案：拼接为完整的研究方向描述
-                new_research_topic = "；".join(answers)
+            parsed = json.loads(user_answer)
+            if isinstance(parsed, list):
+                flat = _flatten_answers(parsed)
+                new_research_topic = "，".join(flat) if flat else user_answer
             else:
                 new_research_topic = user_answer
         except (json.JSONDecodeError, TypeError):
             new_research_topic = user_answer
+    elif isinstance(user_answer, list):
+        flat = _flatten_answers(user_answer)
+        new_research_topic = "，".join(flat) if flat else user_query
     else:
         new_research_topic = str(user_answer) if user_answer else user_query
 

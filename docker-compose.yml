@@ -32,6 +32,7 @@ services:
       - "8000:8000"
     env_file:
       - .env
+      - .env.local
     environment:
       - NODE_ID=docker-${HOSTNAME}
     expose:
@@ -42,6 +43,7 @@ services:
       - ./pyproject.toml:/app/pyproject.toml
       - ./src:/app/src
       - ./tests:/app/tests
+      - ./skills:/app/skills
 
     restart: unless-stopped
     networks:
@@ -56,7 +58,7 @@ services:
     #   dockerfile: Dockerfile.dev.yml
     #   args:
     #     - NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-    image: deer-flow-front:latest
+    image: deer-flow-front.dev:latest
     container_name: deer-flow-frontend
     expose:
       - "3000"
@@ -96,81 +98,10 @@ services:
       - postgres  # 依赖 PostgreSQL
       - frontend
       - backend
-      - easyparse-1
-      - easyparse-2
     restart: unless-stopped
-    networks:
-      - deer-flow-network
-  easyparse-1:
-    image: easyparse:latest
-    container_name: easyparse-1
-    environment:
-      - PORT=5000
-      - SERVER_WORKERS=${SERVER_WORKERS:-4}
-      - MD_WORKER=${MD_WORKER:-4}
-      - IMG_WORKER=${IMG_WORKER:-4}
-      - IMAGE_UPLOAD_URL=${IMAGE_UPLOAD_URL:-}
-      - IMAGE_OUTPUT_DIR=${IMAGE_OUTPUT_DIR:-/tmp/shared_all/assert}
-      - ERROR_IMG_DIR=${ERROR_IMG_DIR:-/tmp/shared_all/error}
-      - LOG_DIR=${LOG_DIR:-/tmp/shared_all/logs}
-      - LIMIT_MAX_REQUESTS=${LIMIT_MAX_REQUESTS:-200}
-      - TIMEOUT_GRACEFUL_SHUTDOWN=${TIMEOUT_GRACEFUL_SHUTDOWN:-30}
-    volumes:
-      - venv_data:/app/.venv
-      - shared_tmp:/tmp/shared_all
-      - ../easyparse:/app
-    restart: unless-stopped
-    healthcheck:
-      # 改为 TCP 端口探测，不依赖具体 HTTP 路径
-      # （原 /docs 返回 404 导致 curl -f 失败）
-      test: ["CMD-SHELL", "python -c \"import socket,sys;s=socket.socket();s.settimeout(3);s.connect(('127.0.0.1',5000));s.close()\" || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-    # 覆盖 Dockerfile 的 CMD，添加 limit-max-requests 参数
-    command: >
-      --port 5000
-      --workers ${SERVER_WORKERS:-4}
-      --limit-max-requests ${LIMIT_MAX_REQUESTS:-200}
-      --timeout-graceful-shutdown ${TIMEOUT_GRACEFUL_SHUTDOWN:-30}
     networks:
       - deer-flow-network
 
-  easyparse-2:
-    image: easyparse:latest
-    container_name: easyparse-2
-    environment:
-      - PORT=5000
-      - SERVER_WORKERS=${SERVER_WORKERS:-4}
-      - MD_WORKER=${MD_WORKER:-4}
-      - IMG_WORKER=${IMG_WORKER:-4}
-      - IMAGE_UPLOAD_URL=${IMAGE_UPLOAD_URL:-}
-      - IMAGE_OUTPUT_DIR=${IMAGE_OUTPUT_DIR:-/tmp/shared_all/assert}
-      - ERROR_IMG_DIR=${ERROR_IMG_DIR:-/tmp/shared_all/error}
-      - LOG_DIR=${LOG_DIR:-/tmp/shared_all/logs}
-      - LIMIT_MAX_REQUESTS=${LIMIT_MAX_REQUESTS:-200}
-      - TIMEOUT_GRACEFUL_SHUTDOWN=${TIMEOUT_GRACEFUL_SHUTDOWN:-30}
-    volumes:
-      - venv_data:/app/.venv
-      - shared_tmp:/tmp/shared_all
-      - ../easyparse:/app
-    restart: unless-stopped
-    healthcheck:
-      # 改为 TCP 端口探测，不依赖具体 HTTP 路径
-      test: ["CMD-SHELL", "python -c \"import socket,sys;s=socket.socket();s.settimeout(3);s.connect(('127.0.0.1',5000));s.close()\" || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-    # 覆盖 Dockerfile 的 CMD，添加 limit-max-requests 参数
-    command: >
-      --port 5000
-      --workers ${SERVER_WORKERS:-4}
-      --limit-max-requests ${LIMIT_MAX_REQUESTS:-200}
-      --timeout-graceful-shutdown ${TIMEOUT_GRACEFUL_SHUTDOWN:-30}
-    networks:
-      - deer-flow-network
 
 
 

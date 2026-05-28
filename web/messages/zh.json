@@ -88,7 +88,9 @@
       "businessMarketingClient": "对公营销报告-战客版",
       "businessMarketingClientDesc": "专业、全面深入,针对战略客户的分析报告",
       "industryReport": "行业研报",
-      "industryReportDesc": "专业、全面深入，基于20步系统化流程的行业深度分析报告"
+      "industryReportDesc": "专业、全面深入，基于20步系统化流程的行业深度分析报告",
+      "industryResearch": "行业研究报告",
+      "industryResearchDesc": "聚焦技术路线、产业链拆解与客户拓展的6步流程化行业研究报告"
     },
     "researchType": {
       "researchType": "研究类型",

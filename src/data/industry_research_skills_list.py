@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: MIT
 
 """
-行业研报研究技能提示词列表配置
+行业研究类技能提示词列表配置
 
-存储所有可用的行业研报研究技能提示词信息。
-每个技能包含 name 和 filepath 两个字段。
+存储行业研报和行业研究报告的研究技能提示词信息。
+每个技能包含 name、filepath 和 description 三个字段。
 """
 
-# 行业研报研究技能列表配置
+# 行业研报研究技能列表配置（industry_report）
 # 用于根据用户输入智能匹配最相关的提示词
 INDUSTRY_REPORT_SKILLS_LIST = [
   {
@@ -45,5 +45,40 @@ INDUSTRY_REPORT_SKILLS_LIST = [
     "name": "行业发展预测",
     "filepath": "src/prompts/industry_report/research_skills/行业发展预测.md",
     "description": "基于当前数据和趋势,预测行业未来发展方向、市场空间、机遇与挑战"
+  }
+]
+
+# 行业研究报告研究技能列表配置（industry_research）
+# 聚焦技术路线、产业链拆解与客户拓展的6步流程
+INDUSTRY_RESEARCH_SKILLS_LIST = [
+  {
+    "name": "优势与技术路线介绍",
+    "filepath": "src/prompts/industry_research/research_skills/优势与技术路线介绍.md",
+    "description": "分析目标行业的技术原理与产业优势、商业化核心指标与条件、主流技术路线及其进展"
+  },
+  {
+    "name": "产业发展情况",
+    "filepath": "src/prompts/industry_research/research_skills/产业发展情况.md",
+    "description": "分析全球产业发展现状（各国战略与政策、投资热度）、中国产业发展重点（战略政策、产业投资格局）"
+  },
+  {
+    "name": "产业链全环节拆解",
+    "filepath": "src/prompts/industry_research/research_skills/产业链全环节拆解.md",
+    "description": "分析上游材料领域、上游设备领域、中游系统建设领域、下游商业运用场景、产业链重点企业分布"
+  },
+  {
+    "name": "风险挑战分析",
+    "filepath": "src/prompts/industry_research/research_skills/风险挑战分析.md",
+    "description": "分析行业技术风险、市场风险、经营风险，提出风险管控建议"
+  },
+  {
+    "name": "行业案例介绍",
+    "filepath": "src/prompts/industry_research/research_skills/行业案例介绍.md",
+    "description": "分析行业典型案例的整体优势，对典型案例进行分类分析"
+  },
+  {
+    "name": "客户拓展思路",
+    "filepath": "src/prompts/industry_research/research_skills/客户拓展思路.md",
+    "description": "制定客户选择标准、产品适配方案、组织推动与渠道建设、业务创新方向、风险管控措施"
   }
 ]

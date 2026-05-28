@@ -448,36 +448,51 @@ export async function sendMessage(
     // Flush any remaining batched updates before finishing
     flushNow();
     setResponding(false);
-    // 兑底清理：无论什么分支（abort / 正常 / 错误），把所有仍在 isStreaming 的消息终止，防止波浪号不消失
+    // 兜底清理：把所有仍在 isStreaming 的消息终止，防止波浪号不消失
     try {
       const store = useStore.getState();
       const updated: Message[] = [];
-      let hasInterrupted = false;
+
+      // 判断是否存在 interrupt 消息（计划审核/问题澄清等正常中断）
+      // 如果有 interrupt，说明图是正常暂停等待用户输入，不应显示"已终止"
+      const hasInterruptMessage = Array.from(store.messages.values()).some(
+        (m) => m.finishReason === "interrupt",
+      );
+
       for (const id of store.messageIds) {
         const m = store.messages.get(id);
         if (m?.isStreaming) {
-          hasInterrupted = true;
-          const existing = m.content ?? "";
-          const newContent = existing
-            ? (existing.endsWith("[已终止]") ? existing : existing + "\n\n**[已终止]**")
-            : "**[已终止]**";
-          updated.push({
-            ...m,
-            isStreaming: false,
-            finishReason: m.finishReason ?? "stop",
-            content: newContent,
-          });
+          if (hasInterruptMessage) {
+            // 正常 interrupt（如计划审核）：仅停止流式动画，不追加终止文本
+            updated.push({
+              ...m,
+              isStreaming: false,
+              finishReason: m.finishReason ?? "stop",
+            });
+          } else {
+            // 非正常结束（错误/超时等）：追加"已终止"提示
+            const existing = m.content ?? "";
+            const newContent = existing
+              ? (existing.endsWith("[已终止]") ? existing : existing + "\n\n**[已终止]**")
+              : "**[已终止]**";
+            updated.push({
+              ...m,
+              isStreaming: false,
+              finishReason: m.finishReason ?? "stop",
+              content: newContent,
+            });
+          }
         }
       }
       if (updated.length > 0) {
         store.updateMessages(updated);
       }
       store.setOngoingResearch(null);
-      // 若确实发生了中断（有消息被打断），在主聊天区追加一条终止提示消息
-      if (hasInterrupted) {
+
+      // 只有在非 interrupt 且确实有消息被打断时，才追加终止提示
+      if (!hasInterruptMessage && updated.length > 0) {
         const lastMsgId = store.messageIds[store.messageIds.length - 1];
         const lastMsg = lastMsgId ? store.messages.get(lastMsgId) : undefined;
-        // 如果最后一条已经是终止提示，不重复添加
         if (!lastMsg || lastMsg.agent !== "system" || !lastMsg.content?.includes("研究已停止")) {
           store.appendMessage({
             id: nanoid(),

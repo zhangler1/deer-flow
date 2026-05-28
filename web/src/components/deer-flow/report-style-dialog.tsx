@@ -150,6 +150,12 @@ const REPORT_STYLES = [
     descriptionKey: "businessMarketingClientDesc",
     IconComponent: Building,
   },
+  {
+    value: "industry_research" as const,
+    labelKey: "industryResearch",
+    descriptionKey: "industryResearchDesc",
+    IconComponent: FileText,
+  },
 ];
 
 export function ReportStyleDialog() {

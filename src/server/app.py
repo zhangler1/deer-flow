@@ -642,6 +642,11 @@ async def _stream_graph_events(
     _step_title = ""
     _cached_plan_steps = None
 
+    # 去重：记录已通过流式 chunk 发送过内容的消息 ID
+    # LangGraph messages 流会发两次同一消息：1) LLM 流式 AIMessageChunk  2) 状态写回的完整 AIMessage
+    # 前端 mergeMessage 用 += 拼接，如果不去重会导致内容翻倍
+    _streamed_message_ids: set = set()
+
     try:
         # 使用显式异步迭代 + 超时心跳机制
         stream_iterator = graph_instance.astream(
@@ -747,6 +752,18 @@ async def _stream_graph_events(
             message_chunk, message_metadata = cast(
                 tuple[BaseMessage, dict[str, Any]], event_data
             )
+
+            # 去重：跳过已通过流式 chunk 发送过的完整 AIMessage（避免前端内容翻倍）
+            msg_id = getattr(message_chunk, 'id', None)
+            if isinstance(message_chunk, AIMessage) and not isinstance(message_chunk, AIMessageChunk):
+                if msg_id and msg_id in _streamed_message_ids:
+                    logger.info(f"[DEDUP] thread_id={thread_id} | ✅ 命中去重，跳过完整消息 id={msg_id}")
+                    continue
+                else:
+                    logger.info(f"[DEDUP] thread_id={thread_id} | ❌ 未命中去重 | id={msg_id} | type={type(message_chunk).__name__} | 已记录IDs={list(_streamed_message_ids)[:5]}")
+            elif isinstance(message_chunk, AIMessageChunk) and msg_id:
+                _streamed_message_ids.add(msg_id)
+                logger.debug(f"[DEDUP] thread_id={thread_id} | 记录流式chunk id={msg_id}")
 
             # 记录接收到消息块
             agent_name = _get_agent_name(agent, message_metadata)
@@ -1127,6 +1144,7 @@ async def enhance_prompt(request: EnhancePromptRequest):
                     "SOCIAL_MEDIA": ReportStyle.SOCIAL_MEDIA,
                     "BUSINESS_MARKETING": ReportStyle.BUSINESS_MARKETING,
                     "BUSINESS_MARKETING_CLIENT": ReportStyle.BUSINESS_MARKETING_CLIENT,
+                    "INDUSTRY_RESEARCH": ReportStyle.INDUSTRY_RESEARCH,
                 }
                 report_style = style_mapping.get(
                     request.report_style.upper(), ReportStyle.ACADEMIC
