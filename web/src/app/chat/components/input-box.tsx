@@ -5,13 +5,14 @@ import { MagicWandIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Detective } from "~/components/deer-flow/icons/detective";
 import MessageInput, {
   type MessageInputRef,
 } from "~/components/deer-flow/message-input";
 import { ReportStyleDialog } from "~/components/deer-flow/report-style-dialog";
+import { ReporterModelSelector } from "~/components/deer-flow/reporter-model-selector";
 import { ResearchTypeSelector } from "~/components/deer-flow/research-type-selector";
 import { Tooltip } from "~/components/deer-flow/tooltip";
 import { BorderBeam } from "~/components/magicui/border-beam";
@@ -21,6 +22,7 @@ import { useConfig } from "~/core/api/hooks";
 import type { Option, Resource } from "~/core/messages";
 import {
   setEnableBackgroundInvestigation,
+  setReporterModel,
   useSettingsStore,
 } from "~/core/store";
 import { cn } from "~/lib/utils";
@@ -56,6 +58,7 @@ export function InputBox({
 
   const { config, loading } = useConfig();
   const reportStyle = useSettingsStore((state) => state.general.reportStyle);
+  const reporterModel = useSettingsStore((state) => state.general.reporterModel);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<MessageInputRef>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
@@ -64,7 +67,12 @@ export function InputBox({
   const [isEnhanceAnimating, setIsEnhanceAnimating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
 
-
+  // 当配置加载后，如果 reporterModel 为空，则用 default 初始化
+  useEffect(() => {
+    if (config?.reporter_options?.default && !reporterModel) {
+      setReporterModel(config.reporter_options.default);
+    }
+  }, [config, reporterModel]);
 
   const handleSendMessage = useCallback(
     (message: string, resources: Array<Resource>) => {
@@ -244,6 +252,7 @@ export function InputBox({
             </Button>
           </Tooltip> */}
           <ReportStyleDialog />
+          <ReporterModelSelector />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Tooltip

@@ -29,6 +29,7 @@ export async function* chatStream(
     enable_deep_thinking?: boolean;
     enable_background_investigation: boolean;
     report_style?: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report" | "industry_research";
+    reporter_model?: string;  // REPORTER_MODEL_OPTIONS 中的 key
     force_routing_path?: "direct_answer" | "simple_search" | "iterative_research" | "deep_research"; // 🐛 调试模式
     mcp_settings?: {
       servers: Record<

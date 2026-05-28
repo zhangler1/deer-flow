@@ -97,6 +97,10 @@
       "chooseDesc": "Select research type to force routing to the corresponding research mode.",
       "deepResearch": "Deep Research",
       "iterativeResearch": "Iterative Research"
+    },
+    "reporterModel": {
+      "model": "Model",
+      "chooseDesc": "Select the model used to generate the report. Different models vary in style, quality, and speed."
     }
   },
   "footer": {

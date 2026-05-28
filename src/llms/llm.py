@@ -298,7 +298,7 @@ def _attach_langfuse_callback(llm_instance: BaseChatModel) -> BaseChatModel:
     return llm_instance
 
 
-def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatModel:
+def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any], reporter_model_key: str | None = None) -> BaseChatModel:
     """Create LLM instance using configuration."""
     llm_type_config_keys = _get_llm_type_config_keys()
     config_key = llm_type_config_keys.get(llm_type)
@@ -306,9 +306,24 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
     if not config_key:
         raise ValueError(f"Unknown LLM type: {llm_type}")
 
-    llm_conf = conf.get(config_key, {})
-    if not isinstance(llm_conf, dict):
-        raise ValueError(f"Invalid LLM configuration for {llm_type}: {llm_conf}")
+    # Reporter type: resolve config from REPORTER_MODEL_OPTIONS
+    if llm_type == "reporter":
+        options_conf = conf.get("REPORTER_MODEL_OPTIONS", {})
+        default_key = conf.get("REPORTER_MODEL", {}).get("default", "")
+        selected_key = reporter_model_key or default_key
+
+        if not selected_key:
+            raise ValueError("REPORTER_MODEL.default is not set")
+        if selected_key not in options_conf:
+            raise ValueError(f"Reporter model key '{selected_key}' not found in REPORTER_MODEL_OPTIONS. Available: {list(options_conf.keys())}")
+
+        llm_conf = options_conf[selected_key]
+        if not isinstance(llm_conf, dict):
+            raise ValueError(f"Invalid reporter model configuration for key '{selected_key}': {llm_conf}")
+    else:
+        llm_conf = conf.get(config_key, {})
+        if not isinstance(llm_conf, dict):
+            raise ValueError(f"Invalid LLM configuration for {llm_type}: {llm_conf}")
 
     # Get configuration from environment variables
     env_conf = _get_env_llm_conf(llm_type)
@@ -414,13 +429,22 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
         return _attach_langfuse_callback(ChatOpenAI(**merged_conf))
 
 
-def get_llm_by_type(llm_type: LLMType) -> Union[BaseChatModel, 'EnhancedLLMWrapper']:
+def get_llm_by_type(llm_type: LLMType, reporter_model_key: str | None = None) -> Union[BaseChatModel, 'EnhancedLLMWrapper']:
     """
     Get LLM instance by type. Returns cached instance if available.
     """
     start_time = time.time()
     
     try:
+        # Reporter with specific model key is not cached (user can switch at runtime)
+        if llm_type == "reporter" and reporter_model_key:
+            conf = load_yaml_config(_get_config_file_path())
+            llm = _create_llm_use_conf(llm_type, conf, reporter_model_key=reporter_model_key)
+            wrapped_llm = EnhancedLLMWrapper(llm, f"reporter:{reporter_model_key}")
+            enhanced_logger.logger.info(f"reporter wrapped_llm: {wrapped_llm.llm_type}")
+            duration = time.time() - start_time
+            return wrapped_llm
+
         if llm_type in _llm_cache:
             duration = time.time() - start_time
             return _llm_cache[llm_type]
@@ -481,3 +505,36 @@ def get_configured_llm_models() -> dict[str, list[str]]:
 # In the future, we will use researcher_llm and vl_llm for different purposes
 # researcher_llm = get_llm_by_type("researcher")
 # vl_llm = get_llm_by_type("vision")
+
+
+def get_reporter_model_options() -> dict:
+    """
+    Get reporter model options from configuration.
+
+    Returns:
+        Dictionary with 'default' key name and 'options' list.
+        Example: {"default": "deepseek_chat", "options": [{"key": "deepseek_chat", "model": "deepseek-chat"}]}
+    """
+    try:
+        conf = load_yaml_config(_get_config_file_path())
+        reporter_conf = conf.get("REPORTER_MODEL", {})
+        options_conf = conf.get("REPORTER_MODEL_OPTIONS", {})
+
+        default_key = reporter_conf.get("default", "")
+
+        options = []
+        for key, model_conf in options_conf.items():
+            if isinstance(model_conf, dict) and "model" in model_conf:
+                options.append({
+                    "key": key,
+                    "model": model_conf["model"],
+                })
+
+        return {
+            "default": default_key,
+            "options": options,
+        }
+
+    except Exception as e:
+        print(f"Warning: Failed to load reporter model options: {e}")
+        return {"default": "", "options": []}

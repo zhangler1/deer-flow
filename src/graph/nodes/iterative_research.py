@@ -331,7 +331,10 @@ def iterative_reporter_node(state, config: RunnableConfig) -> Command[Literal["_
             f"🤖 LLM_INVOKE | iterative_reporter | 开始生成最终报告 | 提示消息数: {len(invoke_messages)}"
         )
         
-        response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(invoke_messages)
+        response = get_llm_by_type(
+            AGENT_LLM_MAP["reporter"],
+            reporter_model_key=configurable.reporter_model or None,
+        ).invoke(invoke_messages)
         response_content = response.content
         
         llm_duration = time.time() - llm_start_time

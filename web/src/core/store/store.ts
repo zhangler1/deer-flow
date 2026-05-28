@@ -238,6 +238,7 @@ export async function sendMessage(
       useBudgetControlledOnlineSearch: settings.useBudgetControlledOnlineSearch,  // 新增
       useBudgetControlledBocomSearch: settings.useBudgetControlledBocomSearch,    // 新增
       report_style: settings.reportStyle,
+      reporter_model: settings.reporterModel,
       force_routing_path: settings.forceRoutingPath, // 🐛 调试模式
       mcp_settings: settings.mcpSettings,
       guwpToken: settings.guwpToken,

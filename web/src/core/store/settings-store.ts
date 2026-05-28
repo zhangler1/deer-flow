@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     useBudgetControlledOnlineSearch: true,  // 默认使用budget控制的在线检索
     useBudgetControlledBocomSearch: true,   // 默认使用budget控制的bocom搜索
     reportStyle: "industry_report",  // 默认为行业研报
+    reporterModel: "",  // 空=使用后端 default，加载配置后从 reporter_options.default 初始化
     forceRoutingPath: "deep_research", // 调试模式默认路由设置为交心深度研究
   },
   mcp: {
@@ -41,6 +42,7 @@ export type SettingsState = {
     useBudgetControlledOnlineSearch: boolean;  // 是否使用budget控制的在线检索
     useBudgetControlledBocomSearch: boolean;   // 是否使用budget控制的bocom搜索
     reportStyle: "academic" | "popular_science" | "news" | "social_media" | "business_marketing" | "business_marketing_client" | "industry_report" | "industry_research";
+    reporterModel: string;  // REPORTER_MODEL_OPTIONS 中的 key
     forceRoutingPath?: "direct_answer" | "simple_search" | "iterative_research" | "deep_research"; // 限制调试模式路由路径选项
   };
   mcp: {
@@ -165,6 +167,16 @@ export function setEnableDeepThinking(value: boolean) {
     general: {
       ...state.general,
       enableDeepThinking: value,
+    },
+  }));
+  saveSettings();
+}
+
+export function setReporterModel(value: string) {
+  useSettingsStore.setState((state) => ({
+    general: {
+      ...state.general,
+      reporterModel: value,
     },
   }));
   saveSettings();

@@ -49,7 +49,11 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
     if len(tools) == 0:
         logger.warning(f"⚠️  NO_TOOLS | {agent_name} | 警告：没有工具被传递给Agent！")
 
-    llm = get_llm_by_type(AGENT_LLM_MAP[agent_type])
+    # Reporter 类型支持用户动态选择模型
+    if agent_type == "reporter" and configurable and hasattr(configurable, 'reporter_model') and configurable.reporter_model:
+        llm = get_llm_by_type(AGENT_LLM_MAP[agent_type], reporter_model_key=configurable.reporter_model)
+    else:
+        llm = get_llm_by_type(AGENT_LLM_MAP[agent_type])
 
     # 解包LLM包装器以获取原始LLM对象
     raw_llm = llm

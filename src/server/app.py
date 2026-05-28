@@ -32,7 +32,7 @@ from src.config.loader import get_bool_env, get_str_env, load_tool_compression_c
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.graph.builder import build_graph_with_memory
-from src.llms.llm import EnhancedLLMWrapper, get_configured_llm_models
+from src.llms.llm import EnhancedLLMWrapper, get_configured_llm_models, get_reporter_model_options
 from src.podcast.graph.builder import build_graph as build_podcast_graph
 from src.ppt.graph.builder import build_graph as build_ppt_graph
 from src.prompt_enhancer.graph.builder import build_graph as build_prompt_enhancer_graph
@@ -182,6 +182,7 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                 use_budget_controlled_online_search=request.use_budget_controlled_online_search if request.use_budget_controlled_online_search is not None else True,
                 use_budget_controlled_bocom_search=request.use_budget_controlled_bocom_search if request.use_budget_controlled_bocom_search is not None else True,
                 cancel_event=cancel_event,
+                reporter_model=request.reporter_model or "",
             ):
                 # 每发送一个 SSE 事件前检查客户端是否断连
                 if await raw_request.is_disconnected():
@@ -843,6 +844,7 @@ async def _astream_workflow_generator(
     use_budget_controlled_online_search: bool = True,  # 是否使用预算控制的在线搜索
     use_budget_controlled_bocom_search: bool = True,  # 是否使用预算控制的交行搜索
     cancel_event: asyncio.Event = None,  # 客户端断连取消信号
+    reporter_model: str = "",  # 用户选择的 reporter 模型 key
 ):
     # Process initial messages
     for message in messages:
@@ -893,6 +895,7 @@ async def _astream_workflow_generator(
             "use_budget_controlled_online_search": use_budget_controlled_online_search,
             "use_budget_controlled_bocom_search": use_budget_controlled_bocom_search,
             "cancel_event": cancel_event,  # 客户端断连取消信号，reporter 节点检测
+            "reporter_model": reporter_model,
         },
         "recursion_limit": get_recursion_limit(),
     }
@@ -1237,6 +1240,7 @@ async def config():
     return ConfigResponse(
         rag=RAGConfigResponse(provider=SELECTED_RAG_PROVIDER),
         models=get_configured_llm_models(),
+        reporter_options=get_reporter_model_options(),
     )
 
 
@@ -1450,6 +1454,7 @@ async def _full_workflow_sse_generator(
             enable_background_investigation=request.enable_background_investigation or True,
             report_style=request.report_style or ReportStyle.ACADEMIC,
             enable_deep_thinking=request.enable_deep_thinking or False,
+                        reporter_model=request.reporter_model or "",
             system_context=get_str_env("SYSTEM_CONTEXT", ""),  # 从环境变量读取
             force_routing_path=request.force_routing_path,  # 🐛 调试模式：支持测试迭代研究
         ):

@@ -50,6 +50,7 @@ const generalFormSchema = z.object({
   enableBackgroundInvestigation: z.boolean(),
   enableDeepThinking: z.boolean(),
   reportStyle: z.enum(["academic", "popular_science", "news", "social_media", "business_marketing", "business_marketing_client", "industry_report", "industry_research"]),
+  reporterModel: z.string(),  // REPORTER_MODEL_OPTIONS 中的 key
   // 🐛 Debug Mode
   forceRoutingPath: z.enum(["direct_answer", "simple_search", "iterative_research", "deep_research"]).optional(),
 });

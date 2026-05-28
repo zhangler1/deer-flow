@@ -97,6 +97,10 @@
       "chooseDesc": "选择研究类型以强制路由到对应的研究模式。",
       "deepResearch": "深度研究",
       "iterativeResearch": "迭代研究"
+    },
+    "reporterModel": {
+      "model": "模型",
+      "chooseDesc": "选择用于生成报告的模型。不同模型在报告风格、质量和速度上有所差异。"
     }
   },
   "footer": {

@@ -77,6 +77,10 @@ class ChatRequest(BaseModel):
     enable_deep_thinking: Optional[bool] = Field(
         False, description="Whether to enable deep thinking"
     )
+    reporter_model: Optional[str] = Field(
+        None,
+        description="Selected reporter model key from REPORTER_MODEL_OPTIONS"
+    )
     force_routing_path: Optional[str] = Field(
         None, description="🐛 Debug Mode: Force routing to specific path (direct_answer, simple_search, iterative_research, deep_research)"
     )
@@ -150,6 +154,7 @@ class SimpleResearchRequest(BaseModel):
     enable_background_investigation: Optional[bool] = Field(True, description="是否启用背景调研")
     report_style: Optional[ReportStyle] = Field(ReportStyle.ACADEMIC, description="报告风格")
     enable_deep_thinking: Optional[bool] = Field(False, description="是否启用深度思考")
+    reporter_model: Optional[str] = Field(None, description="用户选择的 Reporter 模型 key")
     force_routing_path: Optional[str] = Field(None, description="🐛 调试模式：强制路由到指定路径 (direct_answer, simple_search, iterative_research, deep_research)")
 
 

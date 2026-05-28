@@ -86,7 +86,10 @@ def reporter_node(state: State, config: RunnableConfig):
     enhanced_logger.logger.info(f"🤖 LLM_INVOKE | reporter | 开始生成最终报告 | 消息数: {len(invoke_messages)}")
 
     try:
-        reporter_llm = get_llm_by_type(AGENT_LLM_MAP["reporter"])
+        reporter_llm = get_llm_by_type(
+            AGENT_LLM_MAP["reporter"],
+            reporter_model_key=configurable.reporter_model or None,
+        )
 
         # 获取取消事件（统一封装，一行搞定）
         from src.graph.cancellation import get_from_config as _get_cancel_event
