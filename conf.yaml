@@ -69,9 +69,27 @@ COMPRESSION_MODEL:
   base_url: https://api.deepseek.com/v1
   model: deepseek-chat 
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  verify_ssl: false
+  # Uncomment to add more reporter model options:
+  # gpt4o_mini:
+  #   base_url: https://api.openai.com/v1
+  #   model: gpt-4o-mini
+  #   api_key: sk-your-openai-key
+  #   verify_ssl: false
+
+BASIC_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
+COMPRESSION_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  # max_retries: 3 # Maximum number of retries for LLM calls
+  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
 # OTHER SETTINGS:
 # Search engine configuration
