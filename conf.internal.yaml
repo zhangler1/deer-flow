@@ -17,7 +17,7 @@
 #   - api_key_refresh_interval / api_key_refresh_ahead: 密钥后台刷新参数（秒）
 # ==============================================================================
 
-BASIC_MODEL:
+COORDINATOR_MODEL:
   platform: ellm
   model: Qwen3-235B-A22B
   base_url: http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-ADAPTER.V-1.0/v1
@@ -29,7 +29,31 @@ BASIC_MODEL:
   temperature: 0.7
   verify_ssl: false
 
-REASONING_MODEL:
+PLANNER_MODEL:
+  platform: ellm
+  model: Qwen3-235B-A22B
+  base_url: http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-ADAPTER.V-1.0/v1
+  api_key_url: http://eaip-ellm-1.bocomm.com/ELLM.ELLM-OMSERVICE.V-1.0/createSceneApiKey.do
+  scene_code: P2024146
+  api_key_refresh_interval: 1800
+  api_key_refresh_ahead: 300
+  max_tokens: 8192
+  temperature: 0.7
+  verify_ssl: false
+
+RESEARCHER_MODEL:
+  platform: ellm
+  model: Qwen3-235B-A22B
+  base_url: http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-ADAPTER.V-1.0/v1
+  api_key_url: http://eaip-ellm-1.bocomm.com/ELLM.ELLM-OMSERVICE.V-1.0/createSceneApiKey.do
+  scene_code: P2024146
+  api_key_refresh_interval: 1800
+  api_key_refresh_ahead: 300
+  max_tokens: 8192
+  temperature: 0.7
+  verify_ssl: false
+
+CODER_MODEL:
   platform: ellm
   model: Qwen3-235B-A22B
   base_url: http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-ADAPTER.V-1.0/v1
@@ -42,6 +66,34 @@ REASONING_MODEL:
   verify_ssl: false
 
 REPORTER_MODEL:
+  default: qwen3_235b
+
+REPORTER_MODEL_OPTIONS:
+  qwen3_235b:
+    platform: ellm
+    model: Qwen3-235B-A22B
+    base_url: http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-ADAPTER.V-1.0/v1
+    api_key_url: http://eaip-ellm-1.bocomm.com/ELLM.ELLM-OMSERVICE.V-1.0/createSceneApiKey.do
+    scene_code: P2024146
+    api_key_refresh_interval: 1800
+    api_key_refresh_ahead: 300
+    max_tokens: 8192
+    temperature: 0.7
+    verify_ssl: false
+
+BASIC_MODEL:
+  platform: ellm
+  model: Qwen3-235B-A22B
+  base_url: http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-ADAPTER.V-1.0/v1
+  api_key_url: http://eaip-ellm-1.bocomm.com/ELLM.ELLM-OMSERVICE.V-1.0/createSceneApiKey.do
+  scene_code: P2024146
+  api_key_refresh_interval: 1800
+  api_key_refresh_ahead: 300
+  max_tokens: 8192
+  temperature: 0.7
+  verify_ssl: false
+
+COMPRESSION_MODEL:
   platform: ellm
   model: Qwen3-235B-A22B
   base_url: http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-ADAPTER.V-1.0/v1

@@ -6,15 +6,28 @@
 # - Set `verify_ssl` to `false` if your LLM server uses self-signed certificates
 # - A restart is required every time you change the `config.yaml` file.
 
-BASIC_MODEL:
+COORDINATOR_MODEL:
   base_url: https://api.deepseek.com/v1
   model: deepseek-chat 
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
+PLANNER_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  # max_retries: 3 # Maximum number of retries for LLM calls
+  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
-REASONING_MODEL:
+RESEARCHER_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  # max_retries: 3 # Maximum number of retries for LLM calls
+  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
+
+CODER_MODEL:
   base_url: https://api.deepseek.com/v1
   model: deepseek-chat 
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
@@ -22,7 +35,37 @@ REASONING_MODEL:
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
 # Reporter model for deep research report generation
+# REPORTER_MODEL is a reference pointer: default specifies which REPORTER_MODEL_OPTIONS key to use
 REPORTER_MODEL:
+  default: deepseek-v4-pro
+
+# All selectable reporter models, each with complete independent configuration
+REPORTER_MODEL_OPTIONS:
+  deepseek-v4-flash:
+    base_url: https://api.deepseek.com/v1
+    model: deepseek-v4-flash
+    api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+    verify_ssl: false
+  deepseek-v4-pro:
+    base_url: https://api.deepseek.com/v1
+    model: deepseek-v4-pro
+    api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+    verify_ssl: false
+  # Uncomment to add more reporter model options:
+  # gpt4o_mini:
+  #   base_url: https://api.openai.com/v1
+  #   model: gpt-4o-mini
+  #   api_key: sk-your-openai-key
+  #   verify_ssl: false
+
+BASIC_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  # max_retries: 3 # Maximum number of retries for LLM calls
+  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
+
+COMPRESSION_MODEL:
   base_url: https://api.deepseek.com/v1
   model: deepseek-chat 
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
@@ -145,6 +188,28 @@ SEARCH_BUDGET:
   # （可选）researcher 节点每步搜索工具调用预算
   # 未设置时 Configuration 默认 5；也可用环境变量 RESEARCHER_RECURSION_LIMIT 覆盖
   # researcher_recursion_limit: 5
+
+# ============================================================================
+# 技能（Skill）系统配置
+# ============================================================================
+# Skill 系统允许通过 SKILL.md 文件声明式定义可扩展的 Agent 能力。
+# public/ 下为内置 Skill，custom/ 下为用户/Agent 创建的自定义 Skill。
+# 初始时 public/ 和 custom/ 目录为空，后续按需添加。
+
+SKILLS:
+  # Skill 目录的绝对路径（可选）
+  # 未设置时默认为项目根目录下的 skills/ 目录
+  # path: /home/user/deer-flow-1/skills
+
+  # Skill 启用/禁用状态配置
+  # 未在此处列出的 Skill 默认启用
+  enabled_skills: {}
+  # 示例：
+  # enabled_skills:
+  #   ppt-generation:
+  #     enabled: false
+  #   deep-research:
+  #     enabled: true
 
 # ============================================================================
 # ReactLoop 中间件配置（对齐 DeerFlow 2.0 配置结构）
