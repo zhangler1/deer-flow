@@ -68,9 +68,7 @@ def planner_node(
         ]
 
     if configurable.enable_deep_thinking:
-        llm = get_llm_by_type("reasoning")
-    elif AGENT_LLM_MAP["planner"] == "basic":
-        llm = get_llm_by_type("basic")
+        llm = get_llm_by_type("researcher")
     else:
         llm = get_llm_by_type(AGENT_LLM_MAP["planner"])
 
@@ -84,7 +82,7 @@ def planner_node(
 
     full_response = ""
     llm_start_time = time.time()
-    if AGENT_LLM_MAP["planner"] == "basic" and not configurable.enable_deep_thinking:
+    if not configurable.enable_deep_thinking:
         response = llm.invoke(messages)
         try:
             if hasattr(response, 'content'):
