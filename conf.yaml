@@ -6,15 +6,28 @@
 # - Set `verify_ssl` to `false` if your LLM server uses self-signed certificates
 # - A restart is required every time you change the `config.yaml` file.
 
-BASIC_MODEL:
+COORDINATOR_MODEL:
   base_url: https://api.deepseek.com/v1
   model: deepseek-chat 
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
+PLANNER_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  # max_retries: 3 # Maximum number of retries for LLM calls
+  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
-REASONING_MODEL:
+RESEARCHER_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  # max_retries: 3 # Maximum number of retries for LLM calls
+  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
+
+CODER_MODEL:
   base_url: https://api.deepseek.com/v1
   model: deepseek-chat 
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
@@ -22,13 +35,32 @@ REASONING_MODEL:
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
 # Reporter model for deep research report generation
+# REPORTER_MODEL is a reference pointer: default specifies which REPORTER_MODEL_OPTIONS key to use
 REPORTER_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  verify_ssl: false
+  # Uncomment to add more reporter model options:
+  # gpt4o_mini:
+  #   base_url: https://api.openai.com/v1
+  #   model: gpt-4o-mini
+  #   api_key: sk-your-openai-key
+  #   verify_ssl: false
+
+BASIC_MODEL:
   base_url: https://api.deepseek.com/v1
   model: deepseek-chat 
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
+COMPRESSION_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  # max_retries: 3 # Maximum number of retries for LLM calls
+  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
 # OTHER SETTINGS:
 # Search engine configuration

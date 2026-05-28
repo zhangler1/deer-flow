@@ -32,3 +32,5 @@ coverage/
 *.md
 #
 uv.lock
+
+/**/*.tar

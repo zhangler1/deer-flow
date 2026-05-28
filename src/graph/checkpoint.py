@@ -277,7 +277,7 @@ class ChatStreamManager:
 # TODO: Consider using dependency injection instead of global instance
 _default_manager = ChatStreamManager(
     checkpoint_saver=get_bool_env("LANGGRAPH_CHECKPOINT_SAVER", False),
-    db_uri=get_str_env("LANGGRAPH_CHECKPOINT_DB_URL", "postgresql://localhost:5432/deerflow"),
+    db_uri=get_str_env("LANGGRAPH_CHECKPOINT_DB_URL", "postgresql://localhost:5432/deerflow_checkpoint"),
 )
 
 
