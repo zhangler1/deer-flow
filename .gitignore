@@ -30,7 +30,16 @@ coverage.xml
 coverage/
 
 *.md
+!src/**/*.md
 #
 uv.lock
 
 /**/*.tar
+.qoder/skills
+
+openspec/
+
+*.7z
+*.doc
+
+skills/
