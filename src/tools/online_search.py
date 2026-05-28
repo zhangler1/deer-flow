@@ -47,7 +47,7 @@ def online_search_tool(max_results: Optional[int] = None) -> CustomSearchTool:
     """
     effective = max_results if (max_results and max_results > 0) else _default_max_results()
     tool = CustomSearchTool(
-        repository="online_search",
+        repository="online-search",
         max_results=effective
     )
     # 自定义工具名称和描述，让模型能够识别这是互联网搜索工具
