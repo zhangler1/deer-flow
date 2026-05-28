@@ -4,15 +4,15 @@
 from typing import Literal
 
 # Define available LLM types
-LLMType = Literal["basic", "reasoning", "vision", "code", "reporter_llm"]
+LLMType = Literal["coordinator", "planner", "researcher", "coder", "reporter", "vision", "basic", "compression"]
 
 # Define agent-LLM mapping
 AGENT_LLM_MAP: dict[str, LLMType] = {
-    "coordinator": "basic",
-    "planner": "basic",
-    "researcher": "reasoning",
-    "coder": "basic",
-    "reporter": "reporter_llm",  # 使用专用的 reporter 模型
+    "coordinator": "coordinator",
+    "planner": "planner",
+    "researcher": "researcher",
+    "coder": "coder",
+    "reporter": "reporter",
     "podcast_script_writer": "basic",
     "ppt_composer": "basic",
     "prose_writer": "basic",

@@ -18,6 +18,7 @@ from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command, interrupt
 
+from src.config.agents import AGENT_LLM_MAP
 from src.config.configuration import Configuration
 from src.llms.llm import get_llm_by_type
 from src.utils.enhanced_logger import get_enhanced_logger
@@ -103,7 +104,7 @@ def clarification_node(
             user_query=user_query,
             coordinator_reasoning=coordinator_content,
         )
-        llm = get_llm_by_type("basic")
+        llm = get_llm_by_type(AGENT_LLM_MAP["coordinator"])
         response = llm.invoke([{"role": "user", "content": prompt_text}])
         raw_content = response.content if hasattr(response, "content") else str(response)
     

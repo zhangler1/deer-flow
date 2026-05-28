@@ -97,7 +97,7 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
         compression_llm = None
         if cfg.summarization.compression_mode == "summarize":
             try:
-                compression_llm = get_llm_by_type("basic")
+                compression_llm = get_llm_by_type("compression")
             except Exception as e:
                 logger.warning(f"⚠️ 无法获取压缩用 LLM，回退到 truncate 模式: {e}")
         

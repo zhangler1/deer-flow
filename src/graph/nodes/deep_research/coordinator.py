@@ -83,7 +83,7 @@ def _should_reset_state(state: dict) -> bool:
     )
 
     try:
-        judge_llm = get_llm_by_type("basic")
+        judge_llm = get_llm_by_type(AGENT_LLM_MAP["coordinator"])
         prompt = _RESET_JUDGE_PROMPT.format(
             old_topic=old_topic[:200],
             new_input=new_input[:500],

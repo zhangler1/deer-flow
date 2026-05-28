@@ -262,11 +262,14 @@ def _get_config_file_path() -> str:
 def _get_llm_type_config_keys() -> dict[str, str]:
     """Get mapping of LLM types to their configuration keys."""
     return {
-        "reasoning": "REASONING_MODEL",
-        "basic": "BASIC_MODEL",
+        "coordinator": "COORDINATOR_MODEL",
+        "planner": "PLANNER_MODEL",
+        "researcher": "RESEARCHER_MODEL",
+        "coder": "CODER_MODEL",
+        "reporter": "REPORTER_MODEL",
         "vision": "VISION_MODEL",
-        "code": "CODE_MODEL",
-        "reporter_llm": "REPORTER_MODEL",
+        "basic": "BASIC_MODEL",
+        "compression": "COMPRESSION_MODEL",
     }
 
 
@@ -392,7 +395,7 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
 
     # Check if base_url is dashscope endpoint
     if "base_url" in merged_conf and "dashscope." in merged_conf["base_url"]:
-        if llm_type == "reasoning":
+        if llm_type == "researcher":
             merged_conf["extra_body"] = {
                 "enable_thinking": False,
                 "chat_template_kwargs": {"enable_thinking": False}
@@ -404,7 +407,7 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
             }
         return _attach_langfuse_callback(ChatDashscope(**merged_conf))
 
-    if llm_type == "reasoning":
+    if llm_type == "researcher":
         merged_conf["api_base"] = merged_conf.pop("base_url", None)
         return _attach_langfuse_callback(ChatDeepSeek(**merged_conf))
     else:
@@ -475,6 +478,6 @@ def get_configured_llm_models() -> dict[str, list[str]]:
         return {}
 
 
-# In the future, we will use reasoning_llm and vl_llm for different purposes
-# reasoning_llm = get_llm_by_type("reasoning")
+# In the future, we will use researcher_llm and vl_llm for different purposes
+# researcher_llm = get_llm_by_type("researcher")
 # vl_llm = get_llm_by_type("vision")
