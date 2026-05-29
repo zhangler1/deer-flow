@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState, useRef } from "react";
 
 import { useSourceStore, type SourceDetail } from "~/core/source-store";
 import { cn } from "~/lib/utils";
 
-import { Tooltip } from "./tooltip";
+import { FavIcon } from "./fav-icon";
 
 // ── 类型 ──────────────────────────────────────────
 
@@ -23,7 +23,7 @@ export interface SourceTagProps {
 /**
  * 溯源标签组件
  *
- * 渲染为行内可点击的上标标签 [N]，点击后：
+ * 渲染为行内可点击的上标标签 [N]，悬停弹出溯源卡片，点击后：
  * 1. 优先通过 URL 在 sourceStore 中查找匹配 → 打开详情抽屉
  * 2. 若未找到（兜底）→ 直接在新标签页打开 URL
  *
@@ -32,11 +32,48 @@ export interface SourceTagProps {
 export function SourceTag({ index, url, references }: SourceTagProps) {
   const openSourceByUrl = useSourceStore((s) => s.openSourceByUrl);
   const storeReferences = useSourceStore((s) => s.references);
+  const [showCard, setShowCard] = useState(false);
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 尝试从 props references 或 store references 中找到标题
   const allRefs = references ?? storeReferences;
   const matchedRef = allRefs.find((r) => r.url === url);
   const title = matchedRef?.title ?? extractDomain(url);
+  const domain = matchedRef?.domain ?? extractDomain(url);
+
+  const handleMouseEnter = useCallback(() => {
+    if (leaveTimeout.current) {
+      clearTimeout(leaveTimeout.current);
+      leaveTimeout.current = null;
+    }
+    hoverTimeout.current = setTimeout(() => {
+      setShowCard(true);
+    }, 300);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeout.current) {
+      clearTimeout(hoverTimeout.current);
+      hoverTimeout.current = null;
+    }
+    leaveTimeout.current = setTimeout(() => {
+      setShowCard(false);
+    }, 200);
+  }, []);
+
+  const handleCardMouseEnter = useCallback(() => {
+    if (leaveTimeout.current) {
+      clearTimeout(leaveTimeout.current);
+      leaveTimeout.current = null;
+    }
+  }, []);
+
+  const handleCardMouseLeave = useCallback(() => {
+    leaveTimeout.current = setTimeout(() => {
+      setShowCard(false);
+    }, 200);
+  }, []);
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -45,7 +82,6 @@ export function SourceTag({ index, url, references }: SourceTagProps) {
 
       // Ctrl+Click / Cmd+Click → 直接在新标签页打开
       if (e.ctrlKey || e.metaKey) {
-        console.log('[SourceTag] Ctrl/Cmd+Click, 直接跳转:', url);
         window.open(url, "_blank", "noopener,noreferrer");
         return;
       }
@@ -54,27 +90,9 @@ export function SourceTag({ index, url, references }: SourceTagProps) {
       const refs = useSourceStore.getState().references;
       const found = refs.some((r) => r.url === url);
 
-      console.group('[SourceTag] 点击调试');
-      console.log('点击的 URL:', url);
-      console.log('store references 数量:', refs.length);
-      console.log('store references URLs:', refs.map(r => r.url));
-      console.log('严格匹配结果:', found);
-      if (!found && refs.length > 0) {
-        // 打印前3个 reference 的 URL 对比
-        console.log('--- URL 对比（前5个）---');
-        refs.slice(0, 5).forEach((r, i) => {
-          console.log(`  [${i}] store: "${r.url}"`);
-          console.log(`       click: "${url}"`);
-          console.log(`       相等: ${r.url === url}`);
-        });
-      }
-      console.groupEnd();
-
       if (found) {
-        console.log('[SourceTag] ✅ 匹配成功，打开抽屉');
         openSourceByUrl(url);
       } else {
-        console.log('[SourceTag] ❌ 匹配失败，跳转新标签页');
         window.open(url, "_blank", "noopener,noreferrer");
       }
     },
@@ -82,7 +100,7 @@ export function SourceTag({ index, url, references }: SourceTagProps) {
   );
 
   return (
-    <Tooltip title={title}>
+    <span className="relative inline-block">
       <span
         className={cn(
           "inline-flex cursor-pointer select-none items-center justify-center",
@@ -97,13 +115,42 @@ export function SourceTag({ index, url, references }: SourceTagProps) {
           "shadow-sm",
         )}
         onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         role="button"
         tabIndex={0}
         aria-label={`来源 ${index}: ${title}`}
       >
         {index}
       </span>
-    </Tooltip>
+
+      {/* 溯源卡片 - 悬停弹出 */}
+      {showCard && (
+        <span
+          className={cn(
+            "absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2",
+            "w-[280px] rounded-lg border border-border bg-popover p-3 shadow-lg",
+            "animate-in fade-in-0 zoom-in-95 duration-150",
+            "cursor-pointer",
+          )}
+          onMouseEnter={handleCardMouseEnter}
+          onMouseLeave={handleCardMouseLeave}
+          onClick={handleClick}
+        >
+          {/* 卡片头部：来源图标 + 域名 */}
+          <span className="flex items-center gap-2 mb-1.5">
+            <FavIcon url={url} className="h-4 w-4 shrink-0" title={title} />
+            <span className="text-xs text-muted-foreground truncate">
+              {domain}
+            </span>
+          </span>
+          {/* 卡片标题 */}
+          <span className="block text-sm font-medium leading-snug text-foreground line-clamp-2">
+            {title}
+          </span>
+        </span>
+      )}
+    </span>
   );
 }
 
