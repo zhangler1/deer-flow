@@ -1,15 +1,16 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { Markdown } from "~/components/deer-flow/markdown";
+import { SourceAwareMarkdown } from "~/components/deer-flow/source-aware-markdown";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
+import { type SourceDetail } from "~/core/source-store";
 import { cn } from "~/lib/utils";
 
 // ── 类型 ──────────────────────────────────────────
@@ -36,27 +37,37 @@ interface ReportSection {
  * - 二级标题（## 开头）作为章节标题，每个章节可折叠
  * - 三级及以下标题保留在章节内容中，不单独拆分
  */
+/** 判断章节标题是否为“参考资料”类型 */
+const REFERENCE_SECTION_PATTERNS = /^(参考资料|参考文献|主要引用|references)$/i;
+
 function parseReportSections(markdown: string): {
   preamble: string;
   sections: ReportSection[];
+  referenceSection: ReportSection | null;
 } {
   const lines = markdown.split("\n");
   const sections: ReportSection[] = [];
   let preamble = ""; // 标题之前的内容
   let currentSection: ReportSection | null = null;
   let foundFirstH2 = false;
-  let preambleLines: string[] = [];
+  const preambleLines: string[] = [];
+  let referenceSection: ReportSection | null = null;
 
   for (const line of lines) {
     // 匹配 ## 标题（二级）
-    const h2Match = line.match(/^##\s+(.+)/);
+    const h2Match = /^##\s+(.+)/.exec(line);
     
     if (h2Match) {
       foundFirstH2 = true;
       // 保存之前的章节
       if (currentSection) {
         currentSection.content = currentSection.content.trimEnd();
-        sections.push(currentSection);
+        // 检查是否为参考资料章节
+        if (REFERENCE_SECTION_PATTERNS.test(currentSection.title)) {
+          referenceSection = currentSection;
+        } else {
+          sections.push(currentSection);
+        }
       }
       // 开始新章节
       currentSection = {
@@ -77,12 +88,16 @@ function parseReportSections(markdown: string): {
   // 保存最后一个章节
   if (currentSection) {
     currentSection.content = currentSection.content.trimEnd();
-    sections.push(currentSection);
+    if (REFERENCE_SECTION_PATTERNS.test(currentSection.title)) {
+      referenceSection = currentSection;
+    } else {
+      sections.push(currentSection);
+    }
   }
 
   preamble = preambleLines.join("\n").trim();
 
-  return { preamble, sections };
+  return { preamble, sections, referenceSection };
 }
 
 // ── 组件 ──────────────────────────────────────────
@@ -96,6 +111,10 @@ export interface CollapsibleReportProps {
   checkLinkCredibility?: boolean;
   /** 额外 className */
   className?: string;
+  /** 来源引用列表（用于解析 [来源:N] 标记） */
+  references?: SourceDetail[];
+  /** 外部控制：是否全部展开（每次变化触发展开/折叠全部） */
+  allExpanded?: boolean;
 }
 
 export function CollapsibleReport({
@@ -103,41 +122,54 @@ export function CollapsibleReport({
   animated = false,
   checkLinkCredibility = false,
   className,
+  references = [],
+  allExpanded = false,
 }: CollapsibleReportProps) {
-  const { preamble, sections } = useMemo(
+  const { preamble, sections, referenceSection } = useMemo(
     () => parseReportSections(content),
     [content],
   );
+
+  // 使用受控状态管理展开的章节（所有 hooks 必须在条件返回之前调用）
+  const allSectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
+  const [openSections, setOpenSections] = useState<string[]>([]);
+
+  // 响应外部 allExpanded prop 变化
+  useEffect(() => {
+    if (allExpanded) {
+      setOpenSections(allSectionIds);
+    } else {
+      setOpenSections([]);
+    }
+  }, [allExpanded, allSectionIds]);
 
   // 如果没有章节结构，直接渲染原始 Markdown
   if (sections.length === 0) {
     return (
       <div className={cn(className)}>
-        <Markdown animated={animated} checkLinkCredibility={checkLinkCredibility}>
+        <SourceAwareMarkdown references={references} animated={animated} checkLinkCredibility={checkLinkCredibility}>
           {content}
-        </Markdown>
+        </SourceAwareMarkdown>
       </div>
     );
   }
-
-  // 默认全部折叠
-  const defaultOpen: string[] = [];
 
   return (
     <div className={cn(className)}>
       {/* 前言部分（## 之前的内容） */}
       {preamble && (
         <div className="mb-6">
-          <Markdown animated={animated} checkLinkCredibility={checkLinkCredibility}>
+          <SourceAwareMarkdown references={references} animated={animated} checkLinkCredibility={checkLinkCredibility}>
             {preamble}
-          </Markdown>
+          </SourceAwareMarkdown>
         </div>
       )}
 
       {/* 可折叠章节 */}
       <Accordion
         type="multiple"
-        defaultValue={defaultOpen}
+        value={openSections}
+        onValueChange={setOpenSections}
         className="w-full"
       >
         {sections.map((section) => (
@@ -156,17 +188,36 @@ export function CollapsibleReport({
             </AccordionTrigger>
             <AccordionContent className="pb-4 pt-0">
               <div className="pl-6">
-                <Markdown
+                <SourceAwareMarkdown
+                  references={references}
                   animated={false}
                   checkLinkCredibility={checkLinkCredibility}
                 >
                   {section.content}
-                </Markdown>
+                </SourceAwareMarkdown>
               </div>
             </AccordionContent>
           </AccordionItem>
         ))}
       </Accordion>
+
+      {/* 参考资料章节（始终可见，不折叠） */}
+      {referenceSection && (
+        <div className="mt-6 border-t pt-4">
+          <h2 className="mb-3 text-sm font-semibold text-foreground">
+            {referenceSection.title}
+          </h2>
+          <div className="pl-2">
+            <SourceAwareMarkdown
+              references={references}
+              animated={false}
+              checkLinkCredibility={checkLinkCredibility}
+            >
+              {referenceSection.content}
+            </SourceAwareMarkdown>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
