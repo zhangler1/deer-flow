@@ -334,6 +334,13 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any], reporter_model
     if not merged_conf:
         raise ValueError(f"No configuration found for LLM type: {llm_type}")
 
+    # 从模型配置中提取可选的 chat_template_kwargs，注入到 extra_body 透传给 API 请求
+    # 若未配置则不携带此字段，若已配置则合并到 extra_body 中
+    chat_template_kwargs = merged_conf.pop("chat_template_kwargs", None)
+    if chat_template_kwargs is not None:
+        existing_extra_body = merged_conf.get("extra_body", {})
+        merged_conf["extra_body"] = {**existing_extra_body, "chat_template_kwargs": chat_template_kwargs}
+
     # Add max_retries to handle rate limit errors
     if "max_retries" not in merged_conf:
         merged_conf["max_retries"] = 3
@@ -419,16 +426,13 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any], reporter_model
 
     # Check if base_url is dashscope endpoint
     if "base_url" in merged_conf and "dashscope." in merged_conf["base_url"]:
-        if llm_type == "researcher":
-            merged_conf["extra_body"] = {
-                "enable_thinking": False,
-                "chat_template_kwargs": {"enable_thinking": False}
-            }
-        else:
-            merged_conf["extra_body"] = {
-                "enable_thinking": False,
-                "chat_template_kwargs": {"enable_thinking": False}
-            }
+        # 合并 dashscope 硬编码的 extra_body 与用户配置的 extra_body
+        dashscope_extra_body = {
+            "enable_thinking": False,
+            "chat_template_kwargs": {"enable_thinking": False}
+        }
+        merged_extra_body = {**merged_conf.get("extra_body", {}), **dashscope_extra_body}
+        merged_conf["extra_body"] = merged_extra_body
         return _attach_langfuse_callback(ChatDashscope(**merged_conf))
 
     if llm_type == "researcher":
