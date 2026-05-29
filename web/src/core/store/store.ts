@@ -364,7 +364,24 @@ export async function sendMessage(
       messageId = data.id;
       let message: Message | undefined;
       if (type === "tool_call_result") {
+        // 先 flush pending，确保 tool_calls 事件创建的消息已写入 store
+        flushNow();
+        console.log('[SSE调试] tool_call_result 事件到达 | tool_call_id=', data.tool_call_id, '| content长度=', data.content?.length ?? 0);
         message = findMessageByToolCallId(data.tool_call_id);
+        if (!message) {
+          // 查看所有消息的 toolCall IDs
+          const allToolCallIds: string[] = [];
+          for (const msg of useStore.getState().messages.values()) {
+            if (msg.toolCalls) {
+              for (const tc of msg.toolCalls) {
+                allToolCallIds.push(`${tc.name}:${tc.id}`);
+              }
+            }
+          }
+          console.warn('[SSE调试] findMessageByToolCallId 未找到! 当前存储的 toolCall IDs:', allToolCallIds);
+        } else {
+          console.log('[SSE调试] 已匹配到消息, id=', message.id);
+        }
       } else if (!existsMessage(messageId)) {
         message = {
           id: messageId,

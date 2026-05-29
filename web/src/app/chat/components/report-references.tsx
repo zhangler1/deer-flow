@@ -20,6 +20,18 @@ export interface ReferenceItem {
   domain: string;
 }
 
+/** 来源详细信息（用于溯源详情页） */
+export interface SourceDetail {
+  url: string;
+  title: string;
+  domain: string;
+  snippet?: string;
+  fullContent?: string;
+  aiSummary?: string;
+  sourceType: "search" | "crawl" | "knowledge";
+  toolName?: string;
+}
+
 // ── 数据提取 ──────────────────────────────────────
 
 /** 从 URL 提取域名 */
@@ -51,21 +63,33 @@ const SEARCH_TOOLS = new Set([
 const CRAWL_TOOLS = new Set(["crawl_tool", "batch_crawl_tool"]);
 
 /** 从 researchId 对应的所有 activity 消息中提取参考资料 */
-function extractReferences(
+export function extractReferences(
   researchId: string,
 ): ReferenceItem[] {
+  return extractSourceDetails(researchId).map(s => ({ url: s.url, title: s.title, domain: s.domain }));
+}
+
+/** 从 researchId 对应的所有 activity 消息中提取完整来源数据 */
+export function extractSourceDetails(
+  researchId: string,
+): SourceDetail[] {
   const state = useStore.getState();
   const activityIds = state.researchActivityIds.get(researchId);
-  if (!activityIds) return [];
+  if (!activityIds) {
+    console.warn('[ReportReferences] researchActivityIds 无映射, researchId=', researchId);
+    return [];
+  }
+  console.log('[ReportReferences] activityIds:', activityIds.length, '条消息');
 
   const seen = new Set<string>();
-  const refs: ReferenceItem[] = [];
+  const sources: SourceDetail[] = [];
 
   for (const msgId of activityIds) {
     const msg = state.messages.get(msgId);
     if (!msg?.toolCalls) continue;
 
     for (const tc of msg.toolCalls) {
+      console.log('[ReportReferences] toolCall:', tc.name, '| result长度:', tc.result?.length ?? 0);
       if (tc.result?.startsWith("Error")) continue;
 
       if (SEARCH_TOOLS.has(tc.name)) {
@@ -79,10 +103,13 @@ function extractReferences(
               if (url) {
                 if (seen.has(url)) continue;
                 seen.add(url);
-                refs.push({
+                sources.push({
                   url,
                   title: (r.title as string) ?? extractDomain(url),
                   domain: extractDomain(url),
+                  snippet: (r.content as string) ?? "",
+                  sourceType: "search",
+                  toolName: tc.name,
                 });
               } else {
                 // —— 无 URL 的内网知识库结果，用 docGuid 去重，不渲染跳转 ——
@@ -93,10 +120,13 @@ function extractReferences(
                 if (!key || key === "doc:" || seen.has(key)) continue;
                 if (!title && !source) continue;
                 seen.add(key);
-                refs.push({
+                sources.push({
                   url: "",  // 空 URL 表示不可点
                   title: title || source || "未命名文档",
                   domain: source || "内部文档",
+                  snippet: (r.content as string) ?? "",
+                  sourceType: "knowledge",
+                  toolName: tc.name,
                 });
               }
             }
@@ -116,15 +146,26 @@ function extractReferences(
               (result.title as string) && result.title !== "未命名文档"
                 ? (result.title as string)
                 : extractDomain(url);
-            refs.push({ url, title, domain: extractDomain(url) });
+            sources.push({
+              url,
+              title,
+              domain: extractDomain(url),
+              snippet: (result.preview as string) ?? "",
+              aiSummary: (result.summary as string) ?? undefined,
+              fullContent: (result.content as string) ?? undefined,
+              sourceType: "crawl",
+              toolName: tc.name,
+            });
           }
         } catch {
           if (crawlUrl && !seen.has(crawlUrl)) {
             seen.add(crawlUrl);
-            refs.push({
+            sources.push({
               url: crawlUrl,
               title: extractDomain(crawlUrl),
               domain: extractDomain(crawlUrl),
+              sourceType: "crawl",
+              toolName: tc.name,
             });
           }
         }
@@ -132,7 +173,7 @@ function extractReferences(
     }
   }
 
-  return refs;
+  return sources;
 }
 
 // ── 组件 ──────────────────────────────────────────

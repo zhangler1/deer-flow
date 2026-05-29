@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { Check, Copy, Pencil, Undo2, X, Download, Loader2, FileText, FileDown } from "lucide-react";
+import { Check, Copy, Pencil, Undo2, X, Download, Loader2, FileText, FileDown, ChevronsUpDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
@@ -54,6 +54,7 @@ export function ResearchBlock({
   }, [hasReport]);
 
   const [editing, setEditing] = useState(false);
+  const [sectionsExpanded, setSectionsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const handleCopy = useCallback(() => {
     if (!reportId) {
@@ -190,6 +191,16 @@ export function ResearchBlock({
         <div className="absolute right-4 flex h-9 items-center justify-center">
           {hasReport && !reportStreaming && (
             <>
+              <Tooltip title={sectionsExpanded ? "折叠全部" : "展开全部"}>
+                <Button
+                  className="text-gray-400"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setSectionsExpanded((v) => !v)}
+                >
+                  <ChevronsUpDown />
+                </Button>
+              </Tooltip>
               <Tooltip title={t("edit")}>
                 <Button
                   className="text-gray-400"
@@ -319,6 +330,7 @@ export function ResearchBlock({
                   researchId={researchId}
                   messageId={reportId}
                   editing={editing}
+                  allExpanded={sectionsExpanded}
                 />
               )}
             </ScrollContainer>

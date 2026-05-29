@@ -1,13 +1,16 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { LoadingAnimation } from "~/components/deer-flow/loading-animation";
-import { Markdown } from "~/components/deer-flow/markdown";
+import { SourceAwareMarkdown } from "~/components/deer-flow/source-aware-markdown";
+import { SourceDetailDrawer } from "~/components/deer-flow/source-detail-drawer";
 import ReportEditor from "~/components/editor";
 import { useReplay } from "~/core/replay";
 import { useMessage, useStore } from "~/core/store";
+import { useSourceStore } from "~/core/source-store";
+import { extractSourceDetails } from "~/app/chat/components/report-references";
 import { cn } from "~/lib/utils";
 
 import { CollapsibleReport } from "./collapsible-report";
@@ -18,14 +21,36 @@ export function ResearchReportBlock({
   researchId,
   messageId,
   editing,
+  allExpanded,
 }: {
   className?: string;
   researchId: string;
   messageId: string;
   editing: boolean;
+  allExpanded: boolean;
 }) {
   const message = useMessage(messageId);
   const { isReplay } = useReplay();
+  const setReferences = useSourceStore((s) => s.setReferences);
+  const setResearchId = useSourceStore((s) => s.setResearchId);
+
+  // 提取来源数据并设置到 store
+  useEffect(() => {
+    setResearchId(researchId);
+    const sources = extractSourceDetails(researchId);
+    
+    console.group('[ResearchReportBlock] 来源数据提取');
+    console.log('researchId:', researchId);
+    console.log('提取到的 sources 数量:', sources.length);
+    console.log('sources URLs:', sources.map(s => s.url));
+    console.log('sources 详情:', sources.map(s => ({ url: s.url, title: s.title, type: s.sourceType })));
+    console.groupEnd();
+    
+    setReferences(sources);
+  }, [researchId, setResearchId, setReferences]);
+
+  const references = useSourceStore((s) => s.references);
+
   const handleMarkdownChange = useCallback(
     (markdown: string) => {
       if (message) {
@@ -69,20 +94,24 @@ export function ResearchReportBlock({
         />
       ) : (
         <>
-          {/* 流式输出时用原始 Markdown（支持打字动画） */}
+          {/* 流式输出时用 SourceAwareMarkdown（支持打字动画 + 源引用角标） */}
           {message?.isStreaming ? (
-            <Markdown animated checkLinkCredibility>
+            <SourceAwareMarkdown animated checkLinkCredibility references={references}>
               {message?.content}
-            </Markdown>
+            </SourceAwareMarkdown>
           ) : (
             <CollapsibleReport
               content={message?.content ?? ""}
               checkLinkCredibility
+              references={references}
+              allExpanded={allExpanded}
             />
           )}
           {message?.isStreaming && <LoadingAnimation className="my-12" />}
           {/* 报告完成后展示参考资料 */}
           {isCompleted && <ReportReferences researchId={researchId} />}
+          {/* 来源详情抽屉 */}
+          <SourceDetailDrawer />
         </>
       )}
     </div>

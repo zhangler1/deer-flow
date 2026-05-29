@@ -11,6 +11,7 @@
 
 import logging
 import os
+import re
 import time
 
 from langchain_core.messages import HumanMessage
@@ -29,6 +30,46 @@ from src.graph.types import State
 
 logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.reporter')
+
+
+def build_reference_index(observations: list[str]) -> tuple[str, dict]:
+    """从所有 observations 中提取 URL，构建全局来源索引。
+
+    Args:
+        observations: Researcher 步骤的输出结果列表
+
+    Returns:
+        tuple: (格式化的索引文本, {url: {"index": N, "title": title}} 映射字典)
+    """
+    url_pattern = r'\[([^\]]+)\]\((https?://[^\)]+)\)'
+    seen_urls: dict[str, dict] = {}  # url -> {"index": N, "title": title}
+    index = 1
+
+    for obs in observations:
+        for match in re.finditer(url_pattern, obs):
+            title, url = match.group(1), match.group(2)
+            # 跳过图片链接（通常以 ![...](url) 格式出现，但正则不匹配 !）
+            # 跳过空标题
+            if not title.strip():
+                continue
+            if url not in seen_urls:
+                seen_urls[url] = {"index": index, "title": title}
+                index += 1
+
+    # 生成索引文本
+    lines = []
+    for url, info in seen_urls.items():
+        lines.append(f"[{info['index']}] {info['title']} [{url}]({url})")
+
+    index_text = "\n\n".join(lines)
+
+    # 打印索引列表日志
+    logger.info(f"\n{'='*60}\n全局来源索引（共 {len(seen_urls)} 条）\n{'='*60}")
+    for url, info in seen_urls.items():
+        logger.info(f"  [{info['index']}] {info['title']} -> {url}")
+    logger.info(f"{'='*60}")
+
+    return index_text, seen_urls
 
 
 def reporter_node(state: State, config: RunnableConfig):
@@ -64,10 +105,21 @@ def reporter_node(state: State, config: RunnableConfig):
     invoke_messages = apply_prompt_template("reporter", input_, configurable)
     observations = state.get("observations", [])
 
-    # 添加关于报告格式、引用风格和表格使用的提醒
+    # 添加关于报告格式和表格使用的提醒（引用格式由全局索引统一管理）
     invoke_messages.append(
         HumanMessage(
-            content=f"重要提示：请按照提示词中的格式组织您的报告。记得包含：\n\n1. 关键要点 - 最重要发现的要点列表\n2. 概述 - 主题的简要介绍\n3. 详细分析 - 按逻辑部分组织\n4. 调研说明（可选）- 用于更全面的报告\n5. 主要引用 - 在末尾列出所有参考文献\n\n对于引用，不要在正文中包含内联引用。而是将所有引用放在末尾的'主要引用'部分，使用格式：`- [来源标题](URL)`。在每个引用之间包含一个空行以提高可读性。\n\n优先使用MARKDOWN表格进行数据展示和对比。在展示对比数据、统计信息、功能或选项时使用表格。使用清晰的表头和对齐的列来构建表格。示例表格格式：\n\n| 功能 | 描述 | 优点 | 缺点 |\n|------|------|------|------|\n| 功能1 | 描述1 | 优点1 | 缺点1 |\n| 功能2 | 描述2 | 优点2 | 缺点2 |\n\n**请用{state.get('locale', 'zh-CN')}语言编写报告，并充分引用下面的研究结果。**",
+            content=(
+                f"重要提示：请按照提示词中的格式组织您的报告。记得包含：\n\n"
+                f"1. 关键要点 - 最重要发现的要点列表\n"
+                f"2. 概述 - 主题的简要介绍\n"
+                f"3. 详细分析 - 按逻辑部分组织\n"
+                f"4. 调研说明（可选）- 用于更全面的报告\n"
+                f"5. 参考资料 - 在末尾列出所有参考文献\n\n"
+                f"优先使用MARKDOWN表格进行数据展示和对比。在展示对比数据、统计信息、功能或选项时使用表格。\n\n"
+                f"**请用{state.get('locale', 'zh-CN')}语言编写报告，并充分引用下面的研究结果。**\n\n"
+                f"**引用格式要求：正文中每个数据/事实的句子末尾必须标注来源，格式为 [(N)](URL)，"
+                f"其中 N 和 URL 必须来自后面提供的「全局来源索引」。**"
+            ),
             name="system"
         )
     )
@@ -79,7 +131,38 @@ def reporter_node(state: State, config: RunnableConfig):
                 name="observation",
             )
         )
-    
+
+    # 构建全局来源索引并注入（三层保障策略 - 第1层：Prompt 约束）
+    ref_index_text, ref_map = build_reference_index(observations)
+    if ref_index_text:
+        # 截断策略：来源数量过多时只保留 top-50
+        max_sources = 50
+        if len(ref_map) > max_sources:
+            lines = ref_index_text.split("\n\n")[:max_sources]
+            ref_index_text = "\n\n".join(lines)
+            ref_index_text += f"\n\n...（还有 {len(ref_map) - max_sources} 条未列出的来源）"
+
+        invoke_messages.append(
+            HumanMessage(
+                content=(
+                    f"# 全局来源索引（共 {min(len(ref_map), max_sources)} 条，已去重）\n\n"
+                    f"以下是你可以引用的所有来源，请严格使用 [(序号)](URL) 格式引用：\n\n"
+                    f"{ref_index_text}\n\n"
+                    f"---\n\n"
+                    f"**重要规则（必须严格遵守）**：\n"
+                    f"- 正文中引用格式：[(1)](对应的URL)\n"
+                    f"- 序号必须与上述索引一致\n"
+                    f"- 只能引用索引中存在的 URL，禁止编造或修改 URL\n"
+                    f"- 同一来源可多次引用，使用相同序号和 URL\n"
+                    f"- 末尾「参考资料」章节格式：[N] [来源标题](URL)"
+                ),
+                name="reference_index",
+            )
+        )
+        enhanced_logger.logger.info(f"📚 REFERENCE_INDEX | 已构建全局来源索引 | 来源总数: {len(ref_map)} | 注入数: {min(len(ref_map), max_sources)}")
+    else:
+        enhanced_logger.logger.info(f"⚠️ REFERENCE_INDEX | 未从 observations 中提取到任何来源 URL")
+
     enhanced_logger.logger.info(f"📝 REPORTER_INPUT | 输入消息数: {len(invoke_messages)} | 观察结果数: {len(observations)} | 计划标题: {plan_title}")
     
     llm_start_time = time.time()
