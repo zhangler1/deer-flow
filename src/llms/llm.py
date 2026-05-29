@@ -393,10 +393,7 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any], reporter_model
 
         # 根据配置中的 THINK_TAG_MODELS 列表决定是否开启思考标签注入
         think_tag_models = conf.get("THINK_TAG_MODELS", [])
-        enhanced_logger.logger.info(f"THINK_TAG_MODELS: {think_tag_models}")
-        enhanced_logger.logger.info(f"merged_conf.get('model'): {merged_conf.get('model')}")
         if merged_conf.get("model") in think_tag_models:
-            enhanced_logger.logger.info(f"Injecting think tag for model: {merged_conf.get('model')}")
             merged_conf["inject_think_tag"] = True
 
         return _attach_langfuse_callback(EllmChatModel(**merged_conf))

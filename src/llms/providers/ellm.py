@@ -290,7 +290,6 @@ class EllmChatModel(ChatOpenAI):
         _injected = False
         try:
             async for chunk in super()._astream(messages, stop=stop, run_manager=run_manager, **kwargs):
-                logger.info(f"self.inject_think_tag: {self.inject_think_tag}")
                 if self.inject_think_tag and not _injected:
                     msg = chunk.message
                     if isinstance(msg, AIMessageChunk) \
