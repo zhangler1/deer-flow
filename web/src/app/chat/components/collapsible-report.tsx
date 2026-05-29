@@ -50,12 +50,12 @@ function parseReportSections(markdown: string): {
   let preamble = ""; // 标题之前的内容
   let currentSection: ReportSection | null = null;
   let foundFirstH2 = false;
-  let preambleLines: string[] = [];
+  const preambleLines: string[] = [];
   let referenceSection: ReportSection | null = null;
 
   for (const line of lines) {
     // 匹配 ## 标题（二级）
-    const h2Match = line.match(/^##\s+(.+)/);
+    const h2Match = /^##\s+(.+)/.exec(line);
     
     if (h2Match) {
       foundFirstH2 = true;
@@ -130,18 +130,7 @@ export function CollapsibleReport({
     [content],
   );
 
-  // 如果没有章节结构，直接渲染原始 Markdown
-  if (sections.length === 0) {
-    return (
-      <div className={cn(className)}>
-        <SourceAwareMarkdown references={references} animated={animated} checkLinkCredibility={checkLinkCredibility}>
-          {content}
-        </SourceAwareMarkdown>
-      </div>
-    );
-  }
-
-  // 使用受控状态管理展开的章节
+  // 使用受控状态管理展开的章节（所有 hooks 必须在条件返回之前调用）
   const allSectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
   const [openSections, setOpenSections] = useState<string[]>([]);
 
@@ -153,6 +142,17 @@ export function CollapsibleReport({
       setOpenSections([]);
     }
   }, [allExpanded, allSectionIds]);
+
+  // 如果没有章节结构，直接渲染原始 Markdown
+  if (sections.length === 0) {
+    return (
+      <div className={cn(className)}>
+        <SourceAwareMarkdown references={references} animated={animated} checkLinkCredibility={checkLinkCredibility}>
+          {content}
+        </SourceAwareMarkdown>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(className)}>

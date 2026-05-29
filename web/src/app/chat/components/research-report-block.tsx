@@ -3,14 +3,14 @@
 
 import { useCallback, useEffect, useRef } from "react";
 
+import { extractSourceDetails } from "~/app/chat/components/report-references";
 import { LoadingAnimation } from "~/components/deer-flow/loading-animation";
 import { SourceAwareMarkdown } from "~/components/deer-flow/source-aware-markdown";
 import { SourceDetailDrawer } from "~/components/deer-flow/source-detail-drawer";
 import ReportEditor from "~/components/editor";
 import { useReplay } from "~/core/replay";
-import { useMessage, useStore } from "~/core/store";
 import { useSourceStore } from "~/core/source-store";
-import { extractSourceDetails } from "~/app/chat/components/report-references";
+import { useMessage, useStore } from "~/core/store";
 import { cn } from "~/lib/utils";
 
 import { CollapsibleReport } from "./collapsible-report";

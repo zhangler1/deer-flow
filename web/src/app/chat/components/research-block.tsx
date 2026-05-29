@@ -16,9 +16,9 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { useReplay } from "~/core/replay";
 import { closeResearch, useStore } from "~/core/store";
-import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { cn } from "~/lib/utils";
 
 import { ResearchActivitiesBlock } from "./research-activities-block";
@@ -66,7 +66,7 @@ export function ResearchBlock({
     }
     
     // 降级方案：兼容非 HTTPS 环境
-    if (navigator.clipboard && navigator.clipboard.writeText) {
+    if (navigator.clipboard?.writeText) {
       // 使用现代 Clipboard API
       void navigator.clipboard.writeText(report.content);
     } else {
