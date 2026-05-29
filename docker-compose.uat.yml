@@ -58,7 +58,7 @@ services:
     #   dockerfile: Dockerfile.dev.yml
     #   args:
     #     - NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-    image: deer-flow-front.dev:latest
+    image: deer-flow-front:latest
     container_name: deer-flow-frontend
     expose:
       - "3000"

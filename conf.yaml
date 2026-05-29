@@ -327,3 +327,13 @@ REACT_LOOP:
       - product_instance_search
     # 是否在每次成功调用后给工具结果附加预算警告
     attach_warning: true
+
+# ============================================================================
+# Docx 页脚配置
+# ============================================================================
+# 控制 easyparse 生成的 docx 文件每页页脚声明文案
+# 仅当 enabled=true 时，后端才会将 text 透传给 easyparse
+
+DOCX_FOOTER:
+  enabled: true
+  text: "内容由AI生成，请核实重要信息"

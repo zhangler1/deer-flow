@@ -28,7 +28,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
 from src.config.configuration import get_recursion_limit
-from src.config.loader import get_bool_env, get_str_env, load_tool_compression_config
+from src.config.loader import get_bool_env, get_str_env, load_tool_compression_config, load_yaml_config
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.graph.builder import build_graph_with_memory
@@ -1042,6 +1042,18 @@ async def markdown_to_word(request: MarkdownToWordRequest):
     """
     easyparse_url = f"{EASYPARSE_SERVICE_URL}/markdown_to_word"
 
+    # 读取 DOCX_FOOTER 配置，决定是否向 easyparse 透传页脚文案
+    docx_footer_config = load_yaml_config(os.path.join(os.getcwd(), "conf.yaml")).get("DOCX_FOOTER", {})
+    footer_data = {}
+    if docx_footer_config.get("enabled", True) and docx_footer_config.get("text"):
+        footer_data["footer_text"] = docx_footer_config["text"]
+        footer_data["footer_enabled"] = "true"
+    elif not docx_footer_config.get("enabled", True):
+        # enabled=false 时传 footer_enabled=false，显式禁用页脚
+        footer_data["footer_enabled"] = "false"
+
+    logger.info(f"Using easyparse footer text: {footer_data.get('footer_text', 'none')}")
+
     # 将 markdown 内容写入临时文件
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".md", delete=False, encoding="utf-8"
@@ -1064,6 +1076,7 @@ async def markdown_to_word(request: MarkdownToWordRequest):
                 response = await client.post(
                     easyparse_url,
                     files={"file": ("report.md", f, "text/markdown")},
+                    data=footer_data,
                 )
 
         if response.status_code != 200:
