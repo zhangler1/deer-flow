@@ -33,7 +33,7 @@ from typing import Any, Iterator, AsyncIterator
 
 from pydantic import Field, SecretStr
 from langchain_core.language_models import LanguageModelInput
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_openai import ChatOpenAI
 
@@ -72,6 +72,9 @@ class EllmChatModel(ChatOpenAI):
     api_key_refresh_interval: int = 1800
     api_key_refresh_ahead: int = 300
     force_refresh_min_interval: int = 600  # 失败后强制刷新最小间隔（秒）
+
+    # 是否在流式输出时主动注入 💭 标签（由 _create_llm_use_conf 根据配置设置）
+    inject_think_tag: bool = False
 
     # 必须在父类初始化校验前就存在一个占位 api_key
     openai_api_key: SecretStr = Field(
@@ -278,9 +281,22 @@ class EllmChatModel(ChatOpenAI):
         run_manager: Any = None,
         **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
-        """Override to retry once on auth failure after forced key refresh."""
+        """Override to retry once on auth failure after forced key refresh.
+
+        When ``inject_think_tag`` is True, prepend ``<think>\n`` to the
+        first non-empty AI content chunk so the frontend can render the
+        reasoning in a collapsible "thinking" section.
+        """
+        _injected = False
         try:
             async for chunk in super()._astream(messages, stop=stop, run_manager=run_manager, **kwargs):
+                logger.info(f"self.inject_think_tag: {self.inject_think_tag}")
+                if self.inject_think_tag and not _injected:
+                    msg = chunk.message
+                    if isinstance(msg, AIMessageChunk) \
+                       and isinstance(msg.content, str) and msg.content:
+                        msg.content = "<think>\n" + msg.content
+                        _injected = True
                 yield chunk
         except Exception as e:
             if self._is_auth_error(e) and self._key_manager.force_refresh_on_failure():
@@ -291,6 +307,12 @@ class EllmChatModel(ChatOpenAI):
                 )
                 self._inject_latest_api_key()
                 async for chunk in super()._astream(messages, stop=stop, run_manager=run_manager, **kwargs):
+                    if self.inject_think_tag and not _injected:
+                        msg = chunk.message
+                        if isinstance(msg, AIMessageChunk) \
+                           and isinstance(msg.content, str) and msg.content:
+                            msg.content = "<think>\n" + msg.content
+                            _injected = True
                     yield chunk
             else:
                 raise
