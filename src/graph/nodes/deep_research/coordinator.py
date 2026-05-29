@@ -52,7 +52,7 @@ _RESET_JUDGE_PROMPT = """你是一个智能助手。请判断用户的新输入�
 只返回 JSON，不要解释。"""
 
 
-def _should_reset_state(state: dict) -> bool:
+async def _should_reset_state(state: dict) -> bool:
     """判断是否需要重置上一轮研究状态。
 
     条件：final_report 非空（上一轮已完成）且 LLM 判定新输入为全新话题。
@@ -88,7 +88,7 @@ def _should_reset_state(state: dict) -> bool:
             old_topic=old_topic[:200],
             new_input=new_input[:500],
         )
-        resp = judge_llm.invoke([SystemMessage(content=prompt)])
+        resp = await judge_llm.ainvoke([SystemMessage(content=prompt)])
         content = resp.content.strip()
         # 容忍 markdown 代码块
         if content.startswith("```"):
@@ -106,7 +106,7 @@ def _should_reset_state(state: dict) -> bool:
         return True  # 保守策略：默认重置
 
 
-def coordinator_node(
+async def coordinator_node(
     state, config: RunnableConfig
 ) -> Command[Literal["planner", "background_investigator", "clarification", "__end__"]]:
     """与客户沟通的协调节点"""
@@ -120,7 +120,7 @@ def coordinator_node(
     # 智能状态重置：如果上一轮已生成报告，让 LLM 判断是否为新话题
     # ------------------------------------------------------------------
     state_reset_fields = {}
-    if _should_reset_state(state):
+    if await _should_reset_state(state):
         enhanced_logger.logger.info(
             "🔄 STATE_RESET | 判定为全新话题，重置 observations / current_plan / final_report"
         )
@@ -159,11 +159,17 @@ def coordinator_node(
         enhanced_logger.logger.info(f"  消息{i+1}: {msg_preview}")
     
     llm_start_time = time.time()
-    response = (
+    full_response = None
+    async for chunk in (
         get_llm_by_type(AGENT_LLM_MAP["coordinator"])
         .bind_tools([handoff_to_planner])
-        .invoke(messages)
-    )
+        .astream(messages)
+    ):
+        if full_response is None:
+            full_response = chunk
+        else:
+            full_response = full_response + chunk
+    response = full_response
     llm_duration = time.time() - llm_start_time
     
     enhanced_logger.logger.info(f"🤖 COORDINATOR_LLM_RESPONSE | LLM调用完成 | 耗时: {llm_duration:.2f}s")

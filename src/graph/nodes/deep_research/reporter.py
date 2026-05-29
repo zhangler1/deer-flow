@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.reporter')
 
 
-def reporter_node(state: State, config: RunnableConfig):
+async def reporter_node(state: State, config: RunnableConfig):
     """撰写最终报告的报告员节点"""
     start_time = time.time()
     enhanced_logger.logger.info(f"🔄 NODE_ENTRY | reporter | 开始执行报告生成节点")
@@ -104,10 +104,10 @@ def reporter_node(state: State, config: RunnableConfig):
             return {"final_report": "报告生成已被用户取消。"}
 
 
-        # 使用 stream() 替代 invoke()，允许在 chunk 之间检测取消信号
+        # 使用 astream() 替代 stream()，允许在 chunk 之间检测取消信号
         chunks = []
         cancelled = False
-        for chunk in reporter_llm.stream(invoke_messages):
+        async for chunk in reporter_llm.astream(invoke_messages):
             if cancel_event and cancel_event.is_set():
                 enhanced_logger.logger.info(
                     f"⛔ LLM_CANCELLED | reporter | 客户端断连，中止报告生成 | "

@@ -264,7 +264,13 @@ class ReactLoop:
         """
         # 最内层：实际的 LLM 调用
         async def core_model_call(msgs: list) -> AIMessage:
-            return await self.model.ainvoke(msgs)
+            full_response = None
+            async for chunk in self.model.astream(msgs):
+                if full_response is None:
+                    full_response = chunk
+                else:
+                    full_response = full_response + chunk
+            return full_response
         
         # 从后往前包装洋葱链
         chain = core_model_call
@@ -380,7 +386,12 @@ class ReactLoop:
             
         try:
             # 使用不绑定工具的模型，确保 LLM 只能输出文本
-            final_response = await self.raw_model.ainvoke(messages)
+            final_response = None
+            async for chunk in self.raw_model.astream(messages):
+                if final_response is None:
+                    final_response = chunk
+                else:
+                    final_response = final_response + chunk
             messages.append(final_response)
             logger.info(f"✅ ReactLoop 强制总结完成 | 响应长度: {len(final_response.content or '')}")
         except Exception as e:

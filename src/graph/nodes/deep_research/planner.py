@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.planner')
 
 
-def planner_node(
+async def planner_node(
     state, config: RunnableConfig
 ) -> Command[Literal["human_feedback", "reporter"]]:
     """生成完整计划的规划节点"""
@@ -83,7 +83,7 @@ def planner_node(
     full_response = ""
     llm_start_time = time.time()
     if not configurable.enable_deep_thinking:
-        response = llm.invoke(messages)
+        response = await llm.ainvoke(messages)
         try:
             if hasattr(response, 'content'):
                 full_response = str(response.content)
@@ -92,8 +92,7 @@ def planner_node(
         except Exception:
             full_response = "Response conversion failed"
     else:
-        response = llm.stream(messages)
-        for chunk in response:
+        async for chunk in llm.astream(messages):
             try:
                 if hasattr(chunk, 'content'):
                     content = getattr(chunk, 'content', '')
