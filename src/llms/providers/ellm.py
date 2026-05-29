@@ -83,24 +83,15 @@ class EllmChatModel(ChatOpenAI):
     )
 
     def model_post_init(self, __context: Any) -> None:
-        """Initialise the API key manager and set up default headers.
-
-        When ``api_key_url`` is empty, skip the ELLM key manager entirely
-        and fall back to the static ``api_key`` configured in the YAML.
-        This allows testing the EllmChatModel path (e.g. inject_think_tag)
-        against non-ELLM endpoints such as DeepSeek.
-        """
-        if not self.api_key_url or not self.scene_code:
-            logger.warning(
-                "EllmChatModel: api_key_url or scene_code not configured — "
-                "skipping ELLM key manager, using static api_key "
-                "(model=%s)",
-                self.model_name,
+        """Initialise the API key manager and set up default headers."""
+        if not self.api_key_url:
+            raise ValueError(
+                "EllmChatModel requires 'api_key_url' to be configured in config.yaml"
             )
-            # Mark that we don't have a key manager so retry logic can skip.
-            self._key_manager = None  # type: ignore[assignment]
-            super().model_post_init(__context)
-            return
+        if not self.scene_code:
+            raise ValueError(
+                "EllmChatModel requires 'scene_code' to be configured in config.yaml"
+            )
 
         # Get or create the singleton key manager for this scene_code
         self._key_manager = EllmApiKeyManager.get_instance(
@@ -134,9 +125,6 @@ class EllmChatModel(ChatOpenAI):
 
     def _inject_latest_api_key(self) -> None:
         """Update default_headers with the latest API key from the manager."""
-        # No key manager → using static api_key, nothing to inject.
-        if self._key_manager is None:
-            return
         try:
             current_key = self._key_manager.get_api_key()
             self.default_headers = {
@@ -233,7 +221,7 @@ class EllmChatModel(ChatOpenAI):
         try:
             return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
         except Exception as e:
-            if self._is_auth_error(e) and self._key_manager and self._key_manager.force_refresh_on_failure():
+            if self._is_auth_error(e) and self._key_manager.force_refresh_on_failure():
                 logger.info(
                     "EllmChatModel: retrying _generate after forced key refresh "
                     "(scene_code=%s)",
@@ -254,7 +242,7 @@ class EllmChatModel(ChatOpenAI):
         try:
             return await super()._agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
         except Exception as e:
-            if self._is_auth_error(e) and self._key_manager and self._key_manager.force_refresh_on_failure():
+            if self._is_auth_error(e) and self._key_manager.force_refresh_on_failure():
                 logger.info(
                     "EllmChatModel: retrying _agenerate after forced key refresh "
                     "(scene_code=%s)",
@@ -275,7 +263,7 @@ class EllmChatModel(ChatOpenAI):
         try:
             yield from super()._stream(messages, stop=stop, run_manager=run_manager, **kwargs)
         except Exception as e:
-            if self._is_auth_error(e) and self._key_manager and self._key_manager.force_refresh_on_failure():
+            if self._is_auth_error(e) and self._key_manager.force_refresh_on_failure():
                 logger.info(
                     "EllmChatModel: retrying _stream after forced key refresh "
                     "(scene_code=%s)",
@@ -302,6 +290,7 @@ class EllmChatModel(ChatOpenAI):
         _injected = False
         try:
             async for chunk in super()._astream(messages, stop=stop, run_manager=run_manager, **kwargs):
+                logger.info(f"self.inject_think_tag: {self.inject_think_tag}")
                 if self.inject_think_tag and not _injected:
                     msg = chunk.message
                     if isinstance(msg, AIMessageChunk) \
@@ -310,7 +299,7 @@ class EllmChatModel(ChatOpenAI):
                         _injected = True
                 yield chunk
         except Exception as e:
-            if self._is_auth_error(e) and self._key_manager and self._key_manager.force_refresh_on_failure():
+            if self._is_auth_error(e) and self._key_manager.force_refresh_on_failure():
                 logger.info(
                     "EllmChatModel: retrying _astream after forced key refresh "
                     "(scene_code=%s)",
