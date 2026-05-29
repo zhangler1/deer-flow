@@ -196,12 +196,24 @@ class EllmChatModel(ChatOpenAI):
         stop: list[str] | None = None,
         **kwargs: Any,
     ) -> dict:
-        """Inject the latest API key into the request payload before sending."""
+        """Inject the latest API key and strip user-message names for MiniMax."""
         # Refresh the key in default_headers before building the payload
         self._inject_latest_api_key()
 
         # Build the payload via the parent class
         payload = super()._get_request_payload(input_, stop=stop, **kwargs)
+
+        # ---- MiniMax API 兼容 ----
+        # MiniMax 要求同一请求中所有 role="user" 消息的 name 字段一致，
+        # 否则返回 400 "user name must be consistent (2013)"。
+        # LangGraph 工作流会给 HumanMessage 设置不同的 name（如
+        # "researcher"、"feedback"、"coordinator"），导致 MiniMax 拒绝请求。
+        # 移除 user 消息的 name 字段是安全的：其他 OpenAI 兼容提供商
+        # （DeepSeek、OpenAI）均忽略此字段。
+        messages = payload.get("messages", [])
+        for msg in messages:
+            if isinstance(msg, dict) and msg.get("role") == "user" and "name" in msg:
+                del msg["name"]
 
         return payload
 
