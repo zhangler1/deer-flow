@@ -154,6 +154,9 @@ function mergeToolCallResultMessage(
   );
   if (toolCall) {
     toolCall.result = event.data.content;
+    console.log('[mergeToolCallResult] tool=', toolCall.name, '| result长度=', event.data.content?.length, '| result预览=', event.data.content?.substring(0, 200));
+  } else {
+    console.warn('[mergeToolCallResult] 未找到 toolCall! tool_call_id=', event.data.tool_call_id);
   }
 }
 

@@ -35,7 +35,7 @@ export function FavIcon({
   
   return (
     <img
-      className={cn("bg-accent h-4 w-4 rounded-full shadow-sm", className)}
+      className={cn("h-4 w-4 shrink-0 rounded-full object-contain", className)}
       width={16}
       height={16}
       src={getFaviconUrl(url)}

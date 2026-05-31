@@ -127,7 +127,9 @@ function extractToolCallTags(toolCall: ToolCallRuntime): ToolCallTag[] {
     // research_skill_prompt_search 返回纯 markdown，不是 JSON，跳过解析
     if (toolCall.result && toolCall.name !== "research_skill_prompt_search") {
       try {
+        console.log('[ResearchActivity] 解析搜索结果 | tool=', toolCall.name, '| result=', toolCall.result?.substring(0, 300));
         const results = parseJSON<SearchResult[]>(toolCall.result, []);
+        console.log('[ResearchActivity] 解析结果 | 数量=', results?.length, '| 第一条=', results?.[0]);
         if (Array.isArray(results)) {
           let docCount = 0; // 限制无URL文档卡片的显示数量
           results
@@ -135,6 +137,7 @@ function extractToolCallTags(toolCall: ToolCallRuntime): ToolCallTag[] {
             .slice(0, 5)
             .forEach((r) => {
               if (r.url) {
+                console.log('[ResearchActivity] 构建 SourceLink | url=', r.url, '| title=', r.title, '| source=', r.source);
                 tags.push({
                   type: "source",
                   url: r.url,
@@ -355,6 +358,21 @@ export function ResearchActivitiesBlock({
     return indices.join(",");
   });
 
+  // 订阅 toolCall.result 变化，确保搜索结果到达后立即重新渲染胶囊
+  const toolCallResultDeps = useStore((state) => {
+    const ids = state.researchActivityIds.get(researchId) || [];
+    let resultCount = 0;
+    for (const id of ids) {
+      const msg = state.messages.get(id);
+      if (msg?.toolCalls) {
+        for (const tc of msg.toolCalls) {
+          if (tc.result) resultCount++;
+        }
+      }
+    }
+    return resultCount;
+  });
+
   const { steps, title } = useMemo(() => {
     const state = useStore.getState();
     return buildStepsFromActivityIds(
@@ -364,7 +382,7 @@ export function ResearchActivitiesBlock({
       reportGenerating,
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activityIds, reportCompleted, reportGenerating, stepIndexDeps]);
+  }, [activityIds, reportCompleted, reportGenerating, stepIndexDeps, toolCallResultDeps]);
 
   if (steps.length === 0) {
     return ongoing ? (

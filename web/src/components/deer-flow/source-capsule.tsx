@@ -1,46 +1,38 @@
 "use client";
 
 import { useCallback, useState, useRef } from "react";
+import { ExternalLink } from "lucide-react";
 
-import { useSourceStore, type SourceDetail } from "~/core/source-store";
 import { cn } from "~/lib/utils";
-
 import { FavIcon } from "./fav-icon";
 
 // ── 类型 ──────────────────────────────────────────
 
-export interface SourceTagProps {
-  /** 来源序号（从1开始） */
-  index: number;
+export interface SourceCapsuleProps {
   /** 来源 URL */
   url: string;
-  /** 来源引用列表（可选，用于 tooltip 标题查找） */
-  references?: SourceDetail[];
+  /** 域名 */
+  domain: string;
+  /** 标题 */
+  title?: string;
+  /** 摘要（可选） */
+  snippet?: string;
 }
 
 // ── 组件 ──────────────────────────────────────────
 
 /**
- * 溯源标签组件
- *
- * 渲染为行内可点击的上标标签 [N]，悬停弹出溯源卡片，点击后：
- * 1. 优先通过 URL 在 sourceStore 中查找匹配 → 打开详情抽屉
- * 2. 若未找到（兜底）→ 直接在新标签页打开 URL
- *
- * Ctrl+Click / Cmd+Click → 始终直接在新标签页打开原始 URL
+ * 来源胶囊组件（用于研究过程中）
+ * 
+ * 默认显示为小胶囊（域名 + favicon），hover 时弹出详细信息卡片
  */
-export function SourceTag({ index, url, references }: SourceTagProps) {
-  const openSourceByUrl = useSourceStore((s) => s.openSourceByUrl);
-  const storeReferences = useSourceStore((s) => s.references);
+export function SourceCapsule({ url, domain, title, snippet }: SourceCapsuleProps) {
   const [showCard, setShowCard] = useState(false);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 尝试从 props references 或 store references 中找到标题
-  const allRefs = references ?? storeReferences;
-  const matchedRef = allRefs.find((r) => r.url === url);
-  const title = matchedRef?.title ?? extractDomain(url);
-  const domain = matchedRef?.domain ?? extractDomain(url);
+  const displayTitle = title || "未命名文档";
+  const displayDomain = domain || extractDomain(url);
 
   const handleMouseEnter = useCallback(() => {
     if (leaveTimeout.current) {
@@ -79,58 +71,47 @@ export function SourceTag({ index, url, references }: SourceTagProps) {
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-
+      
       // Ctrl+Click / Cmd+Click → 直接在新标签页打开
       if (e.ctrlKey || e.metaKey) {
         window.open(url, "_blank", "noopener,noreferrer");
         return;
       }
 
-      // 正常点击：尝试在 store 中匹配并打开抽屉
-      const refs = useSourceStore.getState().references;
-      const found = refs.some((r) => r.url === url);
-
-      if (found) {
-        openSourceByUrl(url);
-      } else {
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
+      // 正常点击 → 在新标签页打开
+      window.open(url, "_blank", "noopener,noreferrer");
     },
-    [url, openSourceByUrl],
+    [url],
   );
 
   return (
     <span className="relative inline-block">
+      {/* 小胶囊（默认显示） */}
       <span
         className={cn(
-          "inline-flex cursor-pointer select-none items-center justify-center",
-          "min-w-[18px] h-[18px] px-[4px] rounded-full",
-          "text-[11px] font-semibold leading-none",
-          "bg-blue-500 text-white",
-          "hover:bg-blue-600 hover:scale-110",
-          "dark:bg-blue-400 dark:text-gray-900",
-          "dark:hover:bg-blue-300",
+          "inline-flex cursor-pointer select-none items-center gap-1.5",
+          "rounded-full border border-border/50 bg-muted/30",
+          "px-2 py-0.5 text-xs text-muted-foreground",
+          "hover:bg-muted hover:text-foreground",
           "transition-all duration-150",
-          "align-super",
-          "shadow-sm",
         )}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         role="button"
         tabIndex={0}
-        aria-label={`来源 ${index}: ${title}`}
+        aria-label={`查看来源: ${displayTitle}`}
       >
-        {index}
+        <FavIcon url={url} className="h-3.5 w-3.5 shrink-0" title={displayTitle} />
+        <span className="truncate max-w-[80px]">{displayDomain}</span>
       </span>
 
-      {/* 溯源卡片 - 悬停弹出 */}
+      {/* 弹出卡片（hover 时显示） */}
       {showCard && (
         <span
           className={cn(
-            "not-prose",
             "absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2",
-            "w-[260px] rounded-lg border border-border/60 bg-popover px-2.5 py-1.5 shadow-md",
+            "w-[280px] rounded-xl border border-border/60 bg-popover px-3 py-2.5 shadow-md",
             "animate-in fade-in-0 zoom-in-95 duration-150",
             "cursor-pointer",
           )}
@@ -138,17 +119,28 @@ export function SourceTag({ index, url, references }: SourceTagProps) {
           onMouseLeave={handleCardMouseLeave}
           onClick={handleClick}
         >
-          {/* favicon + 域名 */}
-          <span className="flex items-center gap-1.5">
-            <FavIcon url={url} className="h-4 w-4 shrink-0 rounded-sm" title={title} />
-            <span className="text-xs text-muted-foreground truncate leading-none">
-              {domain}
+          {/* 第一排：favicon + 域名 + 外部链接图标 */}
+          <span className="flex items-center justify-between gap-1.5 mb-1.5">
+            <span className="flex items-center gap-1.5">
+              <FavIcon url={url} className="h-3.5 w-3.5 shrink-0 rounded-sm" title={displayTitle} />
+              <span className="text-xs text-muted-foreground truncate leading-none">
+                {displayDomain}
+              </span>
             </span>
+            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
           </span>
-          {/* 标题 */}
-          <span className="block mt-1 text-sm font-bold leading-snug text-foreground line-clamp-2">
-            {title}
+          
+          {/* 第二行：标题 */}
+          <span className="block text-[13px] font-semibold leading-tight text-foreground line-clamp-2 mb-1.5">
+            {displayTitle}
           </span>
+          
+          {/* 第三行：摘要（如果有） */}
+          {snippet && (
+            <span className="block text-xs text-muted-foreground line-clamp-3 leading-relaxed">
+              {snippet}
+            </span>
+          )}
         </span>
       )}
     </span>
