@@ -139,6 +139,7 @@ function extractToolCallTags(toolCall: ToolCallRuntime): ToolCallTag[] {
                   type: "source",
                   url: r.url,
                   domain: extractDomain(r.url),
+                  title: r.title || undefined,
                 });
               } else if ((r.title || r.source) && docCount < 5) {
                 // 无 URL 的内网知识库类结果，使用不可点文档卡片展示
@@ -169,6 +170,7 @@ function extractToolCallTags(toolCall: ToolCallRuntime): ToolCallTag[] {
             type: "source",
             url: resultUrl,
             domain: extractDomain(resultUrl),
+            title: result.title || undefined,
           });
         }
       } catch {

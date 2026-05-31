@@ -31,6 +31,8 @@ export interface SourceLink {
   domain: string;
   /** 网站 favicon URL（可选） */
   favicon?: string;
+  /** 文章/页面标题（可选） */
+  title?: string;
 }
 
 /** 内网文档标签（不可点，用于无 URL 的知识库结果） */
@@ -96,28 +98,35 @@ function ReadTagBadge({ label = "已阅读相关资料" }: { label?: string }) {
 }
 
 /** 来源链接胶囊 */
-function SourceLinkBadge({ url, domain, favicon }: SourceLink) {
+function SourceLinkBadge({ url, domain, favicon, title }: SourceLink) {
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-0.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      className="inline-flex max-w-full flex-col rounded-lg border border-border/50 bg-muted/50 p-2.5 transition-colors hover:bg-muted hover:text-foreground"
     >
-      {favicon ? (
-        <img
-          src={favicon}
-          alt=""
-          className="h-3.5 w-3.5 shrink-0 rounded-full object-cover"
-          onError={(e) => {
-            // favicon 加载失败时用 FavIcon 兜底
-            e.currentTarget.style.display = "none";
-          }}
-        />
-      ) : (
-        <FavIcon url={url} className="h-3.5 w-3.5 shrink-0" />
+      <div className="flex items-center gap-1.5">
+        {favicon ? (
+          <img
+            src={favicon}
+            alt=""
+            className="h-4 w-4 shrink-0 rounded-full object-cover"
+            onError={(e) => {
+              // favicon 加载失败时用 FavIcon 兜底
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+          <FavIcon url={url} className="h-4 w-4 shrink-0" />
+        )}
+        <span className="truncate text-xs text-muted-foreground">{domain}</span>
+      </div>
+      {title && (
+        <h3 className="mt-1.5 line-clamp-2 text-sm font-medium leading-relaxed text-foreground">
+          {title}
+        </h3>
       )}
-      <span className="truncate">{domain}</span>
     </a>
   );
 }
