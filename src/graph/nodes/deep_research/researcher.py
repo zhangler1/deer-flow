@@ -28,6 +28,7 @@ from src.tools import (
     product_instance_search,
     report_search,
     searchknowledge_standard,
+    searchknowledge_standard_tool,
     budget_controlled_bocomsearch_tool,
     get_budget_manager,
     clear_budget_manager,
@@ -131,11 +132,11 @@ async def researcher_node(
         tool_name_list = ["research_skill_prompt_search"]
         # 根据开关决定是否添加在线搜索工具
         if use_budget_online:
-            tools.append(online_search_tool(configurable.max_search_results))
+            tools.append(online_search_tool(configurable.get_max_results("online_search")))
             tool_name_list.append("online_search")
         # 行业研报沿用 use_budget_bocom 开关控制内部知识库检索（语义复用：内网知识库开关）
         if use_budget_bocom:
-            tools.append(searchknowledge_standard)
+            tools.append(searchknowledge_standard_tool(configurable.get_max_results("searchknowledge_standard")))
             tool_name_list.append("searchknowledge_standard")
         tool_names = ", ".join(tool_name_list)
 
@@ -149,7 +150,7 @@ async def researcher_node(
         tool_name_list = []
         # 根据开关决定是否添加在线搜索工具
         if use_budget_online:
-            tools.append(online_search_tool(configurable.max_search_results))
+            tools.append(online_search_tool(configurable.get_max_results("online_search")))
             tool_name_list.append("online_search")
         # bocomsearch 保留 BudgetControlledSearchTool 包装器（guwp_token 线程安全注入）
         if use_budget_bocom:
@@ -157,7 +158,7 @@ async def researcher_node(
                 session_id=session_id,
                 max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
-                max_results=configurable.max_search_results,
+                max_results=configurable.get_max_results("bocomsearch"),
                 guwp_token=guwp_token,
                 hard_token_limit=hard_token_limit,
             ))
@@ -178,7 +179,7 @@ async def researcher_node(
         tool_name_list = ["research_skill_prompt_search"]
         # 根据开关决定是否添加在线搜索工具
         if use_budget_online:
-            tools.append(online_search_tool(configurable.max_search_results))
+            tools.append(online_search_tool(configurable.get_max_results("online_search")))
             tool_name_list.append("online_search")
         tool_names = ", ".join(tool_name_list)
 
@@ -188,7 +189,7 @@ async def researcher_node(
         tool_name_list = ["research_skill_prompt_search"]
         # 根据开关决定是否添加在线搜索工具
         if use_budget_online:
-            tools.append(online_search_tool(configurable.max_search_results))
+            tools.append(online_search_tool(configurable.get_max_results("online_search")))
             tool_name_list.append("online_search")
         tool_names = ", ".join(tool_name_list)
 
@@ -199,7 +200,7 @@ async def researcher_node(
         tool_name_list = []
         # 根据开关决定是否添加在线搜索工具
         if use_budget_online:
-            tools.append(online_search_tool(configurable.max_search_results))
+            tools.append(online_search_tool(configurable.get_max_results("online_search")))
             tool_name_list.append("online_search")
         tool_names = ", ".join(tool_name_list) if tool_name_list else "(无搜索工具)"
     

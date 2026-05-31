@@ -37,7 +37,7 @@ def background_investigation_node(state, config: RunnableConfig):
     if SELECTED_SEARCH_ENGINE == SearchEngine.TAVILY.value:
         enhanced_logger.logger.info(f"🔍 使用Tavily搜索引擎进行背景调研 | 查询: '{query}'")
         searched_content = LoggedTavilySearch(
-            max_results=configurable.max_search_results
+            max_results=configurable.get_max_results("online_search")
         ).invoke(query)
         # check if the searched_content is a tuple, then we need to unpack it
         if isinstance(searched_content, tuple):
@@ -60,7 +60,7 @@ def background_investigation_node(state, config: RunnableConfig):
     else:
         enhanced_logger.logger.info(f"🔍 使用online_search进行背景调研 | 查询: '{query}'")
         background_investigation_results = online_search_tool(
-            max_results=configurable.max_search_results
+            max_results=configurable.get_max_results("online_search")
         ).invoke(query)
         result = {
             "background_investigation_results": json.dumps(
