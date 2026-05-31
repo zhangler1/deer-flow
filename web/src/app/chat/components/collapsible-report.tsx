@@ -37,13 +37,9 @@ interface ReportSection {
  * - 二级标题（## 开头）作为章节标题，每个章节可折叠
  * - 三级及以下标题保留在章节内容中，不单独拆分
  */
-/** 判断章节标题是否为“参考资料”类型 */
-const REFERENCE_SECTION_PATTERNS = /^(参考资料|参考文献|主要引用|references)$/i;
-
 function parseReportSections(markdown: string): {
   preamble: string;
   sections: ReportSection[];
-  referenceSection: ReportSection | null;
 } {
   const lines = markdown.split("\n");
   const sections: ReportSection[] = [];
@@ -51,7 +47,6 @@ function parseReportSections(markdown: string): {
   let currentSection: ReportSection | null = null;
   let foundFirstH2 = false;
   const preambleLines: string[] = [];
-  let referenceSection: ReportSection | null = null;
 
   for (const line of lines) {
     // 匹配 ## 标题（二级）
@@ -62,12 +57,7 @@ function parseReportSections(markdown: string): {
       // 保存之前的章节
       if (currentSection) {
         currentSection.content = currentSection.content.trimEnd();
-        // 检查是否为参考资料章节
-        if (REFERENCE_SECTION_PATTERNS.test(currentSection.title)) {
-          referenceSection = currentSection;
-        } else {
-          sections.push(currentSection);
-        }
+        sections.push(currentSection);
       }
       // 开始新章节
       currentSection = {
@@ -88,16 +78,12 @@ function parseReportSections(markdown: string): {
   // 保存最后一个章节
   if (currentSection) {
     currentSection.content = currentSection.content.trimEnd();
-    if (REFERENCE_SECTION_PATTERNS.test(currentSection.title)) {
-      referenceSection = currentSection;
-    } else {
-      sections.push(currentSection);
-    }
+    sections.push(currentSection);
   }
 
   preamble = preambleLines.join("\n").trim();
 
-  return { preamble, sections, referenceSection };
+  return { preamble, sections };
 }
 
 // ── 组件 ──────────────────────────────────────────
@@ -125,7 +111,7 @@ export function CollapsibleReport({
   references = [],
   allExpanded = false,
 }: CollapsibleReportProps) {
-  const { preamble, sections, referenceSection } = useMemo(
+  const { preamble, sections } = useMemo(
     () => parseReportSections(content),
     [content],
   );
@@ -200,24 +186,6 @@ export function CollapsibleReport({
           </AccordionItem>
         ))}
       </Accordion>
-
-      {/* 参考资料章节（始终可见，不折叠） */}
-      {referenceSection && (
-        <div className="mt-6 border-t pt-4">
-          <h2 className="mb-3 text-sm font-semibold text-foreground">
-            {referenceSection.title}
-          </h2>
-          <div className="pl-2">
-            <SourceAwareMarkdown
-              references={references}
-              animated={false}
-              checkLinkCredibility={checkLinkCredibility}
-            >
-              {referenceSection.content}
-            </SourceAwareMarkdown>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
