@@ -9,7 +9,7 @@
 #     docker compose -f docker-compose.yml -f docker-compose.easypase.yml up -d
 #
 #   同时叠加 Mock：
-#     docker compose -f docker-compose.uat.yml -f docker-compose.mock.yml -f docker-compose.easypase.yml up -d
+#     docker compose -f docker-compose.uat.yml -f docker-compose.local.yml -f docker-compose.easypase.yml up -d
 # ===========================================================
 
 services:

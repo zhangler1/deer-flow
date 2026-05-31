@@ -129,7 +129,7 @@ export function SourceTag({ index, url, references }: SourceTagProps) {
         <span
           className={cn(
             "absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2",
-            "w-[280px] rounded-lg border border-border bg-popover p-3 shadow-lg",
+            "w-[260px] rounded-xl border border-border/60 bg-popover px-3 py-2.5 shadow-md",
             "animate-in fade-in-0 zoom-in-95 duration-150",
             "cursor-pointer",
           )}
@@ -137,15 +137,15 @@ export function SourceTag({ index, url, references }: SourceTagProps) {
           onMouseLeave={handleCardMouseLeave}
           onClick={handleClick}
         >
-          {/* 卡片头部：来源图标 + 域名 */}
-          <span className="flex items-center gap-2 mb-1.5">
-            <FavIcon url={url} className="h-4 w-4 shrink-0" title={title} />
-            <span className="text-xs text-muted-foreground truncate">
+          {/* 第一排：favicon + 域名 */}
+          <span className="flex items-center gap-1.5 mb-1.5">
+            <FavIcon url={url} className="h-[14px] w-[14px] shrink-0 rounded-sm" title={title} />
+            <span className="text-xs text-muted-foreground truncate leading-none">
               {domain}
             </span>
           </span>
-          {/* 卡片标题 */}
-          <span className="block text-sm font-medium leading-snug text-foreground line-clamp-2">
+          {/* 第二行：标题 */}
+          <span className="block text-[13px] font-semibold leading-tight text-foreground line-clamp-2">
             {title}
           </span>
         </span>
