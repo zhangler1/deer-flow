@@ -7,32 +7,39 @@
 # - A restart is required every time you change the `config.yaml` file.
 
 COORDINATOR_MODEL:
-  base_url: https://api.deepseek.com/v1
-  model: deepseek-chat 
+  base_url: https://api.deepseek.com
+  model: deepseek-v4-flash
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  # api_key: sk-api-neIHGWLpXeuieE9bs5Z0WRophLm9fe2FAzDDlaeaCGdSh1oOLEpxruS7PdRoYUUJOA0CJDI25yRQ9JIWjicX0vjYgZnlSNjsLP1sIF96-9sehi0IRzsCYXo
+  api_key_refresh_interval: 1800
+  api_key_refresh_ahead: 300
+  max_tokens: 8192
+  temperature: 0.7
   # max_retries: 3 # Maximum number of retries for LLM calls
-  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
+  verify_ssl: false
+  # chat_template_kwargs:
+  #     enable_thinking: true
 
 PLANNER_MODEL:
-  base_url: https://api.deepseek.com/v1
-  model: deepseek-chat 
+  base_url: https://api.deepseek.com
+  model: deepseek-v4-flash
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
+
 
 RESEARCHER_MODEL:
-  base_url: https://api.deepseek.com/v1
-  model: deepseek-chat 
-  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  base_url: https://api.minimaxi.com/v1
+  model: MiniMax-M2.5
+  api_key: sk-api-neIHGWLpXeuieE9bs5Z0WRophLm9fe2FAzDDlaeaCGdSh1oOLEpxruS7PdRoYUUJOA0CJDI25yRQ9JIWjicX0vjYgZnlSNjsLP1sIF96-9sehi0IRzsCYXo
+  # api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
-
-CODER_MODEL:
-  base_url: https://api.deepseek.com/v1
-  model: deepseek-chat 
-  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
-  # max_retries: 3 # Maximum number of retries for LLM calls
-  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
+  # chat_template_kwargs:
+  #     enable_thinking: true
+  # extra_body:
+  #   thinking:
+  #     type: enabled
 
 # Reporter model for deep research report generation
 # REPORTER_MODEL is a reference pointer: default specifies which REPORTER_MODEL_OPTIONS key to use
@@ -42,15 +49,27 @@ REPORTER_MODEL:
 # All selectable reporter models, each with complete independent configuration
 REPORTER_MODEL_OPTIONS:
   deepseek-v4-flash:
-    base_url: https://api.deepseek.com/v1
-    model: deepseek-v4-flash
-    api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+    base_url: https://api.minimaxi.com/v1
+    model: MiniMax-M2.5
+    api_key: sk-api-neIHGWLpXeuieE9bs5Z0WRophLm9fe2FAzDDlaeaCGdSh1oOLEpxruS7PdRoYUUJOA0CJDI25yRQ9JIWjicX0vjYgZnlSNjsLP1sIF96-9sehi0IRzsCYXo
+    # base_url: https://api.deepseek.com
+    # model: deepseek-v4-flash
+    # api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
     verify_ssl: false
+    # chat_template_kwargs:
+    #   enable_thinking: true
+    extra_body:
+      thinking:
+        type: enabled
   deepseek-v4-pro:
-    base_url: https://api.deepseek.com/v1
+    platform: ellm
+    base_url: https://api.deepseek.com
     model: deepseek-v4-pro
     api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
     verify_ssl: false
+    # Optional: enable thinking mode for the model
+    # chat_template_kwargs:
+    #   enable_thinking: true
   # Uncomment to add more reporter model options:
   # gpt4o_mini:
   #   base_url: https://api.openai.com/v1
@@ -61,6 +80,13 @@ REPORTER_MODEL_OPTIONS:
 BASIC_MODEL:
   base_url: https://api.deepseek.com/v1
   model: deepseek-chat 
+  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
+  # max_retries: 3 # Maximum number of retries for LLM calls
+  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
+
+CODER_MODEL:
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-chat
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
@@ -77,19 +103,6 @@ COMPRESSION_MODEL:
   #   api_key: sk-your-openai-key
   #   verify_ssl: false
 
-BASIC_MODEL:
-  base_url: https://api.deepseek.com/v1
-  model: deepseek-chat 
-  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
-  # max_retries: 3 # Maximum number of retries for LLM calls
-  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
-
-COMPRESSION_MODEL:
-  base_url: https://api.deepseek.com/v1
-  model: deepseek-chat 
-  api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
-  # max_retries: 3 # Maximum number of retries for LLM calls
-  verify_ssl: false  # Uncomment this line to disable SSL certificate verification for self-signed certificates
 
 # OTHER SETTINGS:
 # Search engine configuration
@@ -337,3 +350,15 @@ REACT_LOOP:
 DOCX_FOOTER:
   enabled: true
   text: "内容由AI生成，请核实重要信息"
+
+# ============================================================================
+# Think Tag 注入配置
+# ============================================================================
+# 声明需要注入 💭 标签的模型名列表
+# 仅对 EllmChatModel（ELLM 网关）路径的模型生效
+# 在这些模型的流式输出首个非空 chunk 前自动追加 💭\n 开标签
+# 使前端能将模型推理过程展示为可折叠的“思考过程”区域
+
+THINK_TAG_MODELS:
+  - deepseek-v4-flash
+  - MiniMax-M2.5
