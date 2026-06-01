@@ -135,7 +135,8 @@ def iterative_research_node(state, config: RunnableConfig) -> Command[Literal["_
         
         try:
             result = agent.invoke({
-                "messages": messages_for_llm
+                "messages": messages_for_llm,
+                "system_context": state.get("system_context", ""),
             })
             invoke_duration = time.time() - invoke_start
             
@@ -286,7 +287,8 @@ def iterative_reporter_node(state, config: RunnableConfig) -> Command[Literal["_
             ],
             "locale": state.get("locale", "zh-CN"),
             "iteration_history": iteration_history,
-            "research_topic": research_topic
+            "research_topic": research_topic,
+            "system_context": state.get("system_context", ""),
         }
         
         # 应用提示词模板

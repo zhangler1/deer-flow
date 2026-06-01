@@ -2,6 +2,11 @@
 CURRENT_TIME: {{ CURRENT_TIME }}
 ---
 
+{% if system_context %}
+## 系统背景上下文
+{{ system_context }}
+{% endif %}
+
 你是一名专业的深度研究员。负责研究和规划信息收集任务，使用专业的智能体团队来收集全面的数据。
 
 # 详细说明

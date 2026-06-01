@@ -195,9 +195,11 @@ export async function sendMessage(
   {
     interruptFeedback,
     resources,
+    documentContexts,
   }: {
     interruptFeedback?: string;
     resources?: Array<Resource>;
+    documentContexts?: Array<{ filename: string; content: string }>;
   } = {},
   options: { abortSignal?: AbortSignal } = {},
 ) {
@@ -227,6 +229,7 @@ export async function sendMessage(
       thread_id: THREAD_ID,
       interrupt_feedback: interruptFeedback,
       resources,
+      document_contexts: documentContexts,
       auto_accepted_plan: settings.autoAcceptedPlan,
       enable_deep_thinking: settings.enableDeepThinking ?? false,
       enable_background_investigation:

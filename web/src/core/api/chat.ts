@@ -18,6 +18,7 @@ export async function* chatStream(
   params: {
     thread_id: string;
     resources?: Array<Resource>;
+    document_contexts?: Array<{ filename: string; content: string }>;
     auto_accepted_plan: boolean;
     max_plan_iterations: number;
     max_step_num: number;

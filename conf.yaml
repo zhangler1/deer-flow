@@ -11,9 +11,6 @@ COORDINATOR_MODEL:
   model: deepseek-v4-flash
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   # api_key: sk-api-neIHGWLpXeuieE9bs5Z0WRophLm9fe2FAzDDlaeaCGdSh1oOLEpxruS7PdRoYUUJOA0CJDI25yRQ9JIWjicX0vjYgZnlSNjsLP1sIF96-9sehi0IRzsCYXo
-  api_key_refresh_interval: 1800
-  api_key_refresh_ahead: 300
-  max_tokens: 8192
   temperature: 0.7
   # max_retries: 3 # Maximum number of retries for LLM calls
   verify_ssl: false

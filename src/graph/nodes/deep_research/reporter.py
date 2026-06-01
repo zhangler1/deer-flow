@@ -101,6 +101,7 @@ async def reporter_node(state: State, config: RunnableConfig):
             )
         ],
         "locale": state.get("locale", "zh-CN"),
+        "system_context": state.get("system_context", ""),
     }
     invoke_messages = apply_prompt_template("reporter", input_, configurable)
     observations = state.get("observations", [])

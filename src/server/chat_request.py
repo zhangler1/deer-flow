@@ -27,12 +27,30 @@ class ChatMessage(BaseModel):
     )
 
 
+class DocumentContext(BaseModel):
+    """User uploaded document content as context for the conversation."""
+    filename: str = Field(..., description="Original filename of the uploaded document")
+    content: str = Field(..., description="Parsed text content of the document")
+
+
+class DocumentUploadResponse(BaseModel):
+    """Response model for document upload API."""
+    id: str = Field(..., description="Unique document ID")
+    filename: str = Field(..., description="Original filename")
+    content: str = Field(..., description="Parsed text content")
+    size: int = Field(..., description="File size in bytes")
+    file_type: str = Field(..., description="File extension")
+
+
 class ChatRequest(BaseModel):
     messages: Optional[List[ChatMessage]] = Field(
         [], description="History of messages between the user and the assistant"
     )
     resources: Optional[List[Resource]] = Field(
         [], description="Resources to be used for the research"
+    )
+    document_contexts: Optional[List[DocumentContext]] = Field(
+        [], description="User uploaded document contents as context"
     )
     debug: Optional[bool] = Field(False, description="Whether to enable debug logging")
     thread_id: Optional[str] = Field(

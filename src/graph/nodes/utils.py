@@ -211,7 +211,8 @@ async def _execute_agent_step(
                     f"## 语言区域\n\n{state.get('locale', 'zh-CN')}"
                 )
             )
-        ]
+        ],
+        "system_context": state.get("system_context", ""),
     }
     if agent_type == "researcher":
         agent_input["messages"].append(

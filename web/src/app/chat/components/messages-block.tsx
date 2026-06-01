@@ -45,6 +45,7 @@ export function MessagesBlock({ className }: { className?: string }) {
       options?: {
         interruptFeedback?: string;
         resources?: Array<Resource>;
+        documentContexts?: Array<{ filename: string; content: string }>;
       },
     ) => {
       const abortController = new AbortController();
@@ -56,6 +57,7 @@ export function MessagesBlock({ className }: { className?: string }) {
             interruptFeedback:
               options?.interruptFeedback ?? feedback?.option.value,
             resources: options?.resources,
+            documentContexts: options?.documentContexts,
           },
           {
             abortSignal: abortController.signal,

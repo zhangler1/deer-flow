@@ -17,7 +17,7 @@ import uuid
 from uuid import uuid4
 import os
 import httpx
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, ToolMessage
@@ -48,6 +48,7 @@ from src.server.chat_request import (
     ChatCompletionChoice,
     ChatCompletionMessage,
     ChatRequest,
+    DocumentUploadResponse,
     EnhancePromptRequest,
     GeneratePodcastRequest,
     GeneratePPTRequest,
@@ -183,6 +184,7 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                 use_budget_controlled_bocom_search=request.use_budget_controlled_bocom_search if request.use_budget_controlled_bocom_search is not None else True,
                 cancel_event=cancel_event,
                 reporter_model=request.reporter_model or "",
+                document_contexts=request.document_contexts or [],
             ):
                 # 每发送一个 SSE 事件前检查客户端是否断连
                 if await raw_request.is_disconnected():
@@ -871,14 +873,33 @@ async def _astream_workflow_generator(
     use_budget_controlled_bocom_search: bool = True,  # 是否使用预算控制的交行搜索
     cancel_event: asyncio.Event = None,  # 客户端断连取消信号
     reporter_model: str = "",  # 用户选择的 reporter 模型 key
+    document_contexts: List = None,  # 用户上传的文档上下文
 ):
     # Process initial messages
     for message in messages:
         if isinstance(message, dict) and "content" in message:
             _process_initial_messages(message, thread_id)
 
-    # ⚠️ 不再设置全局环境变量（避免多用户并发冲突）
+    # ⚙️ 不再设置全局环境变量（避免多用户并发冲突）
     # 改为通过 workflow_input["guwp_token"] 传递到 state，确保线程安全
+    
+    # 将用户上传的文档上下文注入到系统上下文中
+    document_context_text = ""
+    if document_contexts:
+        doc_sections = []
+        for doc in document_contexts:
+            doc_dict = doc if isinstance(doc, dict) else doc.dict()
+            fname = doc_dict.get("filename", "unknown")
+            content = doc_dict.get("content", "")
+            doc_sections.append(f"[附件文档 - {fname}]\n{content}\n[/附件文档]")
+        document_context_text = "\n\n".join(doc_sections)
+    
+    # 合并系统背景上下文和文档上下文
+    full_system_context = system_context
+    if document_context_text:
+        if full_system_context:
+            full_system_context += "\n\n"
+        full_system_context += f"以下是用户上传的参考文档，请在回答时参考这些文档内容：\n\n{document_context_text}"
 
     # Prepare workflow input
     workflow_input = {
@@ -890,7 +911,7 @@ async def _astream_workflow_generator(
         "auto_accepted_plan": auto_accepted_plan,
         "enable_background_investigation": enable_background_investigation,
         "research_topic": messages[-1]["content"] if messages else "",
-        "system_context": system_context,  # 将系统背景传递给工作流
+        "system_context": full_system_context,  # 将系统背景+文档上下文传递给工作流
         "force_routing_path": force_routing_path,  # 🐛 调试模式
         # 确保迭代研究的状态字段被正确初始化
         "iteration_count": 0,
@@ -917,7 +938,7 @@ async def _astream_workflow_generator(
             "mcp_settings": mcp_settings,
             "report_style": report_style.value,
             "enable_deep_thinking": enable_deep_thinking,
-            "system_context": system_context,  # 将系统背景传递到配置中
+            "system_context": full_system_context,  # 将系统背景+文档上下文传递到配置中
             "use_budget_controlled_online_search": use_budget_controlled_online_search,
             "use_budget_controlled_bocom_search": use_budget_controlled_bocom_search,
             "cancel_event": cancel_event,  # 客户端断连取消信号，reporter 节点检测
@@ -1056,6 +1077,99 @@ def _make_event(event_type: str, data: Dict[str, Any]):
 
 EASYPARSE_SERVICE_URL = os.getenv("EASYPARSE_SERVICE_URL", "http://nginx")
 
+# 文档上传支持的文件类型
+ALLOWED_UPLOAD_EXTENSIONS = {
+    "pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt",
+    "txt", "md", "csv", "json", "xml", "html",
+}
+# 文档上传最大文件大小 (50MB)
+MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
+
+
+# ============================================================
+# 文档上传解析接口
+# ============================================================
+
+@app.post("/api/documents/upload", response_model=DocumentUploadResponse)
+async def upload_document(file: UploadFile = File(...)):
+    """
+    接收用户上传的文件，调用 Easyparse 解析为文本，返回解析结果。
+
+    调用链: 前端 → 后端 /api/documents/upload → Easyparse /convert → 返回解析文本
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Empty filename")
+
+    # 文件类型校验
+    file_ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if file_ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: .{file_ext}. Allowed: {', '.join('.' + e for e in sorted(ALLOWED_UPLOAD_EXTENSIONS))}"
+        )
+
+    # 读取文件内容并校验大小
+    file_content = await file.read()
+    file_size = len(file_content)
+    if file_size > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large: {file_size} bytes. Maximum allowed: {MAX_UPLOAD_SIZE_BYTES} bytes (50MB)"
+        )
+
+    # 调用 Easyparse /convert 接口解析文件
+    easyparse_url = f"{EASYPARSE_SERVICE_URL}/convert"
+    try:
+        async with httpx.AsyncClient(
+            timeout=120.0,
+            trust_env=False,
+            proxy=None,
+        ) as client:
+            response = await client.post(
+                easyparse_url,
+                files={"file": (file.filename, file_content, file.content_type or "application/octet-stream")},
+            )
+
+        if response.status_code != 200:
+            logger.error(f"Easyparse conversion failed: status={response.status_code}, detail={response.text[:200]}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Document parsing failed: easyparse returned {response.status_code}"
+            )
+
+        # Easyparse 返回纯文本文件
+        parsed_content = response.text
+
+        # 截断过长内容（防止单文档擑爆上下文）
+        MAX_CONTENT_CHARS = 50000  # ~16k tokens
+        if len(parsed_content) > MAX_CONTENT_CHARS:
+            parsed_content = parsed_content[:MAX_CONTENT_CHARS] + "\n\n[... 文档内容已截断，原文过长 ...]"
+
+        doc_id = str(uuid4())
+        return DocumentUploadResponse(
+            id=doc_id,
+            filename=file.filename,
+            content=parsed_content,
+            size=file_size,
+            file_type=file_ext,
+        )
+
+    except httpx.ConnectError:
+        logger.error(f"Cannot connect to easyparse service: {EASYPARSE_SERVICE_URL}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Cannot connect to document parsing service ({EASYPARSE_SERVICE_URL}). Please ensure it is running."
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Document upload error: {e}")
+        raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
+
+
+# ============================================================
+# Markdown 转 Word 代理接口
+# ============================================================
 
 @app.post("/api/markdown/to_word")
 async def markdown_to_word(request: MarkdownToWordRequest):

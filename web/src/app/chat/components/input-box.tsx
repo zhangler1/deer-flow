@@ -3,10 +3,14 @@
 
 import { MagicWandIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, X } from "lucide-react";
+import { ArrowUp, Paperclip, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import AttachmentUpload, {
+  type AttachmentFile,
+  type AttachmentUploadRef,
+} from "~/components/deer-flow/attachment-upload";
 import { Detective } from "~/components/deer-flow/icons/detective";
 import MessageInput, {
   type MessageInputRef,
@@ -15,6 +19,7 @@ import { ReportStyleDialog } from "~/components/deer-flow/report-style-dialog";
 import { ReporterModelSelector } from "~/components/deer-flow/reporter-model-selector";
 import { ResearchTypeSelector } from "~/components/deer-flow/research-type-selector";
 import { Tooltip } from "~/components/deer-flow/tooltip";
+import { UploadMask } from "~/components/deer-flow/upload-mask";
 import { BorderBeam } from "~/components/magicui/border-beam";
 import { Button } from "~/components/ui/button";
 import { enhancePrompt } from "~/core/api";
@@ -44,6 +49,7 @@ export function InputBox({
     options?: {
       interruptFeedback?: string;
       resources?: Array<Resource>;
+      documentContexts?: Array<{ filename: string; content: string }>;
     },
   ) => void;
   onCancel?: () => void;
@@ -62,10 +68,13 @@ export function InputBox({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<MessageInputRef>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
+  const attachmentRef = useRef<AttachmentUploadRef>(null);
 
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isEnhanceAnimating, setIsEnhanceAnimating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
 
   // 当配置加载后，如果 reporterModel 为空，则用 default 初始化
   useEffect(() => {
@@ -83,17 +92,52 @@ export function InputBox({
           return;
         }
         if (onSend) {
+          const documentContexts =
+            attachmentRef.current?.getSuccessfulAttachments() || [];
           onSend(message, {
             interruptFeedback: feedback?.option.value,
             resources,
+            documentContexts:
+              documentContexts.length > 0 ? documentContexts : undefined,
           });
           onRemoveFeedback?.();
+          // Clear attachments after sending
+          attachmentRef.current?.clear();
+          setAttachments([]);
           // Clear enhancement animation after sending
           setIsEnhanceAnimating(false);
         }
       }
     },
     [responding, onCancel, onSend, feedback, onRemoveFeedback],
+  );
+
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        attachmentRef.current?.addFiles(Array.from(files));
+      }
+    },
+    [],
   );
 
   const handleEnhancePrompt = useCallback(async () => {
@@ -139,7 +183,11 @@ export function InputBox({
         className,
       )}
       ref={containerRef}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
+      <UploadMask visible={isDragOver} />
       <div className="w-full">
         <AnimatePresence>
           {feedback && (
@@ -219,6 +267,13 @@ export function InputBox({
           onEnter={handleSendMessage}
           onChange={setCurrentPrompt}
         />
+        <AttachmentUpload
+          ref={attachmentRef}
+          maxFiles={5}
+          maxSizeMB={50}
+          disabled={responding}
+          onChange={setAttachments}
+        />
       </div>
       <div className="flex items-center px-4 py-2">
         <div className="flex grow gap-2">
@@ -251,6 +306,17 @@ export function InputBox({
               <Detective /> {t("investigation")}
             </Button>
           </Tooltip> */}
+          <Tooltip title="上传文档">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-2xl"
+              onClick={() => attachmentRef.current?.triggerSelect()}
+              disabled={responding}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+          </Tooltip>
           <ReportStyleDialog />
           <ReporterModelSelector />
         </div>

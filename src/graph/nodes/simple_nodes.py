@@ -165,7 +165,8 @@ async def simple_search_node(state, config: RunnableConfig) -> Command[Literal["
                 HumanMessage(
                     content=f"请回答以下问题（不超过300字）:\n\n{query}"
                 )
-            ]
+            ],
+            "system_context": state.get("system_context", ""),
         }
         
         # 设置递归限制

@@ -2,6 +2,11 @@
 CURRENT_TIME: {{ CURRENT_TIME }}
 ---
 
+{% if system_context %}
+## 系统背景上下文
+{{ system_context }}
+{% endif %}
+
 
 
 # 角色定位
