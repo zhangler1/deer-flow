@@ -59,6 +59,13 @@ from .bocom_search import (
     bocomsearch,
     call_bocomsearch,
 )
+from .vector_search import (
+    vector_search,
+    call_vector_search,
+    VectorSearchConfig,
+    get_vector_search_config,
+    VectorSearchBaseTool,
+)
 from .searchknowledge_standard import (
     searchknowledge_standard,
     searchknowledge_standard_tool,
@@ -68,6 +75,7 @@ from .budget_controlled_search import (
     create_budget_controlled_bocomsearch_tool,
     budget_controlled_bocomsearch_tool,
     budget_controlled_searchknowledge_standard_tool,
+    budget_controlled_vector_search_tool,
 )
 
 __all__ = [
@@ -109,10 +117,16 @@ __all__ = [
     "BudgetManagerStore",
     "bocomsearch",
     "call_bocomsearch",
+    "vector_search",
+    "call_vector_search",
+    "VectorSearchConfig",
+    "get_vector_search_config",
+    "VectorSearchBaseTool",
     "budget_controlled_bocomsearch_tool",
     "create_budget_controlled_bocomsearch_tool",
     "searchknowledge_standard",
     "searchknowledge_standard_tool",
     "call_searchknowledge_standard",
     "budget_controlled_searchknowledge_standard_tool",
+    "budget_controlled_vector_search_tool",
 ]

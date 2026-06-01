@@ -29,10 +29,9 @@ from src.tools import (
     report_search,
     searchknowledge_standard,
     searchknowledge_standard_tool,
-    budget_controlled_bocomsearch_tool,
+    budget_controlled_vector_search_tool,
     get_budget_manager,
     clear_budget_manager,
-    bocomsearch,
 )
 from src.utils.enhanced_logger import get_enhanced_logger
 
@@ -121,7 +120,7 @@ async def researcher_node(
     # 根据报告风格动态配置工具
     # 说明：预算控制现已下沉到 BudgetEnforcementMiddleware（方案 C），
     # 所以 researcher 节点下发到 ReactLoop 的是原生工具。
-    # 例外：bocomsearch 因 guwp_token 线程安全需从 state 注入，仍用 BudgetControlledSearchTool 包装器。
+    # 例外：vector_search 因 guwp_token 线程安全需从 state 注入，仍用 BudgetControlledSearchTool 包装器。
     if report_style == "industry_report":
         # 行业研报：searchknowledge_standard(段落级标准知识检索) + online_search
         session_id = state.get("session_id", "default")
@@ -138,6 +137,17 @@ async def researcher_node(
         if use_budget_bocom:
             tools.append(searchknowledge_standard_tool(configurable.get_max_results("searchknowledge_standard")))
             tool_name_list.append("searchknowledge_standard")
+            # 新增 vector_search（向量相似度检索），与 searchknowledge_standard 互补
+            guwp_token = state.get("guwp_token", None)
+            tools.append(budget_controlled_vector_search_tool(
+                session_id=session_id,
+                max_search_calls=researcher_search_budget,
+                max_tokens=max_tokens,
+                max_results=configurable.get_max_results("vector_search"),
+                guwp_token=guwp_token,
+                hard_token_limit=hard_token_limit,
+            ))
+            tool_name_list.append("budget_controlled_vector_search")
         tool_names = ", ".join(tool_name_list)
 
     elif report_style == "business_marketing":
@@ -152,17 +162,17 @@ async def researcher_node(
         if use_budget_online:
             tools.append(online_search_tool(configurable.get_max_results("online_search")))
             tool_name_list.append("online_search")
-        # bocomsearch 保留 BudgetControlledSearchTool 包装器（guwp_token 线程安全注入）
+        # vector_search 使用 BudgetControlledSearchTool 包装器（guwp_token 线程安全注入），替换原 bocomsearch
         if use_budget_bocom:
-            tools.append(budget_controlled_bocomsearch_tool(
+            tools.append(budget_controlled_vector_search_tool(
                 session_id=session_id,
                 max_search_calls=researcher_search_budget,
                 max_tokens=max_tokens,
-                max_results=configurable.get_max_results("bocomsearch"),
+                max_results=configurable.get_max_results("vector_search"),
                 guwp_token=guwp_token,
                 hard_token_limit=hard_token_limit,
             ))
-            tool_name_list.append("budget_controlled_bocomsearch")
+            tool_name_list.append("budget_controlled_vector_search")
         tools += [
             business_opportunity_search,
             sentiment_search,

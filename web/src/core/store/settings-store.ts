@@ -85,6 +85,16 @@ export const loadSettings = () => {
       console.error(error);
     }
   }
+
+  // URL guwpToken 优先覆盖 store 旧值
+  // 父页面通过 URL 参数 ?guwpToken=xxx 注入 token，每次刷新 iframe 带来的新 token 立即生效
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlToken = urlParams.get("guwpToken");
+  if (urlToken) {
+    useSettingsStore.setState((state) => ({
+      tokens: { ...state.tokens, guwpToken: urlToken },
+    }));
+  }
 };
 
 export const saveSettings = () => {

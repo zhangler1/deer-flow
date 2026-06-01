@@ -30,6 +30,7 @@ _SEARCH_MAX_RESULTS_ALLOWED_TOOLS = {
     "online_search",
     "bocomsearch",
     "searchknowledge_standard",
+    "vector_search",
 }
 
 
@@ -136,6 +137,7 @@ class Configuration:
     max_search_results_online_search: int = 0  # 互联网搜索返回条数，0=使用全局默认
     max_search_results_bocomsearch: int = 0  # 交行知识库返回条数，0=使用全局默认
     max_search_results_searchknowledge_standard: int = 0  # EUVD检索返回条数，0=使用全局默认
+    max_search_results_vector_search: int = 0  # 向量检索返回条数，0=使用全局默认
     max_iteration: int = 5  # Maximum number of iterations for iterative research node
     search_engine: str = "custom_search"  # Search engine to use
     use_budget_controlled_online_search: bool = True  # 是否使用Budget控制的在线检索
@@ -189,7 +191,7 @@ class Configuration:
         """获取指定搜索工具的最大返回条数。
 
         优先级：按工具配置 > 全局默认（max_search_results）
-        tool_name 支持: online_search, bocomsearch, searchknowledge_standard
+        tool_name 支持: online_search, bocomsearch, searchknowledge_standard, vector_search
 
         Args:
             tool_name: 工具名称
