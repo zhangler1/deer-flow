@@ -11,6 +11,7 @@ import ReportEditor from "~/components/editor";
 import { useReplay } from "~/core/replay";
 import { useSourceStore } from "~/core/source-store";
 import { useMessage, useStore } from "~/core/store";
+import { stripThinkTags } from "~/core/utils/think-tag-parser";
 import { cn } from "~/lib/utils";
 
 import { CollapsibleReport } from "./collapsible-report";
@@ -71,6 +72,15 @@ export function ResearchReportBlock({
   );
   const contentRef = useRef<HTMLDivElement>(null);
   const isCompleted = message?.isStreaming === false && message?.content !== "";
+
+  // reporter 内容过滤 think tag：流式和已完成均过滤
+  const filteredContent = stripThinkTags(message?.content ?? "");
+  // 编辑器内容：也过滤 think tag
+  const editorContent = stripThinkTags(message?.content ?? "");
+
+  // 流式场景：如果过滤后无正文内容（仅含未闭合的 think tag），不渲染任何内容
+  const hasDisplayContent = message?.isStreaming ? filteredContent.length > 0 : true;
+
   // TODO: scroll to top when completed, but it's not working
   // useEffect(() => {
   //   if (isCompleted && contentRef.current) {
@@ -89,19 +99,21 @@ export function ResearchReportBlock({
     <div ref={contentRef} className={cn("w-full pt-4 pb-8", className)}>
       {!isReplay && isCompleted && editing ? (
         <ReportEditor
-          content={message?.content}
+          content={editorContent}
           onMarkdownChange={handleMarkdownChange}
         />
       ) : (
         <>
           {/* 流式输出时用 SourceAwareMarkdown（支持打字动画 + 源引用角标） */}
           {message?.isStreaming ? (
-            <SourceAwareMarkdown animated checkLinkCredibility references={references}>
-              {message?.content}
-            </SourceAwareMarkdown>
+            hasDisplayContent ? (
+              <SourceAwareMarkdown animated checkLinkCredibility references={references}>
+                {filteredContent}
+              </SourceAwareMarkdown>
+            ) : null
           ) : (
             <CollapsibleReport
-              content={message?.content ?? ""}
+              content={filteredContent}
               checkLinkCredibility
               references={references}
               allExpanded={allExpanded}

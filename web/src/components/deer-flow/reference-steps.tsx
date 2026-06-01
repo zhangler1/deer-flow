@@ -61,6 +61,8 @@ export interface ThinkingStep {
   isCompleted?: boolean;
   /** 是否为计划步骤标题（加粗显示，作为 research 活动的分组标题） */
   isPlanStep?: boolean;
+  /** 思考内容（从 💭... 标签中提取，researcher 阶段差异化展示） */
+  thinkingContent?: string;
 }
 
 /** ReferenceSteps 组件属性 */
@@ -341,6 +343,13 @@ function StepRow({
               <div className="mb-1 text-sm font-medium text-foreground">
                 {step.title}
               </div>
+            )}
+
+            {/* 思考内容（来自 💭 标签，blockquote 引用格式展示） */}
+            {step.thinkingContent && (
+              <blockquote className="mb-2 border-l-3 border-gray-300 pl-3 text-xs leading-relaxed text-gray-400">
+                {step.thinkingContent}
+              </blockquote>
             )}
 
             {/* 步骤描述 */}

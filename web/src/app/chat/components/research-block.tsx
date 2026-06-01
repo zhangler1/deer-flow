@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { useReplay } from "~/core/replay";
 import { closeResearch, useStore } from "~/core/store";
+import { stripThinkTags } from "~/core/utils/think-tag-parser";
 import { cn } from "~/lib/utils";
 
 import { ResearchActivitiesBlock } from "./research-activities-block";
@@ -66,13 +67,15 @@ export function ResearchBlock({
     }
     
     // 降级方案：兼容非 HTTPS 环境
+    // 过滤 think tag 后再复制
+    const cleanContent = stripThinkTags(report.content);
     if (navigator.clipboard?.writeText) {
       // 使用现代 Clipboard API
-      void navigator.clipboard.writeText(report.content);
+      void navigator.clipboard.writeText(cleanContent);
     } else {
       // 降级方案：使用传统的 execCommand 方法
       const textArea = document.createElement('textarea');
-      textArea.value = report.content;
+      textArea.value = cleanContent;
       textArea.style.position = 'fixed';
       textArea.style.left = '-999999px';
       textArea.style.top = '-999999px';
@@ -110,9 +113,12 @@ export function ResearchBlock({
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
     const filename = `research-report-${timestamp}`;
 
+    // 过滤 think tag 后再下载
+    const cleanContent = stripThinkTags(report.content);
+
     if (format === 'markdown') {
       // 直接下载 Markdown
-      const blob = new Blob([report.content], { type: 'text/markdown' });
+      const blob = new Blob([cleanContent], { type: 'text/markdown' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -132,7 +138,7 @@ export function ResearchBlock({
       const res = await fetch(resolveServiceURL("markdown/to_word"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: report.content, filename }),
+        body: JSON.stringify({ content: cleanContent, filename }),
       });
 
       if (res.ok) {
@@ -160,7 +166,7 @@ export function ResearchBlock({
     }
 
     // 降级：下载原始 Markdown
-    const blob = new Blob([report.content], { type: 'text/markdown' });
+    const blob = new Blob([cleanContent], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

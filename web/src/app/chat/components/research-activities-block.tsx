@@ -12,6 +12,7 @@ import {
 import type { ToolCallRuntime } from "~/core/messages";
 import { useMessage, useStore } from "~/core/store";
 import { parseJSON } from "~/core/utils";
+import { parseThinkTags } from "~/core/utils/think-tag-parser";
 import { cn } from "~/lib/utils";
 
 // ── 搜索结果类型 ──────────────────────────────────
@@ -240,7 +241,11 @@ function buildStepsFromActivityIds(
 
   for (const msg of researcherMessages) {
     const rawContent = msg.content || "";
-    const description = extractSummary(rawContent);
+
+    // 解析 think tag：分离思考内容和正文
+    const { thinkingContent, mainContent } = parseThinkTags(rawContent);
+    // 描述仅使用正文内容（过滤掉 think tag）
+    const description = extractSummary(mainContent);
 
     // 提取工具调用标签
     const toolCallTags: ToolCallTag[] = [];
@@ -287,6 +292,7 @@ function buildStepsFromActivityIds(
         || (msgStepIndex !== undefined ? planSteps[msgStepIndex]?.description : undefined)
         || (toolCallTags.length > 0 ? "执行搜索与资料阅读" : ""),
       toolCalls: toolCallTags,
+      thinkingContent: thinkingContent || undefined,
     });
   }
 
