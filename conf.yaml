@@ -242,6 +242,8 @@ SEARCH_MAX_RESULTS:
   bocomsearch: 10
   # EUVD 段落级知识检索（searchknowledge_standard）
   searchknowledge_standard: 5
+  # EUVD 向量相似度检索（vector_search）
+  vector_search: 10
 
 # ============================================================================
 # 技能（Skill）系统配置
@@ -344,7 +346,7 @@ REACT_LOOP:
   # --- 预算执行中间件（方案 C：原生工具 + wrap_tool_call 拦截） ---
   # 仅对 researcher / iterative_researcher 生效
   # 控制 researcher 节点中原生搜索工具的调用预算。
-  # bocomsearch 仍由 BudgetControlledSearchTool 包装器控制（guwp_token 需从 state 注入，线程安全）
+  # bocomsearch 已被 vector_search 替换，vector_search 仍由 BudgetControlledSearchTool 包装器控制（guwp_token 需从 state 注入，线程安全）
   budget_enforcement:
     enabled: true
     # 每个 researcher 节点的最大搜索调用次数（与 SEARCH_BUDGET.search_budget_max_calls 保持一致）
@@ -373,6 +375,26 @@ REACT_LOOP:
 DOCX_FOOTER:
   enabled: true
   text: "内容由AI生成，请核实重要信息"
+
+# ============================================================================
+# Vector Search 配置（EUVB 向量相似度检索）
+# ============================================================================
+# 用于 VectorSearchBaseTool 内网知识库向量检索
+# 优先级：conf.yaml VECTOR_SEARCH 段 > 环境变量 > 硬编码默认值
+# api_url 为必填项，其余参数均有合理默认值
+
+VECTOR_SEARCH:
+  api_url: "http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-OFFICE.V-1.0/querySources.do"
+  # timeout: 30
+  # page_size: 10
+  # repository: "aggregation-search"
+  # search_type: "2"
+  # space_codes:
+  #   - "SP0999999"
+  # rerank_flag: 1
+  # channel_id: "0"
+  # text_top_n: 7
+  # vector_top_n: 10
 
 # ============================================================================
 # Think Tag 注入配置
