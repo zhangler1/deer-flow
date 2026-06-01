@@ -61,6 +61,7 @@ from .bocom_search import (
 )
 from .searchknowledge_standard import (
     searchknowledge_standard,
+    searchknowledge_standard_tool,
     call_searchknowledge_standard,
 )
 from .budget_controlled_search import (
@@ -111,6 +112,7 @@ __all__ = [
     "budget_controlled_bocomsearch_tool",
     "create_budget_controlled_bocomsearch_tool",
     "searchknowledge_standard",
+    "searchknowledge_standard_tool",
     "call_searchknowledge_standard",
     "budget_controlled_searchknowledge_standard_tool",
 ]

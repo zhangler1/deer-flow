@@ -119,3 +119,10 @@ SEARCH_BUDGET:
   search_budget_max_tokens: 10000
   search_budget_hard_limit: 14000
   search_budget_token_chars_ratio: 2.5
+
+# 搜索结果返回条数（精细化控制）
+SEARCH_MAX_RESULTS:
+  default: 10
+  online_search: 10
+  bocomsearch: 10
+  searchknowledge_standard: 5

@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { Check, Copy, Pencil, Undo2, X, Download, Loader2, FileText, FileDown, ChevronsUpDown } from "lucide-react";
+import { Check, Copy, Pencil, Undo2, X, Download, Loader2, FileText, FileDown, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
@@ -198,7 +198,7 @@ export function ResearchBlock({
                   variant="ghost"
                   onClick={() => setSectionsExpanded((v) => !v)}
                 >
-                  <ChevronsUpDown />
+                  {sectionsExpanded ? <ChevronsDownUp /> : <ChevronsUpDown />}
                 </Button>
               </Tooltip>
               <Tooltip title={t("edit")}>

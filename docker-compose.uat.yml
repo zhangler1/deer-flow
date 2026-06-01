@@ -32,7 +32,6 @@ services:
       - "8000:8000"
     env_file:
       - .env
-      - .env.local
     environment:
       - NODE_ID=docker-${HOSTNAME}
     expose:
@@ -58,7 +57,7 @@ services:
     #   dockerfile: Dockerfile.dev.yml
     #   args:
     #     - NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-    image: deer-flow-front:latest
+    image: deer-flow-front.dev:latest
     container_name: deer-flow-frontend
     expose:
       - "3000"

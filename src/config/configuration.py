@@ -25,6 +25,13 @@ _SEARCH_BUDGET_ALLOWED_FIELDS = {
     "researcher_recursion_limit",
 }
 
+# SEARCH_MAX_RESULTS 段中允许的工具名
+_SEARCH_MAX_RESULTS_ALLOWED_TOOLS = {
+    "online_search",
+    "bocomsearch",
+    "searchknowledge_standard",
+}
+
 
 def _load_search_budget_yaml() -> dict:
     """从当前激活的 yaml (conf.yaml / conf.internal.yaml) 加载 SEARCH_BUDGET 段。
@@ -48,6 +55,47 @@ def _load_search_budget_yaml() -> dict:
         else:
             logger.warning(
                 f"SEARCH_BUDGET 中的未知字段 '{key}' 已忽略（请使用带前缀的 Configuration 字段名）"
+            )
+    return result
+
+
+def _load_search_max_results_yaml() -> dict:
+    """从当前激活的 yaml 加载 SEARCH_MAX_RESULTS 段，支持全局默认 + 按工具精细化配置。
+
+    YAML 格式:
+        SEARCH_MAX_RESULTS:
+          default: 10
+          online_search: 10
+          bocomsearch: 10
+          searchknowledge_standard: 5
+
+    返回映射到 Configuration 字段名的 dict:
+        {
+            "max_search_results": 10,                           # default → 全局
+            "max_search_results_online_search": 10,             # 按工具
+            "max_search_results_bocomsearch": 10,
+            "max_search_results_searchknowledge_standard": 5,
+        }
+    """
+    try:
+        from src.llms.llm import _get_config_file_path
+        from src.config import load_yaml_config
+        raw = load_yaml_config(_get_config_file_path()).get("SEARCH_MAX_RESULTS", {}) or {}
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"读取 SEARCH_MAX_RESULTS 配置失败，将使用默认值: {e}")
+        return {}
+    result: dict = {}
+    for key, val in raw.items():
+        if val is None:
+            continue
+        if key == "default":
+            result["max_search_results"] = val
+        elif key in _SEARCH_MAX_RESULTS_ALLOWED_TOOLS:
+            result[f"max_search_results_{key}"] = val
+        else:
+            logger.warning(
+                f"SEARCH_MAX_RESULTS 中的未知工具 '{key}' 已忽略"
+                f"（支持的工具: {', '.join(sorted(_SEARCH_MAX_RESULTS_ALLOWED_TOOLS))}）"
             )
     return result
 
@@ -84,7 +132,10 @@ class Configuration:
     )  # Resources to be used for the research
     max_plan_iterations: int = 2  # Maximum number of plan iterations
     max_step_num: int = 5  # Maximum number of steps in a plan
-    max_search_results: int = 2  # Maximum number of search results
+    max_search_results: int = 10  # 全局默认搜索返回条数
+    max_search_results_online_search: int = 0  # 互联网搜索返回条数，0=使用全局默认
+    max_search_results_bocomsearch: int = 0  # 交行知识库返回条数，0=使用全局默认
+    max_search_results_searchknowledge_standard: int = 0  # EUVD检索返回条数，0=使用全局默认
     max_iteration: int = 5  # Maximum number of iterations for iterative research node
     search_engine: str = "custom_search"  # Search engine to use
     use_budget_controlled_online_search: bool = True  # 是否使用Budget控制的在线检索
@@ -110,12 +161,13 @@ class Configuration:
     ) -> "Configuration":
         """Create a Configuration instance from a RunnableConfig.
 
-        配置优先级：env > configurable > yaml(SEARCH_BUDGET) > dataclass 默认值
+        配置优先级：env > configurable > yaml(SEARCH_BUDGET + SEARCH_MAX_RESULTS) > dataclass 默认值
         """
         configurable = (
             config["configurable"] if config and "configurable" in config else {}
         )
         yaml_values = _load_search_budget_yaml()
+        yaml_values.update(_load_search_max_results_yaml())
 
         values: dict[str, Any] = {}
         for f in fields(cls):
@@ -132,3 +184,21 @@ class Configuration:
                 values[f.name] = yaml_val
 
         return cls(**{k: v for k, v in values.items() if v not in (None, "")})
+
+    def get_max_results(self, tool_name: str) -> int:
+        """获取指定搜索工具的最大返回条数。
+
+        优先级：按工具配置 > 全局默认（max_search_results）
+        tool_name 支持: online_search, bocomsearch, searchknowledge_standard
+
+        Args:
+            tool_name: 工具名称
+
+        Returns:
+            该工具应使用的最大返回条数
+        """
+        per_tool_attr = f"max_search_results_{tool_name}"
+        per_tool_val = getattr(self, per_tool_attr, 0)
+        if per_tool_val and per_tool_val > 0:
+            return per_tool_val
+        return self.max_search_results

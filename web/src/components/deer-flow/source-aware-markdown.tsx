@@ -69,7 +69,6 @@ export function SourceAwareMarkdown({
 
         if (sourceMatch && href) {
           const index = parseInt(sourceMatch[1]!, 10);
-          console.log(`[SourceAwareMarkdown] 识别到源引用 (${index}), URL: "${href}"`);
           return <SourceTag index={index} url={href} references={references} />;
         }
 

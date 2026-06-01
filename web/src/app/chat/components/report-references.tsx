@@ -1,9 +1,10 @@
 "use client";
 
 import { ExternalLink, Globe, BookOpen } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { FavIcon } from "~/components/deer-flow/fav-icon";
+import { useSourceStore } from "~/core/source-store";
 import { useStore } from "~/core/store";
 import { parseJSON } from "~/core/utils";
 import { cn } from "~/lib/utils";
@@ -191,6 +192,22 @@ export function ReportReferences({
     () => extractReferences(researchId),
     [researchId],
   );
+  const openSourceByUrl = useSourceStore((s) => s.openSourceByUrl);
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent, url: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Ctrl/Cmd+Click → 直接在新标签页打开
+      if (e.ctrlKey || e.metaKey) {
+        window.open(url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      // 普通点击 → 打开 Drawer
+      openSourceByUrl(url);
+    },
+    [openSourceByUrl],
+  );
 
   if (references.length === 0) return null;
 
@@ -215,12 +232,12 @@ export function ReportReferences({
             </span>
 
             {ref.url ? (
-              /* 有 URL：favicon + 链接 */
-              <a
-                href={ref.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              /* 有 URL：favicon + 可点击打开 Drawer */
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={(e) => handleClick(e, ref.url)}
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <FavIcon
                   url={ref.url}
@@ -232,7 +249,7 @@ export function ReportReferences({
                   {ref.domain}
                 </span>
                 <ExternalLink className="ml-auto h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-50" />
-              </a>
+              </div>
             ) : (
               /* 无 URL：不可点文档卡片 */
               <div

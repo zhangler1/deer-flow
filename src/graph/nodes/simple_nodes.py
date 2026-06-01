@@ -136,7 +136,7 @@ async def simple_search_node(state, config: RunnableConfig) -> Command[Literal["
         # 配置工具：使用简单检索需要的工具
         tools = [
             online_search_tool(
-                max_results=configurable.max_search_results
+                max_results=configurable.get_max_results("online_search")
             ),
             crawl_tool,
             domain_fin_search,

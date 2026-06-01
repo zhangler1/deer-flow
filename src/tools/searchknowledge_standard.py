@@ -346,13 +346,48 @@ def searchknowledge_standard(query: str) -> List[Dict[str, Any]]:
 
     适用于查询行业政策、研报段落级语义片段等结构化知识库内容。
     输入应为完整的检索关键词，返回带相关度评分的段落列表。
-    返回条数由 env SEARCHKNOWLEDGE_MAX_RESULTS 控制，默认 2。
+    返回条数由 conf.yaml 中 SEARCH_MAX_RESULTS.searchknowledge_standard 控制。
     """
     return call_searchknowledge_standard(query=query)
+
+
+def searchknowledge_standard_tool(max_results: Optional[int] = None):
+    """创建带 max_results 参数的段落级标准知识检索工具实例。
+
+    类似 online_search_tool(max_results) 的工厂函数，
+    将 max_results 通过闭包注入到工具调用中。
+
+    Args:
+        max_results: 最大返回结果数。
+            优先级：调用显式传入 > env SEARCHKNOWLEDGE_MAX_RESULTS > 默认值
+
+    Returns:
+        绑定了 max_results 的 searchknowledge_standard 工具
+    """
+    effective = max_results if (max_results and max_results > 0) else SearchKnowledgeStandardConfig.default_max_results()
+
+    @tool
+    def searchknowledge_standard_configured(query: str) -> List[Dict[str, Any]]:
+        """段落级标准知识检索工具（EUVD）
+
+        适用于查询行业政策、研报段落级语义片段等结构化知识库内容。
+        输入应为完整的检索关键词，返回带相关度评分的段落列表。
+        """
+        return call_searchknowledge_standard(query=query, max_results=effective)
+
+    # 保持工具名和描述一致
+    searchknowledge_standard_configured.name = "searchknowledge_standard"
+    searchknowledge_standard_configured.description = (
+        "段落级标准知识检索工具（EUVD）。"
+        "适用于查询行业政策、研报段落级语义片段等结构化知识库内容。"
+        "输入应为完整的检索关键词，返回带相关度评分的段落列表。"
+    )
+    return searchknowledge_standard_configured
 
 
 __all__ = [
     "SearchKnowledgeStandardConfig",
     "call_searchknowledge_standard",
     "searchknowledge_standard",
+    "searchknowledge_standard_tool",
 ]

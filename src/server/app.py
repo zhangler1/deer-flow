@@ -167,7 +167,7 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                 request.resources or [],
                 request.max_plan_iterations or 2,
                 request.max_step_num or 5,
-                request.max_search_results or 2,
+                request.max_search_results or int(os.getenv("ONLINE_SEARCH_MAX_RESULTS", "2")),
                 request.max_iteration or 5,
                 request.search_engine or "custom_search",
                 request.auto_accepted_plan or False,
@@ -746,6 +746,32 @@ async def _stream_graph_events(
                                 target_step = steps[_step_index]
                                 _step_title = getattr(target_step, 'title', None) or (target_step.get('title', '') if isinstance(target_step, dict) else '')
                     break  # 只处理第一个节点更新
+
+                # 5) Fallback: 从 updates 中提取 ToolMessages 并发送 tool_call_result 事件
+                # 当 ReactLoop 内部的 ToolMessages 通过 Command update 写入状态时，
+                # 如果 LangGraph 不通过 "messages" stream 单独发出它们，这里作为兜底处理
+                for _node_name_fb, _node_update_fb in event_data.items():
+                    if not isinstance(_node_update_fb, dict):
+                        continue
+                    update_messages = _node_update_fb.get("messages")
+                    if not update_messages or not isinstance(update_messages, list):
+                        continue
+                    for _upd_msg in update_messages:
+                        if isinstance(_upd_msg, ToolMessage):
+                            _tool_name = getattr(_upd_msg, 'name', 'unknown')
+                            _content_preview = str(_upd_msg.content)[:200] if _upd_msg.content else ''
+                            logger.info(f"[TOOL_RESULT_FROM_UPDATE] tool={_tool_name} | tool_call_id={_upd_msg.tool_call_id} | content_preview={_content_preview}")
+                            _agent_name_fb = _get_agent_name(agent, {})
+                            _tool_event = {
+                                "thread_id": thread_id,
+                                "agent": _agent_name_fb,
+                                "id": _upd_msg.id,
+                                "role": "assistant",
+                                "content": _upd_msg.content,
+                                "tool_call_id": _upd_msg.tool_call_id,
+                            }
+                            yield _make_event("tool_call_result", _tool_event)
+                    break
 
                 # 其他 update 目前不需要转成事件，直接忽略
                 continue
@@ -1458,7 +1484,7 @@ async def _full_workflow_sse_generator(
             resources=request.resources or [],
             max_plan_iterations=request.max_plan_iterations or 2,
             max_step_num=request.max_step_num or 5,
-            max_search_results=request.max_search_results or 1,
+            max_search_results=request.max_search_results or int(os.getenv("ONLINE_SEARCH_MAX_RESULTS", "2")),
             max_iteration=request.max_iteration or 5,
             search_engine=request.search_engine or "custom_search",
             auto_accepted_plan=request.auto_accepted_plan if request.auto_accepted_plan is not None else True,

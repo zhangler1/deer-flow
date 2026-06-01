@@ -1,7 +1,7 @@
 "use client";
 
-import { Search, BookOpen, ChevronDown, CheckCircle, FileText } from "lucide-react";
-import { useState } from "react";
+import { Search, BookOpen, ChevronDown, CheckCircle, FileText, ExternalLink } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
 
 import { FavIcon } from "~/components/deer-flow/fav-icon";
 import { cn } from "~/lib/utils";
@@ -31,6 +31,8 @@ export interface SourceLink {
   domain: string;
   /** 网站 favicon URL（可选） */
   favicon?: string;
+  /** 文章/页面标题（可选） */
+  title?: string;
 }
 
 /** 内网文档标签（不可点，用于无 URL 的知识库结果） */
@@ -95,30 +97,133 @@ function ReadTagBadge({ label = "已阅读相关资料" }: { label?: string }) {
   );
 }
 
-/** 来源链接胶囊 */
-function SourceLinkBadge({ url, domain, favicon }: SourceLink) {
+/** 来源链接胶囊（hover 弹出详情） */
+function SourceLinkBadge({ url, domain, favicon, title }: SourceLink) {
+  const [showCard, setShowCard] = useState(false);
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    if (leaveTimeout.current) {
+      clearTimeout(leaveTimeout.current);
+      leaveTimeout.current = null;
+    }
+    hoverTimeout.current = setTimeout(() => {
+      setShowCard(true);
+    }, 300);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeout.current) {
+      clearTimeout(hoverTimeout.current);
+      hoverTimeout.current = null;
+    }
+    leaveTimeout.current = setTimeout(() => {
+      setShowCard(false);
+    }, 200);
+  }, []);
+
+  const handleCardMouseEnter = useCallback(() => {
+    if (leaveTimeout.current) {
+      clearTimeout(leaveTimeout.current);
+      leaveTimeout.current = null;
+    }
+  }, []);
+
+  const handleCardMouseLeave = useCallback(() => {
+    leaveTimeout.current = setTimeout(() => {
+      setShowCard(false);
+    }, 200);
+  }, []);
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (e.ctrlKey || e.metaKey) {
+        window.open(url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    },
+    [url],
+  );
+
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-0.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-    >
-      {favicon ? (
-        <img
-          src={favicon}
-          alt=""
-          className="h-3.5 w-3.5 shrink-0 rounded-full object-cover"
-          onError={(e) => {
-            // favicon 加载失败时用 FavIcon 兜底
-            e.currentTarget.style.display = "none";
-          }}
-        />
-      ) : (
-        <FavIcon url={url} className="h-3.5 w-3.5 shrink-0" />
+    <span className="relative inline-block">
+      {/* 小胶囊（默认显示） */}
+      <span
+        className={cn(
+          "inline-flex cursor-pointer select-none items-center gap-1.5",
+          "rounded-full border border-border/50 bg-muted/30",
+          "px-2 py-0.5 text-xs text-muted-foreground",
+          "hover:bg-muted hover:text-foreground",
+          "transition-all duration-150",
+        )}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        role="button"
+        tabIndex={0}
+        aria-label={`查看来源: ${title || domain}`}
+      >
+        {favicon ? (
+          <img
+            src={favicon}
+            alt=""
+            className="h-3.5 w-3.5 shrink-0 rounded-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+          <FavIcon url={url} className="h-3.5 w-3.5 shrink-0" />
+        )}
+        <span className="truncate max-w-[80px]">{domain}</span>
+      </span>
+
+      {/* 弹出卡片（hover 时显示） */}
+      {showCard && (
+        <span
+          className={cn(
+            "absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2",
+            "w-[260px] rounded-lg border border-border/60 bg-popover px-2.5 py-1.5 shadow-md",
+            "animate-in fade-in-0 zoom-in-95 duration-150",
+            "cursor-pointer",
+          )}
+          onMouseEnter={handleCardMouseEnter}
+          onMouseLeave={handleCardMouseLeave}
+          onClick={handleClick}
+        >
+          {/* favicon + 域名 */}
+          <span className="flex items-center gap-1.5">
+            {favicon ? (
+              <img
+                src={favicon}
+                alt=""
+                className="h-4 w-4 max-h-4 max-w-4 shrink-0 rounded-sm object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : (
+              <FavIcon url={url} className="h-4 w-4 shrink-0 rounded-sm" />
+            )}
+            <span className="text-xs text-muted-foreground truncate leading-none">
+              {domain}
+            </span>
+          </span>
+          
+          {/* 标题 */}
+          {title && (
+            <span className="block mt-1 text-sm font-bold leading-snug text-foreground line-clamp-2">
+              {title}
+            </span>
+          )}
+        </span>
       )}
-      <span className="truncate">{domain}</span>
-    </a>
+    </span>
   );
 }
 

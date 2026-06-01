@@ -82,7 +82,7 @@ def iterative_research_node(state, config: RunnableConfig) -> Command[Literal["_
         # 创建带有工具的 Agent
         tools = [
             online_search_tool(
-                max_results=configurable.max_search_results
+                max_results=configurable.get_max_results("online_search")
             ),
             industry_report_search,
             news_search,

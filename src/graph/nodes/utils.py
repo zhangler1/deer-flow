@@ -306,7 +306,8 @@ async def _execute_agent_step(
                 pass
 
     # ─── 7. 处理结果 ───
-    response_content = result["messages"][-1].content
+    all_messages = result["messages"]
+    response_content = all_messages[-1].content
     if not response_content or not str(response_content).strip():
         response_content = "（步骤已完成，工具调用未产生文本响应）"
     if response_content and '<think>' in response_content.lower():
@@ -319,9 +320,27 @@ async def _execute_agent_step(
     step_duration = time.time() - step_start_time
     enhanced_logger.logger.info(f"✅ STEP_DONE | {agent_type} | '{current_step.title}' | 耗时: {step_duration:.2f}s")
 
+    # 提取 ReactLoop 内部的 ToolMessages，将它们加入 Command 的 messages 更新中，
+    # 使 LangGraph 能够流式传输 tool_call_result 事件到前端（供参考资料渲染使用）
+    from langchain_core.messages import AIMessage as _AIMessage, ToolMessage as _ToolMessage
+    update_messages = []
+    for msg in all_messages:
+        if isinstance(msg, _ToolMessage):
+            update_messages.append(msg)
+        elif isinstance(msg, _AIMessage) and getattr(msg, 'tool_calls', None):
+            update_messages.append(msg)
+    # 最后追加最终响应
+    update_messages.append(HumanMessage(content=response_content, name=agent_type))
+
+    enhanced_logger.logger.info(
+        f"📤 COMMAND_UPDATE | {agent_type} | "
+        f"update_messages: {len(update_messages)} 条 (ToolMsg: {sum(1 for m in update_messages if isinstance(m, _ToolMessage))}, "
+        f"AIMsg: {sum(1 for m in update_messages if isinstance(m, _AIMessage))})"
+    )
+
     return Command(
         update={
-            "messages": [HumanMessage(content=response_content, name=agent_type)],
+            "messages": update_messages,
             "observations": observations + [response_content],
             "current_step_index": len(completed_steps),
             "current_step_title": current_step.title,

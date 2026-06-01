@@ -13,6 +13,7 @@ ReactLoop - 可控的 ReAct 循环引擎
 ReactLoop 本身只是纯粹的循环引擎 + 中间件调度器。
 """
 
+import json
 import logging
 import time
 import asyncio
@@ -348,8 +349,18 @@ class ReactLoop:
                 logger.warning(f"⚠️ 未知工具: {t_name}")
                 result = f"错误: 未知工具 '{t_name}'，可用工具: {list(tools_map.keys())}"
             
+            # 将结果转换为 JSON 字符串（前端需要 JSON 格式才能正确解析）
+            if result is None:
+                content = "工具执行完成（无返回内容）"
+            elif isinstance(result, (dict, list)):
+                # 字典或列表类型，转为 JSON 字符串
+                content = json.dumps(result, ensure_ascii=False, default=str)
+            else:
+                # 其他类型（字符串、数字等），直接转字符串
+                content = str(result)
+            
             return ToolMessage(
-                content=str(result) if result else "工具执行完成（无返回内容）",
+                content=content,
                 tool_call_id=t_call_id,
                 name=t_name,
             )

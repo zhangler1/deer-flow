@@ -3,7 +3,7 @@
 # ===========================================================
 # 使用方式：
 #   外网开发（Mock 模式）：
-#     docker compose -f docker-compose.yml -f docker-compose.mock.yml up -d
+#     docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 #
 #   生产模式（走真实内网接口）：
 #     docker compose up -d
