@@ -32,7 +32,7 @@ from src.config.loader import get_bool_env, get_str_env, load_tool_compression_c
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.graph.builder import build_graph_with_memory
-from src.llms.llm import EnhancedLLMWrapper, get_configured_llm_models, get_reporter_model_options
+from src.llms.llm import EnhancedLLMWrapper, get_configured_llm_models, get_reporter_model_options, get_llm_by_type
 from src.podcast.graph.builder import build_graph as build_podcast_graph
 from src.ppt.graph.builder import build_graph as build_ppt_graph
 from src.prompt_enhancer.graph.builder import build_graph as build_prompt_enhancer_graph
@@ -292,7 +292,7 @@ def _determine_message_tag(agent_name, message_metadata, message_chunk):
                 return result
     
     # Check for routing phase
-    if agent_name in ("router", "direct_answer_node", "simple_search_node", "domain_knowledge_node"):
+    if agent_name in ("router", "domain_knowledge_node"):
         return "routing"
     
     # Check for planning phase
@@ -300,22 +300,8 @@ def _determine_message_tag(agent_name, message_metadata, message_chunk):
         return "planning"
     
     # Check for reporting phase
-    if agent_name == "reporter" or langgraph_node == "reporter" or agent_name == "iterative_reporter_node":
+    if agent_name == "reporter" or langgraph_node == "reporter":
         return "reporting"
-    
-    # Check for iterative research node - default to answering unless tool calls are involved
-    if agent_name == "iterative_research_node":
-        # If there are tool calls or tool call chunks, don't set tag here
-        # (it will be set in _process_message_chunk when handling tool calls)
-        if hasattr(message_chunk, 'tool_calls') and message_chunk.tool_calls:
-            return None  # Will be set to "searching" in tool_calls handling
-        if hasattr(message_chunk, 'tool_call_chunks') and message_chunk.tool_call_chunks:
-            return None  # Will be set to "searching" in tool_call_chunks handling
-        # Check if has reasoning content - indicates analyzing
-        if hasattr(message_chunk, 'additional_kwargs') and message_chunk.additional_kwargs.get("reasoning_content"):
-            return "iterative_answering"
-        # Default to answering for iterative research
-        return "answering"
     
     # Check for researcher - could be searching or analyzing
     if agent_name == "researcher" or langgraph_node == "researcher":
@@ -883,8 +869,9 @@ async def _astream_workflow_generator(
     # ⚙️ 不再设置全局环境变量（避免多用户并发冲突）
     # 改为通过 workflow_input["guwp_token"] 传递到 state，确保线程安全
     
-    # 将用户上传的文档上下文注入到系统上下文中
-    document_context_text = ""
+    # 将用户上传的文档原文和摘要分开处理
+    document_original_text = ""
+    document_summary_text = ""
     if document_contexts:
         doc_sections = []
         for doc in document_contexts:
@@ -892,14 +879,31 @@ async def _astream_workflow_generator(
             fname = doc_dict.get("filename", "unknown")
             content = doc_dict.get("content", "")
             doc_sections.append(f"[附件文档 - {fname}]\n{content}\n[/附件文档]")
-        document_context_text = "\n\n".join(doc_sections)
+        document_original_text = "\n\n".join(doc_sections)
+        
+        # 用 LLM 生成文档摘要，供 researcher 节点使用（减轻上下文负担）
+        try:
+            from src.config.agents import LLMType
+            summary_llm = get_llm_by_type("basic")
+            summary_prompt = (
+                "请对以下文档内容生成一份简洁的摘要（1000字以内），保留核心观点、关键数据和主要结论：\n\n"
+                f"{document_original_text}"
+            )
+            from langchain_core.messages import HumanMessage as _HumanMessage, SystemMessage as _SystemMessage
+            summary_messages = [
+                _SystemMessage(content="你是一个文档摘要生成助手，请用简洁的语言提取文档的核心内容。"),
+                _HumanMessage(content=summary_prompt),
+            ]
+            summary_result = summary_llm.invoke(summary_messages)
+            document_summary_text = summary_result.content if hasattr(summary_result, 'content') else str(summary_result)
+            logger.info(f"文档摘要生成成功，摘要长度: {len(document_summary_text)}")
+        except Exception as e:
+            logger.warning(f"文档摘要生成失败，回退使用截断原文作为摘要: {e}")
+            # 回退策略：截取前 500 字作为摘要
+            document_summary_text = document_original_text[:500] + ("\n\n[... 文档内容已截断 ...]" if len(document_original_text) > 500 else "")
     
-    # 合并系统背景上下文和文档上下文
+    # system_context 仅保留非文档的系统背景上下文
     full_system_context = system_context
-    if document_context_text:
-        if full_system_context:
-            full_system_context += "\n\n"
-        full_system_context += f"以下是用户上传的参考文档，请在回答时参考这些文档内容：\n\n{document_context_text}"
 
     # Prepare workflow input
     workflow_input = {
@@ -911,7 +915,9 @@ async def _astream_workflow_generator(
         "auto_accepted_plan": auto_accepted_plan,
         "enable_background_investigation": enable_background_investigation,
         "research_topic": messages[-1]["content"] if messages else "",
-        "system_context": full_system_context,  # 将系统背景+文档上下文传递给工作流
+        "system_context": full_system_context,  # 系统背景上下文（不含文档内容）
+        "document_summary": document_summary_text,  # 文档摘要，供 researcher 使用
+        "document_original": document_original_text,  # 文档原文，供 reporter 使用
         "force_routing_path": force_routing_path,  # 🐛 调试模式
         # 确保迭代研究的状态字段被正确初始化
         "iteration_count": 0,
@@ -938,7 +944,7 @@ async def _astream_workflow_generator(
             "mcp_settings": mcp_settings,
             "report_style": report_style.value,
             "enable_deep_thinking": enable_deep_thinking,
-            "system_context": full_system_context,  # 将系统背景+文档上下文传递到配置中
+            "system_context": full_system_context,  # 系统背景上下文（不含文档内容，文档由各节点自行注入）
             "use_budget_controlled_online_search": use_budget_controlled_online_search,
             "use_budget_controlled_bocom_search": use_budget_controlled_bocom_search,
             "cancel_event": cancel_event,  # 客户端断连取消信号，reporter 节点检测
@@ -1709,18 +1715,10 @@ async def _full_workflow_openai_generator(
                         # 处理所有输出节点的消息
                         # - reporter: 深度研究报告
                         # - coordinator: 深度研究协调/追问
-                        # - direct_answer_assistant: 直接回答
-                        # - simple_search_assistant: 简单检索
-                        # - iterative_research_node: 迭代研究节点
-                        # - iterative_reporter_node: 迭代研究报告节点
                         agent = event_data.get("agent", "")
                         allowed_agents = [
                             "reporter",                    # 深度研究报告
                             "coordinator",                # 深度研究协调
-                            "direct_answer_node",         # 直接回答节点
-                            "simple_search_node",         # 简单检索节点
-                            "iterative_research_node",    # 迭代研究节点
-                            "iterative_reporter_node"     # 迭代研究报告节点
                         ]
                         if agent not in allowed_agents:
                             enhanced_logger.logger.debug(f"⚠️ FILTERED_AGENT | 过滤非输出agent: {agent}")

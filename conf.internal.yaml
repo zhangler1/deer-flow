@@ -10,11 +10,12 @@
 #   3. 未设置 LLM_NETWORK 或设为 external 时，继续使用 conf.yaml（DeepSeek 等外网配置），
 #      两套配置互不影响。
 #
-# 关键字段说明：
-#   - platform: 必须固定为 "ellm"，用于工厂方法路由到 EllmChatModel
-#   - api_key_url:  ELLM 网关的密钥服务地址
-#   - scene_code:   ELLM 场景编码
-#   - api_key_refresh_interval / api_key_refresh_ahead: 密钥后台刷新参数（秒）
+# 关键设计特点
+# 文件级切换，不做跨文件合并 — 选中哪个文件就只加载那个文件的全部内容，两套配置完全独立互不干扰。
+# 优雅降级 — 如果设置了 LLM_NETWORK=internal 但 conf.internal.yaml 文件不存在，会记录警告并回退到 conf.yaml。
+# 配置缓存 — 加载后的配置通过 load_yaml_config() 缓存在内存中，避免重复读取。
+# 统一结构 — 两个文件的 YAML 结构完全一致（COORDINATOR_MODEL、PLANNER_MODEL、SEARCH_BUDGET 等），代码无需区分来源。
+# 配置优先级 — 最终生效的优先级为：环境变量 > RunnableConfig > YAML配置 > 默认值。
 # ==============================================================================
 
 COORDINATOR_MODEL:

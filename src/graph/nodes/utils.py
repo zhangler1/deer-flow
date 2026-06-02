@@ -201,6 +201,17 @@ async def _execute_agent_step(
     agent = create_agent(agent_type, agent_type, tools, agent_type, configurable)
 
     # ─── 5. 准备输入消息 ───
+    # researcher 使用文档摘要，避免将全文注入研究上下文
+    base_system_context = state.get("system_context", "")
+    doc_summary = state.get("document_summary", "")
+    if doc_summary and agent_type == "researcher":
+        effective_context = base_system_context
+        if effective_context:
+            effective_context += "\n\n"
+        effective_context += f"以下是用户上传文档的摘要，请在研究时参考：\n\n{doc_summary}"
+    else:
+        effective_context = base_system_context
+
     agent_input = {
         "messages": [
             HumanMessage(
@@ -212,7 +223,7 @@ async def _execute_agent_step(
                 )
             )
         ],
-        "system_context": state.get("system_context", ""),
+        "system_context": effective_context,
     }
     if agent_type == "researcher":
         agent_input["messages"].append(

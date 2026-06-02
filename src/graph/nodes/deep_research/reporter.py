@@ -94,6 +94,17 @@ async def reporter_node(state: State, config: RunnableConfig):
         plan_title = str(current_plan) if current_plan else "未知计划"
         plan_thought = "计划详情不可用"
         
+    # reporter 使用文档原文（而非摘要），确保报告能参考完整内容
+    base_system_context = state.get("system_context", "")
+    doc_original = state.get("document_original", "")
+    if doc_original:
+        reporter_context = base_system_context
+        if reporter_context:
+            reporter_context += "\n\n"
+        reporter_context += f"以下是用户上传的参考文档原文，请在撰写报告时充分参考：\n\n{doc_original}"
+    else:
+        reporter_context = base_system_context
+
     input_ = {
         "messages": [
             HumanMessage(
@@ -101,7 +112,7 @@ async def reporter_node(state: State, config: RunnableConfig):
             )
         ],
         "locale": state.get("locale", "zh-CN"),
-        "system_context": state.get("system_context", ""),
+        "system_context": reporter_context,
     }
     invoke_messages = apply_prompt_template("reporter", input_, configurable)
     observations = state.get("observations", [])

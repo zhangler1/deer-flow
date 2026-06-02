@@ -23,6 +23,8 @@ class State(MessagesState):
     enable_background_investigation: bool = True
     background_investigation_results: str = None
     system_context: str = ""  # 系统背景上下文，各节点在Prompt Template中按需使用（不修改用户消息）
+    document_summary: str = ""  # 文档摘要，供 researcher 节点使用（减轻上下文负担）
+    document_original: str = ""  # 文档原文，供 reporter 节点使用（撰写报告时参考完整内容）
     
     # 智能路由相关字段
     query_complexity: str = "unknown"  # 查询复杂度: simple/medium/complex
