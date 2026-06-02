@@ -14,6 +14,7 @@ import sys
 from typing import Any, Dict, List, Optional, Union
 from functools import wraps
 from contextlib import contextmanager
+from contextvars import ContextVar
 
 
 # 从环境变量读取日志级别配置
@@ -83,13 +84,37 @@ def should_log(level: int = logging.INFO) -> bool:
 def console_print(message: str, level: int = logging.INFO):
     """
     带日志级别判断的控制台打印函数
-    
+
     Args:
         message: 要打印的消息
         level: 日志级别
     """
     if should_log(level):
         print(message)
+
+
+# ─── Thread ID 上下文（多并发场景下按请求链路隔离日志） ─────────────────────
+
+# 每个 asyncio Task 独立持有自己的 thread_id 副本，不互相干扰
+current_thread_id: ContextVar[str] = ContextVar('current_thread_id', default='-')
+
+
+class ThreadIdFilter(logging.Filter):
+    """将当前 asyncio Task 的 thread_id 注入到每条日志记录中。
+
+    contextvars 确保多并发下各 Task 取到各自的 thread_id，
+    Filter 在日志格式化前将 thread_id 写入 record 的 thread_id 字段，
+    供 Formatter 的格式串或 ColoredFormatter.format() 使用。
+    """
+    def filter(self, record):
+        record.thread_id = current_thread_id.get()
+        return True
+
+
+_THREAD_ID_FILTER = ThreadIdFilter()
+
+
+# ─── 彩色日志格式化器 ──────────────────────────────────────────────────────
 
 
 class ColoredFormatter(logging.Formatter):
@@ -108,25 +133,32 @@ class ColoredFormatter(logging.Formatter):
     }
     
     def format(self, record):
+        # 确保 thread_id 字段存在（ThreadIdFilter 应在格式化前已注入）
+        if not hasattr(record, 'thread_id'):
+            record.thread_id = '-'
+
         # 根据用户偏好：前面部分使用绿色，后面部分使用紫色
         log_color = self.COLORS.get(record.levelname, self.COLORS['INFO'])
         purple_color = self.COLORS['PURPLE']
         reset_color = self.COLORS['RESET']
         bold = self.COLORS['BOLD']
-        
+
         # 格式化时间戳 (绿色)
         timestamp = self.formatTime(record, self.datefmt)
-        
+
+        # 格式化 thread_id (绿色)
+        thread_id = f"{log_color}[{record.thread_id}]{reset_color}"
+
         # 格式化日志级别 (绿色)
         level = f"{log_color}[{record.levelname}]{reset_color}"
-        
+
         # 格式化模块名 (绿色)
         module = f"{log_color}{record.name}{reset_color}"
-        
+
         # 格式化消息 (紫色)
         message = f"{purple_color}{record.getMessage()}{reset_color}"
-        
-        return f"{log_color}{timestamp}{reset_color} {level} {module} {purple_color}|{reset_color} {message}"
+
+        return f"{log_color}{timestamp}{reset_color} {thread_id} {level} {module} {purple_color}|{reset_color} {message}"
 
 
 class EnhancedLogger:
@@ -140,7 +172,7 @@ class EnhancedLogger:
         
     def setup_enhanced_logging(self, level=logging.INFO, enable_colors=True, log_file=None):
         """设置增强日志
-        
+
         Args:
             level: 日志级别
             enable_colors: 是否启用彩色输出（仅控制台）
@@ -152,40 +184,42 @@ class EnhancedLogger:
         use_colors = should_use_colors(enable_colors)
         if use_colors:
             console_formatter = ColoredFormatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                '%(asctime)s - [%(thread_id)s] - %(name)s - %(levelname)s - %(message)s',
                 datefmt='%H:%M:%S'
             )
         else:
             console_formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                '%(asctime)s - [%(thread_id)s] - %(name)s - %(levelname)s - %(message)s',
                 datefmt='%H:%M:%S'
             )
-            
+
         console_handler.setFormatter(console_formatter)
+        console_handler.addFilter(_THREAD_ID_FILTER)
         self.logger.addHandler(console_handler)
-        
+
         # 设置文件输出（如果指定了日志文件）
         if log_file:
             # 确保日志目录存在
             log_dir = os.path.dirname(log_file)
             if log_dir and not os.path.exists(log_dir):
                 os.makedirs(log_dir, exist_ok=True)
-            
+
             # 创建文件处理器
             self.file_handler = logging.FileHandler(
-                log_file, 
+                log_file,
                 mode='a',  # 追加模式
                 encoding='utf-8'
             )
-            
+
             # 文件输出使用无颜色格式
             file_formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                '%(asctime)s - [%(thread_id)s] - %(name)s - %(levelname)s - %(message)s',
                 datefmt='%Y-%m-%d %H:%M:%S'
             )
             self.file_handler.setFormatter(file_formatter)
+            self.file_handler.addFilter(_THREAD_ID_FILTER)
             self.logger.addHandler(self.file_handler)
-            
+
         self.logger.setLevel(level)
         
         # 禁止日志向父logger传播，避免重复输出

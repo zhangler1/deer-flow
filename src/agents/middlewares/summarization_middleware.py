@@ -19,7 +19,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from src.agents.middleware import AgentMiddleware
-from src.utils.enhanced_logger import get_enhanced_logger
+from src.utils.enhanced_logger import get_enhanced_logger, current_thread_id
 
 logger = get_enhanced_logger(__name__).logger
 
@@ -99,7 +99,16 @@ class SummarizationMiddleware(AgentMiddleware):
         
         # 估算当前 token 数
         total_tokens = self._estimate_tokens(messages)
-        
+
+        # 计算输入总字符长度
+        total_chars = sum(len(self._get_content(m)) for m in messages)
+        logger.info(
+            f"CTX_CHECK | thread_id={current_thread_id.get()} | "
+            f"tokens={total_tokens} | chars={total_chars} | "
+            f"triggered={total_tokens > self.config.max_context_tokens} | "
+            f"threshold={self.config.max_context_tokens}"
+        )
+
         if total_tokens <= self.config.max_context_tokens:
             return messages
         
@@ -119,7 +128,14 @@ class SummarizationMiddleware(AgentMiddleware):
             f"压缩后: ~{new_tokens} tokens ({len(compressed)} 条) | "
             f"第 {self._compressions_count} 次压缩"
         )
-        
+
+        new_chars = sum(len(self._get_content(m)) for m in compressed)
+        logger.debug(
+            f"CTX_COMPRESSED | thread_id={current_thread_id.get()} | "
+            f"pre_tokens=~{total_tokens} | pre_chars={total_chars} | "
+            f"post_tokens=~{new_tokens} | post_chars={new_chars}"
+        )
+
         return compressed
     
     async def after_tool(self, messages: list, tool_results: list[Any], iteration: int, context: dict) -> list:

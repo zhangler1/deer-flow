@@ -299,7 +299,7 @@ class CustomSearchTool(BaseTool):
                 f"📡 {self.name} | HTTP响应 | status={meta.get('status')} | "
                 f"content-length={meta.get('content_length')} | encoding={meta.get('encoding')} | "
                 f"result条数={meta.get('result_count')} | "
-                f"耗时={duration:.1f}s"
+                f"耗时={duration:.2f}s"
             )
             
             # 恢复原始配置

@@ -69,7 +69,7 @@ from src.server.rag_request import (
 from src.tools import VolcengineTTS
 from src.graph.checkpoint import chat_stream_message
 from src.utils.json_utils import sanitize_args
-from src.utils.enhanced_logger import get_enhanced_logger, setup_enhanced_logging
+from src.utils.enhanced_logger import get_enhanced_logger, setup_enhanced_logging, current_thread_id
 
 logger = logging.getLogger(__name__)
 
@@ -861,6 +861,9 @@ async def _astream_workflow_generator(
     reporter_model: str = "",  # 用户选择的 reporter 模型 key
     document_contexts: List = None,  # 用户上传的文档上下文
 ):
+    # 设置 thread_id 到 contextvars，该请求链路内所有日志自动携带此 ID
+    current_thread_id.set(thread_id)
+
     # Process initial messages
     for message in messages:
         if isinstance(message, dict) and "content" in message:
