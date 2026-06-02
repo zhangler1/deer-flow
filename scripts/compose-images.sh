@@ -8,7 +8,7 @@ set -euo pipefail
 #   -f 指定 docker-compose 文件（默认 ./docker-compose.yml）
 #   -d 指定目录（默认 .）
 # 用法示例：
-#   保存：./compose-images.sh -o -f ./docker-compose.yml -d ./images
+#   保存：bash ./compose-images.sh -o -f ../docker-compose.yml -d ./images
 #   加载：./compose-images.sh -i -f ./docker-compose.yml -d ./images
 
 OUT_DIR="."
