@@ -26,6 +26,7 @@ PLANNER_MODEL:
 
 
 RESEARCHER_MODEL:
+  platform: ellm
   base_url: https://api.minimaxi.com/v1
   model: MiniMax-M2.5
   api_key: sk-api-neIHGWLpXeuieE9bs5Z0WRophLm9fe2FAzDDlaeaCGdSh1oOLEpxruS7PdRoYUUJOA0CJDI25yRQ9JIWjicX0vjYgZnlSNjsLP1sIF96-9sehi0IRzsCYXo
@@ -45,7 +46,8 @@ REPORTER_MODEL:
 
 # All selectable reporter models, each with complete independent configuration
 REPORTER_MODEL_OPTIONS:
-  deepseek-v4-flash:
+  MiniMax-M2.5:
+    platform: ellm
     base_url: https://api.minimaxi.com/v1
     model: MiniMax-M2.5
     api_key: sk-api-neIHGWLpXeuieE9bs5Z0WRophLm9fe2FAzDDlaeaCGdSh1oOLEpxruS7PdRoYUUJOA0CJDI25yRQ9JIWjicX0vjYgZnlSNjsLP1sIF96-9sehi0IRzsCYXo
@@ -403,4 +405,3 @@ VECTOR_SEARCH:
 
 THINK_TAG_MODELS:
   - deepseek-v4-flash
-  - MiniMax-M2.5
