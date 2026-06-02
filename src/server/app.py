@@ -1259,6 +1259,40 @@ async def markdown_to_word(request: MarkdownToWordRequest):
             pass
 
 
+@app.post("/api/prose/generate")
+async def generate_prose(request: GenerateProseRequest):
+    try:
+        workflow = build_prose_graph()
+        prose_input = {
+            "messages": [],
+            "content": request.prompt,
+            "option": request.option,
+            "command": request.command or "",
+            "output": "",
+        }
+
+        async def event_generator():
+            try:
+                async for _node, events in workflow.astream(
+                    prose_input,
+                    stream_mode="messages",
+                    subgraphs=True,
+                ):
+                    for event in events:
+                        if hasattr(event, "content") and event.content:
+                            yield event.content
+            except Exception as e:
+                logger.exception(f"Error during prose streaming: {str(e)}")
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+        )
+    except Exception as e:
+        logger.exception(f"Error occurred during prose generation: {str(e)}")
+        raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
+
+
 @app.post("/api/ppt/generate")
 async def generate_ppt(request: GeneratePPTRequest):
     try:

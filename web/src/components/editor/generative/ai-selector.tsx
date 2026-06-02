@@ -38,7 +38,7 @@ function useProseCompletion() {
 
       try {
         const response = await fetchStream(
-          resolveServiceURL("/api/prose/generate"),
+          resolveServiceURL("prose/generate"),
           {
             method: "POST",
             headers: {
