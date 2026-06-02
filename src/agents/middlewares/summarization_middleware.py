@@ -171,9 +171,20 @@ class SummarizationMiddleware(AgentMiddleware):
         return getattr(msg, "content", "") or ""
     
     @staticmethod
+    def _is_system_message(msg) -> bool:
+        """判断是否为系统提示词消息
+
+        系统提示词（role=system）不能被压缩，否则 LLM 会丢失角色约束和工具使用指导。
+        兼容 dict 格式和 LangChain Message 对象两种表示。
+        """
+        if isinstance(msg, dict):
+            return msg.get("role") == "system"
+        return getattr(msg, "type", None) == "system"
+
+    @staticmethod
     def _is_protected(msg) -> bool:
         """判断消息是否受保护（不可压缩）
-        
+
         保护标记通过 additional_kwargs["protected"] = True 设置。
         未来技能系统加载的内容也可以通过这个标记避免被压缩。
         """
@@ -199,25 +210,35 @@ class SummarizationMiddleware(AgentMiddleware):
         """对消息列表执行压缩
         
         策略：
-        1. 计算安全切割点（保护 AI/Tool 消息对不被拆散）
-        2. 保留最近 N 条消息不压缩
-        3. 对旧消息生成摘要
+        1. 先提取系统提示词（不参与压缩，压缩后原样拼回 position 0）
+        2. 计算安全切割点（保护 AI/Tool 消息对不被拆散）
+        3. 保留最近 N 条消息不压缩
+        4. 对旧消息生成摘要
         """
+        # 1. 提取系统提示词，确保不被压缩
+        system_msgs = [m for m in messages if self._is_system_message(m)]
+        rest_msgs = [m for m in messages if not self._is_system_message(m)]
+
+        if system_msgs:
+            logger.debug(
+                f"🛡️ 系统提示词保护 | {len(system_msgs)} 条系统消息从压缩范围排除"
+            )
+
         keep_count = self.config.keep_recent_messages
         
-        if len(messages) <= keep_count:
+        if len(rest_msgs) <= keep_count:
             return messages
         
-        # 找到安全的切割点（参考 2.0 的 AI/Tool 对保护）
-        cutoff = self._find_safe_cutoff(messages, keep_count)
+        # 2. 找到安全的切割点（参考 2.0 的 AI/Tool 对保护）
+        cutoff = self._find_safe_cutoff(rest_msgs, keep_count)
         
         if cutoff <= 0:
             return messages
         
-        to_compress = messages[:cutoff]
-        to_keep = messages[cutoff:]
+        to_compress = rest_msgs[:cutoff]
+        to_keep = rest_msgs[cutoff:]
         
-        # 提取受保护的消息（不参与压缩）
+        # 3. 提取受保护的消息（不参与压缩）
         to_compress, to_keep = self._preserve_protected_messages(to_compress, to_keep)
         
         # 根据模式选择压缩方法
@@ -232,7 +253,8 @@ class SummarizationMiddleware(AgentMiddleware):
             name="context_summary",
         )
         
-        return [summary_msg] + to_keep
+        # 4. 系统提示词拼回 position 0，确保 LLM 角色约束不丢失
+        return system_msgs + [summary_msg] + to_keep
     
     def _find_safe_cutoff(self, messages: list, keep_count: int) -> int:
         """找到安全的消息切割点，确保不拆散 AI/Tool 消息对
