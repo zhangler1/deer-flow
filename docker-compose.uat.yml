@@ -49,7 +49,7 @@ services:
       - deer-flow-network
     tty: true
     stdin_open: true
-    entrypoint: ["/app/.venv/bin/python" ,"server.py" ,"--host", "0.0.0.0" ,"--port", "8000"]
+    entrypoint: ["/app/.venv/bin/python" ,"server.py" ,"--host", "0.0.0.0" ,"--port", "8000", "--reload"]
 
   frontend:
     # build:
