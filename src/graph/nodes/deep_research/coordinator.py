@@ -143,12 +143,26 @@ async def coordinator_node(
     # ------------------------------------------------------------------
     
     enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | research_topic: {state.get('research_topic', 'Not set')}")
-    enhanced_logger.logger.debug(f"📊 COORDINATOR_STATE | locale: {state.get('locale', 'Not set')}")
-    enhanced_logger.logger.debug(f"📊 COORDINATOR_STATE | messages数量: {len(state.get('messages', []))}")
     
     try:
-        messages = apply_prompt_template("coordinator", state, configurable)
-        enhanced_logger.logger.debug(f"📝 COORDINATOR_PROMPT | 提示模板应用成功 | 消息数: {len(messages)}")
+        # coordinator 使用文档摘要（同 researcher 逻辑），让协调节点了解文档背景
+        coord_state = dict(state) if not isinstance(state, dict) else state.copy()
+        doc_summary = coord_state.get("document_summary", "")
+        enhanced_logger.logger.info(
+            f"📄 COORDINATOR_DOC_DEBUG | document_summary 长度: {len(doc_summary)} | "
+            f"document_summary 前100字: {doc_summary[:100] if doc_summary else '(空)'}"
+        )
+        if doc_summary:
+            base_ctx = coord_state.get("system_context", "")
+            if base_ctx:
+                base_ctx += "\n\n"
+            coord_state["system_context"] = base_ctx + f"以下是用户上传文档的摘要，请在协调时参考：\n\n{doc_summary}"
+            enhanced_logger.logger.info(f"📄 COORDINATOR_DOC_DEBUG | 文档摘要已注入 system_context")
+        else:
+            enhanced_logger.logger.info(f"📄 COORDINATOR_DOC_DEBUG | 无文档摘要，跳过注入")
+
+        messages = apply_prompt_template("coordinator", coord_state, configurable)
+        enhanced_logger.logger.info(f"📝 COORDINATOR_PROMPT | 提示模板应用成功 | 消息数: {len(messages)}")
     except Exception as e:
         enhanced_logger.logger.error(f"Failed to apply coordinator template: {e}")
         messages = [HumanMessage(content=f"协调请求：{state.get('research_topic', '未知请求')}")]
@@ -172,9 +186,7 @@ async def coordinator_node(
     response = full_response
     llm_duration = time.time() - llm_start_time
     
-    enhanced_logger.logger.info(f"🤖 COORDINATOR_LLM_RESPONSE | LLM调用完成 | 耗时: {llm_duration:.2f}s")
-    enhanced_logger.logger.debug(f"📤 COORDINATOR_RESPONSE_TYPE | 响应类型: {type(response).__name__}")
-    enhanced_logger.logger.info(f"📤 COORDINATOR_RESPONSE_CONTENT | 响应内容: {response.content[:100] if hasattr(response, 'content') else 'No content'}")
+    enhanced_logger.logger.info(f"📤 COORDINATOR_RESPONSE_CONTENT | 耗时: {llm_duration:.2f}s ｜ 响应内容: {response.content[:100] if hasattr(response, 'content') else 'No content'}")
     
     logger.debug(f"Current state messages: {state['messages']}")
 

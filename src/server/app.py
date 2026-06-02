@@ -873,6 +873,12 @@ async def _astream_workflow_generator(
     document_original_text = ""
     document_summary_text = ""
     if document_contexts:
+        logger.info(f"📄 DOCUMENT_CONTEXTS_DEBUG | 文档数量: {len(document_contexts)}")
+        for i, doc in enumerate(document_contexts):
+            doc_dict = doc if isinstance(doc, dict) else doc.dict()
+            fname = doc_dict.get("filename", "unknown")
+            content = doc_dict.get("content", "")
+            logger.info(f"📄 DOCUMENT_CONTEXTS_DEBUG | 文档[{i}] filename='{fname}' | content长度={len(content)} | content前100字: {content[:100]}")
         doc_sections = []
         for doc in document_contexts:
             doc_dict = doc if isinstance(doc, dict) else doc.dict()
@@ -880,6 +886,7 @@ async def _astream_workflow_generator(
             content = doc_dict.get("content", "")
             doc_sections.append(f"[附件文档 - {fname}]\n{content}\n[/附件文档]")
         document_original_text = "\n\n".join(doc_sections)
+        logger.info(f"📄 DOCUMENT_CONTEXTS_DEBUG | document_original_text 总长度: {len(document_original_text)}")
         
         # 用 LLM 生成文档摘要，供 researcher 节点使用（减轻上下文负担）
         try:
@@ -916,8 +923,6 @@ async def _astream_workflow_generator(
         "enable_background_investigation": enable_background_investigation,
         "research_topic": messages[-1]["content"] if messages else "",
         "system_context": full_system_context,  # 系统背景上下文（不含文档内容）
-        "document_summary": document_summary_text,  # 文档摘要，供 researcher 使用
-        "document_original": document_original_text,  # 文档原文，供 reporter 使用
         "force_routing_path": force_routing_path,  # 🐛 调试模式
         # 确保迭代研究的状态字段被正确初始化
         "iteration_count": 0,
@@ -925,10 +930,19 @@ async def _astream_workflow_generator(
         "report_style": report_style.value,  # 将报告风格传递到 state，用于 researcher_node 动态选择工具
         "guwp_token": guwp_token,  # ✅ 通过 state 传递 token，确保线程安全
     }
+    # 仅在本次请求带有文档时才写入，避免后续追问覆盖已有文档摘要
+    if document_summary_text:
+        workflow_input["document_summary"] = document_summary_text
+
+    else:
+        logger.info(f"📄 DOCUMENT_WORKFLOW_DEBUG | document_summary_text 为空，未写入 workflow_input（依赖 checkpoint 保留已有值）")
+    if document_original_text:
+        workflow_input["document_original"] = document_original_text
     if not auto_accepted_plan and interrupt_feedback:
         resume_msg = f"[{interrupt_feedback}]"
         if messages:
             resume_msg += f" {messages[-1]['content']}"
+        logger.info(f"⚠️ DOCUMENT_WORKFLOW_DEBUG | interrupt_feedback 触发! workflow_input 将被替换为 Command(resume=...) | interrupt_feedback='{interrupt_feedback}' | 文档摘要是否已设置: {bool(document_summary_text)}")
         workflow_input = Command(resume=resume_msg)
 
     # Prepare workflow config

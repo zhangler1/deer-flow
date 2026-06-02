@@ -91,14 +91,17 @@ def apply_prompt_template(
     state_dict = dict(state) if not isinstance(state, dict) else state
     state_vars = {
         "CURRENT_TIME": datetime.now().strftime("%Y年%m月%d日"),
-        **state_dict,
     }
 
-    # Add configurable variables
+    # Add configurable variables first (lower priority)
     report_style = None
     if configurable:
         state_vars.update(dataclasses.asdict(configurable))
         report_style = getattr(configurable, 'report_style', None)
+
+    # State dict overwrites configurable (higher priority)
+    # 这样节点中修改的 state 字段（如注入文档摘要后的 system_context）不会被 configurable 覆盖
+    state_vars.update(state_dict)
 
     # Inject skills_section for researcher prompt
     skills_section = ""
