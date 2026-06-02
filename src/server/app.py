@@ -1280,7 +1280,7 @@ async def generate_prose(request: GenerateProseRequest):
                 ):
                     for event in events:
                         if hasattr(event, "content") and event.content:
-                            yield event.content
+                            yield f"data: {event.content}\n\n"
             except Exception as e:
                 logger.exception(f"Error during prose streaming: {str(e)}")
 

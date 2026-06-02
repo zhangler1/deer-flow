@@ -41,9 +41,14 @@ def build_graph():
             "fix": "prose_fix",
             "zap": "prose_zap",
         },
-        END,
     )
-    
+    builder.add_edge("prose_continue", END)
+    builder.add_edge("prose_improve", END)
+    builder.add_edge("prose_shorter", END)
+    builder.add_edge("prose_longer", END)
+    builder.add_edge("prose_fix", END)
+    builder.add_edge("prose_zap", END)
+
     compiled_graph = builder.compile()
     
     

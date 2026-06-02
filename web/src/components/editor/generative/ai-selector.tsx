@@ -112,7 +112,7 @@ export function AISelector({ onOpenChange }: AISelectorProps) {
       {isLoading && (
         <div className="flex h-12 w-full items-center px-4 text-sm font-medium text-purple-500">
           <Magic className="mr-2 h-4 w-4 shrink-0" />
-          AI is thinking
+          AI 正在思考
           <div className="mt-1 ml-2">
             <LoadingOutlined />
           </div>
@@ -127,8 +127,8 @@ export function AISelector({ onOpenChange }: AISelectorProps) {
               autoFocus
               placeholder={
                 hasCompletion
-                  ? "Tell AI what to do next"
-                  : "Ask AI to edit or generate..."
+                  ? "告诉 AI 接下来做什么"
+                  : "让 AI 编辑或生成内容..."
               }
               onFocus={() => addAIHighlight(editor)}
             />

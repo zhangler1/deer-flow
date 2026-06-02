@@ -14,23 +14,23 @@ import { CommandGroup, CommandItem, CommandSeparator } from "../../ui/command";
 const options = [
   {
     value: "improve",
-    label: "Improve writing",
+    label: "改进文本",
     icon: RefreshCcwDot,
   },
   // TODO: add this back in
   // {
   //   value: "fix",
-  //   label: "Fix grammar",
+  //   label: "修正语法",
   //   icon: CheckCheck,
   // },
   {
     value: "shorter",
-    label: "Make shorter",
+    label: "缩短内容",
     icon: ArrowDownWideNarrow,
   },
   {
     value: "longer",
-    label: "Make longer",
+    label: "扩展内容",
     icon: WrapText,
   },
 ];
@@ -44,7 +44,7 @@ const AISelectorCommands = ({ onSelect }: AISelectorCommandsProps) => {
   if (!editor) return null;
   return (
     <>
-      <CommandGroup heading="Edit or review selection">
+      <CommandGroup heading="编辑或优化选中内容">
         {options.map((option) => (
           <CommandItem
             onSelect={(value) => {
@@ -64,7 +64,7 @@ const AISelectorCommands = ({ onSelect }: AISelectorCommandsProps) => {
         ))}
       </CommandGroup>
       <CommandSeparator />
-      <CommandGroup heading="Use AI to do more">
+      <CommandGroup heading="使用 AI 做更多">
         <CommandItem
           onSelect={() => {
             const pos = editor.state.selection.from;
@@ -75,7 +75,7 @@ const AISelectorCommands = ({ onSelect }: AISelectorCommandsProps) => {
           className="gap-2 px-4"
         >
           <StepForward className="h-4 w-4 text-purple-500" />
-          Continue writing
+          继续写作
         </CommandItem>
       </CommandGroup>
     </>

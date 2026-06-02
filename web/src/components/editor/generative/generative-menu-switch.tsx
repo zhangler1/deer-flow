@@ -54,7 +54,7 @@ const GenerativeMenuSwitch = ({
                   Ask AI
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>You can't ask AI in replay mode.</TooltipContent>
+              <TooltipContent>回放模式下无法使用 AI</TooltipContent>
             </Tooltip>
           ) : (
             <Button
