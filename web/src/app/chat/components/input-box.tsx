@@ -70,6 +70,8 @@ export function InputBox({
   const feedbackRef = useRef<HTMLDivElement>(null);
   const attachmentRef = useRef<AttachmentUploadRef>(null);
 
+  const MAX_CHARS = 3000;
+
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isEnhanceAnimating, setIsEnhanceAnimating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
@@ -106,6 +108,8 @@ export function InputBox({
           setAttachments([]);
           // Clear enhancement animation after sending
           setIsEnhanceAnimating(false);
+          // Immediately reset counter, avoid waiting for debounced onUpdate
+          setCurrentPrompt("");
         }
       }
     },
@@ -266,6 +270,7 @@ export function InputBox({
           config={config}
           onEnter={handleSendMessage}
           onChange={setCurrentPrompt}
+          maxLength={MAX_CHARS}
         />
         <AttachmentUpload
           ref={attachmentRef}
@@ -319,6 +324,23 @@ export function InputBox({
           </Tooltip>
           <ReportStyleDialog />
           <ReporterModelSelector />
+        </div>
+        <div className="flex shrink-0 items-center justify-center gap-1 px-2">
+          <span
+            className={cn(
+              "text-xs tabular-nums",
+              currentPrompt.length >= MAX_CHARS
+                ? "text-red-500"
+                : "text-muted-foreground",
+            )}
+          >
+            {currentPrompt.length.toLocaleString()}/{MAX_CHARS.toLocaleString()}
+          </span>
+          {currentPrompt.length >= MAX_CHARS && (
+            <span className="text-xs text-red-500 whitespace-nowrap">
+              已超出字数限制
+            </span>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Tooltip
