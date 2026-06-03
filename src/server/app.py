@@ -919,7 +919,7 @@ async def _astream_workflow_generator(
     workflow_input = {
         "messages": messages,
         "plan_iterations": 0,
-        "final_report": "",
+        # "final_report": "",
         "current_plan": None,
         "observations": [],
         "auto_accepted_plan": auto_accepted_plan,
