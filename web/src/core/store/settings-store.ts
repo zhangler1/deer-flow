@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     searchEngine: "custom_search",
     useBudgetControlledOnlineSearch: true,  // 默认使用budget控制的在线检索
     useBudgetControlledBocomSearch: true,   // 默认使用budget控制的bocom搜索
-    reportStyle: "industry_report",  // 默认为行业研报
+    reportStyle: "industry_research",  // 默认为行业研报
     reporterModel: "",  // 空=使用后端 default，加载配置后从 reporter_options.default 初始化
     forceRoutingPath: "deep_research", // 调试模式默认路由设置为交心深度研究
   },
