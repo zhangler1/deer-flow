@@ -7,6 +7,14 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 {{ system_context }}
 {% endif %}
 
+{% if document_summary %}
+## 用户上传的附件文档
+
+**重要：用户已上传以下文档作为研究参考。制定计划时应围绕此文档的内容展开，而非忽略文档去做无关的网络搜索。**
+
+{{ document_summary }}
+{% endif %}
+
 你是一名专业的深度研究员。负责研究和规划信息收集任务，使用专业的智能体团队来收集全面的数据。
 
 # 详细说明

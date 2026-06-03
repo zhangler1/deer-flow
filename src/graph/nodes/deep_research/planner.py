@@ -46,6 +46,33 @@ async def planner_node(
     plan_iterations = state["plan_iterations"] if state.get("plan_iterations", 0) else 0
     enhanced_logger.log_plan_generation(plan_iterations + 1, state.get("research_topic", "未知"), 0)
     
+    # ===== 详细输入日志 =====
+    _existing_plan = state.get("current_plan")
+    _existing_plan_info = "None"
+    if _existing_plan:
+        if hasattr(_existing_plan, 'title'):
+            _existing_plan_info = f"Plan对象(title='{_existing_plan.title}', steps={len(_existing_plan.steps)})"
+        elif isinstance(_existing_plan, str):
+            _existing_plan_info = f"字符串(前100字={_existing_plan[:100]})"
+        elif isinstance(_existing_plan, dict):
+            _existing_plan_info = f"字典(title='{_existing_plan.get('title', 'N/A')}', steps={len(_existing_plan.get('steps', []))})"
+    _state_messages = state.get("messages", [])
+    _last_user_msg = ""
+    for _m in reversed(_state_messages):
+        _content = _m.get("content", "") if isinstance(_m, dict) else getattr(_m, "content", "")
+        _role = _m.get("role", "") if isinstance(_m, dict) else getattr(_m, "type", "")
+        if _role in ("user", "human"):
+            _last_user_msg = str(_content)[:200]
+            break
+    enhanced_logger.logger.info(
+        f"📥 PLANNER_STATE_INPUT | "
+        f"research_topic='{state.get('research_topic', '')[:100]}' | "
+        f"plan_iterations={plan_iterations} | "
+        f"current_plan={_existing_plan_info} | "
+        f"messages_count={len(_state_messages)} | "
+        f"last_user_msg='{_last_user_msg}'"
+    )
+    
     messages = []
     try:
         messages = apply_prompt_template("planner", state, configurable)
@@ -56,11 +83,18 @@ async def planner_node(
     if state.get("enable_background_investigation") and state.get(
         "background_investigation_results"
     ):
+        # 当用户上传了文档时，背景调研仅作为补充参考，文档内容优先
+        _has_doc = bool(state.get("document_summary"))
+        _bg_prefix = (
+            "以下是背景调研的补充信息（注意：用户已上传文档，请以文档内容为主，背景调研仅作参考）：\n"
+            if _has_doc
+            else "用户查询的背景调研结果：\n"
+        )
         messages += [
             {
                 "role": "user",
                 "content": (
-                    "用户查询的背景调研结果：\n"
+                    _bg_prefix
                     + state["background_investigation_results"]
                     + "\n"
                 ),
@@ -104,7 +138,14 @@ async def planner_node(
     thinking_duration = time.time() - llm_start_time
     logger.debug(f"Current state messages: {state['messages']}")
     enhanced_logger.log_llm_thinking("planner", len(str(messages)), len(full_response), thinking_duration)
-    # logger.info(f"Planner response: {full_response}")
+    # ===== LLM 输出日志 =====
+    _response_preview = full_response[:500] if len(full_response) > 500 else full_response
+    enhanced_logger.logger.info(
+        f"📤 PLANNER_LLM_OUTPUT | "
+        f"响应长度={len(full_response)} | "
+        f"耗时={thinking_duration:.2f}s | "
+        f"内容预览: {_response_preview}"
+    )
 
     try:
         curr_plan = json.loads(repair_json_output(full_response))

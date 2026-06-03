@@ -996,6 +996,19 @@ async def _astream_workflow_generator(
 
     checkpoint_saver = get_bool_env("LANGGRAPH_CHECKPOINT_SAVER", False)
     checkpoint_url = get_str_env("LANGGRAPH_CHECKPOINT_DB_URL", "")
+
+    # ===== 工作流启动日志：帮助排查 thread_id 复用导致 state 残留问题 =====
+    _wf_input_type = type(workflow_input).__name__
+    _wf_plan = "N/A"
+    if isinstance(workflow_input, dict):
+        _wf_plan = str(workflow_input.get("current_plan", "None"))[:50]
+    logger.info(
+        f"🚀 WORKFLOW_START | thread_id={thread_id} | "
+        f"checkpoint_saver={checkpoint_saver} | "
+        f"input_type={_wf_input_type} | "
+        f"current_plan_in_input={_wf_plan} | "
+        f"research_topic={workflow_input.get('research_topic', 'N/A')[:80] if isinstance(workflow_input, dict) else 'Command'}"
+    )
     # 注：新版 langgraph-checkpoint-postgres 的 from_conn_string() 不再接受
     # psycopg 级别的 kwargs（如 autocommit / row_factory / prepare_threshold），
     # 内部已自动启用 autocommit=True。如需自定义连接参数，
