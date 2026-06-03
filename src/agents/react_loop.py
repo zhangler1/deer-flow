@@ -343,8 +343,16 @@ class ReactLoop:
         
         # 最内层：实际的工具调用
         async def core_tool_call(t_name: str, t_args: dict, t_call_id: str) -> ToolMessage:
+            t_start = time.time()
             if t_name in tools_map:
                 result = await tools_map[t_name].ainvoke(t_args)
+            t_duration = time.time() - t_start
+
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    f"TOOL_DURATION | {t_name} | "
+                    f"耗时={t_duration:.4f}s | call_id={t_call_id}"
+                )
             else:
                 logger.warning(f"⚠️ 未知工具: {t_name}")
                 result = f"错误: 未知工具 '{t_name}'，可用工具: {list(tools_map.keys())}"
@@ -397,14 +405,28 @@ class ReactLoop:
             
         try:
             # 使用不绑定工具的模型，确保 LLM 只能输出文本
+            force_start = time.time()
             final_response = None
+            total_content_length = 0
             async for chunk in self.raw_model.astream(messages):
                 if final_response is None:
                     final_response = chunk
                 else:
                     final_response = final_response + chunk
+                if hasattr(chunk, 'content') and chunk.content:
+                    total_content_length += len(str(chunk.content))
             messages.append(final_response)
-            logger.info(f"✅ ReactLoop 强制总结完成 | 响应长度: {len(final_response.content or '')}")
+            force_duration = time.time() - force_start
+            logger.info(f"✅ ReactLoop 强制总结完成 | 响应长度: {len(final_response.content or '')} | 耗时: {force_duration:.2f}s")
+
+            if logger.isEnabledFor(logging.DEBUG):
+                from src.utils.text_utils import estimate_token_count
+                logger.debug(
+                    f"FORCE_FINAL_DURATION | "
+                    f"耗时={force_duration:.2f}s | "
+                    f"输出chars={total_content_length} | "
+                    f"输出tokens={estimate_token_count(str(total_content_length))}"
+                )
         except Exception as e:
             logger.error(f"❌ ReactLoop 强制总结失败: {e}")
             # 兆底：构造一个最小响应

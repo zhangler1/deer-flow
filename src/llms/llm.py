@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+import logging
 import os
 import time
 from pathlib import Path
@@ -79,7 +80,68 @@ class EnhancedLLMWrapper:
                 duration = time.time() - start_time
                 self.enhanced_logger.logger.error(f"❌ LLM_INVOKE_ERROR | {self.llm_type} | 思考失败: {str(e)} | 耗时: {duration:.2f}s")
                 raise
-            
+
+    async def ainvoke(self, messages, **kwargs):
+        """异步 invoke，用于 planner 等节点调用 llm.ainvoke() 时不会绕过 wrapper 日志"""
+        import asyncio
+        from httpx import RemoteProtocolError, ConnectError, TimeoutException  # type: ignore
+
+        max_retries = 2
+        retry_delay = 2.0
+
+        for attempt in range(max_retries + 1):
+            start_time = time.time()
+            char_len, token_est = get_messages_context_stats(messages)
+
+            if attempt == 0:
+                self.enhanced_logger.logger.info(f"🤖 LLM_AINVOKE | {self.llm_type} | 开始异步思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
+            else:
+                self.enhanced_logger.logger.warning(f"🔄 LLM_AINVOKE_RETRY | {self.llm_type} | 第 {attempt} 次重试 | 上下文长度: chars={char_len} | tokens≈{token_est}")
+
+            try:
+                result = await self.llm.ainvoke(messages, **kwargs)
+                duration = time.time() - start_time
+                response_length = len(str(result.content)) if hasattr(result, 'content') else 0
+
+                self.enhanced_logger.log_llm_thinking(self.llm_type, char_len, response_length, duration)
+
+                if self.enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+                    from src.utils.text_utils import estimate_token_count
+                    char_len_out, token_est_out = get_messages_context_stats(str(result.content) if hasattr(result, 'content') else str(result))
+                    self.enhanced_logger.logger.debug(
+                        f"LLM_DURATION | {self.llm_type} | "
+                        f"异步invoke耗时={duration:.2f}s | "
+                        f"输出chars={response_length} | "
+                        f"输出tokens={token_est_out}"
+                    )
+
+                if hasattr(result, 'response_metadata'):
+                    usage = result.response_metadata.get('usage', {})
+                    if usage:
+                        self.enhanced_logger.logger.debug(f"🤖 LLM_USAGE | {self.llm_type} | token使用: {usage}")
+
+                return result
+
+            except (RemoteProtocolError, ConnectError, TimeoutException) as e:
+                duration = time.time() - start_time
+                is_last_attempt = (attempt == max_retries)
+
+                if is_last_attempt:
+                    self.enhanced_logger.logger.error(
+                        f"❌ LLM_AINVOKE_ERROR | {self.llm_type} | 网络错误（已达最大重试次数）: {str(e)} | 耗时: {duration:.2f}s"
+                    )
+                    raise
+                else:
+                    self.enhanced_logger.logger.warning(
+                        f"⚠️  LLM_AINVOKE_NETWORK_ERROR | {self.llm_type} | 网络错误，将在 {retry_delay}s 后重试: {str(e)}"
+                    )
+                    await asyncio.sleep(retry_delay * (attempt + 1))
+
+            except Exception as e:
+                duration = time.time() - start_time
+                self.enhanced_logger.logger.error(f"❌ LLM_AINVOKE_ERROR | {self.llm_type} | 异步思考失败: {str(e)} | 耗时: {duration:.2f}s")
+                raise
+
     def stream(self, messages, **kwargs):
         """记录并执行流式LLM调用，带有自动重试机制"""
         from httpx import RemoteProtocolError, ConnectError, TimeoutException  # type: ignore
@@ -125,7 +187,65 @@ class EnhancedLLMWrapper:
                 duration = time.time() - start_time
                 self.enhanced_logger.logger.error(f"❌ LLM_STREAM_ERROR | {self.llm_type} | 流式思考失败: {str(e)} | 耗时: {duration:.2f}s")
                 raise
-            
+
+    async def astream(self, messages, **kwargs):
+        """异步流式调用，包含计时和DEBUG日志"""
+        import asyncio
+        from httpx import RemoteProtocolError, ConnectError, TimeoutException  # type: ignore
+
+        max_retries = 2
+        retry_delay = 2.0
+
+        for attempt in range(max_retries + 1):
+            start_time = time.time()
+            char_len, token_est = get_messages_context_stats(messages)
+
+            if attempt == 0:
+                self.enhanced_logger.logger.info(f"🤖 LLM_ASTREAM | {self.llm_type} | 开始异步思考 | 上下文长度: chars={char_len} | tokens={token_est}")
+            else:
+                self.enhanced_logger.logger.warning(f"🔄 LLM_ASTREAM_RETRY | {self.llm_type} | 第 {attempt} 次重试 | 上下文长度: chars={char_len} | tokens={token_est}")
+
+            total_content_length = 0
+            try:
+                async for chunk in self.llm.astream(messages, **kwargs):
+                    if hasattr(chunk, 'content') and chunk.content:
+                        total_content_length += len(str(chunk.content))
+                    yield chunk
+
+                duration = time.time() - start_time
+                self.enhanced_logger.logger.info(f"🤖 LLM_ASTREAM_DONE | {self.llm_type} | 异步思考完成 | 输出长度: {total_content_length} | 耗时: {duration:.2f}s")
+
+                # DEBUG: 调用耗时 + 输出 token/字符数
+                if self.enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+                    from src.utils.text_utils import estimate_token_count
+                    self.enhanced_logger.logger.debug(
+                        f"LLM_DURATION | {self.llm_type} | "
+                        f"异步调用耗时={duration:.2f}s | "
+                        f"输出chars={total_content_length} | "
+                        f"输出tokens={total_content_length/3}"
+                    )
+                return
+
+            except (RemoteProtocolError, ConnectError, TimeoutException) as e:
+                duration = time.time() - start_time
+                is_last_attempt = (attempt == max_retries)
+
+                if is_last_attempt:
+                    self.enhanced_logger.logger.error(
+                        f"❌ LLM_ASTREAM_ERROR | {self.llm_type} | 网络错误（已达最大重试次数）: {str(e)} | 耗时: {duration:.2f}s"
+                    )
+                    raise
+                else:
+                    self.enhanced_logger.logger.warning(
+                        f"⚠️  LLM_ASTREAM_NETWORK_ERROR | {self.llm_type} | 网络错误，将在 {retry_delay}s 后重试: {str(e)}"
+                    )
+                    await asyncio.sleep(retry_delay * (attempt + 1))
+
+            except Exception as e:
+                duration = time.time() - start_time
+                self.enhanced_logger.logger.error(f"❌ LLM_ASTREAM_ERROR | {self.llm_type} | 异步流式思考失败: {str(e)} | 耗时: {duration:.2f}s")
+                raise
+
     def with_structured_output(self, *args, **kwargs):
         """包装结构化输出方法"""
         structured_llm = self.llm.with_structured_output(*args, **kwargs)
@@ -177,6 +297,35 @@ class EnhancedStructuredLLMWrapper:
             self.enhanced_logger.logger.error(f"❌ LLM_STRUCTURED_ERROR | {self.llm_type} | 结构化思考失败: {str(e)} | 耗时: {duration:.2f}s")
             raise
             
+    async def astream(self, messages, **kwargs):
+        start_time = time.time()
+        char_len, token_est = get_messages_context_stats(messages)
+
+        self.enhanced_logger.logger.info(f"🤖 LLM_STRUCTURED_ASTREAM | {self.llm_type} | 开始结构化异步思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
+
+        total_content_length = 0
+        try:
+            async for chunk in self.structured_llm.astream(messages, **kwargs):
+                if hasattr(chunk, 'content') and chunk.content:
+                    total_content_length += len(str(chunk.content))
+                yield chunk
+
+            duration = time.time() - start_time
+
+            if self.enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+                from src.utils.text_utils import estimate_token_count
+                self.enhanced_logger.logger.debug(
+                    f"LLM_DURATION | {self.llm_type} | "
+                    f"结构化异步调用耗时={duration:.2f}s | "
+                    f"输出chars={total_content_length} | "
+                    f"输出tokens={total_content_length/3:.0f}"
+                )
+
+        except Exception as e:
+            duration = time.time() - start_time
+            self.enhanced_logger.logger.error(f"❌ LLM_STRUCTURED_ASTREAM_ERROR | {self.llm_type} | 结构化异步思考失败: {str(e)} | 耗时: {duration:.2f}s")
+            raise
+
     def _calculate_prompt_length(self, messages):
         if isinstance(messages, list):
             return sum(len(str(msg)) for msg in messages)
@@ -221,6 +370,44 @@ class EnhancedToolBoundLLMWrapper:
             self.enhanced_logger.logger.error(f"❌ LLM_TOOLS_ERROR | {self.llm_type} | 工具思考失败: {str(e)} | 耗时: {duration:.2f}s")
             raise
             
+    async def astream(self, messages, **kwargs):
+        start_time = time.time()
+        char_len, token_est = get_messages_context_stats(messages)
+
+        self.enhanced_logger.logger.info(f"🤖 LLM_TOOLS_ASTREAM | {self.llm_type} | 开始工具异步思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
+
+        full_response = None
+        total_content_length = 0
+        try:
+            async for chunk in self.tool_bound_llm.astream(messages, **kwargs):
+                if full_response is None:
+                    full_response = chunk
+                else:
+                    full_response = full_response + chunk
+                if hasattr(chunk, 'content') and chunk.content:
+                    total_content_length += len(str(chunk.content))
+                yield chunk
+
+            duration = time.time() - start_time
+
+            tool_calls = getattr(full_response, 'tool_calls', [])
+            tool_count = len(tool_calls) if tool_calls else 0
+
+            if self.enhanced_logger.logger.isEnabledFor(logging.DEBUG):
+                from src.utils.text_utils import estimate_token_count
+                self.enhanced_logger.logger.debug(
+                    f"LLM_DURATION | {self.llm_type} | "
+                    f"工具异步调用耗时={duration:.2f}s | "
+                    f"输出chars={total_content_length} | "
+                    f"输出tokens={total_content_length/3:.0f} | "
+                    f"工具数={tool_count}"
+                )
+
+        except Exception as e:
+            duration = time.time() - start_time
+            self.enhanced_logger.logger.error(f"❌ LLM_TOOLS_ASTREAM_ERROR | {self.llm_type} | 工具异步思考失败: {str(e)} | 耗时: {duration:.2f}s")
+            raise
+
     def _calculate_prompt_length(self, messages):
         if isinstance(messages, list):
             return sum(len(str(msg)) for msg in messages)
@@ -461,10 +648,10 @@ def get_llm_by_type(llm_type: LLMType, reporter_model_key: str | None = None) ->
 
         conf = load_yaml_config(_get_config_file_path())
         llm = _create_llm_use_conf(llm_type, conf)
-        _llm_cache[llm_type] = llm
-        
+
         # 包装LLM以添加日志功能
         wrapped_llm = EnhancedLLMWrapper(llm, llm_type)
+        _llm_cache[llm_type] = wrapped_llm  # 缓存包装后的实例，避免后续调用返回裸模型
         
         duration = time.time() - start_time
         return wrapped_llm

@@ -178,6 +178,9 @@ class EnhancedLogger:
             enable_colors: 是否启用彩色输出（仅控制台）
             log_file: 日志文件路径，如果为None则不输出到文件
         """
+        # 幂等：清除已有 handler，避免重复配置（运行时自动注册可能多次触发）
+        self.logger.handlers.clear()
+
         # 设置控制台输出
         console_handler = logging.StreamHandler()
 
@@ -333,28 +336,43 @@ class EnhancedLogger:
 # 全局日志记录器实例
 _enhanced_loggers = {}
 
+# 日志系统初始化是否已完成（标记位，用于运行时自动注册新 logger）
+_setup_complete = False
+
+
 def get_enhanced_logger(name: str) -> EnhancedLogger:
     """获取增强日志记录器实例"""
     if name not in _enhanced_loggers:
         _enhanced_loggers[name] = EnhancedLogger(name)
+        # 如果日志系统已初始化完成，为新 logger 自动注册全局配置
+        if _setup_complete:
+            _enhanced_loggers[name].setup_enhanced_logging(
+                level=CURRENT_LOG_LEVEL,
+                enable_colors=True,
+                log_file=os.getenv('LOG_FILE'),
+            )
     return _enhanced_loggers[name]
 
 
 def setup_enhanced_logging(level=logging.INFO, enable_colors=True, log_file=None):
     """全局设置增强日志
-    
+
     Args:
         level: 日志级别
         enable_colors: 是否启用彩色输出（仅控制台）
         log_file: 日志文件路径，如果为None则不输出到文件
                  可以从环境变量LOG_FILE读取
     """
+    global _setup_complete
+
     # 如果没有指定log_file，尝试从环境变量读取
     if log_file is None:
         log_file = os.getenv('LOG_FILE')
-    
+
     for logger in _enhanced_loggers.values():
         logger.setup_enhanced_logging(level, enable_colors, log_file)
+
+    _setup_complete = True
 
 
 @contextmanager

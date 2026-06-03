@@ -55,22 +55,11 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
     else:
         llm = get_llm_by_type(AGENT_LLM_MAP[agent_type])
 
-    # 解包LLM包装器以获取原始LLM对象
-    raw_llm = llm
-
-    # 安全检测并提取原始LLM对象
-    if hasattr(llm, '__class__') and hasattr(llm, 'llm'):
-        class_name = llm.__class__.__name__
-        if 'EnhancedLLMWrapper' in class_name:
-            raw_llm = getattr(llm, 'llm', llm)
-            logger.debug(f"🔄 LLM_UNWRAP | 从EnhancedLLMWrapper中提取原始LLM")
-        elif 'EnhancedToolBoundLLMWrapper' in class_name:
-            raw_llm = getattr(llm, 'tool_bound_llm', llm)
-            logger.debug(f"🔄 LLM_UNWRAP | 从EnhancedToolBoundLLMWrapper中提取原始LLM")
-
-    # 确保raw_llm是BaseChatModel类型
-    chat_model = cast(BaseChatModel, raw_llm)
-    logger.info(f"🤖 LLM_MODEL | 使用模型: {getattr(chat_model, 'model_name', 'unknown')}")
+    # 保持 EnhancedLLMWrapper 包装，确保 bind_tools() → EnhancedToolBoundLLMWrapper → astream() 日志系统生效
+    chat_model = cast(BaseChatModel, llm)
+    llm_type_label = getattr(llm, 'llm_type', 'unknown')
+    inner_model = getattr(llm, 'llm', llm)
+    logger.info(f"🤖 LLM_MODEL | 使用模型: {getattr(inner_model, 'model_name', 'unknown')} | llm_type: {llm_type_label}")
 
     # === 从统一配置加载（对齐 DeerFlow 2.0） ===
     cfg = get_react_loop_config()

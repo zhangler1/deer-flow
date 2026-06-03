@@ -69,13 +69,13 @@ from src.server.rag_request import (
 from src.tools import VolcengineTTS
 from src.graph.checkpoint import chat_stream_message
 from src.utils.json_utils import sanitize_args
-from src.utils.enhanced_logger import get_enhanced_logger, setup_enhanced_logging, current_thread_id
+from src.utils.enhanced_logger import get_enhanced_logger, get_log_level_from_env, setup_enhanced_logging, current_thread_id
 
 logger = logging.getLogger(__name__)
 
 # 初始化增强日志系统，支持从环境变量LOG_FILE读取日志文件路径
 log_file = os.getenv('LOG_FILE')  # 例如: logs/deer-flow.log
-setup_enhanced_logging(level=logging.INFO, enable_colors=True, log_file=log_file)
+setup_enhanced_logging(level=get_log_level_from_env(), enable_colors=True, log_file=log_file)
 enhanced_logger = get_enhanced_logger("deer-flow.api")
 
 # 加载工具结果压缩配置
