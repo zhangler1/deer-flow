@@ -112,6 +112,19 @@ def apply_prompt_template(
         pass  # If skills system fails, continue without skills
     state_vars["skills_section"] = skills_section
 
+    # Inject citation rules (统一从 rules_loader 加载)
+    try:
+        from src.prompts.rules_loader import REPORTER_RULES, REPORTER_REMINDER, RESEARCHER_RULES, RESEARCHER_REMINDER
+        state_vars["reporter_ref_rules"] = REPORTER_RULES
+        state_vars["reporter_ref_reminder"] = REPORTER_REMINDER
+        state_vars["researcher_ref_rules"] = RESEARCHER_RULES
+        state_vars["researcher_ref_reminder"] = RESEARCHER_REMINDER
+    except Exception:
+        state_vars["reporter_ref_rules"] = ""
+        state_vars["reporter_ref_reminder"] = ""
+        state_vars["researcher_ref_rules"] = ""
+        state_vars["researcher_ref_reminder"] = ""
+
     # Get the appropriate environment based on report style
     prompt_env = _get_prompt_env(report_style)
 

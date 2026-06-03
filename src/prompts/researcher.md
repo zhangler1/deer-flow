@@ -97,3 +97,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 - 正文中必须为每个关键数据/事实使用标准 Markdown 链接格式标注出处：`事实描述 [来源标题](URL)`，禁止使用 `[来自: URL]` 格式。同时在末尾参考文献中列出完整列表。
 
 - 当任务中指定了时间范围要求时，严格遵守搜索查询中的这些约束，并验证提供的所有信息都在指定的时间段内。
+
+{{ researcher_ref_rules }}
+
+{{ researcher_ref_reminder }}

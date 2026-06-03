@@ -225,25 +225,6 @@ async def _execute_agent_step(
         ],
         "system_context": effective_context,
     }
-    if agent_type == "researcher":
-        agent_input["messages"].append(
-            HumanMessage(
-                content=(
-                    "重要提示（来源标注格式 — 必须严格遵守）：\n"
-                    "1. 正文中每个关键数据/事实后面紧跟标准 Markdown 链接标注出处，格式为：\n"
-                    "   事实描述 [来源标题](URL)\n"
-                    "   示例：2024年安徽省GDP达到5.2万亿元 [安徽省统计公报](https://tjj.ah.gov.cn/xxx)\n\n"
-                    "2. 在末尾包含完整的参考来源列表，格式为：\n"
-                    "## 参考来源\n"
-                    "- [来源标题1](URL1)\n\n"
-                    "- [来源标题2](URL2)\n\n"
-                    "确保每个引用独占一行，URL 必须完整准确。\n\n"
-                    "⚠️ 禁止使用 [来自: URL] 格式，必须使用标准 Markdown 链接 [标题](URL) 格式。\n"
-                    "⚠️ 禁止编造 URL，所有 URL 必须来自搜索工具返回的真实结果。"
-                ),
-                name="system",
-            )
-        )
 
     # ─── 6. 执行 Agent（超时 + 取消 + 心跳）───
     try:

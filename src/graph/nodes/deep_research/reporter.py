@@ -178,9 +178,7 @@ async def reporter_node(state: State, config: RunnableConfig):
                 f"4. 调研说明（可选）- 用于更全面的报告\n"
                 f"5. 参考资料 - 在末尾列出所有参考文献\n\n"
                 f"优先使用MARKDOWN表格进行数据展示和对比。在展示对比数据、统计信息、功能或选项时使用表格。\n\n"
-                f"**请用{state.get('locale', 'zh-CN')}语言编写报告，并充分引用下面的研究结果。**\n\n"
-                f"**引用格式要求：正文中每个数据/事实的句子末尾必须标注来源，格式为 [(N)](URL)，"
-                f"其中 N 和 URL 必须来自后面提供的「全局来源索引」。**"
+                f"**请用{state.get('locale', 'zh-CN')}语言编写报告，并充分引用下面的研究结果。**"
             ),
             name="system"
         )
@@ -208,15 +206,8 @@ async def reporter_node(state: State, config: RunnableConfig):
             HumanMessage(
                 content=(
                     f"# 全局来源索引（共 {min(len(ref_map), max_sources)} 条，已去重）\n\n"
-                    f"以下是你可以引用的所有来源，请严格使用 [(序号)](URL) 格式引用：\n\n"
-                    f"{ref_index_text}\n\n"
-                    f"---\n\n"
-                    f"**重要规则（必须严格遵守）**：\n"
-                    f"- 正文中引用格式：[(1)](对应的URL)\n"
-                    f"- 序号必须与上述索引一致\n"
-                    f"- 只能引用索引中存在的 URL，禁止编造或修改 URL\n"
-                    f"- 同一来源可多次引用，使用相同序号和 URL\n"
-                    f"- 末尾「参考资料」章节格式：[N] [来源标题](URL)"
+                    f"以下是你**唯一可以引用**的来源列表。请严格使用 [(序号)](URL) 格式引用：\n\n"
+                    f"{ref_index_text}"
                 ),
                 name="reference_index",
             )
