@@ -43,3 +43,5 @@ openspec/
 *.doc
 
 skills/
+.env
+*.patch
