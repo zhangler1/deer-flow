@@ -152,21 +152,13 @@ async def coordinator_node(
     enhanced_logger.logger.info(f"📊 COORDINATOR_STATE | research_topic: {state.get('research_topic', 'Not set')}")
     
     try:
-        # coordinator 使用文档摘要（同 researcher 逻辑），让协调节点了解文档背景
+        # coordinator 通过模板变量 document_summary 直接渲染文档段落（模板注入优先于代码注入）
         coord_state = dict(state) if not isinstance(state, dict) else state.copy()
         doc_summary = coord_state.get("document_summary", "")
         enhanced_logger.logger.info(
             f"📄 COORDINATOR_DOC_DEBUG | document_summary 长度: {len(doc_summary)} | "
             f"document_summary 前100字: {doc_summary[:100] if doc_summary else '(空)'}"
         )
-        if doc_summary:
-            base_ctx = coord_state.get("system_context", "")
-            if base_ctx:
-                base_ctx += "\n\n"
-            coord_state["system_context"] = base_ctx + f"以下是用户上传文档的摘要，请在协调时参考：\n\n{doc_summary}"
-            enhanced_logger.logger.info(f"📄 COORDINATOR_DOC_DEBUG | 文档摘要已注入 system_context")
-        else:
-            enhanced_logger.logger.info(f"📄 COORDINATOR_DOC_DEBUG | 无文档摘要，跳过注入")
 
         messages = apply_prompt_template("coordinator", coord_state, configurable)
         enhanced_logger.logger.info(f"📝 COORDINATOR_PROMPT | 提示模板应用成功 | 消息数: {len(messages)}")
