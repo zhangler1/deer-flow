@@ -636,6 +636,9 @@ async def _stream_graph_events(
     # 前端 mergeMessage 用 += 拼接，如果不去重会导致内容翻倍
     _streamed_message_ids: set = set()
 
+    # 追踪 reporter 流式消息 ID，用于 normalize_citations 后替换前端内容
+    _reporter_message_id: str | None = None
+
     try:
         # 使用显式异步迭代 + 超时心跳机制
         stream_iterator = graph_instance.astream(
@@ -761,6 +764,22 @@ async def _stream_graph_events(
                             yield _make_event("tool_call_result", _tool_event)
                     break
 
+                # 6) Reporter 引用修正：当 reporter 节点完成后，发送修正后的完整报告替换前端流式内容
+                # normalize_citations 在 reporter_node 内部执行，结果存入 final_report
+                # 但前端已经显示了未修正的原始 LLM 流式输出，需要用最终版本替换
+                for _node_name_rpt, _node_update_rpt in event_data.items():
+                    if not isinstance(_node_update_rpt, dict):
+                        continue
+                    _final_report = _node_update_rpt.get("final_report")
+                    if _final_report and _reporter_message_id:
+                        logger.info(f"[REPORT_FINALIZED] thread_id={thread_id} | msg_id={_reporter_message_id} | report_len={len(_final_report)}")
+                        yield _make_event("report_finalized", {
+                            "thread_id": thread_id,
+                            "id": _reporter_message_id,
+                            "content": _final_report,
+                        })
+                        break
+
                 # 其他 update 目前不需要转成事件，直接忽略
                 continue
 
@@ -790,6 +809,11 @@ async def _stream_graph_events(
             # 从缓存的 plan steps 和 State 中的 current_step_index 推算
             _msg_node = message_metadata.get("langgraph_node", "") if isinstance(message_metadata, dict) else ""
             _is_researcher = agent_name == "researcher" or _msg_node == "researcher"
+
+            # 追踪 reporter 消息 ID，用于后续 report_finalized 事件
+            _is_reporter = agent_name == "reporter" or _msg_node == "reporter"
+            if _is_reporter and isinstance(message_chunk, AIMessageChunk) and msg_id:
+                _reporter_message_id = msg_id
             if _is_researcher and _step_index < 0 and _cached_plan_steps:
                 _step_index = 0
                 if not _step_title and len(_cached_plan_steps) > 0:

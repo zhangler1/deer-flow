@@ -121,6 +121,15 @@ export interface ErrorEvent {
   };
 }
 
+export interface ReportFinalizedEvent {
+  type: "report_finalized";
+  data: {
+    thread_id: string;
+    id: string;
+    content: string;
+  };
+}
+
 export type ChatEvent =
   | MessageChunkEvent
   | ToolCallsEvent
@@ -130,4 +139,5 @@ export type ChatEvent =
   | SearchStatusEvent
   | NodeTransitionEvent
   | PingEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | ReportFinalizedEvent;
