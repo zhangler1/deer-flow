@@ -35,24 +35,55 @@ enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.reporter')
 def build_reference_index(observations: list[str]) -> tuple[str, dict]:
     """从所有 observations 中提取 URL，构建全局来源索引。
 
+    采用多层正则回退策略，确保即使模型输出格式不完全标准，也能尽可能提取来源：
+      - 模式 1（主）：标准 Markdown 链接 [title](URL)
+      - 模式 2（回退）：[来自: URL] 格式（旧版 researcher 可能输出）
+      - 模式 3（兜底）：裸 URL 提取（http/https 开头的完整链接）
+
     Args:
         observations: Researcher 步骤的输出结果列表
 
     Returns:
         tuple: (格式化的索引文本, {url: {"index": N, "title": title}} 映射字典)
     """
-    url_pattern = r'\[([^\]]+)\]\((https?://[^\)]+)\)'
+    # 模式 1：标准 Markdown 链接 [title](URL)
+    md_link_pattern = r'\[([^\]]+)\]\((https?://[^\)]+)\)'
+    # 模式 2：[来自: URL] 格式（兼容旧版输出）
+    from_pattern = r'\[来自:\s*(https?://[^\]\s]+)\]'
+    # 模式 3：裸 URL（兜底，排除已被 Markdown 链接包裹的 URL）
+    bare_url_pattern = r'(?<!\()(https?://[^\s\)\]<>"]+)(?!\))'
+
     seen_urls: dict[str, dict] = {}  # url -> {"index": N, "title": title}
     index = 1
 
     for obs in observations:
-        for match in re.finditer(url_pattern, obs):
+        # 第一遍：提取标准 Markdown 链接
+        for match in re.finditer(md_link_pattern, obs):
             title, url = match.group(1), match.group(2)
-            # 跳过图片链接（通常以 ![...](url) 格式出现，但正则不匹配 !）
             # 跳过空标题
             if not title.strip():
                 continue
+            # 跳过 "来自" 开头的标题（这类标题信息量低，尝试从 URL 推断更好的标题）
+            clean_title = title.strip()
+            if clean_title.startswith("来自"):
+                clean_title = _extract_domain_title(url)
             if url not in seen_urls:
+                seen_urls[url] = {"index": index, "title": clean_title}
+                index += 1
+
+        # 第二遍：提取 [来自: URL] 格式（仅提取未被模式1覆盖的）
+        for match in re.finditer(from_pattern, obs):
+            url = match.group(1).rstrip('.,;，。；')
+            if url not in seen_urls:
+                title = _extract_domain_title(url)
+                seen_urls[url] = {"index": index, "title": title}
+                index += 1
+
+        # 第三遍（兜底）：提取裸 URL（仅当前两种模式都未捕获时）
+        for match in re.finditer(bare_url_pattern, obs):
+            url = match.group(1).rstrip('.,;，。；')
+            if url not in seen_urls:
+                title = _extract_domain_title(url)
                 seen_urls[url] = {"index": index, "title": title}
                 index += 1
 
@@ -70,6 +101,25 @@ def build_reference_index(observations: list[str]) -> tuple[str, dict]:
     logger.info(f"{'='*60}")
 
     return index_text, seen_urls
+
+
+def _extract_domain_title(url: str) -> str:
+    """从 URL 中提取可读的域名标题作为来源名称的回退方案。
+
+    示例:
+        https://www.stats.gov.cn/data/xxx -> stats.gov.cn
+        https://pbc.gov.cn/report/2024 -> pbc.gov.cn
+    """
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        domain = parsed.netloc or parsed.path.split('/')[0]
+        # 移除 www. 前缀
+        if domain.startswith("www."):
+            domain = domain[4:]
+        return domain if domain else "未知来源"
+    except Exception:
+        return "未知来源"
 
 
 async def reporter_node(state: State, config: RunnableConfig):
