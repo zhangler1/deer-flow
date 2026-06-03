@@ -122,6 +122,98 @@ def _extract_domain_title(url: str) -> str:
         return "未知来源"
 
 
+def normalize_citations(content: str, ref_map: dict) -> str:
+    """后处理：将模型输出中各种变体引用格式统一修正为 [(N)](URL)。
+
+    模型常见的错误格式：
+      - [1]、[2] — 纯方括号数字（最常见）
+      - 【1】、【2】 — 中文方括号
+      - [^1]、[^2] — 脚注格式
+      - [[1]]、[[2]] — 双方括号
+    
+    本函数利用已构建的 ref_map 回填正确的 URL 链接。
+    仅修正那些 **不在** 已有 [(N)](URL) 格式中的裸引用。
+
+    Args:
+        content: 模型生成的原始报告文本
+        ref_map: build_reference_index 返回的 {url: {"index": N, "title": title}} 映射
+
+    Returns:
+        修正后的报告文本
+    """
+    if not ref_map:
+        return content
+
+    # 构建反向索引：index_number -> url
+    index_to_url: dict[int, str] = {}
+    for url, info in ref_map.items():
+        idx = info.get("index")
+        if idx is not None:
+            index_to_url[int(idx)] = url
+
+    if not index_to_url:
+        return content
+
+    # 记录修正统计
+    fix_count = 0
+
+    # ── 修正模式 1：[N] 但不是 [(N)](URL) 的一部分 ──
+    # 负向前瞻/后顾确保不匹配已正确的 [(N)](...)
+    # 匹配 [数字] 但排除前面是 ( 的情况（即 [(N)] 已经是正确格式的一部分）
+    def _replace_bracket(m: re.Match) -> str:
+        nonlocal fix_count
+        # 检查前面字符 —— 如果紧跟 '(' 说明可能是 [(N)](URL) 的一部分
+        start = m.start()
+        if start > 0 and content[start - 1] == '(':
+            return m.group(0)  # 不动
+        # 检查前面字符 —— 如果是 '\' 说明是 markdown 转义的 \[N]（参考资料区）
+        if start > 0 and content[start - 1] == '\\':
+            return m.group(0)  # 不动
+        # 检查后面是否紧跟 (URL) —— 如果是，说明格式已经正确
+        end = m.end()
+        if end < len(content) and content[end] == '(':
+            return m.group(0)  # 不动
+
+        n = int(m.group(1))
+        url = index_to_url.get(n)
+        if url:
+            fix_count += 1
+            return f"[({n})]({url})"
+        return m.group(0)  # 索引不在 ref_map 中，保持原样
+
+    # [数字] 或 [^数字] 模式
+    content = re.sub(r'\[\^?(\d+)\]', _replace_bracket, content)
+
+    # ── 修正模式 2：【N】中文方括号 ──
+    def _replace_cn_bracket(m: re.Match) -> str:
+        nonlocal fix_count
+        n = int(m.group(1))
+        url = index_to_url.get(n)
+        if url:
+            fix_count += 1
+            return f"[({n})]({url})"
+        return m.group(0)
+
+    content = re.sub(r'【(\d+)】', _replace_cn_bracket, content)
+
+    # ── 修正模式 3：[[N]] 双方括号 ──
+    def _replace_double_bracket(m: re.Match) -> str:
+        nonlocal fix_count
+        n = int(m.group(1))
+        url = index_to_url.get(n)
+        if url:
+            fix_count += 1
+            return f"[({n})]({url})"
+        return m.group(0)
+
+    content = re.sub(r'\[\[(\d+)\]\]', _replace_double_bracket, content)
+
+    if fix_count > 0:
+        logger.info(f"[normalize_citations] 修正了 {fix_count} 处引用格式")
+
+    return content
+
+
 async def reporter_node(state: State, config: RunnableConfig):
     """撰写最终报告的报告员节点"""
     start_time = time.time()
@@ -316,6 +408,10 @@ async def reporter_node(state: State, config: RunnableConfig):
 
     duration = time.time() - start_time
     enhanced_logger.logger.info(f"✅ NODE_EXIT | reporter | 节点执行完成 | 总耗时: {duration:.2f}s")
+
+    # 后处理：修正模型输出中的变体引用格式（[N] → [(N)](URL)）
+    if ref_map and response_content:
+        response_content = normalize_citations(response_content, ref_map)
 
     return {"final_report": response_content}
 
