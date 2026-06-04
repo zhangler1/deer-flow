@@ -110,9 +110,9 @@ class EnhancedLLMWrapper:
                     char_len_out, token_est_out = get_messages_context_stats(str(result.content) if hasattr(result, 'content') else str(result))
                     self.enhanced_logger.logger.debug(
                         f"LLM_DURATION | {self.llm_type} | "
-                        f"异步invoke耗时={duration:.2f}s | "
-                        f"输出chars={response_length} | "
-                        f"输出tokens={token_est_out}"
+                        f"耗时={duration:.2f}s | 调用方式=invoke | "
+                        f"输入chars={char_len} | 输入tokens={token_est} | "
+                        f"输出chars={response_length} | 输出tokens={token_est_out}"
                     )
 
                 if hasattr(result, 'response_metadata'):
@@ -206,23 +206,28 @@ class EnhancedLLMWrapper:
                 self.enhanced_logger.logger.warning(f"🔄 LLM_ASTREAM_RETRY | {self.llm_type} | 第 {attempt} 次重试 | 上下文长度: chars={char_len} | tokens={token_est}")
 
             total_content_length = 0
+            output_parts: list[str] = []
             try:
                 async for chunk in self.llm.astream(messages, **kwargs):
                     if hasattr(chunk, 'content') and chunk.content:
-                        total_content_length += len(str(chunk.content))
+                        chunk_text = str(chunk.content)
+                        total_content_length += len(chunk_text)
+                        output_parts.append(chunk_text)
                     yield chunk
 
                 duration = time.time() - start_time
                 self.enhanced_logger.logger.info(f"🤖 LLM_ASTREAM_DONE | {self.llm_type} | 异步思考完成 | 输出长度: {total_content_length} | 耗时: {duration:.2f}s")
 
-                # DEBUG: 调用耗时 + 输出 token/字符数
+                # DEBUG: 调用耗时 + 输入输出 token/字符数
                 if self.enhanced_logger.logger.isEnabledFor(logging.DEBUG):
                     from src.utils.text_utils import estimate_token_count
+                    output_text = "".join(output_parts)
+                    token_est_out = estimate_token_count(output_text)
                     self.enhanced_logger.logger.debug(
                         f"LLM_DURATION | {self.llm_type} | "
-                        f"异步调用耗时={duration:.2f}s | "
-                        f"输出chars={total_content_length} | "
-                        f"输出tokens={total_content_length/3}"
+                        f"耗时={duration:.2f}s | 调用方式=stream | "
+                        f"输入chars={char_len} | 输入tokens={token_est} | "
+                        f"输出chars={total_content_length} | 输出tokens={token_est_out}"
                     )
                 return
 
@@ -304,21 +309,26 @@ class EnhancedStructuredLLMWrapper:
         self.enhanced_logger.logger.info(f"🤖 LLM_STRUCTURED_ASTREAM | {self.llm_type} | 开始结构化异步思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
 
         total_content_length = 0
+        output_parts: list[str] = []
         try:
             async for chunk in self.structured_llm.astream(messages, **kwargs):
                 if hasattr(chunk, 'content') and chunk.content:
-                    total_content_length += len(str(chunk.content))
+                    chunk_text = str(chunk.content)
+                    total_content_length += len(chunk_text)
+                    output_parts.append(chunk_text)
                 yield chunk
 
             duration = time.time() - start_time
 
             if self.enhanced_logger.logger.isEnabledFor(logging.DEBUG):
                 from src.utils.text_utils import estimate_token_count
+                output_text = "".join(output_parts)
+                token_est_out = estimate_token_count(output_text)
                 self.enhanced_logger.logger.debug(
                     f"LLM_DURATION | {self.llm_type} | "
-                    f"结构化异步调用耗时={duration:.2f}s | "
-                    f"输出chars={total_content_length} | "
-                    f"输出tokens={total_content_length/3:.0f}"
+                    f"耗时={duration:.2f}s | 调用方式=json | "
+                    f"输入chars={char_len} | 输入tokens={token_est} | "
+                    f"输出chars={total_content_length} | 输出tokens={token_est_out}"
                 )
 
         except Exception as e:
@@ -395,11 +405,13 @@ class EnhancedToolBoundLLMWrapper:
 
             if self.enhanced_logger.logger.isEnabledFor(logging.DEBUG):
                 from src.utils.text_utils import estimate_token_count
+                output_text = str(full_response.content) if hasattr(full_response, 'content') and full_response.content else ""
+                token_est_out = estimate_token_count(output_text)
                 self.enhanced_logger.logger.debug(
                     f"LLM_DURATION | {self.llm_type} | "
-                    f"工具异步调用耗时={duration:.2f}s | "
-                    f"输出chars={total_content_length} | "
-                    f"输出tokens={total_content_length/3:.0f} | "
+                    f"耗时={duration:.2f}s | 调用方式=tools | "
+                    f"输入chars={char_len} | 输入tokens={token_est} | "
+                    f"输出chars={total_content_length} | 输出tokens={token_est_out} | "
                     f"工具数={tool_count}"
                 )
 
