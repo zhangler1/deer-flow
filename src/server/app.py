@@ -185,12 +185,31 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
     cancel_event = _cancel_registry.register(thread_id)
 
     async def _cancellable_stream():
-        """包装生成器，检测客户端断连并设置取消信号。"""
+        """包装生成器，检测客户端断连并设置取消信号。带15s心跳保活。"""
+        # 在请求 Task（Task A）的 context 中设置 thread_id，
+        # 后续所有 asyncio.create_task() 创建的子 Task 都会继承此上下文，
+        # 使得 enhanced_logger（基于 ContextVar）在所有日志中打印正确的 thread_id。
+        current_thread_id.set(thread_id)
         _event_count = 0
         _stream_start = time.time()
         _exit_reason = "normal"
+        HEARTBEAT_INTERVAL = 15  # 每15s发一次ping保活，防止中间代理空闲超时断连
+        _graph_task: asyncio.Task | None = None
+
+        async def _check_disconnect() -> bool:
+            """检查客户端是否已断开，断开则设置cancel_event并返回True"""
+            if await raw_request.is_disconnected():
+                enhanced_logger.logger.info(
+                    f"[CLIENT_DISCONNECTED] thread_id={thread_id} | "
+                    f"客户端已断连，停止推送 | 已发送事件数={_event_count}"
+                )
+                logger.info(f"[CLIENT_DISCONNECTED] thread_id={thread_id} | 客户端已断连，停止推送")
+                cancel_event.set()
+                return True
+            return False
+
         try:
-            async for event in _astream_workflow_generator(
+            graph_gen = _astream_workflow_generator(
                 request.model_dump()["messages"],
                 thread_id,
                 request.resources or [],
@@ -213,21 +232,52 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                 cancel_event=cancel_event,
                 reporter_model=request.reporter_model or "",
                 document_contexts=request.document_contexts or [],
-            ):
-                _event_count += 1
-                # 每发送一个 SSE 事件前检查客户端是否断连
-                if await raw_request.is_disconnected():
-                    enhanced_logger.logger.info(f"[CLIENT_DISCONNECTED] thread_id={thread_id} | 客户端已断连，停止推送 | 已发送事件数={_event_count}")
-                    logger.info(f"[CLIENT_DISCONNECTED] thread_id={thread_id} | 客户端已断连，停止推送")
-                    cancel_event.set()
-                    _exit_reason = "client_disconnected"
-                    break
-                if cancel_event.is_set():
-                    enhanced_logger.logger.info(f"[CANCEL_TRIGGERED] thread_id={thread_id} | cancel_event 已设置，停止推送 | 已发送事件数={_event_count}")
-                    logger.info(f"[CANCEL_TRIGGERED] thread_id={thread_id} | cancel_event 已设置，停止推送")
-                    _exit_reason = "cancel_triggered"
-                    break
-                yield event
+            )
+            generator = graph_gen.__aiter__()
+            _graph_task = asyncio.create_task(generator.__anext__())
+
+            while True:
+                heartbeat_task = asyncio.create_task(asyncio.sleep(HEARTBEAT_INTERVAL))
+                done, _ = await asyncio.wait(
+                    {_graph_task, heartbeat_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                heartbeat_task.cancel()
+
+                if _graph_task in done:
+                    # ── Graph 产生了一个事件 ──
+                    try:
+                        event = _graph_task.result()
+                    except StopAsyncIteration:
+                        # Graph 正常完成
+                        break
+
+                    _event_count += 1
+                    if await _check_disconnect():
+                        break
+                    if cancel_event.is_set():
+                        enhanced_logger.logger.info(
+                            f"[CANCEL_TRIGGERED] thread_id={thread_id} | "
+                            f"cancel_event 已设置，停止推送 | 已发送事件数={_event_count}"
+                        )
+                        logger.info(f"[CANCEL_TRIGGERED] thread_id={thread_id} | cancel_event 已设置，停止推送")
+                        _exit_reason = "cancel_triggered"
+                        break
+                    yield event
+
+                    # 预取下个事件
+                    _graph_task = asyncio.create_task(generator.__anext__())
+
+                else:
+                    # ── 心跳超时 → 发 ping 保活 ──
+                    if await _check_disconnect():
+                        break
+                    if cancel_event.is_set():
+                        _exit_reason = "cancel_triggered"
+                        break
+                    yield {"event": "ping"}
+                    # _graph_task 还在后台运行，继续等待
+
         except asyncio.CancelledError:
             _exit_reason = "cancelled"
             enhanced_logger.logger.warning(
@@ -239,12 +289,16 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
             _exit_reason = "generator_exit"
             raise  # GeneratorExit 必须重新抛出
         finally:
+            # 取消仍在运行的 graph_task（清理孤儿任务）
+            if _graph_task is not None and not _graph_task.done():
+                _graph_task.cancel()
             cancel_event.set()  # 确保无论如何都通知下游停止
             _cancel_registry.unregister(thread_id)
+            _stream_total = time.time() - _stream_start
             enhanced_logger.logger.info(
                 f"✅ STREAM_FINISHED | thread_id={thread_id} | "
                 f"reason={_exit_reason} | "
-                f"总耗时={time.time()-_stream_start:.2f}s | 总事件数={_event_count}"
+                f"总耗时={_stream_total:.2f}s | 总事件数={_event_count}"
             )
 
     return StreamingResponse(

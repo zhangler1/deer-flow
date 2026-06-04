@@ -252,6 +252,8 @@ async def _execute_agent_step(
             )
 
     heartbeat_task = None
+    agent_task = None
+    cancel_wait_task = None
     try:
         heartbeat_task = asyncio.create_task(_heartbeat())
         agent_task = asyncio.create_task(agent.ainvoke(input=agent_input, config={}))
@@ -298,6 +300,11 @@ async def _execute_agent_step(
             f"触发点=agent_exec | 耗时: {elapsed:.2f}s | "
             f"cancel_event_set={cancel_event.is_set() if cancel_event is not None else 'N/A'}"
         )
+        # 清理 agent_task 防止孤儿任务持续消耗资源
+        if agent_task is not None and not agent_task.done():
+            agent_task.cancel()
+        if cancel_wait_task is not None and not cancel_wait_task.done():
+            cancel_wait_task.cancel()
         raise  # 继续向上传播，由 _cancellable_stream 最终捕获
 
     except asyncio.TimeoutError:
