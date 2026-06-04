@@ -120,7 +120,7 @@ export function MessagesBlock({ className }: { className?: string }) {
         scrollRef={messageListRef}
       />
       {!isReplay ? (
-        <div className="relative flex h-42 shrink-0 pb-4 pl-4 pr-[26px]">
+        <div className="relative flex min-h-42 shrink-0 pb-4 pl-4 pr-[26px]">
           {!responding && messageCount === 0 && (
             <ConversationStarter
               className="absolute top-[-218px] left-4"

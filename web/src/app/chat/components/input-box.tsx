@@ -103,9 +103,6 @@ export function InputBox({
               documentContexts.length > 0 ? documentContexts : undefined,
           });
           onRemoveFeedback?.();
-          // Clear attachments after sending
-          attachmentRef.current?.clear();
-          setAttachments([]);
           // Clear enhancement animation after sending
           setIsEnhanceAnimating(false);
           // Immediately reset counter, avoid waiting for debounced onUpdate
@@ -183,7 +180,7 @@ export function InputBox({
   return (
     <div
       className={cn(
-        "bg-card relative flex h-full w-full flex-col rounded-[24px] border",
+        "bg-card relative flex w-full flex-col rounded-[24px] border",
         className,
       )}
       ref={containerRef}
@@ -192,6 +189,14 @@ export function InputBox({
       onDrop={handleDrop}
     >
       <UploadMask visible={isDragOver} />
+      {/* Attachment area - inside input box, top-left aligned */}
+      <AttachmentUpload
+        ref={attachmentRef}
+        maxFiles={5}
+        maxSizeMB={50}
+        disabled={responding}
+        onChange={setAttachments}
+      />
       <div className="w-full">
         <AnimatePresence>
           {feedback && (
@@ -271,13 +276,6 @@ export function InputBox({
           onEnter={handleSendMessage}
           onChange={setCurrentPrompt}
           maxLength={MAX_CHARS}
-        />
-        <AttachmentUpload
-          ref={attachmentRef}
-          maxFiles={5}
-          maxSizeMB={50}
-          disabled={responding}
-          onChange={setAttachments}
         />
       </div>
       <div className="flex items-center px-4 py-2">
