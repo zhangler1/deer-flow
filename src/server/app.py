@@ -834,7 +834,20 @@ async def _stream_graph_events(
                                 _step_title = getattr(target_step, 'title', None) or (target_step.get('title', '') if isinstance(target_step, dict) else '')
                     break  # 只处理第一个节点更新
 
-                # 5) Fallback: 从 updates 中提取 ToolMessages 并发送 tool_call_result 事件
+                # 5) 检测 reporter 节点输出的 reference_index，发送 SSE 事件给前端
+                for _node_name_ri, _node_update_ri in event_data.items():
+                    if not isinstance(_node_update_ri, dict):
+                        continue
+                    _ref_index = _node_update_ri.get("reference_index")
+                    if _ref_index and isinstance(_ref_index, list) and len(_ref_index) > 0:
+                        logger.info(f"[REFERENCE_INDEX] thread_id={thread_id} | 发送 reference_index 事件 | 条数: {len(_ref_index)}")
+                        yield _make_event("reference_index", {
+                            "thread_id": thread_id,
+                            "references": _ref_index,
+                        })
+                        break
+
+                # 6) Fallback: 从 updates 中提取 ToolMessages 并发送 tool_call_result 事件
                 # 当 ReactLoop 内部的 ToolMessages 通过 Command update 写入状态时，
                 # 如果 LangGraph 不通过 "messages" stream 单独发出它们，这里作为兜底处理
                 for _node_name_fb, _node_update_fb in event_data.items():

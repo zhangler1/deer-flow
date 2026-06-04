@@ -9,6 +9,7 @@ import { useShallow } from "zustand/react/shallow";
 import { chatStream, generatePodcast } from "../api";
 import type { Message, Resource } from "../messages";
 import { mergeMessage } from "../messages";
+import { useSourceStore } from "../source-store";
 import { parseJSON } from "../utils";
 
 import { getChatStreamSettings } from "./settings-store";
@@ -361,6 +362,23 @@ export async function sendMessage(
         // console.log(`[轮次创建] 创建第${data.iteration}轮研究容器`);
         useStore.getState().startNewRound(data.iteration);
         
+        continue;
+      }
+
+      // Handle reference_index events (后端传来的参考文献索引)
+      if (type === "reference_index") {
+        const refs = (data as { references: Array<{ index: number; url: string; title: string }> }).references;
+        if (refs && refs.length > 0) {
+          // 将后端的 reference_index 转换为 SourceDetail 格式并设置到 source-store
+          const sourceDetails = refs.map(r => ({
+            url: r.url,
+            title: r.title,
+            domain: r.url ? (() => { try { return new URL(r.url).hostname.replace(/^www\./, ""); } catch { return r.url; } })() : "",
+            sourceType: "search" as const,
+          }));
+          useSourceStore.getState().setReferences(sourceDetails);
+          console.log('[reference_index] 后端参考文献索引已更新 | 条数:', refs.length);
+        }
         continue;
       }
       

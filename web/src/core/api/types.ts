@@ -121,6 +121,18 @@ export interface ErrorEvent {
   };
 }
 
+export interface ReferenceIndexEvent {
+  type: "reference_index";
+  data: {
+    thread_id: string;
+    references: Array<{
+      index: number;
+      url: string;
+      title: string;
+    }>;
+  };
+}
+
 export type ChatEvent =
   | MessageChunkEvent
   | ToolCallsEvent
@@ -130,4 +142,5 @@ export type ChatEvent =
   | SearchStatusEvent
   | NodeTransitionEvent
   | PingEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | ReferenceIndexEvent;

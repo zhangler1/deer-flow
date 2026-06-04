@@ -413,7 +413,20 @@ async def reporter_node(state: State, config: RunnableConfig):
     if ref_map and response_content:
         response_content = normalize_citations(response_content, ref_map)
 
-    return {"final_report": response_content}
+    # 构建 reference_index 列表，通过 State 传递给前端（保证 MD 和 UI 参考文献一致）
+    reference_index_list = []
+    if ref_map:
+        for url, info in ref_map.items():
+            reference_index_list.append({
+                "index": info["index"],
+                "url": url,
+                "title": info.get("title", ""),
+            })
+        # 按序号排序
+        reference_index_list.sort(key=lambda x: x["index"])
+        enhanced_logger.logger.info(f"📚 REFERENCE_INDEX_OUTPUT | 参考文献索引已构建 | 条数: {len(reference_index_list)}")
+
+    return {"final_report": response_content, "reference_index": reference_index_list}
 
 
 def research_team_node(state: State):

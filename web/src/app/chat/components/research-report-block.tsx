@@ -36,17 +36,19 @@ export function ResearchReportBlock({
   const setResearchId = useSourceStore((s) => s.setResearchId);
 
   // 提取来源数据并设置到 store
+  // 优先使用后端通过 reference_index SSE 事件设置的数据（与 MD 参考文献一致）
+  // 仅当后端未提供时，回退到从 tool_call_result 中提取
   useEffect(() => {
     setResearchId(researchId);
+    const currentRefs = useSourceStore.getState().references;
+    // 如果 source-store 已有后端传来的索引数据，不覆盖
+    if (currentRefs.length > 0) {
+      console.log('[ResearchReportBlock] 使用后端 reference_index 数据 | 条数:', currentRefs.length);
+      return;
+    }
+    // Fallback: 从 tool_call_result 中提取
     const sources = extractSourceDetails(researchId);
-    
-    console.group('[ResearchReportBlock] 来源数据提取');
-    console.log('researchId:', researchId);
-    console.log('提取到的 sources 数量:', sources.length);
-    console.log('sources URLs:', sources.map(s => s.url));
-    console.log('sources 详情:', sources.map(s => ({ url: s.url, title: s.title, type: s.sourceType })));
-    console.groupEnd();
-    
+    console.log('[ResearchReportBlock] Fallback: 从 toolCalls 提取来源 | 条数:', sources.length);
     setReferences(sources);
   }, [researchId, setResearchId, setReferences]);
 

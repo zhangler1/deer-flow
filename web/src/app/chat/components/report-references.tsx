@@ -188,10 +188,16 @@ export function ReportReferences({
   researchId,
   className,
 }: ReportReferencesProps) {
-  const references = useMemo(
-    () => extractReferences(researchId),
-    [researchId],
-  );
+  // 优先使用 source-store 中的数据（由后端 reference_index SSE 事件设置，与 MD 参考文献一致）
+  const storeReferences = useSourceStore((s) => s.references);
+  const references: ReferenceItem[] = useMemo(() => {
+    if (storeReferences.length > 0) {
+      // 后端已提供 reference_index，直接使用
+      return storeReferences.map(s => ({ url: s.url, title: s.title, domain: s.domain }));
+    }
+    // Fallback: 从 tool_call_result 中提取
+    return extractReferences(researchId);
+  }, [storeReferences, researchId]);
   const openSourceByUrl = useSourceStore((s) => s.openSourceByUrl);
 
   const handleClick = useCallback(

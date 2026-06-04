@@ -37,6 +37,9 @@ class State(MessagesState):
     iteration_history: list[dict] = []  # 迭代历史记录
     node_transition: dict = None  # 节点跳转信息（用于前端事件流，不进入messages）
 
+    # 参考文献索引（由 reporter 节点 build_reference_index 生成，通过 SSE 传递给前端）
+    reference_index: list[dict] = []  # [{"index": N, "url": "...", "title": "..."}]
+
     # 报告风格相关字段
     report_style: str = "academic"  # 报告风格: academic(学术) / industry_report(行业研报) / business_marketing(对公营销)
     
