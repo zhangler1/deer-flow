@@ -363,24 +363,6 @@ export async function sendMessage(
         
         continue;
       }
-
-      // Handle report_finalized events (reporter 引用修正后的最终报告，替换流式内容)
-      if (type === "report_finalized") {
-        flushNow(); // 确保之前的 pending 都已写入
-        const reportMsg = getMessage(data.id);
-        if (reportMsg) {
-          const updatedMsg: Message = {
-            ...reportMsg,
-            content: data.content,
-            contentChunks: [data.content],
-            isStreaming: false,
-            finishReason: "stop",
-          };
-          pending.set(updatedMsg.id, updatedMsg);
-          scheduleFlush();
-        }
-        continue;
-      }
       
       messageId = data.id;
       let message: Message | undefined;
