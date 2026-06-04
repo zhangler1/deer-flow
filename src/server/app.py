@@ -81,6 +81,24 @@ enhanced_logger = get_enhanced_logger("deer-flow.api")
 # 加载工具结果压缩配置
 load_tool_compression_config()
 
+
+# ─── 后台系统监控（每 60 秒输出一次系统资源，用于排查 OOM / 资源耗尽）───
+async def _system_monitor():
+    """后台系统监控，不依赖任何请求上下文"""
+    while True:
+        await asyncio.sleep(60)
+        try:
+            rss = vms = "N/A"
+            with open('/proc/self/status') as _f:
+                for _l in _f:
+                    if _l.startswith('VmRSS:'):
+                        rss = _l.strip().split()[1] + " kB"
+                    elif _l.startswith('VmSize:'):
+                        vms = _l.strip().split()[1] + " kB"
+            enhanced_logger.logger.info(f"📊 SYS_MONITOR | RSS={rss} | VmSize={vms}")
+        except OSError:
+            pass
+
 # Track active tool calls for search status
 _active_search_calls: Dict[str, Dict[str, str]] = {}
 
@@ -99,6 +117,13 @@ app = FastAPI(
     description="API for Deer",
     version="0.1.0",
 )
+
+
+@app.on_event("startup")
+async def _start_background_monitor():
+    """启动后台系统监控任务"""
+    asyncio.create_task(_system_monitor())
+
 
 # Add CORS middleware
 # It's recommended to load the allowed origins from an environment variable
@@ -161,6 +186,9 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
 
     async def _cancellable_stream():
         """包装生成器，检测客户端断连并设置取消信号。"""
+        _event_count = 0
+        _stream_start = time.time()
+        _exit_reason = "normal"
         try:
             async for event in _astream_workflow_generator(
                 request.model_dump()["messages"],
@@ -186,21 +214,38 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                 reporter_model=request.reporter_model or "",
                 document_contexts=request.document_contexts or [],
             ):
+                _event_count += 1
                 # 每发送一个 SSE 事件前检查客户端是否断连
                 if await raw_request.is_disconnected():
+                    enhanced_logger.logger.info(f"[CLIENT_DISCONNECTED] thread_id={thread_id} | 客户端已断连，停止推送 | 已发送事件数={_event_count}")
                     logger.info(f"[CLIENT_DISCONNECTED] thread_id={thread_id} | 客户端已断连，停止推送")
                     cancel_event.set()
+                    _exit_reason = "client_disconnected"
                     break
                 if cancel_event.is_set():
+                    enhanced_logger.logger.info(f"[CANCEL_TRIGGERED] thread_id={thread_id} | cancel_event 已设置，停止推送 | 已发送事件数={_event_count}")
                     logger.info(f"[CANCEL_TRIGGERED] thread_id={thread_id} | cancel_event 已设置，停止推送")
+                    _exit_reason = "cancel_triggered"
                     break
                 yield event
         except asyncio.CancelledError:
-            logger.info(f"[STREAM_CANCELLED] thread_id={thread_id} | 流被取消")
+            _exit_reason = "cancelled"
+            enhanced_logger.logger.warning(
+                f"[STREAM_CANCELLED] thread_id={thread_id} | 流被取消 | "
+                f"总耗时={time.time()-_stream_start:.2f}s | 总事件数={_event_count}"
+            )
+            logger.warning(f"[STREAM_CANCELLED] thread_id={thread_id} | 流被取消")
+        except GeneratorExit:
+            _exit_reason = "generator_exit"
+            raise  # GeneratorExit 必须重新抛出
         finally:
             cancel_event.set()  # 确保无论如何都通知下游停止
             _cancel_registry.unregister(thread_id)
-            logger.debug(f"[STREAM_CLEANUP] thread_id={thread_id} | cancel_event 已设置, registry 已清理")
+            enhanced_logger.logger.info(
+                f"✅ STREAM_FINISHED | thread_id={thread_id} | "
+                f"reason={_exit_reason} | "
+                f"总耗时={time.time()-_stream_start:.2f}s | 总事件数={_event_count}"
+            )
 
     return StreamingResponse(
         _cancellable_stream(),
@@ -804,6 +849,11 @@ async def _stream_graph_events(
                 yield event
 
     except Exception as e:
+        enhanced_logger.logger.error(
+            f"[STREAM_ERROR] thread_id={thread_id} | 图执行出错 | "
+            f"已处理事件数={event_count} | 距上次事件={time.time()-last_event_time:.1f}s | "
+            f"{type(e).__name__}: {str(e)[:200]}"
+        )
         logger.exception(f"[STREAM_ERROR] thread_id={thread_id} | 图执行出错 | 已处理事件数: {event_count}")
         # 错误分类：给前端友好文案，同时在聊天区追加一条系统消息
         error_type, user_message = _classify_stream_error(e)

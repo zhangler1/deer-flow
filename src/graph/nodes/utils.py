@@ -238,8 +238,17 @@ async def _execute_agent_step(
     async def _heartbeat():
         while True:
             await asyncio.sleep(30)
+            mem_rss = "N/A"
+            try:
+                with open('/proc/self/status') as _f:
+                    for _l in _f:
+                        if _l.startswith('VmRSS:'):
+                            mem_rss = _l.strip().split()[1] + " kB"
+                            break
+            except OSError:
+                pass
             enhanced_logger.logger.info(
-                f"💓 HEARTBEAT | {agent_type} | 已耗时: {time.time() - agent_exec_start:.1f}s / {step_timeout:.0f}s"
+                f"💓 HEARTBEAT | {agent_type} | 已耗时: {time.time() - agent_exec_start:.1f}s / {step_timeout:.0f}s | RSS={mem_rss}"
             )
 
     heartbeat_task = None
@@ -255,6 +264,14 @@ async def _execute_agent_step(
 
         done, _ = await asyncio.wait(wait_set, timeout=step_timeout, return_when=asyncio.FIRST_COMPLETED)
 
+        agent_in_done = agent_task in done
+        cancel_in_done = cancel_wait_task is not None and cancel_wait_task in done
+        enhanced_logger.logger.info(
+            f"🔍 WAIT_DONE | {agent_type} | "
+            f"agent_done={agent_in_done} | cancel_done={cancel_in_done} | "
+            f"耗时: {time.time() - agent_exec_start:.2f}s"
+        )
+
         # 分支 1：用户取消
         if cancel_wait_task is not None and cancel_wait_task in done:
             await _silently_cancel(agent_task)
@@ -269,8 +286,19 @@ async def _execute_agent_step(
 
         # 分支 3：正常完成
         await _silently_cancel(cancel_wait_task)
+        enhanced_logger.logger.debug(f"🔍 BEFORE_RESULT | {agent_type} | 准备提取agent结果")
         result = agent_task.result()
+        enhanced_logger.logger.debug(f"🔍 AFTER_RESULT | {agent_type} | agent结果已提取 | 耗时: {time.time() - agent_exec_start:.2f}s")
         enhanced_logger.logger.info(f"✅ INVOKED | {agent_type} | 耗时: {time.time() - agent_exec_start:.2f}s")
+
+    except asyncio.CancelledError:
+        elapsed = time.time() - agent_exec_start
+        enhanced_logger.logger.warning(
+            f"⛔ CANCELLED_DETECTED | {agent_type} | "
+            f"触发点=agent_exec | 耗时: {elapsed:.2f}s | "
+            f"cancel_event_set={cancel_event.is_set() if cancel_event is not None else 'N/A'}"
+        )
+        raise  # 继续向上传播，由 _cancellable_stream 最终捕获
 
     except asyncio.TimeoutError:
         enhanced_logger.logger.warning(f"⏰ TIMEOUT | {agent_type} | 超过 {step_timeout:.0f}s")
@@ -281,16 +309,20 @@ async def _execute_agent_step(
         )
 
     except Exception as e:
+        elapsed = time.time() - agent_exec_start
         # 网络异常 - 跳过当前步骤继续执行
         import httpcore
         if isinstance(e, (httpcore.RemoteProtocolError, httpcore.ConnectError, httpcore.ReadTimeout)):
-            enhanced_logger.logger.warning(f"⚠️ NETWORK_ERROR | {agent_type} | {type(e).__name__}: {e}")
+            enhanced_logger.logger.warning(f"⚠️ NETWORK_ERROR | {agent_type} | {type(e).__name__}: {e} | 耗时: {elapsed:.2f}s")
             current_step.execution_res = f"⚠️ 由于网络连接异常，此步骤被跳过。错误信息: {str(e)[:200]}"
             return _build_skip_command(
                 agent_type, current_step, completed_steps, plan_steps, observations,
                 "由于网络异常被跳过",
             )
-        enhanced_logger.logger.error(f"❌ ERROR | {agent_type} | {type(e).__name__}: {e}")
+        enhanced_logger.logger.error(
+            f"❌ ERROR | {agent_type} | {type(e).__name__}: {str(e)[:200]} | "
+            f"耗时: {elapsed:.2f}s"
+        )
         raise
 
     finally:
