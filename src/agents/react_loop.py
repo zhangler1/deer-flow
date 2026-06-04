@@ -346,9 +346,7 @@ class ReactLoop:
             t_start = time.time()
             if t_name in tools_map:
                 result = await tools_map[t_name].ainvoke(t_args)
-            t_duration = time.time() - t_start
-
-            if logger.isEnabledFor(logging.DEBUG):
+                t_duration = time.time() - t_start
                 logger.debug(
                     f"TOOL_DURATION | {t_name} | "
                     f"耗时={t_duration:.4f}s | call_id={t_call_id}"
