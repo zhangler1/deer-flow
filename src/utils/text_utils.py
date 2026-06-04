@@ -161,13 +161,48 @@ def estimate_token_count(text: str) -> int:
     return cjk_count + (other_count + 3) // 4
 
 
+def _get_message_content(msg) -> str:
+    """安全获取消息的 content 文本，兼容 dict 和 LangChain Message 对象"""
+    if isinstance(msg, dict):
+        content = msg.get("content", "") or ""
+    else:
+        content = getattr(msg, "content", "") or ""
+    if isinstance(content, list):
+        # 多模态消息，只取文本部分
+        return "".join(block if isinstance(block, str) else block.get("text", "") for block in content)
+    return content if isinstance(content, str) else str(content)
+
+
+def _get_message_text(msg) -> str:
+    """获取消息中所有语义文本（content + tool_calls args），用于 token 估算和对齐
+
+    tool_calls 的 args 会被序列化为 API 请求的一部分发给 LLM，
+    只计入语义内容（args），不含 id/type 等结构元数据。
+    """
+    text = _get_message_content(msg)
+    tool_calls = msg.get("tool_calls", []) if isinstance(msg, dict) else getattr(msg, "tool_calls", None)
+    if tool_calls:
+        for tc in tool_calls:
+            if isinstance(tc, dict):
+                args = tc.get("args", {})
+            else:
+                args = getattr(tc, "args", {})
+            text += str(args)
+    return text
+
+
 def get_messages_context_stats(messages) -> tuple[int, int]:
     """
     计算上下文长度统计（字符数，估算token数）
+    统计 content + tool_calls args 文本，与中间件日志口径对齐。
     """
     if isinstance(messages, list):
-        chars = sum(len(str(m)) for m in messages)
-        tokens = sum(estimate_token_count(str(m)) for m in messages)
+        chars = 0
+        tokens = 0
+        for m in messages:
+            text = _get_message_text(m)
+            chars += len(text)
+            tokens += estimate_token_count(text)
         return chars, tokens
     text = str(messages)
     return len(text), estimate_token_count(text)

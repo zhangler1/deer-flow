@@ -374,7 +374,7 @@ class EnhancedToolBoundLLMWrapper:
         start_time = time.time()
         char_len, token_est = get_messages_context_stats(messages)
 
-        self.enhanced_logger.logger.info(f"🤖 LLM_TOOLS_ASTREAM | {self.llm_type} | 开始工具异步思考 | 上下文长度: chars={char_len} | tokens≈{token_est}")
+        self.enhanced_logger.logger.info(f"🤖 LLM_TOOLS_ASTREAM | {self.llm_type} | 开始工具异步思考 | 上下文长度: chars={char_len} | tokens={token_est}")
 
         full_response = None
         total_content_length = 0

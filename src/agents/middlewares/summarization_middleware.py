@@ -20,6 +20,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from src.agents.middleware import AgentMiddleware
 from src.utils.enhanced_logger import get_enhanced_logger, current_thread_id
+from src.utils.text_utils import _get_message_text, estimate_token_count
 
 logger = get_enhanced_logger(__name__).logger
 
@@ -100,8 +101,8 @@ class SummarizationMiddleware(AgentMiddleware):
         # 估算当前 token 数
         total_tokens = self._estimate_tokens(messages)
 
-        # 计算输入总字符长度
-        total_chars = sum(len(self._get_content(m)) for m in messages)
+        # 计算输入总字符长度（含 tool_calls args，与 _estimate_tokens 口径对齐）
+        total_chars = sum(len(_get_message_text(m)) for m in messages)
         logger.info(
             f"CTX_CHECK | thread_id={current_thread_id.get()} | "
             f"tokens={total_tokens} | chars={total_chars} | "
@@ -129,7 +130,7 @@ class SummarizationMiddleware(AgentMiddleware):
             f"第 {self._compressions_count} 次压缩"
         )
 
-        new_chars = sum(len(self._get_content(m)) for m in compressed)
+        new_chars = sum(len(_get_message_text(m)) for m in compressed)
         logger.debug(
             f"CTX_COMPRESSED | thread_id={current_thread_id.get()} | "
             f"pre_tokens=~{total_tokens} | pre_chars={total_chars} | "
@@ -356,14 +357,8 @@ class SummarizationMiddleware(AgentMiddleware):
         return "\n".join(parts)
     
     def _estimate_tokens(self, messages: list) -> int:
-        """估算消息列表的 token 数"""
-        total_chars = 0
+        """估算消息列表的 token 数（CJK 感知估算，与 llm.py 口径对齐）"""
+        total_tokens = 0
         for msg in messages:
-            content = self._get_content(msg)
-            total_chars += len(content)
-            tool_calls = msg.get("tool_calls", []) if isinstance(msg, dict) else getattr(msg, "tool_calls", None)
-            if tool_calls:
-                for tc in tool_calls:
-                    total_chars += len(str(tc.get("args", {}) if isinstance(tc, dict) else tc))
-        
-        return int(total_chars / self.config.token_chars_ratio)
+            total_tokens += estimate_token_count(_get_message_text(msg))
+        return total_tokens

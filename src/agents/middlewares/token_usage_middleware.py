@@ -27,6 +27,7 @@ from langchain_core.messages import AIMessage
 
 from src.agents.middleware import AgentMiddleware
 from src.utils.enhanced_logger import get_enhanced_logger
+from src.utils.text_utils import _get_message_text, estimate_token_count
 
 logger = get_enhanced_logger(__name__).logger
 
@@ -79,8 +80,12 @@ class TokenUsageMiddleware(AgentMiddleware):
     async def before_model(self, messages: list, iteration: int, context: dict) -> list:
         """记录 LLM 调用前的上下文大小（对齐 2.0 RunJournal 的 on_llm_start）"""
         msg_count = len(messages)
-        total_chars = sum(len(self._get_content(m)) for m in messages)
-        est_tokens = int(total_chars / self._token_chars_ratio)
+        total_chars = 0
+        est_tokens = 0
+        for m in messages:
+            text = _get_message_text(m)
+            total_chars += len(text)
+            est_tokens += estimate_token_count(text)
         
         logger.info(
             f"📥 CTX_BEFORE | iter={iteration+1} | "
