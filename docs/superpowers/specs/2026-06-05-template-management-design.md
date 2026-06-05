@@ -320,9 +320,9 @@ approval_status → pending
 |------|------|
 | 工具列表 | 工具名、显示名、参数(JSON)、是否默认工具 |
 | 编辑参数 | 修改工具的全局参数配置（JSONB） |
-| 新增工具 | 添加新工具及其默认参数 |
-| 删除工具 | 二次确认弹窗 → 删除工具配置 |
 | 设为默认 | 勾选后，用户上传新模板时自动启用该工具 |
+
+> 工具由代码定义，不通过前端增删。Tab 2 仅管理参数和默认设置。
 
 #### Tab 3：审批管理
 
@@ -351,7 +351,8 @@ approval_status → pending
 | `/api/admin/templates/{id}` | DELETE | 管理员删除模板 |
 | `/api/admin/approvals` | GET | 待审批列表 |
 | `/api/admin/approvals/{id}` | POST | 审批（通过/拒绝） |
-| `/api/admin/tools` | GET/POST/PUT/DELETE | 工具管理 CRUD |
+| `/api/admin/tools` | GET | 工具列表及参数 |
+| `/api/admin/tools/{name}` | PUT | 更新工具参数/默认设置 |
 | `/api/admin/templates/{id}/tool-configs` | PUT | 更新模板工具开关 |
 
 ---
