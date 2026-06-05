@@ -185,7 +185,7 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
     cancel_event = _cancel_registry.register(thread_id)
 
     async def _cancellable_stream():
-        """包装生成器，检测客户端断连并设置取消信号。带15s心跳保活。"""
+        """包装生成器，检测客户端断连并设置取消信号。"""
         # 在请求 Task（Task A）的 context 中设置 thread_id，
         # 后续所有 asyncio.create_task() 创建的子 Task 都会继承此上下文，
         # 使得 enhanced_logger（基于 ContextVar）在所有日志中打印正确的 thread_id。
@@ -193,7 +193,6 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
         _event_count = 0
         _stream_start = time.time()
         _exit_reason = "normal"
-        HEARTBEAT_INTERVAL = 15  # 每15s发一次ping保活，防止中间代理空闲超时断连
         _graph_task: asyncio.Task | None = None
 
         async def _check_disconnect() -> bool:
@@ -203,7 +202,6 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                     f"[CLIENT_DISCONNECTED] thread_id={thread_id} | "
                     f"客户端已断连，停止推送 | 已发送事件数={_event_count}"
                 )
-                logger.info(f"[CLIENT_DISCONNECTED] thread_id={thread_id} | 客户端已断连，停止推送")
                 cancel_event.set()
                 return True
             return False
@@ -237,46 +235,25 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
             _graph_task = asyncio.create_task(generator.__anext__())
 
             while True:
-                heartbeat_task = asyncio.create_task(asyncio.sleep(HEARTBEAT_INTERVAL))
-                done, _ = await asyncio.wait(
-                    {_graph_task, heartbeat_task},
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                heartbeat_task.cancel()
+                try:
+                    event = await _graph_task
+                except StopAsyncIteration:
+                    break
 
-                if _graph_task in done:
-                    # ── Graph 产生了一个事件 ──
-                    try:
-                        event = _graph_task.result()
-                    except StopAsyncIteration:
-                        # Graph 正常完成
-                        break
+                _event_count += 1
+                if await _check_disconnect():
+                    break
+                if cancel_event.is_set():
+                    enhanced_logger.logger.info(
+                        f"[CANCEL_TRIGGERED] thread_id={thread_id} | "
+                        f"cancel_event 已设置，停止推送 | 已发送事件数={_event_count}"
+                    )
+                    _exit_reason = "cancel_triggered"
+                    break
+                yield event
 
-                    _event_count += 1
-                    if await _check_disconnect():
-                        break
-                    if cancel_event.is_set():
-                        enhanced_logger.logger.info(
-                            f"[CANCEL_TRIGGERED] thread_id={thread_id} | "
-                            f"cancel_event 已设置，停止推送 | 已发送事件数={_event_count}"
-                        )
-                        logger.info(f"[CANCEL_TRIGGERED] thread_id={thread_id} | cancel_event 已设置，停止推送")
-                        _exit_reason = "cancel_triggered"
-                        break
-                    yield event
-
-                    # 预取下个事件
-                    _graph_task = asyncio.create_task(generator.__anext__())
-
-                else:
-                    # ── 心跳超时 → 发 ping 保活 ──
-                    if await _check_disconnect():
-                        break
-                    if cancel_event.is_set():
-                        _exit_reason = "cancel_triggered"
-                        break
-                    yield {"event": "ping"}
-                    # _graph_task 还在后台运行，继续等待
+                # 预取下个事件
+                _graph_task = asyncio.create_task(generator.__anext__())
 
         except asyncio.CancelledError:
             _exit_reason = "cancelled"
@@ -284,7 +261,6 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                 f"[STREAM_CANCELLED] thread_id={thread_id} | 流被取消 | "
                 f"总耗时={time.time()-_stream_start:.2f}s | 总事件数={_event_count}"
             )
-            logger.warning(f"[STREAM_CANCELLED] thread_id={thread_id} | 流被取消")
         except GeneratorExit:
             _exit_reason = "generator_exit"
             raise  # GeneratorExit 必须重新抛出
