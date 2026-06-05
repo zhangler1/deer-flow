@@ -300,18 +300,12 @@ const AttachmentUpload = forwardRef<AttachmentUploadRef, AttachmentUploadProps>(
         if (disabled) return;
 
         const newAttachments: AttachmentFile[] = [];
+        const oversizedAttachments: AttachmentFile[] = [];
 
         for (const file of files) {
-          if (attachments.length + newAttachments.length >= maxFiles) {
+          if (attachments.length + newAttachments.length + oversizedAttachments.length >= maxFiles) {
             toast.warning(`最多允许上传 ${maxFiles} 个文件`);
             break;
-          }
-
-          if (file.size > maxSizeBytes) {
-            toast.warning(
-              `${file.name} 文件过大（最大 ${maxSizeMB}MB）`,
-            );
-            continue;
           }
 
           const ext = file.name.split(".").pop()?.toLowerCase() || "";
@@ -331,12 +325,23 @@ const AttachmentUpload = forwardRef<AttachmentUploadRef, AttachmentUploadProps>(
             status: "pending",
             progress: 0,
           };
-          newAttachments.push(attachment);
+
+          if (file.size > maxSizeBytes) {
+            // Mark as error immediately, show in list with error state
+            attachment.status = "error";
+            attachment.errorMessage = `文件过大（最大 ${maxSizeMB}MB）`;
+            oversizedAttachments.push(attachment);
+            toast.error(`${file.name} 文件过大（最大 ${maxSizeMB}MB）`);
+          } else {
+            newAttachments.push(attachment);
+          }
         }
 
-        if (newAttachments.length > 0) {
-          updateAttachments((prev) => [...prev, ...newAttachments]);
-          // Start uploading each file
+        // Add all attachments (normal + oversized) to the list
+        const allNew = [...newAttachments, ...oversizedAttachments];
+        if (allNew.length > 0) {
+          updateAttachments((prev) => [...prev, ...allNew]);
+          // Only start uploading valid files
           for (const attachment of newAttachments) {
             uploadFile(attachment);
           }

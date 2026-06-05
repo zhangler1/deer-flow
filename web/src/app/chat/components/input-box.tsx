@@ -193,7 +193,7 @@ export function InputBox({
       <AttachmentUpload
         ref={attachmentRef}
         maxFiles={5}
-        maxSizeMB={50}
+        maxSizeMB={2}
         disabled={responding}
         onChange={setAttachments}
       />
