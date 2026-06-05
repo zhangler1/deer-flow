@@ -1,10 +1,5 @@
 # [!NOTE]
-# Read the `docs/configuration_guide.md` carefully, and update the
-# configurations to match your specific settings and requirements.
-# - Replace `api_key` with your own credentials.
-# - Replace `base_url` and `model` name if you want to use a custom model.
-# - Set `verify_ssl` to `false` if your LLM server uses self-signed certificates
-# - A restart is required every time you change the `config.yaml` file.
+
 
 COORDINATOR_MODEL:
   base_url: https://api.deepseek.com
@@ -39,7 +34,6 @@ RESEARCHER_MODEL:
   #   thinking:
   #     type: enabled
 
-# Reporter model for deep research report generation
 # REPORTER_MODEL is a reference pointer: default specifies which REPORTER_MODEL_OPTIONS key to use
 REPORTER_MODEL:
   default: deepseek-v4-pro
@@ -69,12 +63,7 @@ REPORTER_MODEL_OPTIONS:
     # Optional: enable thinking mode for the model
     # chat_template_kwargs:
     #   enable_thinking: true
-  # Uncomment to add more reporter model options:
-  # gpt4o_mini:
-  #   base_url: https://api.openai.com/v1
-  #   model: gpt-4o-mini
-  #   api_key: sk-your-openai-key
-  #   verify_ssl: false
+
 
 BASIC_MODEL:
   base_url: https://api.deepseek.com/v1
@@ -95,42 +84,7 @@ COMPRESSION_MODEL:
   model: deepseek-chat 
   api_key: sk-1bdd889cbd3e46a6a454cb4bb322cf60
   verify_ssl: false
-  # Uncomment to add more reporter model options:
-  # gpt4o_mini:
-  #   base_url: https://api.openai.com/v1
-  #   model: gpt-4o-mini
-  #   api_key: sk-your-openai-key
-  #   verify_ssl: false
 
-
-# OTHER SETTINGS:
-# Search engine configuration
-SEARCH_ENGINE:
-  engine: custom_search
-  # Only include results from these domains (for Tavily)
-  include_domains:
-    - example.com
-    - trusted-news.com
-    - reliable-source.org
-    - gov.cn
-    - edu.cn
-  # Exclude results from these domains (for Tavily)
-  exclude_domains:
-    - example.com
-
-# Web crawler configuration
-CRAWLER:
-  # Crawler type: 'deep_research' or 'jina'
-  # - deep_research: 使用内网部署的DeepResearchMdCrawler（推荐）
-  # - jina: 使用外网Jina AI服务
-  type: "deep_research"
-  
-  # Deep Research Crawler settings
-  deep_research:
-    # HTML提取并转换为MD的API地址（一次性完成提取+转换）
-    extract_api_url: "http://localhost:7986/extract_md"
-    # 请求超时时间（秒）
-    timeout: 30
 
 # ============================================================================
 # 工具结果压缩配置 (Tool Result Compression)

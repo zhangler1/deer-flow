@@ -549,6 +549,12 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any], reporter_model
     if "timeout" not in merged_conf:
         merged_conf["timeout"] = 900.0  # 15 minutes in seconds
 
+    # Increase LangChain's stream_chunk_timeout (default 120s) to prevent
+    # StreamChunkTimeoutError when model pauses between chunks during long generation.
+    # We already have HTTP-level read timeout (900s) as the safety net.
+    if "stream_chunk_timeout" not in merged_conf:
+        merged_conf["stream_chunk_timeout"] = 240.0  # 240 seconds between chunks
+
     # Handle SSL verification settings
     verify_ssl = merged_conf.pop("verify_ssl", True)
 
