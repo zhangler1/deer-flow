@@ -713,6 +713,7 @@ async def _stream_graph_events(
 
     try:
         # 使用显式异步迭代 + 超时心跳机制
+        # 注意：不能用 asyncio.wait_for，因为超时会 cancel __anext__() 导致迭代器损坏
         stream_iterator = graph_instance.astream(
             workflow_input,
             config=workflow_config,
@@ -720,16 +721,25 @@ async def _stream_graph_events(
             subgraphs=True,
         ).__aiter__()
 
+        pending_next = None  # 缓存正在等待的 __anext__ 任务
+
         while True:
-            try:
-                agent, _, event_data = await asyncio.wait_for(
-                    stream_iterator.__anext__(),
-                    timeout=HEARTBEAT_INTERVAL
-                )
-            except StopAsyncIteration:
-                break
-            except asyncio.TimeoutError:
-                # 超时未收到事件，发送心跳 ping 保持连接
+            if pending_next is None:
+                pending_next = asyncio.ensure_future(stream_iterator.__anext__())
+
+            done, _ = await asyncio.wait(
+                {pending_next}, timeout=HEARTBEAT_INTERVAL
+            )
+
+            if done:
+                # 事件已到达
+                pending_next = None
+                try:
+                    agent, _, event_data = done.pop().result()
+                except StopAsyncIteration:
+                    break
+            else:
+                # 超时未收到事件，发送心跳 ping 保持连接（不取消 pending_next）
                 ping_event = _make_event("ping", {
                     "thread_id": thread_id,
                     "timestamp": time.time(),
