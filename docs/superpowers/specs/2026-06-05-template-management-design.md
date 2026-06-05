@@ -353,6 +353,21 @@ POST /api/admin/tools/{tool_name}/test
 |------|------|------|
 | `/api/admin/tools/{name}/test` | POST | 调用工具并返回结果，body: `{"args": {...}}`
 
+**调用示例（以 `online_search` 为例）：**
+
+```
+全局参数（global_tool_params.params）：
+  { "max_results": 10, "timeout_seconds": 30 }
+
+用户测试面板输入（方法入参）：
+  { "query": "2024年AI行业发展趋势" }
+
+后端合并调用：
+  online_search(query="2024年AI行业发展趋势", max_results=10, timeout_seconds=30)
+
+返回搜索结果 → 前端 JSON 格式化展示
+```
+
 #### Tab 3：审批管理
 
 | 功能 | 说明 |
