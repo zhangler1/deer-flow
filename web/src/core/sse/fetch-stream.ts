@@ -132,12 +132,14 @@ export async function* fetchStream(
         if (event) {
           eventCount++;
           eventsParsedInThisChunk++;
-          // console.log("[fetchStream] Event parsed", {
-          //   eventNumber: eventCount,
-          //   eventType: event.event,
-          //   dataLength: event.data?.length || 0,
-          //   dataPreview: event.data?.substring(0, 100),
-          // });
+          // 工具调用相关事件打印详细日志
+          if (event.event === "tool_calls" || event.event === "tool_call_chunks" || event.event === "tool_call_result") {
+            console.log(`[fetchStream] 工具事件 #${eventCount}`, {
+              eventType: event.event,
+              dataLength: event.data?.length || 0,
+              dataPreview: event.data?.substring(0, 300),
+            });
+          }
           yield event;
         }
       }

@@ -117,12 +117,34 @@ function mergeToolCallMessage(
   event: ToolCallsEvent | ToolCallChunksEvent,
 ) {
   if (event.type === "tool_calls" && event.data.tool_calls[0]?.name) {
-    message.toolCalls = event.data.tool_calls.map((raw) => ({
+    const newToolCalls = event.data.tool_calls.map((raw) => ({
       id: raw.id,
       name: raw.name,
       args: raw.args,
       result: undefined,
     }));
+    const prevCount = message.toolCalls?.length ?? 0;
+    if (prevCount > 0) {
+      // ⚠️ 追加模式：已有 toolCalls，合并新的（避免覆盖）
+      const existingIds = new Set(message.toolCalls!.map(tc => tc.id));
+      const trulyNew = newToolCalls.filter(tc => !existingIds.has(tc.id));
+      console.warn('[mergeToolCallMessage] ⚠️ 已有toolCalls被追加!',
+        'prevCount=', prevCount,
+        'newCount=', newToolCalls.length,
+        'trulyNewCount=', trulyNew.length,
+        'prevIds=', message.toolCalls!.map(tc => `${tc.name}:${tc.id}`),
+        'newIds=', newToolCalls.map(tc => `${tc.name}:${tc.id}`),
+        'msgId=', (event.data as { id?: string }).id,
+      );
+      message.toolCalls = [...message.toolCalls!, ...trulyNew];
+    } else {
+      console.log('[mergeToolCallMessage] 首次设置 toolCalls |',
+        'count=', newToolCalls.length,
+        'tools=', newToolCalls.map(tc => `${tc.name}:${tc.id}`).join(', '),
+        'msgId=', (event.data as { id?: string }).id,
+      );
+      message.toolCalls = newToolCalls;
+    }
   }
 
   message.toolCalls ??= [];
@@ -133,6 +155,11 @@ function mergeToolCallMessage(
       );
       if (toolCall) {
         toolCall.argsChunks = [convertToolChunkArgs(chunk.args)];
+      } else {
+        console.warn('[mergeToolCallMessage] chunk.id 未匹配到任何 toolCall!',
+          'chunk.id=', chunk.id, 'chunk.name=', chunk.name,
+          '已有IDs=', message.toolCalls.map(tc => tc.id),
+        );
       }
     } else {
       const streamingToolCall = message.toolCalls.find(

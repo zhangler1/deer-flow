@@ -588,6 +588,13 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
         # Tool Message - Return the result of the tool call
         event_stream_message["tool_call_id"] = message_chunk.tool_call_id
         
+        # 调试日志：记录 tool_call_result 发送
+        _tool_name = getattr(message_chunk, 'name', 'unknown')
+        _content_len = len(str(message_chunk.content)) if message_chunk.content else 0
+        logger.info(f"[TOOL_RESULT_SEND] thread_id={thread_id} | agent={agent_name} | "
+                    f"tool_name={_tool_name} | tool_call_id={message_chunk.tool_call_id} | "
+                    f"msg_id={message_chunk.id} | content_len={_content_len}")
+        
         # Check if this is a web_search tool completing and emit search_status completed event
         if message_chunk.tool_call_id in _active_search_calls:
             search_info = _active_search_calls.pop(message_chunk.tool_call_id)
@@ -614,6 +621,12 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
                 message_chunk.tool_call_chunks,
                 extra_headers={"guwp-token": ""},  # 前端不需要看到真实 token
             )
+            
+            # 调试日志：详细记录每次 tool_calls 事件的发送
+            _tc_names = [tc.get('name', '?') for tc in message_chunk.tool_calls]
+            _tc_ids = [tc.get('id', '?') for tc in message_chunk.tool_calls]
+            logger.info(f"[TOOL_CALLS_SEND] thread_id={thread_id} | agent={agent_name} | msg_id={message_chunk.id} | "
+                        f"tool_count={len(message_chunk.tool_calls)} | names={_tc_names} | ids={_tc_ids}")
             
             # Set tag based on tool name
             # Default to searching, but check for specific tool types
