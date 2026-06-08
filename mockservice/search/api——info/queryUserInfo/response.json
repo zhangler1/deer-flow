@@ -1,0 +1,36 @@
+{
+	"RSP_BODY": {
+		"result": {
+			"guwpToken": "ec61471603cbc30cf6a98fa814440e1a",
+			"guipToken": null,
+			"jrtAuthCode": null,
+			"okicToken": null,
+			"okicType": null,
+			"httpHeaders": null,
+			"branchId": 1000000003,
+			"loginName": "sunw_94",
+			"userCode": "9875961",
+			"userName": "孙伟",
+			"euifUserId": 5000285289,
+			"device": "PC",
+			"roles": null,
+			"uniqueId": null,
+			"logined": true,
+			"userId": null,
+			"uuid": null,
+			"locale": null,
+			"state": null,
+			"cifId": null,
+			"name": null,
+			"attributes": {}
+		},
+		"param": null
+	},
+	"RSP_HEAD": {
+		"TRAN_SUCCESS": "1",
+		"TRACE_NO": "omservice-prd-1-ellm-6db46fd5c9-kgs9b-3901408568",
+		"TRACE_ID": "0c44e83c.1.63.4vbvt0sp9ez",
+		"PROCESS_STATUS_CODE": "N",
+		"BIZ_TRACE_NO": null
+	}
+}
