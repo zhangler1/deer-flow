@@ -6,10 +6,11 @@
 
 设计目标：
 - 让 researcher 节点直接装配原生搜索工具（online_search、searchknowledge_standard、
-  financial_summary、product_instance_search），不再使用 BudgetControlledSearchTool 包装器。
+  financial_summary、product_instance_search、vector_search），不再使用 BudgetControlledSearchTool 包装器。
 - 通过 wrap_tool_call 钩子在工具调用边界做预算拦截 + 结果格式化。
 - bocomsearch 因 guwp_token 线程安全（state 注入）保留原有包装器，由白名单
   controlled_tool_names 明确排除，避免双重检查。
+- vector_search 同为 guwp_token 工具，但已改为无状态 + 中间件注入 guwp_token，列入白名单。
 
 钩子分工：
 - before_agent: 取 session_id 拿到/创建预算管理器并 reset；缓存到中间件实例
@@ -35,12 +36,14 @@ from src.utils.search_budget import SearchBudgetManager
 logger = get_enhanced_logger(__name__).logger
 
 
-# 默认受控工具（白名单）。bocomsearch 不在此处，由 BudgetControlledSearchTool 包装器自行控制。
+# 默认受控工具（白名单）。bocomsearch 不在此处，由 BudgetControlledSearchTool 包装器自行控制；
+# vector_search 虽已去掉包装器，但 guwp_token 由本中间件注入，故在此受控。
 DEFAULT_CONTROLLED_TOOLS = {
     "online_search",
     "searchknowledge_standard",
     "financial_summary",
     "product_instance_search",
+    "vector_search",
 }
 
 
@@ -143,6 +146,15 @@ class BudgetEnforcementMiddleware(AgentMiddleware):
             return await call_next(tool_name, tool_args, tool_call_id)
         if tool_name not in self.config.controlled_tool_names:
             return await call_next(tool_name, tool_args, tool_call_id)
+
+        # ── 0. 注入 guwp_token（vector_search 需要，从 state 读取） ──
+        # vector_search 已去掉实例属性，改为每次调用时由中间件从 context.input 注入
+        if tool_name == "vector_search":
+            input_state = context.get("input", {})
+            if isinstance(input_state, dict):
+                guwp_token = input_state.get("guwp_token")
+                if guwp_token:
+                    tool_args["guwp_token"] = guwp_token
 
         self._total_calls += 1
         budget = self._budget

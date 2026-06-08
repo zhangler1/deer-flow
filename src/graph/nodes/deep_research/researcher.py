@@ -29,7 +29,7 @@ from src.tools import (
     report_search,
     searchknowledge_standard,
     searchknowledge_standard_tool,
-    budget_controlled_vector_search_tool,
+    VectorSearchBaseTool,
     get_budget_manager,
     clear_budget_manager,
 )
@@ -50,7 +50,8 @@ async def researcher_node(
     configurable = Configuration.from_runnable_config(config)
     
     # 🔥 每个 researcher 节点开始时清零预算，确保每个节点独立计算预算
-    session_id = state.get("session_id", "default")
+    # 使用 thread_id 作为 budget session_id（State 中无 session_id 字段）
+    session_id = config.get("thread_id") or config.get("configurable", {}).get("thread_id", "default")
     
     # 从配置中获取预算参数
     max_tokens = getattr(configurable, 'search_budget_max_tokens', 10000)
@@ -120,7 +121,7 @@ async def researcher_node(
     # 根据报告风格动态配置工具
     # 说明：预算控制现已下沉到 BudgetEnforcementMiddleware（方案 C），
     # 所以 researcher 节点下发到 ReactLoop 的是原生工具。
-    # 例外：vector_search 因 guwp_token 线程安全需从 state 注入，仍用 BudgetControlledSearchTool 包装器。
+    # vector_search 也已改为无状态原生工具，guwp_token 由中间件注入。
     if report_style == "industry_report":
         # 行业研报：searchknowledge_standard(段落级标准知识检索) + online_search
         session_id = state.get("session_id", "default")
@@ -138,41 +139,29 @@ async def researcher_node(
             tools.append(searchknowledge_standard_tool(configurable.get_max_results("searchknowledge_standard")))
             tool_name_list.append("searchknowledge_standard")
             # 新增 vector_search（向量相似度检索），与 searchknowledge_standard 互补
-            guwp_token = state.get("guwp_token", None)
-            tools.append(budget_controlled_vector_search_tool(
-                session_id=session_id,
-                max_search_calls=researcher_search_budget,
-                max_tokens=max_tokens,
+            # 原生注册，guwp_token 由中间件从 state 注入
+            tools.append(VectorSearchBaseTool(
                 max_results=configurable.get_max_results("vector_search"),
-                guwp_token=guwp_token,
-                hard_token_limit=hard_token_limit,
             ))
-            tool_name_list.append("budget_controlled_vector_search")
+            tool_name_list.append("vector_search")
         tool_names = ", ".join(tool_name_list)
 
     elif report_style == "business_marketing":
         # 对公营销报告：使用完整的工具链
         session_id = state.get("session_id", "default")
-        guwp_token = state.get("guwp_token", None)
-        token_preview = (guwp_token[:8] + "...") if guwp_token and len(guwp_token) > 8 else guwp_token
-        logger.info(f"🔑 business_marketing | guwp_token={token_preview} | session_id={session_id}")
+        logger.info(f"📋 business_marketing | session_id={session_id}")
         tools = []
         tool_name_list = []
         # 根据开关决定是否添加在线搜索工具
         if use_budget_online:
             tools.append(online_search_tool(configurable.get_max_results("online_search")))
             tool_name_list.append("online_search")
-        # vector_search 使用 BudgetControlledSearchTool 包装器（guwp_token 线程安全注入），替换原 bocomsearch
+        # vector_search 原生注册（guwp_token 由中间件从 state 注入），替换原 bocomsearch 包装器
         if use_budget_bocom:
-            tools.append(budget_controlled_vector_search_tool(
-                session_id=session_id,
-                max_search_calls=researcher_search_budget,
-                max_tokens=max_tokens,
+            tools.append(VectorSearchBaseTool(
                 max_results=configurable.get_max_results("vector_search"),
-                guwp_token=guwp_token,
-                hard_token_limit=hard_token_limit,
             ))
-            tool_name_list.append("budget_controlled_vector_search")
+            tool_name_list.append("vector_search")
         tools += [
             business_opportunity_search,
             sentiment_search,

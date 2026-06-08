@@ -75,7 +75,6 @@ from .budget_controlled_search import (
     create_budget_controlled_bocomsearch_tool,
     budget_controlled_bocomsearch_tool,
     budget_controlled_searchknowledge_standard_tool,
-    budget_controlled_vector_search_tool,
 )
 
 __all__ = [
@@ -128,5 +127,4 @@ __all__ = [
     "searchknowledge_standard_tool",
     "call_searchknowledge_standard",
     "budget_controlled_searchknowledge_standard_tool",
-    "budget_controlled_vector_search_tool",
 ]

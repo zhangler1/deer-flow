@@ -12,7 +12,7 @@
 使用方式：
 - 默认从环境变量 `GUWP_TOKEN` 读取 token
 - 也可在函数调用时显式传入 `guwp_token`
-- 通过 VectorSearchBaseTool + BudgetControlledSearchTool 包装器注入 token（LLM 不可见）
+- 通过中间件从 state 注入 token（LLM 不可见）
 
 配置优先级：conf.yaml VECTOR_SEARCH 段 > 环境变量 > 硬编码默认值
 """
@@ -401,7 +401,7 @@ def vector_search(query: str) -> List[Dict[str, Any]]:
 
 
 # ============================================================================
-# VectorSearchBaseTool（适配 BudgetControlledSearchTool 包装器）
+# VectorSearchBaseTool（原生工具，由中间件注入 guwp_token）
 # ============================================================================
 
 
@@ -410,18 +410,16 @@ from langchain_core.callbacks import CallbackManagerForToolRun
 
 
 class VectorSearchBaseTool(BaseTool):
-    """向量检索基础工具，适配 BudgetControlledSearchTool 包装
+    """向量检索基础工具（无状态，原生注册）
 
-    封装 call_vector_search 函数为 LangChain BaseTool 接口，
-    使其可被 BudgetControlledSearchTool 包装并纳入预算控制。
-    guwp_token 作为实例属性由 researcher 节点从 state 注入，不进入 args_schema（LLM 不可见）。
+    封装 call_vector_search 函数为 LangChain BaseTool 接口。
+    guwp_token 由中间件通过 kwargs 注入（来源于 state），不进入 args_schema（LLM 不可见）。
     """
 
     name: str = "vector_search"
     description: str = "基于向量相似度精准检索内部知识库，支持混合召回和重排序。适用于查询银行政策、产品信息、业务流程、合规要求等内部资料，相比聚合搜索具有更高的检索精度。"
     repository: str = "vector-search"
     max_results: int = 10
-    guwp_token: Optional[str] = None
 
     def _run(
         self,
@@ -430,11 +428,12 @@ class VectorSearchBaseTool(BaseTool):
         **kwargs
     ) -> List[Dict[str, Any]]:
         """执行向量检索"""
-        token_preview = (self.guwp_token[:8] + "...") if self.guwp_token and len(self.guwp_token) > 8 else self.guwp_token
+        guwp_token = kwargs.get("guwp_token") or os.getenv("GUWP_TOKEN", "").strip()
+        token_preview = (guwp_token[:8] + "...") if guwp_token and len(guwp_token) > 8 else guwp_token
         logger.info(f"🔑 vector_search | guwp_token={token_preview} | max_results={self.max_results}")
         return call_vector_search(
             query=query,
-            guwp_token=self.guwp_token,
+            guwp_token=guwp_token,
             max_results=self.max_results,
         )
 

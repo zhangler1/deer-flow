@@ -225,6 +225,12 @@ async def _execute_agent_step(
         ],
         "system_context": effective_context,
     }
+    # 向下传递 state 字段至 ReactLoop context.input，供中间件读取
+    if state.get("guwp_token"):
+        agent_input["guwp_token"] = state["guwp_token"]
+    thread_id = config.get("thread_id") or config.get("configurable", {}).get("thread_id")
+    if thread_id:
+        agent_input["session_id"] = thread_id
 
     # ─── 6. 执行 Agent（超时 + 取消 + 心跳）───
     try:

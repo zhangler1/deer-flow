@@ -685,37 +685,6 @@ create_budget_controlled_bocomsearch_tool = budget_controlled_bocomsearch_tool
 
 
 # ============================================================================
-# vector_search（EUVB 向量相似度检索）适配
-# ============================================================================
-
-
-def budget_controlled_vector_search_tool(
-    session_id: str = "default",
-    max_search_calls: int = 5,
-    max_tokens: int = 10000,
-    max_results: int = 10,
-    guwp_token: Optional[str] = None,
-    hard_token_limit: int = 16000,
-) -> BudgetControlledSearchTool:
-    """创建预算控制的向量检索工具
-
-    与 budget_controlled_online_search 共用预算管理器，确保总搜索量不超限
-    guwp_token 通过 VectorSearchBaseTool 实例属性注入，LLM 不可见
-    """
-    from src.tools.vector_search import VectorSearchBaseTool
-
-    base_tool = VectorSearchBaseTool(max_results=max_results, guwp_token=guwp_token)
-
-    return create_budget_controlled_search_tool(
-        wrapped_tool=base_tool,
-        session_id=session_id,
-        max_search_calls=max_search_calls,
-        max_tokens=max_tokens,
-        hard_token_limit=hard_token_limit,
-    )
-
-
-# ============================================================================
 # searchknowledge_standard（EUVD 段落级标准知识检索）适配
 # ============================================================================
 
