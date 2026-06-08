@@ -1,6 +1,7 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
+import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Cpu } from "lucide-react";
 
@@ -63,6 +64,13 @@ export function ReporterModelSelector() {
   const reporterOptions = config?.reporter_options;
   const options = reporterOptions?.options ?? [];
   const defaultKey = reporterOptions?.default ?? "";
+
+  // 自修复：如果 localStorage 存的 key 在最新配置中已不存在，自动清空走 default
+  useEffect(() => {
+    if (options.length > 0 && currentModel && !options.some((o) => o.key === currentModel)) {
+      setReporterModel("");
+    }
+  }, [options, currentModel]);
 
   // 当前选中的 key：优先用户选择，其次 default
   const selectedKey = currentModel || defaultKey;
