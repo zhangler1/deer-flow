@@ -258,10 +258,38 @@ class BudgetEnforcementMiddleware(AgentMiddleware):
 
     @staticmethod
     def _append_warning(content: Any, warning: str, status) -> str:
-        """在工具结果末尾追加预算警告（保持原内容可读）"""
-        body = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
-        suffix = (
-            f"\n\n[💡 预算提示] {warning} "
-            f"(已用 {status.search_calls_used} 次, 剩余 {status.remaining_search_calls} 次)"
+        """在工具结果末尾追加预算警告（保持 JSON 格式有效）
+
+        当原始内容为 JSON（dict/list）时，将预算提示作为 "reminding" 字段
+        嵌入 JSON 结构中，避免前端 JSON.parse 因 extra tokens 而失败。
+        当原始内容为纯文本时，仍采用文本追加方式。
+        """
+        reminder_text = (
+            f"{warning} (已用 {status.search_calls_used} 次, "
+            f"剩余 {status.remaining_search_calls} 次)"
         )
-        return body + suffix
+
+        if isinstance(content, str):
+            # 尝试判断是否为 JSON 字符串
+            try:
+                parsed = json.loads(content)
+                if isinstance(parsed, dict):
+                    parsed["reminding"] = reminder_text
+                    return json.dumps(parsed, ensure_ascii=False)
+                elif isinstance(parsed, list):
+                    return json.dumps({"data": parsed, "reminding": reminder_text}, ensure_ascii=False)
+            except (json.JSONDecodeError, ValueError):
+                pass
+            # 纯文本：沿用追加方式
+            return content + f"\n\n[💡 预算提示] {reminder_text}"
+        else:
+            # content 是 dict/list 等非字符串类型
+            if isinstance(content, dict):
+                result = dict(content)
+                result["reminding"] = reminder_text
+                return json.dumps(result, ensure_ascii=False)
+            elif isinstance(content, list):
+                return json.dumps({"data": content, "reminding": reminder_text}, ensure_ascii=False)
+            else:
+                body = json.dumps(content, ensure_ascii=False)
+                return body + f"\n\n[💡 预算提示] {reminder_text}"
