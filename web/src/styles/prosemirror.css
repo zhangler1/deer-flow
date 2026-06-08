@@ -1,4 +1,6 @@
-.prose {
+/* 仅对 ProseMirror 编辑器上下文去除 prose 默认宽度限制，避免影响报告渲染区 */
+.prose.inline-editor,
+.ProseMirror {
   max-width: inherit;
 }
 

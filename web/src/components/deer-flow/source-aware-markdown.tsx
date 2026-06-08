@@ -95,7 +95,7 @@ export function SourceAwareMarkdown({
   }, [animated]);
 
   return (
-    <div className={cn(className, "prose dark:prose-invert")}>
+    <div className={cn(className, "prose dark:prose-invert max-w-full")}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={rehypePlugins}

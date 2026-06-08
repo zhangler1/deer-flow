@@ -146,7 +146,7 @@ export default function Main() {
           {/* 右侧：报告生成 */}
           <div
             className={cn(
-              "h-full bg-white",
+              "h-full min-w-0 overflow-hidden bg-white",
               !isDraggingState && "transition-all duration-300 ease-out",
             )}
             style={{
