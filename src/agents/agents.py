@@ -102,6 +102,7 @@ def create_agent(agent_name: str, agent_type: str, tools: list, prompt_template:
             compression_mode=cfg.summarization.compression_mode if compression_llm else "truncate",
             summary_max_chars=cfg.summarization.summary_max_chars,
             token_chars_ratio=cfg.summarization.token_chars_ratio,
+            protected_tool_names=cfg.summarization.protected_tool_names,
         )
         middlewares.append(SummarizationMiddleware(llm=compression_llm, config=compression_config))
 

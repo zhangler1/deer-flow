@@ -62,6 +62,12 @@ class SummarizationConfig(BaseModel):
     compression_mode: str = Field(default="summarize", description="压缩模式: summarize 或 truncate")
     summary_max_chars: int = Field(default=1500, ge=100, description="摘要最大长度")
     token_chars_ratio: float = Field(default=3.0, gt=0, description="token 估算比率（与 SEARCH_BUDGET 保持一致，中英混合 3.0）")
+    protected_tool_names: list[str] = Field(
+        default_factory=lambda: [
+            "research_skill_prompt_search",
+        ],
+        description="受保护的工具名单：这些工具的返回结果会被标记为 protected，不会被全局上下文压缩摘要化",
+    )
 
 
 class LLMErrorHandlingConfig(BaseModel):

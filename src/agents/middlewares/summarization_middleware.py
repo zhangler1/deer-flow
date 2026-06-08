@@ -42,6 +42,13 @@ class SummarizationConfig:
     summary_max_chars: int = 1500
     # token 估算比率（字符数 / token）
     token_chars_ratio: float = 4.0
+    # 受保护的工具名单：这些工具的返回结果在 after_tool 中标记 protected=True，
+    # 全局上下文压缩时不会被摘要化，确保检索召回内容不丢失
+    protected_tool_names: list = None  # type: ignore
+
+    def __post_init__(self):
+        if self.protected_tool_names is None:
+            self.protected_tool_names = ["research_skill_prompt_search"]
 
 
 # 全局摘要使用的 prompt
@@ -140,20 +147,39 @@ class SummarizationMiddleware(AgentMiddleware):
         return compressed
     
     async def after_tool(self, messages: list, tool_results: list[Any], iteration: int, context: dict) -> list:
-        """即时截断过长的工具返回结果"""
+        """即时截断过长的工具返回结果，并对受保护工具的结果标记 protected
+        
+        受保护工具（protected_tool_names）的结果：
+        - 不会被即时截断（保留完整内容）
+        - 标记 protected=True，全局压缩时也不会被摘要化
+        """
         if not self.config.enabled:
             return messages
         
         max_chars = self.config.tool_result_max_chars
+        protected_tools = set(self.config.protected_tool_names or [])
         
         for tool_msg in tool_results:
             if not isinstance(tool_msg, ToolMessage):
                 continue
             
+            tool_name = getattr(tool_msg, "name", "") or ""
+            
+            # 受保护工具：跳过截断，直接标记 protected
+            if tool_name in protected_tools:
+                if not hasattr(tool_msg, "additional_kwargs") or tool_msg.additional_kwargs is None:
+                    tool_msg.additional_kwargs = {}
+                tool_msg.additional_kwargs["protected"] = True
+                logger.debug(
+                    f"🛡️ ToolResult 保护 | 工具: {tool_name} | "
+                    f"跳过截断 + 标记 protected=True"
+                )
+                continue
+            
+            # 非保护工具：超过 max_chars 则截断
             content = tool_msg.content or ""
             if len(content) > max_chars:
                 original_len = len(content)
-                # 截断并添加提示
                 tool_msg.content = (
                     content[:max_chars] +
                     f"\n\n... [内容已截断，原始长度: {original_len} 字符，保留前 {max_chars} 字符]"
