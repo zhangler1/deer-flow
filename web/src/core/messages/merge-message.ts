@@ -162,11 +162,30 @@ function mergeToolCallMessage(
         );
       }
     } else {
-      const streamingToolCall = message.toolCalls.find(
-        (toolCall) => toolCall.argsChunks?.length,
-      );
-      if (streamingToolCall) {
-        streamingToolCall.argsChunks!.push(convertToolChunkArgs(chunk.args));
+      // 使用 chunk.index 路由到正确的 toolCall（修复并行工具调用 args 错误合并问题）
+      const targetIndex = chunk.index ?? -1;
+      let targetToolCall =
+        targetIndex >= 0 && targetIndex < message.toolCalls.length
+          ? message.toolCalls[targetIndex]
+          : undefined;
+
+      // 如果按 index 找到的 toolCall 尚未初始化 argsChunks，则初始化
+      if (targetToolCall && !targetToolCall.argsChunks) {
+        targetToolCall.argsChunks = [];
+      }
+
+      // 回退：如果 index 无效，找最后一个有 argsChunks 的 toolCall
+      if (!targetToolCall) {
+        for (let i = message.toolCalls.length - 1; i >= 0; i--) {
+          if (message.toolCalls[i].argsChunks?.length) {
+            targetToolCall = message.toolCalls[i];
+            break;
+          }
+        }
+      }
+
+      if (targetToolCall?.argsChunks) {
+        targetToolCall.argsChunks.push(convertToolChunkArgs(chunk.args));
       }
     }
   }
