@@ -98,7 +98,7 @@ export function ScrollContainer({
         </>
       )}
       <ScrollArea ref={scrollRef} className="h-full w-full">
-        <div className="h-fit w-full overflow-x-hidden" ref={contentRef}>
+        <div className="h-fit w-full" ref={contentRef}>
           {children}
         </div>
       </ScrollArea>

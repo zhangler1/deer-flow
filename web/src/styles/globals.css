@@ -485,3 +485,8 @@ button {
   table-layout: auto;
   word-break: break-word;
 }
+
+/* 禁止 ScrollArea 视口水平滚动，防止绝对定位的悬浮卡片撑宽内容区 */
+[data-slot="scroll-area-viewport"] {
+  overflow-x: hidden !important;
+}
