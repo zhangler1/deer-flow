@@ -34,23 +34,46 @@ export function ResearchReportBlock({
   const { isReplay } = useReplay();
   const setReferences = useSourceStore((s) => s.setReferences);
   const setResearchId = useSourceStore((s) => s.setResearchId);
+  const isCompleted = message?.isStreaming === false && message?.content !== "";
 
   // 提取来源数据并设置到 store
   // 优先使用后端通过 reference_index SSE 事件设置的数据（与 MD 参考文献一致）
-  // 仅当后端未提供时，回退到从 tool_call_result 中提取
+  // 同时从 tool_call_result 中提取 snippet 等内容字段，合并补充到已有数据中
   useEffect(() => {
     setResearchId(researchId);
     const currentRefs = useSourceStore.getState().references;
-    // 如果 source-store 已有后端传来的索引数据，不覆盖
+    const toolCallSources = extractSourceDetails(researchId);
+
     if (currentRefs.length > 0) {
-      console.log('[ResearchReportBlock] 使用后端 reference_index 数据 | 条数:', currentRefs.length);
+      // 后端 reference_index 已提供 url/title/domain，但缺少 snippet/fullContent/aiSummary
+      // 从 toolCall 结果中补充内容字段
+      const contentMap = new Map(
+        toolCallSources
+          .filter((s) => s.url)
+          .map((s) => [s.url, s]),
+      );
+      const enriched = currentRefs.map((ref) => {
+        const detail = ref.url ? contentMap.get(ref.url) : undefined;
+        if (detail && (!ref.snippet && !ref.fullContent)) {
+          return {
+            ...ref,
+            snippet: detail.snippet,
+            fullContent: detail.fullContent,
+            aiSummary: detail.aiSummary,
+            toolName: detail.toolName ?? ref.toolName,
+            sourceType: detail.sourceType ?? ref.sourceType,
+          };
+        }
+        return ref;
+      });
+      console.log('[ResearchReportBlock] 合并后端 reference_index + toolCall 内容 | 条数:', enriched.length);
+      setReferences(enriched);
       return;
     }
-    // Fallback: 从 tool_call_result 中提取
-    const sources = extractSourceDetails(researchId);
-    console.log('[ResearchReportBlock] Fallback: 从 toolCalls 提取来源 | 条数:', sources.length);
-    setReferences(sources);
-  }, [researchId, setResearchId, setReferences]);
+    // Fallback: 后端未提供 reference_index，完全从 tool_call_result 中提取
+    console.log('[ResearchReportBlock] Fallback: 从 toolCalls 提取来源 | 条数:', toolCallSources.length);
+    setReferences(toolCallSources);
+  }, [researchId, setResearchId, setReferences, isCompleted]);
 
   const references = useSourceStore((s) => s.references);
 
@@ -73,7 +96,6 @@ export function ResearchReportBlock({
     [message],
   );
   const contentRef = useRef<HTMLDivElement>(null);
-  const isCompleted = message?.isStreaming === false && message?.content !== "";
 
   // reporter 内容过滤 think tag：流式和已完成均过滤
   const filteredContent = stripThinkTags(message?.content ?? "");
