@@ -11,6 +11,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 
 import { ThemeProviderWrapper } from "~/components/deer-flow/theme-provider-wrapper";
+import { GuwpTokenInitializer } from "~/components/deer-flow/guwp-token-initializer";
 import { withBasePath } from "~/core/utils/base-path";
 import { env } from "~/env";
 
@@ -53,6 +54,7 @@ export default async function RootLayout({
       </head>
       <body className="bg-app">
         <NextIntlClientProvider messages={messages}>
+          <GuwpTokenInitializer />
           <ThemeProviderWrapper>{children}</ThemeProviderWrapper>
           <Toaster />
         </NextIntlClientProvider>

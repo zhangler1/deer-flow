@@ -70,6 +70,8 @@ from src.tools import VolcengineTTS
 from src.graph.checkpoint import chat_stream_message
 from src.utils.json_utils import sanitize_args
 from src.utils.enhanced_logger import get_enhanced_logger, get_log_level_from_env, setup_enhanced_logging, current_thread_id
+from src.server.auth_middleware import GuwpTokenAuthMiddleware
+from src.server.dashboard_router import router as dashboard_router
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +142,12 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],  # Use the configured list of methods
     allow_headers=["*"],  # Now allow all headers, but can be restricted further
 )
+
+# guwpToken 用户认证中间件：从 Cookie 解析 token 并注入用户信息
+app.add_middleware(GuwpTokenAuthMiddleware)
+
+# 注册数据看板 API 路由
+app.include_router(dashboard_router)
 
 # Load examples into Milvus if configured
 if load_examples is not None:
@@ -701,7 +709,10 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
 
 
 async def _stream_graph_events(
-    graph_instance, workflow_input, workflow_config, thread_id
+    graph_instance, workflow_input, workflow_config, thread_id,
+    user_code: str = "anonymous", user_name: str = "",
+    branch_id: int = None, login_name: str = "",
+    stream_start_time: float = None,
 ):
     """Stream events from the graph and process them.
 
@@ -710,6 +721,8 @@ async def _stream_graph_events(
     """
     event_count = 0
     last_event_time = time.time()
+    if stream_start_time is None:
+        stream_start_time = time.time()
 
     # 心跳间隔（秒）：每 30 秒发送一次 ping，远小于 nginx proxy_read_timeout
     HEARTBEAT_INTERVAL = 30
@@ -718,6 +731,10 @@ async def _stream_graph_events(
     _step_index = -1
     _step_title = ""
     _cached_plan_steps = None
+
+    # ─── 报告内容追踪（用于生成完成后保存到 MinIO + DB）───
+    _reporter_content_buffer: dict[str, str] = {}  # msg_id -> accumulated content
+    _reporter_finished = False
 
     # 去重：记录已通过流式 chunk 发送过内容的消息 ID
     # LangGraph messages 流会发两次同一消息：1) LLM 流式 AIMessageChunk  2) 状态写回的完整 AIMessage
@@ -914,6 +931,17 @@ async def _stream_graph_events(
             ):
                 yield event
 
+            # ─── 报告内容追踪：累积 reporter 节点的输出内容 ───
+            _msg_node_rt = message_metadata.get("langgraph_node", "") if isinstance(message_metadata, dict) else ""
+            if (_msg_node_rt == "reporter" or agent_name == "reporter") and hasattr(message_chunk, 'content') and message_chunk.content:
+                msg_id = getattr(message_chunk, 'id', 'default')
+                if msg_id not in _reporter_content_buffer:
+                    _reporter_content_buffer[msg_id] = ""
+                _reporter_content_buffer[msg_id] += message_chunk.content
+                # 检测 reporter 完成
+                if hasattr(message_chunk, 'response_metadata') and message_chunk.response_metadata.get('finish_reason'):
+                    _reporter_finished = True
+
     except Exception as e:
         enhanced_logger.logger.error(
             f"[STREAM_ERROR] thread_id={thread_id} | 图执行出错 | "
@@ -949,6 +977,32 @@ async def _stream_graph_events(
         )
     finally:
         total_duration = time.time() - last_event_time
+
+        # ─── 报告生成完成：异步保存到 MinIO + DB + 埋点日志 ───
+        if _reporter_finished and _reporter_content_buffer:
+            # 合并所有 reporter 消息块的内容
+            full_report = "".join(_reporter_content_buffer.values())
+            if full_report.strip():
+                try:
+                    from src.server.report_service import handle_report_completed, extract_report_title
+                    title = extract_report_title(full_report)
+                    duration_ms = int((time.time() - stream_start_time) * 1000)
+                    # 后台任务，不阻塞流式响应
+                    asyncio.create_task(
+                        handle_report_completed(
+                            thread_id=thread_id,
+                            report_content=full_report,
+                            title=title,
+                            user_code=user_code,
+                            user_name=user_name,
+                            branch_id=branch_id,
+                            login_name=login_name,
+                            duration_ms=duration_ms,
+                            report_type="research",
+                        )
+                    )
+                except Exception as _report_err:
+                    logger.error(f"[REPORT_SERVICE] 报告保存调度失败 | thread_id={thread_id} | {_report_err}")
 
 
 
@@ -1105,6 +1159,22 @@ async def _astream_workflow_generator(
     # psycopg 级别的 kwargs（如 autocommit / row_factory / prepare_threshold），
     # 内部已自动启用 autocommit=True。如需自定义连接参数，
     # 请改用 AsyncConnectionPool + AsyncPostgresSaver(pool)。
+    # ─── 解析用户信息（从 auth_middleware 缓存获取，避免重复调用 API）───
+    _user_code = "anonymous"
+    _user_name = ""
+    _branch_id = None
+    _login_name = ""
+    if guwp_token:
+        from src.server.auth_middleware import _get_cached_user
+        cached = _get_cached_user(guwp_token)
+        if cached and cached.is_authenticated:
+            _user_code = cached.user_code
+            _user_name = cached.user_name
+            _branch_id = cached.branch_id
+            _login_name = cached.login_name
+
+    _stream_start = time.time()
+
     if checkpoint_saver and checkpoint_url != "":
         if checkpoint_url.startswith("postgresql://"):
             logger.info("start async postgres checkpointer.")
@@ -1115,19 +1185,28 @@ async def _astream_workflow_generator(
                 graph.checkpointer = checkpointer
                 graph.store = in_memory_store
                 async for event in _stream_graph_events(
-                    graph, workflow_input, workflow_config, thread_id
+                    graph, workflow_input, workflow_config, thread_id,
+                    user_code=_user_code, user_name=_user_name,
+                    branch_id=_branch_id, login_name=_login_name,
+                    stream_start_time=_stream_start,
                 ):
                     yield event
         else:
             logger.warning(f"Unsupported checkpoint URL scheme: {checkpoint_url}. Only postgresql:// is supported.")
             async for event in _stream_graph_events(
-                graph, workflow_input, workflow_config, thread_id
+                graph, workflow_input, workflow_config, thread_id,
+                user_code=_user_code, user_name=_user_name,
+                branch_id=_branch_id, login_name=_login_name,
+                stream_start_time=_stream_start,
             ):
                 yield event
     else:
         # Use graph without checkpointer
         async for event in _stream_graph_events(
-            graph, workflow_input, workflow_config, thread_id
+            graph, workflow_input, workflow_config, thread_id,
+            user_code=_user_code, user_name=_user_name,
+            branch_id=_branch_id, login_name=_login_name,
+            stream_start_time=_stream_start,
         ):
             yield event
 
