@@ -7,8 +7,4 @@ source_files: []
 depends_on: []
 related_to:
     - path: backend/tools_integrations/search_tools
-    - path: mock_llm
-    - path: frontend
     - path: infra
-    - path: backend/graph_engine/deep_research
-    - path: backend/rag_service

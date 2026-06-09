@@ -5,4 +5,10 @@ scope:
     - web/
 source_files: []
 depends_on: []
-related_to: []
+related_to:
+    - path: backend/server_api
+    - path: infra
+    - path: backend/graph_engine
+    - path: backend/config
+    - path: backend/graph_engine/deep_research
+    - path: backend/prompts_templates

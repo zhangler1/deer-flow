@@ -19,6 +19,7 @@ scope:
     - conf.yaml
     - conf.yaml.example
     - df0608.patch
+    - df0609.patch
     - finance_scenes.yaml
     - langgraph.json
     - main.py

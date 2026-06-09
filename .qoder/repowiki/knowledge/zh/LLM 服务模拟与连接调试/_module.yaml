@@ -7,10 +7,5 @@ source_files: []
 depends_on: []
 related_to:
     - path: backend/llm_providers
-    - path: mock_search
-    - path: frontend
+    - path: backend/config
     - path: infra
-    - path: backend/podcast_feature
-    - path: backend/ppt_feature
-    - path: backend/prose_feature
-    - path: backend/prompt_enhancer_feature
