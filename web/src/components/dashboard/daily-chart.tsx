@@ -61,11 +61,11 @@ export function DailyChart({ data }: DailyChartProps) {
         preserveAspectRatio="xMidYMid meet"
       >
         {/* 网格线 */}
-        {yTicks.map((tick) => {
+        {yTicks.map((tick, index) => {
           const y =
             padding.top + chartHeight - (tick / maxCount) * chartHeight;
           return (
-            <g key={tick}>
+            <g key={`ytick-${index}-${tick}`}>
               <line
                 x1={padding.left}
                 y1={y}
