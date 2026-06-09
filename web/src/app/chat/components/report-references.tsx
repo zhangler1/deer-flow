@@ -58,6 +58,7 @@ const SEARCH_TOOLS = new Set([
   "product_instance_search",
   "news_search",
   "news_detail_search",
+  "vector_search",
 ]);
 
 /** 爬虫工具名列表 */

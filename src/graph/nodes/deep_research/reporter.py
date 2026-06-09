@@ -288,7 +288,7 @@ async def reporter_node(state: State, config: RunnableConfig):
     ref_index_text, ref_map = build_reference_index(observations)
     if ref_index_text:
         # 截断策略：来源数量过多时只保留 top-50
-        max_sources = 50
+        max_sources = 120
         if len(ref_map) > max_sources:
             lines = ref_index_text.split("\n\n")[:max_sources]
             ref_index_text = "\n\n".join(lines)
