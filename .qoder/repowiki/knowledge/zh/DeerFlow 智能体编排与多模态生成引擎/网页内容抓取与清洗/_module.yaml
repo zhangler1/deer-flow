@@ -7,14 +7,13 @@ source_files: []
 depends_on: []
 related_to:
     - path: backend/tools_integrations/search_tools
-    - path: backend/graph_engine/deep_research
-    - path: backend/utils
     - path: backend/rag_service
-    - path: backend/graph_engine/core_engine
-    - path: backend/config
+    - path: backend/tools_integrations/tavily_search_adapter
+    - path: backend/graph_engine/deep_research
+    - path: backend/prompts_templates
     - path: backend/ppt_feature
-    - path: backend/prose_feature
     - path: backend/podcast_feature
+    - path: backend/prose_feature
     - path: backend/prompt_enhancer_feature
+    - path: backend/config
     - path: frontend
-    - path: infra

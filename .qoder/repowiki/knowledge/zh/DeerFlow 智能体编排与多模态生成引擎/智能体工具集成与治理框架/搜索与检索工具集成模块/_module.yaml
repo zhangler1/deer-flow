@@ -6,11 +6,13 @@ scope:
 source_files: []
 depends_on: []
 related_to:
+    - path: backend/graph_engine/deep_research
+    - path: mock_search
     - path: backend/rag_service
-    - path: backend/tools_integrations/utility_tools
-    - path: backend/tools_integrations/tavily_search_adapter
     - path: backend/crawler
+    - path: backend/tools_integrations/tavily_search_adapter
+    - path: backend/tools_integrations/utility_tools
+    - path: backend/utils
+    - path: backend/config
     - path: backend/data_lists
-    - path: backend/prompts_templates
-    - path: backend/llm_providers
-    - path: infra
+    - path: backend/agents_core

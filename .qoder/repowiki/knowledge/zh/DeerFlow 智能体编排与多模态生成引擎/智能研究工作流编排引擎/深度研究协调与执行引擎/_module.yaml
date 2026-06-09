@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: backend/graph_engine/deep_research
+title: 深度研究协调与执行引擎
+scope:
+    - src/graph/nodes/deep_research/
+source_files: []
+depends_on: []
+related_to: []

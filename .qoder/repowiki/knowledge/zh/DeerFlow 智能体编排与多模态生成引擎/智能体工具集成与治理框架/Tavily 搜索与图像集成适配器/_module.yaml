@@ -7,8 +7,8 @@ source_files: []
 depends_on: []
 related_to:
     - path: backend/tools_integrations/search_tools
-    - path: backend/tools_integrations/utility_tools
-    - path: backend/prompts_templates
-    - path: backend/llm_providers
+    - path: backend/crawler
     - path: backend/utils
-    - path: infra
+    - path: backend/tools_integrations/utility_tools
+    - path: backend/graph_engine/deep_research
+    - path: frontend

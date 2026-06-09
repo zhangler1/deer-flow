@@ -6,15 +6,15 @@ scope:
 source_files: []
 depends_on: []
 related_to:
-    - path: backend/podcast_feature
-    - path: backend/ppt_feature
-    - path: backend/prompt_enhancer_feature
-    - path: backend/server_api
-    - path: backend/prompts_templates
     - path: backend/llm_providers
-    - path: backend/config
+    - path: backend/ppt_feature
+    - path: backend/podcast_feature
+    - path: backend/prompt_enhancer_feature
     - path: backend/utils
-    - path: backend/crawler
+    - path: backend/config
+    - path: frontend
+    - path: mock_llm
+    - path: backend/rag_service
     - path: backend/data_lists
-    - path: infra
-    - path: mock_search
+    - path: backend/crawler
+    - path: backend/prompts_templates

@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: backend/graph_engine
+title: 智能研究工作流编排引擎
+scope:
+    - src/graph/
+source_files: []
+depends_on: []
+related_to: []

@@ -7,11 +7,16 @@ source_files: []
 depends_on: []
 related_to:
     - path: backend/tools_integrations/search_tools
-    - path: backend/config
-    - path: backend/utils
+    - path: backend/graph_engine/deep_research
     - path: backend/crawler
+    - path: backend/config
     - path: backend/data_lists
-    - path: backend/llm_providers
-    - path: backend/prompts_templates
     - path: frontend
-    - path: infra
+    - path: mock_search
+    - path: backend/prompts_templates
+    - path: backend/ppt_feature
+    - path: backend/podcast_feature
+    - path: backend/prose_feature
+    - path: backend/prompt_enhancer_feature
+    - path: backend/llm_providers
+    - path: backend/utils

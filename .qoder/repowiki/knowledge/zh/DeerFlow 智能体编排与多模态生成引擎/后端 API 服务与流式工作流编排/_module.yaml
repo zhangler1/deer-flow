@@ -5,4 +5,9 @@ scope:
     - src/server/
 source_files: []
 depends_on: []
-related_to: []
+related_to:
+    - path: backend/graph_engine
+    - path: frontend
+    - path: backend/utils
+    - path: backend/config
+    - path: infra

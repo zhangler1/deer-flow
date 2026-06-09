@@ -6,7 +6,5 @@ scope:
 source_files: []
 depends_on: []
 related_to:
-    - path: backend/config
-    - path: backend/utils
+    - path: backend/agents_core
     - path: frontend
-    - path: infra

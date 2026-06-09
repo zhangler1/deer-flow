@@ -7,21 +7,15 @@ source_files: []
 depends_on: []
 related_to:
     - path: backend/agents_core
-    - path: backend/tools_integrations
-    - path: backend/graph_engine
+    - path: backend/tools_integrations/search_tools
     - path: backend/server_api
-    - path: backend/crawler
-    - path: backend/rag_service
-    - path: backend/prompt_enhancer_feature
-    - path: backend/prose_feature
-    - path: backend/ppt_feature
-    - path: backend/podcast_feature
-    - path: backend/graph_engine/core_engine
-    - path: backend/graph_engine/deep_research
-    - path: backend/llm_providers
-    - path: backend/prompts_templates
-    - path: backend/data_lists
-    - path: backend/config
     - path: backend/tools_integrations/tavily_search_adapter
+    - path: backend/podcast_feature
+    - path: backend/ppt_feature
+    - path: backend/prose_feature
+    - path: backend/graph_engine/deep_research
+    - path: backend/graph_engine
+    - path: backend/prompt_enhancer_feature
+    - path: backend/rag_service
+    - path: backend/config
     - path: frontend
-    - path: infra

@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: frontend
-title: AI 深度研究与对话前端
+title: AI 深度研究与智能问答前端
 scope:
     - web/
 source_files: []

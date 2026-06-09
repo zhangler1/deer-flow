@@ -10,8 +10,6 @@ source_files: []
 depends_on: []
 related_to:
     - path: backend/tools_integrations/search_tools
+    - path: backend/config
     - path: backend/tools_integrations/tavily_search_adapter
-    - path: backend/prompts_templates
-    - path: backend/llm_providers
-    - path: backend/data_lists
-    - path: infra
+    - path: backend/agents_core
