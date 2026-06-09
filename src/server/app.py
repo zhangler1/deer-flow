@@ -743,7 +743,7 @@ async def _stream_graph_events(
     _cached_plan_steps = None
 
     # ─── 报告内容追踪（用于生成完成后保存到 MinIO + DB）───
-    _reporter_content_buffer: dict[str, str] = {}  # msg_id -> accumulated content
+    _reporter_content_from_state: str = ""  # 从 reporter 节点的状态更新中获取完整报告
     _reporter_finished = False
 
     # 去重：记录已通过流式 chunk 发送过内容的消息 ID
@@ -899,6 +899,20 @@ async def _stream_graph_events(
                             yield _make_event("tool_call_result", _tool_event)
                     break
 
+                # 7) 检测 reporter 节点的状态更新完成（兜底机制）
+                # reporter 节点返回 {"final_report": ..., "reference_index": ...}
+                # 这是状态更新，不是 LLM 流式响应，所以没有 finish_reason
+                for _node_name_rpt, _node_update_rpt in event_data.items():
+                    if _node_name_rpt == "reporter" and isinstance(_node_update_rpt, dict):
+                        if "final_report" in _node_update_rpt:
+                            _reporter_finished = True
+                            _report_content_from_state = _node_update_rpt.get("final_report", "")
+                            enhanced_logger.logger.info(
+                                f"[REPORTER_FINISHED_FROM_UPDATE] thread_id={thread_id} | "
+                                f"检测到 reporter 状态更新 | content_length={len(_report_content_from_state)}"
+                            )
+                        break
+
                 # 其他 update 目前不需要转成事件，直接忽略
                 continue
 
@@ -941,13 +955,9 @@ async def _stream_graph_events(
             ):
                 yield event
 
-            # ─── 报告内容追踪：累积 reporter 节点的输出内容 ───
+            # ─── 检测 reporter 完成标志（通过 LLM finish_reason）───
             _msg_node_rt = message_metadata.get("langgraph_node", "") if isinstance(message_metadata, dict) else ""
             if (_msg_node_rt == "reporter" or agent_name == "reporter") and hasattr(message_chunk, 'content') and message_chunk.content:
-                msg_id = getattr(message_chunk, 'id', 'default')
-                if msg_id not in _reporter_content_buffer:
-                    _reporter_content_buffer[msg_id] = ""
-                _reporter_content_buffer[msg_id] += message_chunk.content
                 # 检测 reporter 完成
                 if hasattr(message_chunk, 'response_metadata') and message_chunk.response_metadata.get('finish_reason'):
                     _reporter_finished = True
@@ -989,9 +999,8 @@ async def _stream_graph_events(
         total_duration = time.time() - last_event_time
 
         # ─── 报告生成完成：异步保存到 MinIO + DB + 埋点日志 ───
-        if _reporter_finished and _reporter_content_buffer:
-            # 合并所有 reporter 消息块的内容
-            full_report = "".join(_reporter_content_buffer.values())
+        if _reporter_finished and _report_content_from_state:
+            full_report = _report_content_from_state
             if full_report.strip():
                 try:
                     from src.server.report_service import handle_report_completed, extract_report_title
