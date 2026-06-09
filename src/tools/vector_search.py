@@ -249,17 +249,19 @@ def _parse_response(data: Dict[str, Any], query: str) -> List[Dict[str, Any]]:
 
         results.append(
             {
-                "title": title,
-                "content": content,
-                "score": score,
+                # url/title/score 优先序列化，确保 SummarizationMiddleware 截断后
+                # best-effort-json-parser 仍能解出关键字段供前端展示
                 "url": item.get("url") or "",
+                "title": title,
+                "score": score,
                 "source": item.get("source") or "vector_search",
+                "docGuid": item.get("docGuid") or "",
                 "category": raw_category,
                 "createTime": item.get("createTime") or "",
-                "docGuid": item.get("docGuid") or "",
                 "repository": item.get("repository") or "",
                 "attachEcmId": item.get("attachEcmId") or "",
                 "fromAttachment": bool(item.get("fromAttachment") or False),
+                "content": content,  # 长字段放最后，截断时不影响关键元数据
             }
         )
 

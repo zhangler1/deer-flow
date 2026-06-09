@@ -82,8 +82,8 @@ export interface ReferenceStepsProps {
 /** 搜索关键词标签 */
 function SearchTagBadge({ query }: { query: string }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-0.5 text-sm text-muted-foreground transition-colors hover:bg-muted">
-      <Search className="h-3.5 w-3.5 shrink-0" />
+    <span className="inline-flex max-w-[180px] items-center gap-1 rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted">
+      <Search className="h-3 w-3 shrink-0" />
       <span className="truncate">{query}</span>
     </span>
   );
@@ -92,8 +92,8 @@ function SearchTagBadge({ query }: { query: string }) {
 /** 已阅读资料标签 */
 function ReadTagBadge({ label = "已阅读相关资料" }: { label?: string }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-0.5 text-sm text-muted-foreground transition-colors hover:bg-muted">
-      <BookOpen className="h-3.5 w-3.5 shrink-0" />
+    <span className="inline-flex max-w-[180px] items-center gap-1 rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted">
+      <BookOpen className="h-3 w-3 shrink-0" />
       <span className="truncate">{label}</span>
     </span>
   );
@@ -234,10 +234,10 @@ function DocBadge({ title, subtitle }: DocTag) {
   const display = subtitle ? `${title} · ${subtitle}` : title;
   return (
     <span
-      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-0.5 text-sm text-muted-foreground"
+      className="inline-flex max-w-[120px] items-center gap-1 rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-xs text-muted-foreground"
       title={display}
     >
-      <BookOpen className="h-3.5 w-3.5 shrink-0" />
+      <BookOpen className="h-3 w-3 shrink-0" />
       <span className="truncate">{title}</span>
     </span>
   );
@@ -317,12 +317,17 @@ function StepRow({
   ) as DocTag[];
 
   const [expanded, setExpanded] = useState(false);
-  const hasMore = sourceLinks.length > maxVisibleSources;
-  const visibleSources =
-    expanded || !hasMore
-      ? sourceLinks
-      : sourceLinks.slice(0, maxVisibleSources);
-  const hiddenCount = sourceLinks.length - maxVisibleSources;
+  // sourceLinks + docTags 合并计算折叠
+  const totalLinks = sourceLinks.length + docTags.length;
+  const hasMore = totalLinks > maxVisibleSources;
+  const visibleSources = expanded || !hasMore
+    ? sourceLinks
+    : sourceLinks.slice(0, maxVisibleSources);
+  const docQuota = Math.max(0, maxVisibleSources - visibleSources.length);
+  const visibleDocs = expanded || !hasMore
+    ? docTags
+    : docTags.slice(0, docQuota);
+  const hiddenCount = totalLinks - maxVisibleSources;
 
   return (
     <div className="flex gap-2">
@@ -359,7 +364,7 @@ function StepRow({
 
             {/* 工具调用标签 */}
             {(searchTags.length > 0 || sourceLinks.length > 0 || docTags.length > 0) && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
+              <div className="mt-2 flex flex-wrap gap-1 overflow-hidden">
                 {/* 搜索/阅读标签 */}
                 {searchTags.map((tag, i) => {
                   if (tag.type === "search") {
@@ -378,7 +383,7 @@ function StepRow({
                 ))}
 
                 {/* 内网文档胶囊（不可点） */}
-                {docTags.map((doc, i) => (
+                {visibleDocs.map((doc, i) => (
                   <DocBadge key={`doc-${i}`} {...doc} />
                 ))}
 
@@ -386,15 +391,15 @@ function StepRow({
                 {hasMore && (
                   <button
                     onClick={() => setExpanded(!expanded)}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-0.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <ChevronDown
                       className={cn(
-                        "h-3.5 w-3.5 transition-transform",
+                        "h-3 w-3 transition-transform",
                         expanded && "rotate-180",
                       )}
                     />
-                    <span>{expanded ? "收起" : `展开 (${hiddenCount})`}</span>
+                    <span>{expanded ? "收起" : `+${hiddenCount}`}</span>
                   </button>
                 )}
               </div>

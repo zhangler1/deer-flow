@@ -53,6 +53,7 @@ const SEARCH_TOOLS = new Set([
   "budget_controlled_bocomsearch",
   "searchknowledge_standard",
   "budget_controlled_searchknowledge_standard",
+  "vector_search",
   "industry_report_search",
   "product_search",
   "product_instance_search",

@@ -236,21 +236,24 @@ class CustomSearchTool(BaseTool):
                 raw_category = "/".join(str(c) for c in raw_category if c)
 
             # 转换为 DeerFlow 统一的结构化格式
+            # url/title/score 优先序列化，确保截断后 best-effort-json-parser 仍能解出关键字段
             result = {
-                # === 核心必需字段 ===
-                "title": (item.get("title") or "").strip(),
-                "content": (item.get("content") or "").strip() or (item.get("absContent") or "").strip(),
-                "score": float(item.get("score") or 0) if item.get("score") else 0.0,
+                # === 核心必需字段（优先序列化） ===
                 "url": item.get("url") or "",  # url可能为None
+                "title": (item.get("title") or "").strip(),
+                "score": float(item.get("score") or 0) if item.get("score") else 0.0,
                 "source": item.get("source") or "",
 
                 # === 次要可选字段 ===
+                "docGuid": item.get("docGuid") or "",
                 "category": raw_category,
                 "createTime": item.get("createTime") or "",  # 创建时间
-                "docGuid": item.get("docGuid") or "",
                 "repository": item.get("repository") or "",
                 "attachEcmId": item.get("attachEcmId") or "",
                 "fromAttachment": bool(item.get("fromAttachment") or False),
+
+                # === 长字段放最后，截断时不影响关键元数据 ===
+                "content": (item.get("content") or "").strip() or (item.get("absContent") or "").strip(),
             }
 
             # 只有当内容不为空时才添加到结果中

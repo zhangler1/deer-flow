@@ -137,7 +137,7 @@ class Configuration:
     max_search_results_online_search: int = 0  # 互联网搜索返回条数，0=使用全局默认
     max_search_results_bocomsearch: int = 0  # 交行知识库返回条数，0=使用全局默认
     max_search_results_searchknowledge_standard: int = 0  # EUVD检索返回条数，0=使用全局默认
-    max_search_results_vector_search: int = 0  # 向量检索返回条数，0=使用全局默认
+    max_search_results_vector_search: int = 5  # 向量检索返回条数
     max_iteration: int = 5  # Maximum number of iterations for iterative research node
     search_engine: str = "custom_search"  # Search engine to use
     use_budget_controlled_online_search: bool = True  # 是否使用Budget控制的在线检索
