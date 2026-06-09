@@ -58,6 +58,7 @@ SUMMARIZATION_PROMPT = """请将以下对话历史压缩为简洁摘要。保留
 - 关键来源 URL
 - 已完成的步骤
 
+{truncation_warning}
 对话历史:
 {content}
 
@@ -268,12 +269,23 @@ class SummarizationMiddleware(AgentMiddleware):
             )
 
         keep_count = self.config.keep_recent_messages
-        
+
         if len(rest_msgs) <= keep_count:
+            logger.debug(
+                f"COMPRESS_SKIP | msgs={len(messages)} | sys={len(system_msgs)} | "
+                f"rest={len(rest_msgs)} | keep={keep_count} | 未超过保护阈值跳过 | "
+                f"thread_id={current_thread_id.get()}"
+            )
             return messages
-        
+
         # 2. 找到安全的切割点（参考 2.0 的 AI/Tool 对保护）
         cutoff = self._find_safe_cutoff(rest_msgs, keep_count)
+        logger.debug(
+            f"COMPRESS_ENTRY | msgs={len(messages)} | sys={len(system_msgs)} | "
+            f"rest={len(rest_msgs)} | keep={keep_count} | "
+            f"candidate={len(rest_msgs) - keep_count} | safe_cutoff={cutoff} | "
+            f"thread_id={current_thread_id.get()}"
+        )
         
         if cutoff <= 0:
             return messages
@@ -283,6 +295,19 @@ class SummarizationMiddleware(AgentMiddleware):
         
         # 3. 提取受保护的消息（不参与压缩）
         to_compress, to_keep = self._preserve_protected_messages(to_compress, to_keep)
+
+        # 诊断：待压缩清单
+        _compress_types = [type(m).__name__ for m in to_compress]
+        _compress_chars = [len(self._get_content(m)) for m in to_compress]
+        _keep_protected = sum(1 for m in to_keep if self._is_protected(m))
+        _keep_recent = len(to_keep) - _keep_protected
+        logger.debug(
+            f"COMPRESS_ITEMS | "
+            f"待压缩: {len(to_compress)}条 types={_compress_types} chars={_compress_chars} | "
+            f"保留: {len(to_keep)}条 ({_keep_protected}保护+{_keep_recent}最近) "
+            f"chars_total={sum(len(self._get_content(m)) for m in to_keep)} | "
+            f"thread_id={current_thread_id.get()}"
+        )
         
         # 根据模式选择压缩方法
         if self.config.compression_mode == "summarize" and self.llm:
@@ -297,7 +322,21 @@ class SummarizationMiddleware(AgentMiddleware):
         )
         
         # 4. 系统提示词拼回 position 0，确保 LLM 角色约束不丢失
-        return system_msgs + [summary_msg] + to_keep
+        result = system_msgs + [summary_msg] + to_keep
+        _pre_tok = self._estimate_tokens(messages)
+        _post_tok = self._estimate_tokens(result)
+        _pre_char = sum(len(self._get_content(m)) for m in messages)
+        _post_char = sum(len(self._get_content(m)) for m in result)
+        logger.debug(
+            f"COMPRESS_TAIL | "
+            f"前: {len(messages)}条/{_pre_tok}tok/{_pre_char}ch → "
+            f"后: {len(result)}条/{_post_tok}tok/{_post_char}ch | "
+            f"净tok: {_post_tok - _pre_tok:+d} | "
+            f"构成: {len(system_msgs)}系统+1摘要+{len(to_keep)}保留"
+            f"({_keep_protected}保护+{_keep_recent}最近) | "
+            f"thread_id={current_thread_id.get()}"
+        )
+        return result
     
     def _find_safe_cutoff(self, messages: list, keep_count: int) -> int:
         """找到安全的消息切割点，确保不拆散 AI/Tool 消息对
@@ -314,43 +353,89 @@ class SummarizationMiddleware(AgentMiddleware):
         
         # 向前搜索安全点：不拆散 AI + Tool 对
         idx = candidate
+        logger.debug(
+            f"CUTOFF_INIT | n={n} | candidate={candidate} | keep_count={keep_count} | "
+            f"thread_id={current_thread_id.get()}"
+        )
         while idx > 0:
             msg = messages[idx]
+            _type = type(msg).__name__
+            _has_tc = hasattr(msg, 'tool_calls') and bool(msg.tool_calls) if isinstance(msg, AIMessage) else False
+            logger.debug(
+                f"CUTOFF_WALK | idx={idx} | type={_type} | tool_calls={_has_tc} | "
+                f"thread_id={current_thread_id.get()}"
+            )
             if isinstance(msg, ToolMessage):
                 idx -= 1
                 continue
             if isinstance(msg, AIMessage) and hasattr(msg, 'tool_calls') and msg.tool_calls:
                 break
             break
-        
+        logger.debug(
+            f"CUTOFF_FINAL | idx={idx} | to_compress=[0:{idx}]={idx}条 | "
+            f"to_keep=[{idx}:]={n - idx}条 | thread_id={current_thread_id.get()}"
+        )
         return idx
     
     async def _summarize(self, messages: list) -> str:
         """使用 LLM 生成消息摘要"""
+        # 统计 after_tool 阶段被截断的消息数（内容含 "已截断" 标记）
+        tool_truncated = sum(1 for m in messages if isinstance(m, ToolMessage) and "已截断" in (self._get_content(m) or ""))
+
         content_parts = []
         for msg in messages:
             role = msg.__class__.__name__.replace("Message", "") if not isinstance(msg, dict) else msg.get("role", "unknown")
             text = self._get_content(msg)
             if text:
-                if len(text) > 500:
-                    text = text[:500] + "..."
                 content_parts.append(f"[{role}] {text}")
-        
+
         content = "\n".join(content_parts)
-        
-        # 限制总输入长度
-        max_input_chars = int(self.config.max_context_tokens * self.config.token_chars_ratio * 0.3)
+
+        # 构造截断说明：让压缩模型知道输入可能不完整
+        truncation_warning = ""
+        if tool_truncated > 0:
+            truncation_warning = (
+                f"【截断说明】注意：有 {tool_truncated} 条工具返回因过长已被截断"
+                f"（仅保留前 {self.config.tool_result_max_chars} 字符），"
+                f"摘要时请以截断前内容为准。\n\n"
+            )
+
+        # 限制总输入长度（兜底，防止超模型窗口）
+        max_input_chars = int(self.config.max_context_tokens * self.config.token_chars_ratio * 0.5)
+        total_input_truncated = False
         if len(content) > max_input_chars:
-            content = content[:max_input_chars] + "\n...[已截断]"
-        
+            content = content[:max_input_chars] + "\n...[总输入已截断]"
+            total_input_truncated = True
+
+        if total_input_truncated:
+            truncation_warning += (
+                f"【截断说明】总输入过长已被截断（仅保留前 {max_input_chars} 字符）。"
+            )
+
         prompt = SUMMARIZATION_PROMPT.format(
             content=content,
             max_chars=self.config.summary_max_chars,
+            truncation_warning=truncation_warning,
         )
-        
+
         try:
             response = await self.llm.ainvoke([HumanMessage(content=prompt)])
             summary = response.content or ""
+
+            # 诊断：压缩模型输入输出完整内容
+            _summary_log = summary
+            if len(content) > 3000:
+                _input_preview = content[:1500] + f"\n...[中间省略, 原始{len(content)}字符]...\n" + content[-500:]
+            else:
+                _input_preview = content
+            logger.debug(
+                f"SUMMARY_IO | input_chars={len(content)} | output_chars={len(summary)} | "
+                f"truncated_msgs={tool_truncated} | "
+                f"thread_id={current_thread_id.get()}\n"
+                f"SUMMARY_INPUT:\n{_input_preview}\n"
+                f"SUMMARY_OUTPUT:\n{_summary_log}"
+            )
+
             if len(summary) > self.config.summary_max_chars:
                 summary = summary[:self.config.summary_max_chars] + "..."
             return summary
