@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink, Globe, FileText } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink, Globe, FileText, ChevronDown, ChevronUp } from "lucide-react";
 
 import { useSourceStore } from "~/core/source-store";
 import { Button } from "~/components/ui/button";
@@ -26,6 +27,16 @@ function extractDomain(url: string): string {
   }
 }
 
+/** 判断 URL 是否为内部知识库链接（klbs-*-bocomm.com 域名） */
+function isInternalKlbsUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname;
+    return /^klbs-.*\.bocomm\.com$/.test(hostname);
+  } catch {
+    return false;
+  }
+}
+
 // ── 组件 ──────────────────────────────────────────
 
 /**
@@ -39,6 +50,8 @@ export function SourceDetailDrawer() {
   const closeDrawer = useSourceStore((s) => s.closeDrawer);
   const selectedUrl = useSourceStore((s) => s.selectedUrl);
   const references = useSourceStore((s) => s.references);
+  const [snippetExpanded, setSnippetExpanded] = useState(false);
+  const [fullContentExpanded, setFullContentExpanded] = useState(false);
 
   // 按 URL 查找匹配的来源数据
   const source = selectedUrl
@@ -95,11 +108,23 @@ export function SourceDetailDrawer() {
           {source?.snippet && (
             <div>
               <p className="mb-1 text-xs font-medium text-muted-foreground">内容摘要</p>
-              <p className="text-sm leading-relaxed text-foreground/80">
-                {source.snippet.length > 500
-                  ? source.snippet.slice(0, 500) + "..."
-                  : source.snippet}
+              <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap">
+                {snippetExpanded || source.snippet.length <= 500
+                  ? source.snippet
+                  : source.snippet.slice(0, 500) + "..."}
               </p>
+              {source.snippet.length > 500 && (
+                <button
+                  className="mt-1 flex items-center gap-0.5 text-xs text-primary hover:underline"
+                  onClick={() => setSnippetExpanded(!snippetExpanded)}
+                >
+                  {snippetExpanded ? (
+                    <><ChevronUp className="h-3 w-3" />收起</>
+                  ) : (
+                    <><ChevronDown className="h-3 w-3" />展开全文</>
+                  )}
+                </button>
+              )}
             </div>
           )}
 
@@ -107,11 +132,23 @@ export function SourceDetailDrawer() {
           {source?.fullContent && !source?.snippet && (
             <div>
               <p className="mb-1 text-xs font-medium text-muted-foreground">全文预览</p>
-              <p className="text-sm leading-relaxed text-foreground/80">
-                {source.fullContent.length > 800
-                  ? source.fullContent.slice(0, 800) + "..."
-                  : source.fullContent}
+              <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap">
+                {fullContentExpanded || source.fullContent.length <= 800
+                  ? source.fullContent
+                  : source.fullContent.slice(0, 800) + "..."}
               </p>
+              {source.fullContent.length > 800 && (
+                <button
+                  className="mt-1 flex items-center gap-0.5 text-xs text-primary hover:underline"
+                  onClick={() => setFullContentExpanded(!fullContentExpanded)}
+                >
+                  {fullContentExpanded ? (
+                    <><ChevronUp className="h-3 w-3" />收起</>
+                  ) : (
+                    <><ChevronDown className="h-3 w-3" />展开全文</>
+                  )}
+                </button>
+              )}
             </div>
           )}
 
@@ -129,9 +166,9 @@ export function SourceDetailDrawer() {
           )}
         </div>
 
-        {/* 底部操作栏 */}
+        {/* 底部操作栏：仅对 klbs-*-bocomm.com 域名展示原始链接按钮 */}
         <SheetFooter>
-          {selectedUrl && (
+          {selectedUrl && isInternalKlbsUrl(selectedUrl) && (
             <Button
               variant="outline"
               className="w-full gap-2"
