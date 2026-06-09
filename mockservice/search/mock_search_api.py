@@ -752,6 +752,79 @@ async def unified_search(request: Request):
         return JSONResponse(content=_build_online_response("", {}))
 
 
+# ============================================================
+# 路由：queryUserInfo（用户信息查询）
+# ============================================================
+@app.post("/ELLM.ELLM-OMSERVICE.V-1.0/queryUserInfo.do")
+async def query_user_info(request: Request):
+    """用户信息查询 mock 接口。
+
+    通过 guwpToken 获取当前登录用户信息。
+    请求格式：application/json
+    """
+    try:
+        body = await request.json()
+        req_body = body.get("REQ_BODY", {})
+        param = req_body.get("param", {})
+        guwp_token = param.get("guwpToken", "") or request.headers.get("guwp-token", "")
+
+        logger.info("[queryUserInfo] guwpToken=%s", guwp_token[:8] + "..." if len(guwp_token) > 8 else guwp_token)
+
+        response_data = {
+            "RSP_BODY": {
+                "result": {
+                    "guwpToken": guwp_token or "mock_guwp_token_default",
+                    "guipToken": None,
+                    "jrtAuthCode": None,
+                    "okicToken": None,
+                    "okicType": None,
+                    "httpHeaders": None,
+                    "branchId": 1000000003,
+                    "loginName": "mock_user",
+                    "userCode": "9999001",
+                    "userName": "张乐",
+                    "euifUserId": 5000000001,
+                    "device": "PC",
+                    "roles": None,
+                    "uniqueId": None,
+                    "logined": True,
+                    "userId": None,
+                    "uuid": None,
+                    "locale": None,
+                    "state": None,
+                    "cifId": None,
+                    "name": None,
+                    "attributes": {},
+                },
+                "param": None,
+            },
+            "RSP_HEAD": {
+                "TRAN_SUCCESS": "1",
+                "TRACE_NO": "mock-omservice-queryUserInfo-001",
+                "TRACE_ID": "mock.1.00.queryUserInfo",
+                "PROCESS_STATUS_CODE": "N",
+                "BIZ_TRACE_NO": None,
+            },
+        }
+        return JSONResponse(content=response_data)
+
+    except Exception as e:
+        logger.error("[queryUserInfo] 处理请求异常: %s", e)
+        return JSONResponse(
+            content={
+                "RSP_BODY": {"result": None, "param": None},
+                "RSP_HEAD": {
+                    "TRAN_SUCCESS": "0",
+                    "TRACE_NO": "mock-omservice-error",
+                    "TRACE_ID": "mock.1.00.error",
+                    "PROCESS_STATUS_CODE": "E",
+                    "BIZ_TRACE_NO": None,
+                },
+            },
+            status_code=500,
+        )
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "mock_search_api", "port": 8010}
@@ -765,5 +838,7 @@ if __name__ == "__main__":
     print("       application/json -> online_search（互联网新闻，5条）")
     print("  POST /EUVD.EUVD-ADAPTER.V-1.0/searchKnowledgeStandard.do")
     print("       form-urlencoded -> searchknowledge_standard（段落级标准知识检索，3条）")
+    print("  POST /ELLM.ELLM-OMSERVICE.V-1.0/queryUserInfo.do")
+    print("       application/json -> queryUserInfo（用户信息查询）")
     print("  GET  /health")
     uvicorn.run("mock_search_api:app", host="0.0.0.0", port=8010, reload=True)
