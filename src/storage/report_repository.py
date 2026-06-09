@@ -16,8 +16,9 @@ from uuid import UUID
 from psycopg_pool import AsyncConnectionPool
 
 from src.storage.models import DailyStat, DashboardSummary, ReportRecord
+from src.utils.enhanced_logger import get_enhanced_logger
 
-logger = logging.getLogger(__name__)
+logger = get_enhanced_logger(__name__).logger
 
 # ─── 连接池 ───
 
@@ -99,7 +100,7 @@ async def save_report(report: ReportRecord) -> UUID:
             row = await cur.fetchone()
             await conn.commit()
             report_id = row[0]
-            logger.info(f"✅ 报告元数据已保存 | id={report_id} | title={report.title[:50]}")
+            logger.info(f"✅ 报告元数据已保存 | id={report_id} | thread_id={report.thread_id} | title={report.title[:50]} | user={report.user_code}")
             return report_id
 
 

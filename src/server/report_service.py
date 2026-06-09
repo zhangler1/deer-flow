@@ -12,13 +12,14 @@
 """
 
 import asyncio
-import logging
 import time
 import uuid
 from datetime import datetime
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from src.utils.enhanced_logger import get_enhanced_logger
+
+logger = get_enhanced_logger(__name__).logger
 
 
 async def handle_report_completed(
@@ -54,7 +55,7 @@ async def handle_report_completed(
     try:
         # 1. 上传到 MinIO
         report_url, file_size = await _upload_to_minio(
-            thread_id, report_content, report_type
+            thread_id, report_content, report_type, title
         )
     except Exception as e:
         logger.error(f"[REPORT_SERVICE] MinIO 上传失败 | thread_id={thread_id} | {e}")
@@ -80,11 +81,11 @@ async def handle_report_completed(
         report_id = await report_repository.save_report(record)
         logger.info(
             f"[REPORT_SERVICE] 报告元数据已保存 | thread_id={thread_id} | "
-            f"report_id={report_id} | user={user_code}"
+            f"report_id={report_id} | user={user_code} | title={title[:50]}"
         )
     except Exception as e:
         logger.error(
-            f"[REPORT_SERVICE] 元数据保存失败 | thread_id={thread_id} | {e}"
+            f"[REPORT_SERVICE] 元数据保存失败 | thread_id={thread_id} | user={user_code} | {e}"
         )
 
     try:
@@ -103,12 +104,12 @@ async def handle_report_completed(
         )
     except Exception as e:
         logger.error(
-            f"[REPORT_SERVICE] 统计日志写入失败 | thread_id={thread_id} | {e}"
+            f"[REPORT_SERVICE] 统计日志写入失败 | thread_id={thread_id} | user={user_code} | {e}"
         )
 
 
 async def _upload_to_minio(
-    thread_id: str, content: str, report_type: str
+    thread_id: str, content: str, report_type: str, title: str = ""
 ) -> tuple[Optional[str], Optional[int]]:
     """上传报告内容到 MinIO
 
@@ -119,7 +120,7 @@ async def _upload_to_minio(
 
     # 检查是否配置了 MinIO
     if not os.getenv("MINIO_ENDPOINT"):
-        logger.info("[REPORT_SERVICE] MINIO_ENDPOINT 未配置，跳过上传")
+        logger.info(f"[REPORT_SERVICE] MINIO_ENDPOINT 未配置，跳过上传 | thread_id={thread_id}")
         return None, None
 
     from src.storage.minio_client import upload_report
@@ -142,7 +143,7 @@ async def _upload_to_minio(
 
     logger.info(
         f"[REPORT_SERVICE] MinIO 上传成功 | thread_id={thread_id} | "
-        f"url={report_url} | size={file_size}"
+        f"url={report_url} | size={file_size} | title={title[:50]}"
     )
     return report_url, file_size
 
