@@ -127,6 +127,16 @@ async def _start_background_monitor():
     asyncio.create_task(_system_monitor())
 
 
+@app.on_event("startup")
+async def _ensure_reports_table():
+    """确保 reports 表存在"""
+    try:
+        from src.storage import report_repository
+        await report_repository.ensure_table()
+    except Exception as e:
+        logger.warning(f"reports 表初始化失败（数据库可能未配置）: {e}")
+
+
 # Add CORS middleware
 # It's recommended to load the allowed origins from an environment variable
 # for better security and flexibility across different environments.
