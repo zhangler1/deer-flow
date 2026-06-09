@@ -1,0 +1,24 @@
+schema_version: 1
+module_path: frontend
+title: AI 深度研究与对话前端
+scope:
+    - web/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/server_api
+    - path: mock_search
+    - path: mock_llm
+    - path: infra
+    - path: backend/graph_engine
+    - path: backend/graph_engine/deep_research
+    - path: backend/graph_engine/core_engine
+    - path: backend/agents_core
+    - path: backend/llm_providers
+    - path: backend/tools_integrations
+    - path: backend/rag_service
+    - path: backend/prompts_templates
+    - path: backend/config
+    - path: backend/crawler
+    - path: backend/data_lists
+    - path: backend/utils

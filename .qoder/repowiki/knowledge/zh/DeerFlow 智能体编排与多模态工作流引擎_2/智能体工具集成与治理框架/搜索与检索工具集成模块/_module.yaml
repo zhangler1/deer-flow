@@ -1,0 +1,16 @@
+schema_version: 1
+module_path: backend/tools_integrations/search_tools
+title: 搜索与检索工具集成模块
+scope:
+    - src/tools/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/rag_service
+    - path: backend/tools_integrations/utility_tools
+    - path: backend/tools_integrations/tavily_search_adapter
+    - path: backend/crawler
+    - path: backend/data_lists
+    - path: backend/prompts_templates
+    - path: backend/llm_providers
+    - path: infra

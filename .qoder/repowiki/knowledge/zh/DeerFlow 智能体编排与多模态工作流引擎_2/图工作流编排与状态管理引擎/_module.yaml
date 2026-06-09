@@ -1,0 +1,17 @@
+schema_version: 1
+module_path: backend/graph_engine
+title: 图工作流编排与状态管理引擎
+scope:
+    - src/graph/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/utils
+    - path: backend/llm_providers
+    - path: backend/config
+    - path: backend/server_api
+    - path: backend/agents_core
+    - path: frontend
+    - path: mock_search
+    - path: mock_llm
+    - path: infra

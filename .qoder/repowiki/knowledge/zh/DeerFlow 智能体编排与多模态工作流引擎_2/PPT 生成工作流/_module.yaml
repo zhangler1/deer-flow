@@ -1,0 +1,20 @@
+schema_version: 1
+module_path: backend/ppt_feature
+title: PPT 生成工作流
+scope:
+    - src/ppt/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/podcast_feature
+    - path: backend/prose_feature
+    - path: backend/prompt_enhancer_feature
+    - path: backend/server_api
+    - path: backend/prompts_templates
+    - path: backend/llm_providers
+    - path: backend/config
+    - path: backend/utils
+    - path: backend/crawler
+    - path: backend/data_lists
+    - path: infra
+    - path: mock_search

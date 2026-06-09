@@ -1,0 +1,20 @@
+schema_version: 1
+module_path: backend/crawler
+title: 网页内容抓取与清洗
+scope:
+    - src/crawler/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/tools_integrations/search_tools
+    - path: backend/graph_engine/deep_research
+    - path: backend/utils
+    - path: backend/rag_service
+    - path: backend/graph_engine/core_engine
+    - path: backend/config
+    - path: backend/ppt_feature
+    - path: backend/prose_feature
+    - path: backend/podcast_feature
+    - path: backend/prompt_enhancer_feature
+    - path: frontend
+    - path: infra

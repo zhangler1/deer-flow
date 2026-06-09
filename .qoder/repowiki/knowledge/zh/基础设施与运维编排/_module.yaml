@@ -1,0 +1,37 @@
+schema_version: 1
+module_path: infra
+title: 基础设施与运维编排
+scope:
+    - nginx/
+    - scripts/
+    - SQL/
+    - langfuse/
+    - Dockerfile
+    - docker-compose.local.yml
+    - docker-compose.uat.yml
+    - docker-compose.easypase.yml
+source_files: []
+depends_on: []
+related_to:
+    - path: backend
+    - path: frontend
+    - path: backend/server_api
+    - path: backend/agents_core
+    - path: backend/graph_engine
+    - path: backend/llm_providers
+    - path: backend/tools_integrations
+    - path: backend/rag_service
+    - path: backend/prompts_templates
+    - path: backend/config
+    - path: backend/crawler
+    - path: backend/data_lists
+    - path: backend/utils
+    - path: backend/podcast_feature
+    - path: backend/ppt_feature
+    - path: backend/prose_feature
+    - path: backend/prompt_enhancer_feature
+    - path: backend/graph_engine/deep_research
+    - path: backend/graph_engine/core_engine
+    - path: backend/tools_integrations/tavily_search_adapter
+    - path: backend/tools_integrations/search_tools
+    - path: backend/tools_integrations/utility_tools

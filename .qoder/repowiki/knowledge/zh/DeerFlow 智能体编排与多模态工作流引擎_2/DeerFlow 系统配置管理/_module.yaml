@@ -1,0 +1,24 @@
+schema_version: 1
+module_path: backend/config
+title: DeerFlow 系统配置管理
+scope:
+    - src/config/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/agents_core
+    - path: backend/llm_providers
+    - path: backend/tools_integrations
+    - path: backend/graph_engine
+    - path: backend/rag_service
+    - path: backend/prompt_enhancer_feature
+    - path: backend/prose_feature
+    - path: backend/ppt_feature
+    - path: backend/podcast_feature
+    - path: backend/server_api
+    - path: backend/crawler
+    - path: backend/data_lists
+    - path: backend/utils
+    - path: backend/prompts_templates
+    - path: frontend
+    - path: infra

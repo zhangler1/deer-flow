@@ -1,0 +1,19 @@
+schema_version: 1
+module_path: backend/graph_engine/core_engine
+title: 深度研究工作流编排引擎
+scope:
+    - src/graph/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/graph_engine/deep_research
+    - path: backend/data_lists
+    - path: backend/prompts_templates
+    - path: backend/llm_providers
+    - path: frontend
+    - path: backend/agents_core
+    - path: backend/utils
+    - path: backend/crawler
+    - path: infra
+    - path: mock_search
+    - path: mock_llm

@@ -1,0 +1,17 @@
+schema_version: 1
+module_path: mock_llm
+title: LLM 服务模拟与连接调试
+scope:
+    - mockservice/llm/
+source_files: []
+depends_on: []
+related_to:
+    - path: frontend
+    - path: backend
+    - path: backend/llm_providers
+    - path: backend/agents_core
+    - path: backend/graph_engine
+    - path: backend/server_api
+    - path: backend/graph_engine/deep_research
+    - path: backend/graph_engine/core_engine
+    - path: backend/podcast_feature

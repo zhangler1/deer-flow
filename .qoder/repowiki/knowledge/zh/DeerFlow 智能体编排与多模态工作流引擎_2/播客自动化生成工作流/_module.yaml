@@ -1,0 +1,21 @@
+schema_version: 1
+module_path: backend/podcast_feature
+title: 播客自动化生成工作流
+scope:
+    - src/podcast/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/ppt_feature
+    - path: backend/prose_feature
+    - path: backend/prompt_enhancer_feature
+    - path: backend/server_api
+    - path: backend/prompts_templates
+    - path: backend/llm_providers
+    - path: backend/config
+    - path: backend/utils
+    - path: backend/crawler
+    - path: backend/data_lists
+    - path: infra
+    - path: mock_search
+    - path: mock_llm

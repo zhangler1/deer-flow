@@ -1,0 +1,586 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: midware
+exported_at: "2026-06-09T03:23:28Z"
+modules:
+    "":
+        dir_name: DeerFlow 智能体编排与多模态工作流引擎
+        title: DeerFlow 智能体编排与多模态工作流引擎
+        scope:
+            - CONTRIBUTING
+            - .gitignore
+            - conf.yaml.example
+            - Makefile
+            - langgraph.json
+            - compose-images.sh
+            - .dockerignore
+            - bootstrap.sh
+            - bootstrap.bat
+            - pyproject.toml
+            - main.py
+            - server.py
+            - examples/
+            - tests/
+            - stresstest/
+            - svgs/
+            - .github/
+            - .coverage
+            - .env
+            - .env.example
+            - .python-version
+            - LICENSE
+            - README.md
+            - conf.internal.yaml
+            - df0608.patch
+            - finance_scenes.yaml
+            - uv.lock
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    backend:
+        dir_name: DeerFlow 智能体编排与多模态工作流引擎_2
+        title: DeerFlow 智能体编排与多模态工作流引擎
+        scope:
+            - src/
+        source_files: []
+        children:
+            - backend/tools_integrations
+            - backend/graph_engine
+            - backend/ppt_feature
+            - backend/podcast_feature
+            - backend/data_lists
+            - backend/utils
+            - backend/rag_service
+            - backend/prompt_enhancer_feature
+            - backend/llm_providers
+            - backend/server_api
+            - backend/prose_feature
+            - backend/prompts_templates
+            - backend/crawler
+            - backend/config
+            - backend/agents_core
+        depends_on: []
+        related_to:
+            - path: infra
+            - path: mock_search
+            - path: mock_llm
+    backend/agents_core:
+        dir_name: ReAct Agent Core & Middleware Engine
+        title: ReAct Agent Core & Middleware Engine
+        scope:
+            - src/agents/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/config
+            - path: backend/utils
+            - path: backend/llm_providers
+            - path: backend/graph_engine
+            - path: backend/graph_engine/deep_research
+            - path: backend/graph_engine/core_engine
+            - path: frontend
+            - path: mock_search
+            - path: mock_llm
+            - path: infra
+    backend/config:
+        dir_name: DeerFlow 系统配置管理
+        title: DeerFlow 系统配置管理
+        scope:
+            - src/config/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/agents_core
+            - path: backend/llm_providers
+            - path: backend/tools_integrations
+            - path: backend/graph_engine
+            - path: backend/rag_service
+            - path: backend/prompt_enhancer_feature
+            - path: backend/prose_feature
+            - path: backend/ppt_feature
+            - path: backend/podcast_feature
+            - path: backend/server_api
+            - path: backend/crawler
+            - path: backend/data_lists
+            - path: backend/utils
+            - path: backend/prompts_templates
+            - path: frontend
+            - path: infra
+    backend/crawler:
+        dir_name: 网页内容抓取与清洗
+        title: 网页内容抓取与清洗
+        scope:
+            - src/crawler/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/tools_integrations/search_tools
+            - path: backend/graph_engine/deep_research
+            - path: backend/utils
+            - path: backend/rag_service
+            - path: backend/graph_engine/core_engine
+            - path: backend/config
+            - path: backend/ppt_feature
+            - path: backend/prose_feature
+            - path: backend/podcast_feature
+            - path: backend/prompt_enhancer_feature
+            - path: frontend
+            - path: infra
+    backend/data_lists:
+        dir_name: 研究技能与行业数据配置
+        title: 研究技能与行业数据配置
+        scope:
+            - src/data/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/graph_engine/deep_research
+            - path: backend/prompts_templates
+            - path: backend/graph_engine/core_engine
+            - path: backend/tools_integrations/search_tools
+            - path: backend/rag_service
+            - path: backend/config
+            - path: backend/utils
+            - path: backend/tools_integrations/utility_tools
+            - path: backend/ppt_feature
+            - path: backend/prose_feature
+            - path: backend/podcast_feature
+            - path: backend/prompt_enhancer_feature
+            - path: frontend
+            - path: infra
+    backend/graph_engine:
+        dir_name: 图工作流编排与状态管理引擎
+        title: 图工作流编排与状态管理引擎
+        scope:
+            - src/graph/
+        source_files: []
+        children:
+            - backend/graph_engine/core_engine
+            - backend/graph_engine/deep_research
+        depends_on: []
+        related_to:
+            - path: backend/utils
+            - path: backend/llm_providers
+            - path: backend/config
+            - path: backend/server_api
+            - path: backend/agents_core
+            - path: frontend
+            - path: mock_search
+            - path: mock_llm
+            - path: infra
+    backend/graph_engine/core_engine:
+        dir_name: 深度研究工作流编排引擎
+        title: 深度研究工作流编排引擎
+        scope:
+            - src/graph/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/graph_engine/deep_research
+            - path: backend/data_lists
+            - path: backend/prompts_templates
+            - path: backend/llm_providers
+            - path: frontend
+            - path: backend/agents_core
+            - path: backend/utils
+            - path: backend/crawler
+            - path: infra
+            - path: mock_search
+            - path: mock_llm
+    backend/graph_engine/deep_research:
+        dir_name: 深度研究协调与执行引擎
+        title: 深度研究协调与执行引擎
+        scope:
+            - src/graph/nodes/deep_research/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/graph_engine/core_engine
+            - path: backend/prompts_templates
+            - path: backend/data_lists
+            - path: backend/crawler
+            - path: backend/server_api
+            - path: backend/llm_providers
+            - path: frontend
+            - path: backend/agents_core
+            - path: backend/utils
+            - path: infra
+            - path: mock_search
+            - path: mock_llm
+    backend/llm_providers:
+        dir_name: LLM Provider Abstraction & Management
+        title: LLM Provider Abstraction & Management
+        scope:
+            - src/llms/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/config
+            - path: backend/agents_core
+            - path: backend/graph_engine
+            - path: backend/prompt_enhancer_feature
+            - path: backend/prose_feature
+            - path: backend/ppt_feature
+            - path: backend/podcast_feature
+            - path: backend/graph_engine/deep_research
+            - path: backend/graph_engine/core_engine
+            - path: mock_llm
+            - path: backend/tools_integrations/search_tools
+            - path: backend/tools_integrations/utility_tools
+            - path: backend/rag_service
+            - path: backend/utils
+            - path: backend/tools_integrations/tavily_search_adapter
+            - path: frontend
+            - path: infra
+    backend/podcast_feature:
+        dir_name: 播客自动化生成工作流
+        title: 播客自动化生成工作流
+        scope:
+            - src/podcast/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/ppt_feature
+            - path: backend/prose_feature
+            - path: backend/prompt_enhancer_feature
+            - path: backend/server_api
+            - path: backend/prompts_templates
+            - path: backend/llm_providers
+            - path: backend/config
+            - path: backend/utils
+            - path: backend/crawler
+            - path: backend/data_lists
+            - path: infra
+            - path: mock_search
+            - path: mock_llm
+    backend/ppt_feature:
+        dir_name: PPT 生成工作流
+        title: PPT 生成工作流
+        scope:
+            - src/ppt/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/podcast_feature
+            - path: backend/prose_feature
+            - path: backend/prompt_enhancer_feature
+            - path: backend/server_api
+            - path: backend/prompts_templates
+            - path: backend/llm_providers
+            - path: backend/config
+            - path: backend/utils
+            - path: backend/crawler
+            - path: backend/data_lists
+            - path: infra
+            - path: mock_search
+    backend/prompt_enhancer_feature:
+        dir_name: 提示词增强引擎
+        title: 提示词增强引擎
+        scope:
+            - src/prompt_enhancer/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/podcast_feature
+            - path: backend/ppt_feature
+            - path: backend/prose_feature
+            - path: backend/server_api
+            - path: backend/prompts_templates
+            - path: backend/llm_providers
+            - path: backend/config
+            - path: backend/utils
+            - path: backend/crawler
+            - path: backend/data_lists
+            - path: infra
+            - path: mock_search
+    backend/prompts_templates:
+        dir_name: 提示词模板与规则管理
+        title: 提示词模板与规则管理
+        scope:
+            - src/prompts/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/graph_engine/deep_research
+            - path: backend/prose_feature
+            - path: backend/prompt_enhancer_feature
+            - path: backend/ppt_feature
+            - path: backend/podcast_feature
+            - path: backend/data_lists
+            - path: backend/graph_engine/core_engine
+            - path: backend/tools_integrations/search_tools
+            - path: backend/tools_integrations/utility_tools
+            - path: backend/utils
+            - path: backend/rag_service
+            - path: backend/tools_integrations/tavily_search_adapter
+            - path: backend/config
+            - path: frontend
+            - path: infra
+    backend/prose_feature:
+        dir_name: 散文生成工作流
+        title: 散文生成工作流
+        scope:
+            - src/prose/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/podcast_feature
+            - path: backend/ppt_feature
+            - path: backend/prompt_enhancer_feature
+            - path: backend/server_api
+            - path: backend/prompts_templates
+            - path: backend/llm_providers
+            - path: backend/config
+            - path: backend/utils
+            - path: backend/crawler
+            - path: backend/data_lists
+            - path: infra
+            - path: mock_search
+    backend/rag_service:
+        dir_name: RAG检索与多后端适配模块
+        title: RAG检索与多后端适配模块
+        scope:
+            - src/rag/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/tools_integrations/search_tools
+            - path: backend/config
+            - path: backend/utils
+            - path: backend/crawler
+            - path: backend/data_lists
+            - path: backend/llm_providers
+            - path: backend/prompts_templates
+            - path: frontend
+            - path: infra
+    backend/server_api:
+        dir_name: DeerFlow API 服务与流式工作流编排
+        title: DeerFlow API 服务与流式工作流编排
+        scope:
+            - src/server/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/podcast_feature
+            - path: backend/ppt_feature
+            - path: backend/prose_feature
+            - path: backend/prompt_enhancer_feature
+            - path: frontend
+            - path: backend/utils
+            - path: backend/graph_engine
+            - path: backend/graph_engine/deep_research
+            - path: infra
+            - path: mock_search
+            - path: backend/config
+            - path: mock_llm
+    backend/tools_integrations:
+        dir_name: 智能体工具集成与治理框架
+        title: 智能体工具集成与治理框架
+        scope:
+            - src/tools/
+        source_files: []
+        children:
+            - backend/tools_integrations/utility_tools
+            - backend/tools_integrations/search_tools
+            - backend/tools_integrations/tavily_search_adapter
+        depends_on: []
+        related_to:
+            - path: backend/config
+            - path: backend/utils
+            - path: frontend
+            - path: infra
+    backend/tools_integrations/search_tools:
+        dir_name: 搜索与检索工具集成模块
+        title: 搜索与检索工具集成模块
+        scope:
+            - src/tools/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/rag_service
+            - path: backend/tools_integrations/utility_tools
+            - path: backend/tools_integrations/tavily_search_adapter
+            - path: backend/crawler
+            - path: backend/data_lists
+            - path: backend/prompts_templates
+            - path: backend/llm_providers
+            - path: infra
+    backend/tools_integrations/tavily_search_adapter:
+        dir_name: Tavily 搜索与图像集成适配器
+        title: Tavily 搜索与图像集成适配器
+        scope:
+            - src/tools/tavily_search/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/tools_integrations/search_tools
+            - path: backend/tools_integrations/utility_tools
+            - path: backend/prompts_templates
+            - path: backend/llm_providers
+            - path: backend/utils
+            - path: infra
+    backend/tools_integrations/utility_tools:
+        dir_name: 通用工具与增强日志集成
+        title: 通用工具与增强日志集成
+        scope:
+            - src/tools/python_repl.py
+            - src/tools/tts.py
+            - src/tools/decorators.py
+            - src/tools/retriever.py
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/tools_integrations/search_tools
+            - path: backend/tools_integrations/tavily_search_adapter
+            - path: backend/prompts_templates
+            - path: backend/llm_providers
+            - path: backend/data_lists
+            - path: infra
+    backend/utils:
+        dir_name: 通用工具与可观测性基础设施
+        title: 通用工具与可观测性基础设施
+        scope:
+            - src/utils/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/agents_core
+            - path: backend/tools_integrations
+            - path: backend/graph_engine
+            - path: backend/server_api
+            - path: backend/crawler
+            - path: backend/rag_service
+            - path: backend/prompt_enhancer_feature
+            - path: backend/prose_feature
+            - path: backend/ppt_feature
+            - path: backend/podcast_feature
+            - path: backend/graph_engine/core_engine
+            - path: backend/graph_engine/deep_research
+            - path: backend/llm_providers
+            - path: backend/prompts_templates
+            - path: backend/data_lists
+            - path: backend/config
+            - path: backend/tools_integrations/tavily_search_adapter
+            - path: frontend
+            - path: infra
+    frontend:
+        dir_name: AI 深度研究与对话前端
+        title: AI 深度研究与对话前端
+        scope:
+            - web/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend/server_api
+            - path: mock_search
+            - path: mock_llm
+            - path: infra
+            - path: backend/graph_engine
+            - path: backend/graph_engine/deep_research
+            - path: backend/graph_engine/core_engine
+            - path: backend/agents_core
+            - path: backend/llm_providers
+            - path: backend/tools_integrations
+            - path: backend/rag_service
+            - path: backend/prompts_templates
+            - path: backend/config
+            - path: backend/crawler
+            - path: backend/data_lists
+            - path: backend/utils
+    infra:
+        dir_name: 基础设施与运维编排
+        title: 基础设施与运维编排
+        scope:
+            - nginx/
+            - scripts/
+            - SQL/
+            - langfuse/
+            - Dockerfile
+            - docker-compose.local.yml
+            - docker-compose.uat.yml
+            - docker-compose.easypase.yml
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend
+            - path: frontend
+            - path: backend/server_api
+            - path: backend/agents_core
+            - path: backend/graph_engine
+            - path: backend/llm_providers
+            - path: backend/tools_integrations
+            - path: backend/rag_service
+            - path: backend/prompts_templates
+            - path: backend/config
+            - path: backend/crawler
+            - path: backend/data_lists
+            - path: backend/utils
+            - path: backend/podcast_feature
+            - path: backend/ppt_feature
+            - path: backend/prose_feature
+            - path: backend/prompt_enhancer_feature
+            - path: backend/graph_engine/deep_research
+            - path: backend/graph_engine/core_engine
+            - path: backend/tools_integrations/tavily_search_adapter
+            - path: backend/tools_integrations/search_tools
+            - path: backend/tools_integrations/utility_tools
+    mock_llm:
+        dir_name: LLM 服务模拟与连接调试
+        title: LLM 服务模拟与连接调试
+        scope:
+            - mockservice/llm/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: frontend
+            - path: backend
+            - path: backend/llm_providers
+            - path: backend/agents_core
+            - path: backend/graph_engine
+            - path: backend/server_api
+            - path: backend/graph_engine/deep_research
+            - path: backend/graph_engine/core_engine
+            - path: backend/podcast_feature
+    mock_search:
+        dir_name: 搜索与资讯 Mock 服务集群
+        title: 搜索与资讯 Mock 服务集群
+        scope:
+            - mockservice/search/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: frontend
+            - path: backend
+            - path: backend/server_api
+            - path: backend/agents_core
+            - path: backend/graph_engine
+            - path: backend/graph_engine/deep_research
+            - path: backend/graph_engine/core_engine
+            - path: backend/podcast_feature
+            - path: backend/ppt_feature
+            - path: backend/prose_feature
+            - path: backend/prompt_enhancer_feature

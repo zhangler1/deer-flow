@@ -1,0 +1,14 @@
+schema_version: 1
+module_path: backend/tools_integrations/tavily_search_adapter
+title: Tavily 搜索与图像集成适配器
+scope:
+    - src/tools/tavily_search/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/tools_integrations/search_tools
+    - path: backend/tools_integrations/utility_tools
+    - path: backend/prompts_templates
+    - path: backend/llm_providers
+    - path: backend/utils
+    - path: infra

@@ -1,0 +1,20 @@
+schema_version: 1
+module_path: backend/server_api
+title: DeerFlow API 服务与流式工作流编排
+scope:
+    - src/server/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/podcast_feature
+    - path: backend/ppt_feature
+    - path: backend/prose_feature
+    - path: backend/prompt_enhancer_feature
+    - path: frontend
+    - path: backend/utils
+    - path: backend/graph_engine
+    - path: backend/graph_engine/deep_research
+    - path: infra
+    - path: mock_search
+    - path: backend/config
+    - path: mock_llm

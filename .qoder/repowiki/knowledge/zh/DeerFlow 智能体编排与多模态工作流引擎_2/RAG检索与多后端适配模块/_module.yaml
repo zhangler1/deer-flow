@@ -1,0 +1,17 @@
+schema_version: 1
+module_path: backend/rag_service
+title: RAG检索与多后端适配模块
+scope:
+    - src/rag/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/tools_integrations/search_tools
+    - path: backend/config
+    - path: backend/utils
+    - path: backend/crawler
+    - path: backend/data_lists
+    - path: backend/llm_providers
+    - path: backend/prompts_templates
+    - path: frontend
+    - path: infra

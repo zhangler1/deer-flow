@@ -1,0 +1,17 @@
+schema_version: 1
+module_path: backend/tools_integrations/utility_tools
+title: 通用工具与增强日志集成
+scope:
+    - src/tools/python_repl.py
+    - src/tools/tts.py
+    - src/tools/decorators.py
+    - src/tools/retriever.py
+source_files: []
+depends_on: []
+related_to:
+    - path: backend/tools_integrations/search_tools
+    - path: backend/tools_integrations/tavily_search_adapter
+    - path: backend/prompts_templates
+    - path: backend/llm_providers
+    - path: backend/data_lists
+    - path: infra
