@@ -195,15 +195,19 @@ def _load_react_loop_config() -> ReactLoopConfig:
 
 
 def _read_yaml_section() -> dict:
-    """从 conf.yaml 读取 REACT_LOOP 段"""
+    """读取当前激活的 YAML 中 REACT_LOOP 段
+
+    通过 _get_config_file_path() 实现 conf.yaml / conf.internal.yaml 的自动切换。
+    """
+    config_path = "conf.yaml"
     try:
         from src.config import load_yaml_config
-        import os as _os
-        config_path = _os.path.join(_os.getcwd(), "conf.yaml")
+        from src.llms.llm import _get_config_file_path
+        config_path = _get_config_file_path()
         full_config = load_yaml_config(config_path)
         return full_config.get("REACT_LOOP", {}) or {}
     except Exception as e:
-        logger.warning(f"⚠️ 无法从 conf.yaml 加载 REACT_LOOP: {e}")
+        logger.warning(f"⚠️ 无法从 {config_path} 加载 REACT_LOOP: {e}")
         return {}
 
 
