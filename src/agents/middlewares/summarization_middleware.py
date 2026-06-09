@@ -11,6 +11,7 @@
 2. after_tool: 对刚产生的工具结果做即时截断/压缩，防止单次工具返回过大
 """
 
+import json
 import logging
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -181,14 +182,24 @@ class SummarizationMiddleware(AgentMiddleware):
             content = tool_msg.content or ""
             if len(content) > max_chars:
                 original_len = len(content)
-                tool_msg.content = (
-                    content[:max_chars] +
-                    f"\n\n... [内容已截断，原始长度: {original_len} 字符，保留前 {max_chars} 字符]"
-                )
+                # 优先尝试 JSON 感知截断（保持输出始终为合法 JSON）
+                truncated = self._truncate_json_aware(content, max_chars)
+                if truncated is not None:
+                    tool_msg.content = truncated
+                    new_len = len(truncated)
+                    mode = "JSON"
+                else:
+                    # 非 JSON 内容，回退字符级截断
+                    tool_msg.content = (
+                        content[:max_chars] +
+                        f"\n\n... [内容已截断，原始长度: {original_len} 字符，保留前 {max_chars} 字符]"
+                    )
+                    mode = "CHAR"
                 self._tool_truncations_count += 1
                 logger.debug(
                     f"✂️ ToolResult 截断 | 工具: {tool_msg.name} | "
-                    f"{original_len} → {max_chars} 字符"
+                    f"{original_len} → {len(tool_msg.content)} 字符 | "
+                    f"模式: {mode}"
                 )
         
         return messages
@@ -376,7 +387,88 @@ class SummarizationMiddleware(AgentMiddleware):
             f"to_keep=[{idx}:]={n - idx}条 | thread_id={current_thread_id.get()}"
         )
         return idx
-    
+
+    @staticmethod
+    def _truncate_json_aware(content: str, max_chars: int) -> Optional[str]:
+        """JSON 感知截断：以完整 JSON 元素为单位，保持输出始终为合法 JSON。
+
+        支持两种输入格式：
+        1. 纯 JSON 数组: [elem1, elem2, ...]
+           → 保留头部完整元素 + 追加 {"_reminding": "..."} 说明元素
+        2. BudgetEnforcement 打包的对象: {"data": [...], "reminding": "..."}
+           → 截断 data 数组内的元素 + 更新 reminding 字段
+
+        非 JSON / 无法解析时返回 None，调用方回退字符级截断。
+        """
+        stripped = content.strip()
+
+        try:
+            parsed = json.loads(stripped)
+        except json.JSONDecodeError:
+            return None
+
+        # ── 格式 1：纯 JSON 数组 ──
+        if isinstance(parsed, list):
+            if not parsed:
+                return content  # 空数组无需截断
+
+            kept = []
+            for item in parsed:
+                candidate = json.dumps(kept + [item], ensure_ascii=False, default=str)
+                if len(candidate) > max_chars:
+                    break
+                kept.append(item)
+
+            original_count = len(parsed)
+            if len(kept) == original_count:
+                return content  # 全部放下，无需截断
+
+            if not kept:
+                # 单条结果本身超过 max_chars，至少保留 1 条
+                kept = [parsed[0]]
+
+            notice = {
+                "_reminding": (
+                    f"内容已截断：原始 {original_count} 条结果，"
+                    f"保留 {len(kept)} 条，移除 {original_count - len(kept)} 条"
+                )
+            }
+            return json.dumps(kept + [notice], ensure_ascii=False, default=str)
+
+        # ── 格式 2：BudgetEnforcement._append_warning 打包的对象 ──
+        if isinstance(parsed, dict) and "data" in parsed and isinstance(parsed["data"], list):
+            data = parsed["data"]
+            if not data:
+                return content
+
+            kept_data = []
+            for item in data:
+                candidate = json.dumps({
+                    **parsed,
+                    "data": kept_data + [item],
+                }, ensure_ascii=False, default=str)
+                if len(candidate) > max_chars:
+                    break
+                kept_data.append(item)
+
+            if len(kept_data) == len(data):
+                return content
+
+            if not kept_data:
+                kept_data = [data[0]]
+
+            return json.dumps({
+                **parsed,
+                "data": kept_data,
+                "reminding": (
+                    f"内容已截断：原始 {len(data)} 条搜索结果，"
+                    f"保留 {len(kept_data)} 条，移除 {len(data) - len(kept_data)} 条。"
+                    f"{parsed.get('reminding', '')}"
+                ),
+            }, ensure_ascii=False, default=str)
+
+        return None  # 非数组 / 非已知格式，回退字符截断
+
     async def _summarize(self, messages: list) -> str:
         """使用 LLM 生成消息摘要"""
         # 统计 after_tool 阶段被截断的消息数（内容含 "已截断" 标记）
