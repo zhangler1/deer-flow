@@ -642,7 +642,7 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
             
             # Check if this is an online_search, bocomsearch or web_search tool call and emit search_status event
             for tool_call in message_chunk.tool_calls:
-                if tool_call.get("name") in ["web_search", "online_search", "bocomsearch"]:
+                if tool_call.get("name") in ["web_search", "online_search", "vector_search"]:
                     # Extract query and repository from tool call args
                     args = tool_call.get("args", {})
                     query = args.get("query", "")

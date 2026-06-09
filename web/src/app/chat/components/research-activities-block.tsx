@@ -99,6 +99,7 @@ function isSearchTool(name: string): boolean {
     "local_search_tool",
     "retriever_tool",
     "research_skill_prompt_search",
+    "vector_search",
   ].includes(name);
 }
 
