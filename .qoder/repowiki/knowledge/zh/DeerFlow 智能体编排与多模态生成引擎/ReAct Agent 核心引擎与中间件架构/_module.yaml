@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: backend/agents_core
+title: ReAct Agent 核心引擎与中间件架构
+scope:
+    - src/agents/
+source_files: []
+depends_on: []
+related_to: []

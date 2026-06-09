@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: backend/server_api
+title: 后端 API 服务与流式工作流编排
+scope:
+    - src/server/
+source_files: []
+depends_on: []
+related_to: []
