@@ -1,0 +1,345 @@
+"""Mock Search API - searchknowledge_standard 段落级标准知识检索路由"""
+
+import json
+import logging
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+# Mock 数据 searchknowledge_standard（EUVD 段落级标准知识检索）
+SEARCHKNOWLEDGE_MOCK_RESULTS = [
+    {
+        "paraId": "mock-para-001",
+        "content": "交通银行数字化转型总体目标：以『科技赋能、数据驱动、业务创新』为核心理念，2025-2027年累计科技投入不低于600亿元。重点推进AI大模型与金融业务融合应用，在智能风控、投研分析、客户服务三大场景率先落地。加快核心系统云化改造，建设企业级数据中台和技术中台，实现业务敏捷迭代，打造行业领先的智慧银行。",
+        "score": 0.6892,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_001",
+        "fileName": "交通银行数字化转型三年规划（2025-2027）",
+        "customizedTags": [
+            "SP0000100_内网_战略规划",
+            "数字化转型",
+        ],
+        "createTime": "Mon Mar 03 10:00:00 CST 2026",
+        "updateTime": "Tue Mar 04 11:00:00 CST 2026",
+        "validTimeStart": "Mon Mar 03 10:00:00 CST 2026",
+        "validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+        "pubTime": "Mon Mar 03 12:00:00 CST 2026",
+        "taskId": "TASK_MOCK_001",
+        "page": -1,
+        "sorted": 1,
+        "paraTitle": "# 1. 交通银行数字化转型总体目标",
+        "mainTaskId": None,
+        "knType": 3,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0999999", "SP0000100"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-002",
+        "content": "交通银行自研金融大模型『交智』技术参数：基于Transformer架构，参数量达千亿级，专为中国金融场景优化。支持文本理解、图像识别、语音交互等多模态能力。在智能客服场景实现80%常见问题自动应答，在智能风控场景欺诈识别准确率提升至99.5%，在智能投研场景研报生成效率提升10倍。模型输出须经过滤审查，确保符合金融监管要求。",
+        "score": 0.6541,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_002",
+        "fileName": "交通银行AI大模型应用技术规范_V2.0",
+        "customizedTags": [
+            "SP0000100_内网_技术规范",
+            "AI大模型",
+        ],
+        "createTime": "Wed Apr 09 09:00:00 CST 2026",
+        "updateTime": "Wed Apr 09 18:00:00 CST 2026",
+        "validTimeStart": "Wed Apr 09 09:00:00 CST 2026",
+        "validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+        "pubTime": "Wed Apr 09 14:30:00 CST 2026",
+        "taskId": "TASK_MOCK_002",
+        "page": -1,
+        "sorted": 2,
+        "paraTitle": "# 交通银行AI大模型技术参数",
+        "mainTaskId": None,
+        "knType": 3,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0999999", "SP0000100"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-003",
+        "content": "交通银行核心系统云化改造进展：截至2025年一季度，已有75%的业务系统完成云迁移，云化率居行业领先。采用自主可控的金融云架构，实现资源弹性伸缩和秒级故障切换。核心交易系统云化后，交易处理能力提升3倍，系统可用性达到99.999%。计划2026年底前核心交易系统云化率达到80%，为业务创新提供强大技术支撑。",
+        "score": 0.6213,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_003",
+        "fileName": "交通银行云计算平台建设方案（2025年）",
+        "customizedTags": [
+            "SP0000100_内网_技术方案",
+            "云计算",
+        ],
+        "createTime": "Fri Feb 20 09:00:00 CST 2026",
+        "updateTime": "Mon Feb 23 10:00:00 CST 2026",
+        "validTimeStart": "Fri Feb 20 09:00:00 CST 2026",
+        "validTimeEnd": "Fri Jan 01 08:00:00 CST 2038",
+        "pubTime": "Fri Feb 20 16:00:00 CST 2026",
+        "taskId": "TASK_MOCK_003",
+        "page": -1,
+        "sorted": 3,
+        "paraTitle": "# 交通银行核心系统云化进展",
+        "mainTaskId": None,
+        "knType": 2,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0000100", "SP0999999"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-004",
+        "content": "交通银行数据治理体系建设：设立数据治理委员会，形成总行-分行-支行三级数据管理架构。统一客户数据标准、产品数据标准、交易数据标准，数据质量评分提升至98.5%。数据中台已接入200+业务系统，日处理数据量超过50TB。为精准营销、智能风控、个性化服务提供强大数据支撑，实现数据资产价值最大化。",
+        "score": 0.6105,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_004",
+        "fileName": "交通银行数据治理管理办法（2024修订版）",
+        "customizedTags": [
+            "SP0000100_内网_制度文件",
+            "数据治理",
+        ],
+        "createTime": "Mon Mar 10 09:00:00 CST 2026",
+        "updateTime": "Mon Mar 10 18:00:00 CST 2026",
+        "validTimeStart": "Mon Mar 10 09:00:00 CST 2026",
+        "validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+        "pubTime": "Mon Mar 10 14:00:00 CST 2026",
+        "taskId": "TASK_MOCK_004",
+        "page": -1,
+        "sorted": 4,
+        "paraTitle": "# 交通银行数据治理体系",
+        "mainTaskId": None,
+        "knType": 3,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0999999", "SP0000100"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-005",
+        "content": "交通银行手机银行APP5.0核心功能：以『智能化、个性化、场景化』为设计理念。智能投顾基于AI算法提供个性化资产配置建议，语音导航支持方言识别提升老年用户体验，开放银行接入政务、医疗、教育等第三方服务场景。采用微服务架构，支持日均5000万笔交易处理，响应时间控制在200ms以内，月活用户突破1.3亿。",
+        "score": 0.5987,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_005",
+        "fileName": "交通银行手机银行APP5.0产品需求文档",
+        "customizedTags": [
+            "SP0000100_内网_产品文档",
+            "手机银行",
+        ],
+        "createTime": "Wed Mar 19 10:00:00 CST 2026",
+        "updateTime": "Thu Mar 20 09:00:00 CST 2026",
+        "validTimeStart": "Wed Mar 19 10:00:00 CST 2026",
+        "validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+        "pubTime": "Wed Mar 19 15:00:00 CST 2026",
+        "taskId": "TASK_MOCK_005",
+        "page": -1,
+        "sorted": 5,
+        "paraTitle": "# 交通银行手机银行APP5.0功能",
+        "mainTaskId": None,
+        "knType": 3,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0999999", "SP0000100"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-006",
+        "content": "交通银行智能风控系统升级成果：引入AI大模型技术，实现欺诈识别准确率99.5%、信贷审批时间从3天缩短至30分钟、不良贷款率降至1.28%。系统整合客户行为数据、交易数据、外部数据，构建超过500个风控特征变量。实现贷前、贷中、贷后全流程智能风控，每年避免欺诈损失超过10亿元，显著提升风险管理能力。",
+        "score": 0.5876,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_006",
+        "fileName": "交通银行智能风控系统建设报告",
+        "customizedTags": [
+            "SP0000100_内网_风控报告",
+            "智能风控",
+        ],
+        "createTime": "Fri Mar 28 08:00:00 CST 2026",
+        "updateTime": "Fri Mar 28 17:00:00 CST 2026",
+        "validTimeStart": "Fri Mar 28 08:00:00 CST 2026",
+        "validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+        "pubTime": "Fri Mar 28 13:00:00 CST 2026",
+        "taskId": "TASK_MOCK_006",
+        "page": -1,
+        "sorted": 6,
+        "paraTitle": "# 交通银行智能风控系统成果",
+        "mainTaskId": None,
+        "knType": 3,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0999999", "SP0000100"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-007",
+        "content": "交通银行开放银行战略成效：API开放平台已对接超过500家第三方机构，覆盖政务、医疗、教育、电商等20+行业场景。通过开放API接口，将金融服务嵌入用户日常生活，场景金融交易规模突破2万亿元。未来将继续深化开放银行建设，打造无边界的金融服务生态，提升客户体验和品牌影响力。",
+        "score": 0.5734,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_007",
+        "fileName": "交通银行开放银行战略报告",
+        "customizedTags": [
+            "SP0000100_内网_战略报告",
+            "开放银行",
+        ],
+        "createTime": "Tue Apr 01 09:00:00 CST 2026",
+        "updateTime": "Tue Apr 01 17:30:00 CST 2026",
+        "validTimeStart": "Tue Apr 01 09:00:00 CST 2026",
+        "validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+        "pubTime": "Tue Apr 01 14:00:00 CST 2026",
+        "taskId": "TASK_MOCK_007",
+        "page": -1,
+        "sorted": 7,
+        "paraTitle": "# 交通银行开放银行战略",
+        "mainTaskId": None,
+        "knType": 3,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0999999", "SP0000100"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-008",
+        "content": "交通银行数字化人才队伍建设：2025年一季度科技人员占比提升至12%，较2023年提高5个百分点。与清华大学、复旦大学等高校建立联合实验室，培养金融科技复合型人才。推出『数字交行』内部培训计划，全行超过3万名员工完成数字化转型专题培训。打造科技与业务深度融合的人才梯队，为数字化转型提供人才保障。",
+        "score": 0.5621,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_008",
+        "fileName": "交通银行数字化人才发展报告",
+        "customizedTags": [
+            "SP0000100_内网_人才报告",
+            "数字化人才",
+        ],
+        "createTime": "Mon Feb 10 08:00:00 CST 2026",
+        "updateTime": "Tue Feb 11 09:00:00 CST 2026",
+        "validTimeStart": "Mon Feb 10 08:00:00 CST 2026",
+        "validTimeEnd": "Fri Jan 01 08:00:00 CST 2038",
+        "pubTime": "Mon Feb 10 16:00:00 CST 2026",
+        "taskId": "TASK_MOCK_008",
+        "page": -1,
+        "sorted": 8,
+        "paraTitle": "# 交通银行数字化人才建设",
+        "mainTaskId": None,
+        "knType": 2,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0000100", "SP0999999"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-009",
+        "content": "交通银行数字化转型成效总结：2025年一季度实现营业收入2456亿元，同比增长3.2%，其中线上业务贡献占比超过85%。手机银行月活用户达1.3亿，同比增长25%；智能客服分流率达80%，年节省运营成本超过5亿元。数字化转型经验被中国银保监会列为行业典型案例，向全行业推广，成为高质量发展核心引擎。",
+        "score": 0.5512,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_009",
+        "fileName": "交通银行数字化转型成效报告",
+        "customizedTags": [
+            "SP0000100_内网_成效报告",
+            "转型成效",
+        ],
+        "createTime": "Thu Apr 03 10:00:00 CST 2026",
+        "updateTime": "Fri Apr 04 09:00:00 CST 2026",
+        "validTimeStart": "Thu Apr 03 10:00:00 CST 2026",
+        "validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+        "pubTime": "Thu Apr 03 15:00:00 CST 2026",
+        "taskId": "TASK_MOCK_009",
+        "page": -1,
+        "sorted": 9,
+        "paraTitle": "# 交通银行数字化转型成效",
+        "mainTaskId": None,
+        "knType": 3,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0999999", "SP0000100"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+    {
+        "paraId": "mock-para-010",
+        "content": "交通银行数字化转型未来展望：持续推进AI大模型在更多业务场景落地应用，深化数据要素价值挖掘，加快区块链、隐私计算等前沿技术探索。打造开放、智能、安全的数字金融生态，提升服务实体经济能力。计划2027年全面完成核心系统云化改造，实现数字化转型从『跟跑』向『领跑』转变，打造国际一流智慧银行。",
+        "score": 0.5398,
+        "rerankScore": None,
+        "fileId": "FILE_MOCK_010",
+        "fileName": "交通银行数字化转型未来规划",
+        "customizedTags": [
+            "SP0000100_内网_未来规划",
+            "战略展望",
+        ],
+        "createTime": "Mon Apr 07 09:00:00 CST 2026",
+        "updateTime": "Mon Apr 07 18:00:00 CST 2026",
+        "validTimeStart": "Mon Apr 07 09:00:00 CST 2026",
+        "validTimeEnd": "Wed Dec 31 08:00:00 CST 3000",
+        "pubTime": "Mon Apr 07 14:30:00 CST 2026",
+        "taskId": "TASK_MOCK_010",
+        "page": -1,
+        "sorted": 10,
+        "paraTitle": "# 交通银行数字化转型展望",
+        "mainTaskId": None,
+        "knType": 3,
+        "sourceOrgId": "-1.0.1000000002.mock",
+        "domainTags": None,
+        "sceneCodes": ["SP0999999", "SP0000100"],
+        "qaType": "QP",
+        "fromAttachment": False,
+    },
+]
+
+
+def _build_searchknowledge_response(query: str) -> dict:
+    """构造 searchknowledge_standard 响应（EUVD 段落级标准知识检索格式）"""
+    return {
+        "RSP_BODY": {
+            "result": {
+                "groupPagination": None,
+                "vectorGroupList": SEARCHKNOWLEDGE_MOCK_RESULTS,
+                "textGroupList": None,
+                "graphGroupList": None,
+                "rerankResultList": None,
+                "rerankResultStatus": None,
+            },
+            "param": {"keyword": query},
+        },
+        "RSP_HEAD": {
+            "TRAN_SUCCESS": "1",
+            "TRACE_NO": "mock-searchknowledge-trace-001",
+            "TRACE_ID": "mock.1.00.searchknowledge",
+            "PROCESS_STATUS_CODE": "N",
+            "BIZ_TRACE_NO": None,
+        },
+    }
+
+
+@router.post("/EUVD.EUVD-ADAPTER.V-1.0/searchKnowledgeStandard.do")
+async def searchknowledge_standard(request: Request):
+    """EUVD 段落级标准知识检索 mock 接口。
+    
+    与真实接口一致：application/x-www-form-urlencoded，REQ_MESSAGE 字段为 JSON 字符串。
+    """
+    query = ""
+    try:
+        form = await request.form()
+        req_message_str = form.get("REQ_MESSAGE", "{}")
+        try:
+            req_message = json.loads(req_message_str)
+        except json.JSONDecodeError:
+            req_message = {}
+        param = req_message.get("REQ_BODY", {}).get("param", {})
+        query = param.get("keyword", "")
+        response_data = _build_searchknowledge_response(query)
+        logger.info(
+            "[searchknowledge_standard] query=%r -> %d 条段落结果",
+            query, len(SEARCHKNOWLEDGE_MOCK_RESULTS),
+        )
+        return JSONResponse(content=response_data)
+    except Exception as e:
+        logger.error("[searchknowledge_standard] 处理请求异常: %s", e)
+        return JSONResponse(content=_build_searchknowledge_response(""))
