@@ -2,11 +2,11 @@
 schema_version: 1
 locale: zh-CN
 branch: midware
-exported_at: "2026-06-09T10:16:55Z"
+exported_at: "2026-06-09T10:51:13Z"
 modules:
     "":
-        dir_name: DeerFlow 智能体应用编排与全栈集成
-        title: DeerFlow 智能体应用编排与全栈集成
+        dir_name: DeerFlow 智能研究与内容生成平台
+        title: DeerFlow 智能研究与内容生成平台
         scope:
             - .coverage
             - .dockerignore
@@ -37,33 +37,33 @@ modules:
         depends_on: []
         related_to: []
     backend:
-        dir_name: DeerFlow 智能体编排与多模态生成后端
-        title: DeerFlow 智能体编排与多模态生成后端
+        dir_name: DeerFlow 智能研究与内容生成后端
+        title: DeerFlow 智能研究与内容生成后端
         scope:
             - src/
         source_files: []
         children:
-            - backend/llm_providers
-            - backend/server_api
-            - backend/podcast_feature
-            - backend/data_lists
-            - backend/agents_core
-            - backend/prose_feature
-            - backend/crawler
             - backend/tools_integrations
+            - backend/agents_core
             - backend/utils
             - backend/rag_service
+            - backend/ppt_feature
+            - backend/podcast_feature
+            - backend/crawler
+            - backend/llm_providers
+            - backend/config
+            - backend/server_api
             - backend/prompts_templates
             - backend/prompt_enhancer_feature
+            - backend/data_lists
             - backend/graph_engine
-            - backend/ppt_feature
-            - backend/config
+            - backend/prose_feature
         depends_on: []
         related_to:
             - path: infra
     backend/agents_core:
-        dir_name: ReAct Agent 核心引擎与中间件架构
-        title: ReAct Agent 核心引擎与中间件架构
+        dir_name: ReAct Agent Core & Middleware Engine
+        title: ReAct Agent Core & Middleware Engine
         scope:
             - src/agents/
         source_files: []
@@ -77,8 +77,8 @@ modules:
             - path: backend/tools_integrations/tavily_search_adapter
             - path: backend/tools_integrations
     backend/config:
-        dir_name: DeerFlow 系统配置管理
-        title: DeerFlow 系统配置管理
+        dir_name: 系统配置与状态管理
+        title: 系统配置与状态管理
         scope:
             - src/config/
         source_files: []
@@ -131,8 +131,8 @@ modules:
             - src/graph/
         source_files: []
         children:
-            - backend/graph_engine/deep_research
             - backend/graph_engine/core_engine
+            - backend/graph_engine/deep_research
         depends_on: []
         related_to:
             - path: backend/server_api
@@ -311,8 +311,8 @@ modules:
         source_files: []
         children:
             - backend/tools_integrations/utility_tools
-            - backend/tools_integrations/tavily_search_adapter
             - backend/tools_integrations/search_tools
+            - backend/tools_integrations/tavily_search_adapter
         depends_on: []
         related_to:
             - path: backend/utils
@@ -320,8 +320,8 @@ modules:
             - path: backend/podcast_feature
             - path: backend/agents_core
     backend/tools_integrations/search_tools:
-        dir_name: 搜索与检索工具集成模块
-        title: 搜索与检索工具集成模块
+        dir_name: 多源搜索与预算控制工具集
+        title: 多源搜索与预算控制工具集
         scope:
             - src/tools/
         source_files: []
@@ -387,8 +387,8 @@ modules:
             - path: backend/crawler
             - path: backend/ppt_feature
     frontend:
-        dir_name: AI 深度研究与智能问答前端
-        title: AI 深度研究与智能问答前端
+        dir_name: AI 深度研究与对话前端
+        title: AI 深度研究与对话前端
         scope:
             - web/
         source_files: []

@@ -46,4 +46,4 @@ skills/
 .env
 *.patch
 conf.yaml
-.qoder
+.qoder/
