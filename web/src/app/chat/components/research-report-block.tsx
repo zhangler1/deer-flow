@@ -17,6 +17,23 @@ import { cn } from "~/lib/utils";
 import { CollapsibleReport } from "./collapsible-report";
 import { ReportReferences } from "./report-references";
 
+// ── URL 归一化 ──────────────────────────────────────
+
+/** 对 klbs-*-bocomm.com 链接去除 query 参数，用于跨数据源匹配 */
+function normalizeUrlForMatch(url: string): string {
+  try {
+    const u = new URL(url);
+    if (/^klbs-.*\.bocomm\.com$/.test(u.hostname)) {
+      return u.origin + u.pathname;
+    }
+  } catch {
+    // ignore parse failure
+  }
+  return url;
+}
+
+// ── 组件 ────────────────────────────────────────────
+
 export function ResearchReportBlock({
   className,
   researchId,
@@ -47,13 +64,21 @@ export function ResearchReportBlock({
     if (currentRefs.length > 0) {
       // 后端 reference_index 已提供 url/title/domain，但缺少 snippet/fullContent/aiSummary
       // 从 toolCall 结果中补充内容字段
-      const contentMap = new Map(
-        toolCallSources
-          .filter((s) => s.url)
-          .map((s) => [s.url, s]),
-      );
+      // 对于 klbs 链接，同时用原始 URL 和去 query 后的路径作为 key，兼容 LLM 输出时改写 URL 的情况
+      const contentMap = new Map<string, (typeof toolCallSources)[number]>();
+      for (const s of toolCallSources) {
+        if (!s.url) continue;
+        contentMap.set(s.url, s);                    // 精确 key
+        const normalized = normalizeUrlForMatch(s.url);
+        if (normalized !== s.url) {
+          contentMap.set(normalized, s);             // 去 query key（klbs 兼容）
+        }
+      }
       const enriched = currentRefs.map((ref) => {
-        const detail = ref.url ? contentMap.get(ref.url) : undefined;
+        if (!ref.url) return ref;
+        // 先精确匹配，再尝试归一化匹配
+        const detail = contentMap.get(ref.url)
+          ?? contentMap.get(normalizeUrlForMatch(ref.url));
         if (detail && (!ref.snippet && !ref.fullContent)) {
           return {
             ...ref,
