@@ -106,7 +106,7 @@ export function FeatureShowcase({ className }: { className?: string }) {
     autoTimerRef.current = setTimeout(() => {
       const next = (activeIndex + 1) % TABS.length;
       handleSwitch(next);
-    }, 10_000);
+    }, 5_000);
     return () => {
       if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
     };
