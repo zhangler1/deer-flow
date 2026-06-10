@@ -260,8 +260,8 @@ class BudgetEnforcementMiddleware(AgentMiddleware):
     def _append_warning(content: Any, warning: str, status) -> str:
         """在工具结果末尾追加预算警告（保持 JSON 格式有效）
 
-        当原始内容为 JSON（dict/list）时，将预算提示作为 "reminding" 字段
-        嵌入 JSON 结构中，避免前端 JSON.parse 因 extra tokens 而失败。
+        当原始内容为 JSON 数组时，追加 {"_reminding": "..."} 元素到数组末尾；
+        当原始内容为 JSON 对象时，将提醒作为 "reminding" 字段嵌入；
         当原始内容为纯文本时，仍采用文本追加方式。
         """
         reminder_text = (
@@ -277,7 +277,8 @@ class BudgetEnforcementMiddleware(AgentMiddleware):
                     parsed["reminding"] = reminder_text
                     return json.dumps(parsed, ensure_ascii=False)
                 elif isinstance(parsed, list):
-                    return json.dumps({"data": parsed, "reminding": reminder_text}, ensure_ascii=False)
+                    parsed.append({"_reminding": reminder_text})
+                    return json.dumps(parsed, ensure_ascii=False, default=str)
             except (json.JSONDecodeError, ValueError):
                 pass
             # 纯文本：沿用追加方式
@@ -289,7 +290,8 @@ class BudgetEnforcementMiddleware(AgentMiddleware):
                 result["reminding"] = reminder_text
                 return json.dumps(result, ensure_ascii=False)
             elif isinstance(content, list):
-                return json.dumps({"data": content, "reminding": reminder_text}, ensure_ascii=False)
+                content.append({"_reminding": reminder_text})
+                return json.dumps(content, ensure_ascii=False, default=str)
             else:
                 body = json.dumps(content, ensure_ascii=False)
                 return body + f"\n\n[💡 预算提示] {reminder_text}"
