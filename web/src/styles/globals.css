@@ -509,3 +509,10 @@ button {
 [data-slot="scroll-area-viewport"] {
   overflow-x: hidden !important;
 }
+
+/* 修复: Radix ScrollArea 内部包裹层使用 display:table + minWidth:100%，
+   在 Chrome 某些版本(如行内 141)中 table 布局会根据内容固有宽度撑宽超出视口，
+   导致文字向右溢出被裁剪。改为 block 布局后 width 严格受限于父容器。 */
+[data-slot="scroll-area-viewport"] > div {
+  display: block !important;
+}
