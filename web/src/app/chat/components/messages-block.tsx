@@ -127,8 +127,8 @@ export function MessagesBlock({ className }: { className?: string }) {
         welcomeSlot={
           !responding && messageCount === 0 && !isReplay ? (
             <>
-              <Welcome className="mb-10" hideDescription />
-              <FeatureShowcase className="w-full max-w-[1000px]" />
+              <Welcome className="mb-4" hideDescription />
+              <FeatureShowcase className="w-full max-w-[1000px] flex-1" />
             </>
           ) : undefined
         }

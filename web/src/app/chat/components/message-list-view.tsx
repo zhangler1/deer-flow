@@ -217,7 +217,7 @@ export function MessageListView({
     >
       {/* 空状态：展示欢迎语和 FeatureShowcase */}
       {welcomeSlot && organizedMessages.length === 0 && (
-        <div className="flex flex-col items-center px-4 pt-16 pb-8 w-full max-w-[1000px] mx-auto">
+        <div className="flex flex-col items-center flex-1 px-4 pt-6 pb-4 w-full max-w-[1000px] mx-auto">
           {welcomeSlot}
         </div>
       )}

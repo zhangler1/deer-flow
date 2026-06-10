@@ -74,6 +74,7 @@ const TABS: TabItem[] = [
 export function FeatureShowcase({ className }: { className?: string }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 切换 Tab 时控制视频播放/暂停
   const handleSwitch = useCallback(
@@ -99,6 +100,18 @@ export function FeatureShowcase({ className }: { className?: string }) {
     [activeIndex],
   );
 
+  // 每 10s 自动切换 Tab，手动点击时重置计时
+  useEffect(() => {
+    if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+    autoTimerRef.current = setTimeout(() => {
+      const next = (activeIndex + 1) % TABS.length;
+      handleSwitch(next);
+    }, 10_000);
+    return () => {
+      if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+    };
+  }, [activeIndex, handleSwitch]);
+
   // 组件挂载后自动播放首个视频（如果有）
   useEffect(() => {
     const firstTab = TABS[0];
@@ -116,7 +129,7 @@ export function FeatureShowcase({ className }: { className?: string }) {
       )}
     >
       {/* 左侧 Tab 列表 */}
-      <div className="relative flex sm:flex-col flex-row gap-1 sm:w-40 shrink-0 overflow-x-auto sm:overflow-x-visible">
+      <div className="relative flex sm:flex-col flex-row gap-1 sm:w-48 shrink-0 overflow-x-auto sm:overflow-x-visible">
         {/* 灰色竖线背景 */}
         <div className="hidden sm:block absolute left-0 top-0 bottom-0 w-[3px] rounded-full bg-border/60" />
         {TABS.map((tab, index) => {
@@ -128,7 +141,7 @@ export function FeatureShowcase({ className }: { className?: string }) {
               type="button"
               onClick={() => handleSwitch(index)}
               className={cn(
-                "relative flex items-center gap-2 rounded-xl pl-4 pr-3 py-2.5 text-left transition-all duration-200 outline-none",
+                "relative flex sm:flex-col sm:items-start flex-row items-center gap-1 rounded-xl pl-4 pr-3 py-3 text-left transition-all duration-200 outline-none",
                 "flex-shrink-0 min-w-0 sm:min-w-full",
                 isActive
                   ? "bg-primary/10 text-primary"
@@ -139,46 +152,46 @@ export function FeatureShowcase({ className }: { className?: string }) {
               {isActive && (
                 <motion.div
                   layoutId="feature-tab-indicator"
-                  className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-primary"
+                  className="absolute left-0 top-0 bottom-0 h-full w-[3px] rounded-full bg-primary"
                   transition={{ type: "spring", stiffness: 350, damping: 30 }}
                 />
               )}
-              <Icon
-                size={16}
-                className={cn(
-                  "shrink-0 transition-colors",
-                  isActive ? "text-primary" : "text-muted-foreground/70",
-                )}
-              />
-              <span className="text-sm font-medium whitespace-nowrap truncate">
-                {tab.name}
-              </span>
-              {tab.tag && (
-                <span
+              {/* 标题行：图标 + 名称 + 标签 */}
+              <div className="flex items-center gap-2">
+                <Icon
+                  size={16}
                   className={cn(
-                    "shrink-0 rounded px-1 py-px text-[10px] font-semibold uppercase leading-tight",
-                    tab.tag === "New"
-                      ? "bg-emerald-500/10 text-emerald-600"
-                      : "bg-blue-500/10 text-blue-600",
+                    "shrink-0 transition-colors",
+                    isActive ? "text-primary" : "text-muted-foreground/70",
                   )}
-                >
-                  {tab.tag}
+                />
+                <span className="text-sm font-medium whitespace-nowrap truncate">
+                  {tab.name}
                 </span>
-              )}
+                {tab.tag && (
+                  <span
+                    className={cn(
+                      "shrink-0 rounded px-1 py-px text-[10px] font-semibold uppercase leading-tight",
+                      tab.tag === "New"
+                        ? "bg-emerald-500/10 text-emerald-600"
+                        : "bg-blue-500/10 text-blue-600",
+                    )}
+                  >
+                    {tab.tag}
+                  </span>
+                )}
+              </div>
+              {/* 描述小字 */}
+              <span className="hidden sm:block text-[11px] text-muted-foreground/60 line-clamp-2 leading-tight pl-6">
+                {tab.desc}
+              </span>
             </button>
           );
         })}
       </div>
 
       {/* 右侧内容区 */}
-      <div className="relative sm:flex-1 sm:basis-0 min-w-0 w-full sm:w-auto min-h-[200px] sm:min-h-[280px] rounded-xl overflow-hidden bg-muted/40">
-        {/* Tab 描述 */}
-        <div className="absolute top-2 left-3 right-3 z-10 pointer-events-none">
-          <p className="text-xs text-muted-foreground/80 line-clamp-2 drop-shadow-sm">
-            {TABS[activeIndex]?.desc}
-          </p>
-        </div>
-
+      <div className="relative sm:flex-1 sm:basis-0 min-w-0 w-full sm:w-auto min-h-[200px] sm:min-h-[400px] rounded-xl overflow-hidden bg-muted/40">
         {/* 内容切换 */}
         <AnimatePresence mode="wait">
           <motion.div
