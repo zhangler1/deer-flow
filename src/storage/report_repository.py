@@ -34,10 +34,20 @@ async def _get_pool() -> AsyncConnectionPool:
             raise RuntimeError(
                 "未配置数据库连接：请设置环境变量 LANGGRAPH_CHECKPOINT_DB_URL"
             )
-        _pool = AsyncConnectionPool(conninfo=db_url, min_size=2, max_size=10)
+        _pool = AsyncConnectionPool(
+            conninfo=db_url,
+            min_size=2,
+            max_size=10,
+            configure=_configure_connection,
+        )
         await _pool.open()
         logger.info("PostgreSQL 报告元数据连接池已创建")
     return _pool
+
+
+async def _configure_connection(conn):
+    """连接初始化回调：设置会话时区为 Asia/Shanghai"""
+    await conn.execute("SET timezone = 'Asia/Shanghai'")
 
 
 async def ensure_table():

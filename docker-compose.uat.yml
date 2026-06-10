@@ -7,6 +7,8 @@ services:
       - POSTGRES_USER=deerflow
       - POSTGRES_PASSWORD=deerflow_password_2025
       - POSTGRES_DB=deerflow_checkpoint
+      - TZ=Asia/Shanghai
+      - PGTZ=Asia/Shanghai
     ports:
       - "5432:5432"
     volumes:
