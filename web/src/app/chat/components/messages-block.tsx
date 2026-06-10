@@ -159,7 +159,7 @@ export function MessagesBlock({ className }: { className?: string }) {
           <div className="flex flex-col items-center w-full max-w-2xl mx-auto">
             {/* 快捷问题：紧贴输入框正上方 */}
             {!responding && messageCount === 0 && (
-              <ul className="grid grid-cols-2 gap-2.5 w-full max-w-2xl mb-3">
+              <ul className="grid grid-cols-2 gap-2 w-full max-w-2xl mb-3">
                 {questions.map((question, index) => (
                   <motion.li
                     key={question}
@@ -170,7 +170,7 @@ export function MessagesBlock({ className }: { className?: string }) {
                     transition={{ duration: 0.2, delay: index * 0.08 + 0.3, ease: "easeOut" }}
                   >
                     <div
-                      className="bg-muted/50 hover:bg-muted/80 text-foreground flex items-center justify-between h-auto w-full cursor-pointer rounded-xl px-4 py-3 leading-relaxed transition-all duration-200 hover:shadow-sm group"
+                      className="bg-muted/50 hover:bg-muted/80 text-foreground flex items-center justify-between h-auto w-full cursor-pointer rounded-lg px-3 py-2 leading-normal transition-all duration-200 hover:shadow-sm group"
                       onClick={() => handleSend(question)}
                     >
                       <span className="flex-1 text-sm">{question}</span>

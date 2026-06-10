@@ -111,12 +111,14 @@ export function FeatureShowcase({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex flex-col sm:flex-row gap-3 w-full rounded-2xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm",
+        "flex flex-col sm:flex-row gap-3 w-full p-3",
         className,
       )}
     >
       {/* 左侧 Tab 列表 */}
-      <div className="flex sm:flex-col flex-row gap-1 sm:w-40 shrink-0 overflow-x-auto sm:overflow-x-visible">
+      <div className="relative flex sm:flex-col flex-row gap-1 sm:w-40 shrink-0 overflow-x-auto sm:overflow-x-visible">
+        {/* 灰色竖线背景 */}
+        <div className="hidden sm:block absolute left-0 top-0 bottom-0 w-[3px] rounded-full bg-border/60" />
         {TABS.map((tab, index) => {
           const Icon = ICONS[tab.icon];
           const isActive = index === activeIndex;
@@ -126,14 +128,14 @@ export function FeatureShowcase({ className }: { className?: string }) {
               type="button"
               onClick={() => handleSwitch(index)}
               className={cn(
-                "relative flex items-center gap-2 rounded-xl px-3 py-2.5 text-left transition-all duration-200 outline-none",
+                "relative flex items-center gap-2 rounded-xl pl-4 pr-3 py-2.5 text-left transition-all duration-200 outline-none",
                 "flex-shrink-0 min-w-0 sm:min-w-full",
                 isActive
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
               )}
             >
-              {/* 左侧高亮指示条 */}
+              {/* 左侧高亮指示条（选中时蓝色覆盖灰色竖线） */}
               {isActive && (
                 <motion.div
                   layoutId="feature-tab-indicator"
