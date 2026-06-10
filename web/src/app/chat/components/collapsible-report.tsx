@@ -172,8 +172,8 @@ export function CollapsibleReport({
                 </span>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="pb-4 pt-0">
-              <div className="pl-6">
+            <AccordionContent className="pb-4 pt-0 overflow-hidden">
+              <div className="pl-6 min-w-0">
                 <SourceAwareMarkdown
                   references={references}
                   animated={false}

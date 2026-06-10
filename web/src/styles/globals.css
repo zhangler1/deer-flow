@@ -470,6 +470,12 @@ button {
   word-break: break-word;
 }
 
+/* 链接内的长 URL 强制换行 */
+.prose a {
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
 /* 确保代码块也能正确换行 */
 .prose code,
 .prose pre {
@@ -479,11 +485,24 @@ button {
   overflow-wrap: break-word;
 }
 
+/* 内联代码不擑宽容器 */
+.prose :not(pre) > code {
+  word-break: break-all;
+}
+
 /* 确保表格内容不会溢出 */
 .prose table {
   max-width: 100%;
-  table-layout: auto;
+  table-layout: fixed;
   word-break: break-word;
+}
+
+/* 表格外层允许水平滚动，防止宽表格撑破布局 */
+.prose .table-wrapper,
+.prose > table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 禁止 ScrollArea 视口水平滚动，防止绝对定位的悬浮卡片撑宽内容区 */

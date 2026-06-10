@@ -326,7 +326,7 @@ export function ResearchBlock({
             hidden={activeTab !== "report"}
           >
             <ScrollContainer
-              className="px-5pb-20 h-full"
+              className="px-5 pb-20 h-full"
               scrollShadowColor="var(--card)"
               autoScrollToBottom={!hasReport || reportStreaming}
             >
