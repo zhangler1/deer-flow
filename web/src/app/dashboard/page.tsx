@@ -9,6 +9,10 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+
+import { DailyChart } from "~/components/dashboard/daily-chart";
+import { ReportTable } from "~/components/dashboard/report-table";
+import { StatsCards } from "~/components/dashboard/stats-cards";
 import {
   fetchDailyStats,
   fetchReports,
@@ -19,9 +23,9 @@ import {
   type ReportListResponse,
   type UserInfo,
 } from "~/core/api/dashboard";
-import { StatsCards } from "~/components/dashboard/stats-cards";
-import { DailyChart } from "~/components/dashboard/daily-chart";
-import { ReportTable } from "~/components/dashboard/report-table";
+
+
+
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -31,7 +35,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [filterUserCode, setFilterUserCode] = useState("");
+  const [filterUserName, setFilterUserName] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -39,7 +46,15 @@ export default function DashboardPage() {
       const [summaryData, statsData, reportsData, userData] = await Promise.all([
         fetchSummary(),
         fetchDailyStats(),
-        fetchReports({ page, page_size: 20, user_code: filterUserCode || undefined, status: filterStatus || undefined }),
+        fetchReports({
+          page,
+          page_size: 20,
+          user_code: filterUserCode || undefined,
+          user_name: filterUserName || undefined,
+          status: filterStatus || undefined,
+          start_date: filterStartDate || undefined,
+          end_date: filterEndDate || undefined,
+        }),
         fetchCurrentUser(),
       ]);
       setSummary(summaryData);
@@ -51,7 +66,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filterUserCode, filterStatus]);
+  }, [page, filterUserCode, filterUserName, filterStatus, filterStartDate, filterEndDate]);
 
   useEffect(() => {
     loadData();
@@ -66,8 +81,23 @@ export default function DashboardPage() {
     setPage(1);
   };
 
+  const handleNameFilterChange = (userName: string) => {
+    setFilterUserName(userName);
+    setPage(1);
+  };
+
   const handleStatusFilterChange = (status: string) => {
     setFilterStatus(status);
+    setPage(1);
+  };
+
+  const handleStartDateChange = (date: string) => {
+    setFilterStartDate(date);
+    setPage(1);
+  };
+
+  const handleEndDateChange = (date: string) => {
+    setFilterEndDate(date);
     setPage(1);
   };
 
@@ -105,7 +135,33 @@ export default function DashboardPage() {
           <h2 className="text-lg font-medium text-gray-900 dark:text-white">
             报告列表
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              <label className="text-xs text-gray-500 dark:text-gray-400">从</label>
+              <input
+                type="date"
+                value={filterStartDate}
+                onChange={(e) => handleStartDateChange(e.target.value)}
+                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <label className="text-xs text-gray-500 dark:text-gray-400">至</label>
+              <input
+                type="date"
+                value={filterEndDate}
+                onChange={(e) => handleEndDateChange(e.target.value)}
+                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            {(filterStartDate || filterEndDate) && (
+              <button
+                onClick={() => { setFilterStartDate(""); setFilterEndDate(""); setPage(1); }}
+                className="rounded-md px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+              >
+                清除日期
+              </button>
+            )}
             <select
               value={filterStatus}
               onChange={(e) => handleStatusFilterChange(e.target.value)}
@@ -115,6 +171,13 @@ export default function DashboardPage() {
               <option value="completed">已完成</option>
               <option value="cancelled">已取消</option>
             </select>
+            <input
+              type="text"
+              placeholder="按姓名筛选"
+              value={filterUserName}
+              onChange={(e) => handleNameFilterChange(e.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
             <input
               type="text"
               placeholder="按用户工号筛选"

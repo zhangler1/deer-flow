@@ -155,11 +155,12 @@ async def get_reports_paginated(
     page: int = 1,
     page_size: int = 20,
     user_code: Optional[str] = None,
+    user_name: Optional[str] = None,
     status: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
 ) -> tuple[List[ReportRecord], int]:
-    """分页查询报告列表（支持按用户、日期、状态筛选）
+    """分页查询报告列表（支持按用户、姓名、日期、状态筛选）
 
     Returns:
         (报告列表, 总数)
@@ -173,6 +174,9 @@ async def get_reports_paginated(
     if user_code:
         conditions.append("user_code = %s")
         params.append(user_code)
+    if user_name:
+        conditions.append("user_name ILIKE %s")
+        params.append(f"%{user_name}%")
     if status:
         conditions.append("status = %s")
         params.append(status)
@@ -264,9 +268,23 @@ async def get_summary() -> DashboardSummary:
             )
             today_reports = (await cur.fetchone())[0]
 
-            # 总用户数
-            await cur.execute("SELECT COUNT(DISTINCT user_code) FROM reports")
-            total_users = (await cur.fetchone())[0]
+            # 本月报告数（仅已完成）
+            await cur.execute(
+                "SELECT COUNT(*) FROM reports WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE) AND status = 'completed'"
+            )
+            month_reports = (await cur.fetchone())[0]
+
+            # 月活用户（近 30 天内生成过报告的去重用户数）
+            await cur.execute(
+                "SELECT COUNT(DISTINCT user_code) FROM reports WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'"
+            )
+            mau = (await cur.fetchone())[0]
+
+            # 日活用户（今日生成过报告的去重用户数）
+            await cur.execute(
+                "SELECT COUNT(DISTINCT user_code) FROM reports WHERE DATE(created_at) = CURRENT_DATE"
+            )
+            dau = (await cur.fetchone())[0]
 
             # 平均耗时（仅已完成的报告）
             await cur.execute(
@@ -277,7 +295,9 @@ async def get_summary() -> DashboardSummary:
             return DashboardSummary(
                 total_reports=total_reports,
                 today_reports=today_reports,
-                total_users=total_users,
+                month_reports=month_reports,
+                mau=mau,
+                dau=dau,
                 avg_duration_ms=avg_duration_ms,
             )
 

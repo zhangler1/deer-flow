@@ -20,7 +20,9 @@ export interface DailyStat {
 export interface DashboardSummary {
   total_reports: number;
   today_reports: number;
-  total_users: number;
+  month_reports: number;
+  mau: number;
+  dau: number;
   avg_duration_ms: number;
 }
 
@@ -84,6 +86,7 @@ export async function fetchReports(params: {
   page?: number;
   page_size?: number;
   user_code?: string;
+  user_name?: string;
   status?: string;
   start_date?: string;
   end_date?: string;
@@ -92,6 +95,7 @@ export async function fetchReports(params: {
   if (params.page) searchParams.set("page", String(params.page));
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
   if (params.user_code) searchParams.set("user_code", params.user_code);
+  if (params.user_name) searchParams.set("user_name", params.user_name);
   if (params.status) searchParams.set("status", params.status);
   if (params.start_date) searchParams.set("start_date", params.start_date);
   if (params.end_date) searchParams.set("end_date", params.end_date);

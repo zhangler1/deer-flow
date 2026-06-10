@@ -12,9 +12,4 @@ scope:
     - docker-compose.easypase.yml
 source_files: []
 depends_on: []
-related_to:
-    - path: frontend
-    - path: backend
-    - path: mock_llm
-    - path: mock_search
-    - path: backend/server_api
+related_to: []

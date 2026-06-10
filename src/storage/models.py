@@ -43,7 +43,9 @@ class DashboardSummary(BaseModel):
     """看板汇总数据"""
     total_reports: int = 0
     today_reports: int = 0
-    total_users: int = 0
+    month_reports: int = 0  # 本月报告数
+    mau: int = 0  # 月活用户：近30天内生成过报告的去重用户数
+    dau: int = 0  # 日活用户：今日生成过报告的去重用户数
     avg_duration_ms: int = 0
 
 
