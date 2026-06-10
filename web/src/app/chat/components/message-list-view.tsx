@@ -62,6 +62,8 @@ export function MessageListView({
   onSendMessage,
   onAtBottomChange,
   scrollRef,
+  welcomeSlot,
+  hideScrollbar,
 }: {
   className?: string;
   onFeedback?: (feedback: { option: Option }) => void;
@@ -71,6 +73,8 @@ export function MessageListView({
   ) => void;
   onAtBottomChange?: (atBottom: boolean) => void;
   scrollRef?: React.RefObject<ScrollContainerRef | null>;
+  welcomeSlot?: React.ReactNode;
+  hideScrollbar?: boolean;
 }) {
   const scrollContainerRef = useRef<ScrollContainerRef>(null);
   // 将内部 scrollContainerRef 暂露给父级，用于外部滑动到底部按钮等场景
@@ -206,11 +210,18 @@ export function MessageListView({
     <ScrollContainer
       className={cn("flex h-full w-full flex-col overflow-hidden", className)}
       scrollShadow={false}
-      autoScrollToBottom
+      autoScrollToBottom={!welcomeSlot}
       onAtBottomChange={onAtBottomChange}
+      hideScrollbar={hideScrollbar}
       ref={scrollContainerRef}
     >
-      <ul className="flex flex-col">
+      {/* 空状态：展示欢迎语和 FeatureShowcase */}
+      {welcomeSlot && organizedMessages.length === 0 && (
+        <div className="flex flex-col items-center px-4 pt-16 pb-8 w-full max-w-[1000px] mx-auto">
+          {welcomeSlot}
+        </div>
+      )}
+      <ul className="flex flex-col w-full max-w-[768px] mx-auto">
         {organizedMessages.map((item, _index) => {
           if (item.type === 'round') {
             // 渲染轮次容器
@@ -245,7 +256,7 @@ export function MessageListView({
       </ul>
       {/* 问题澄清卡片渲染已移至 MessageListItem 内联，确保历史消息中卡片不消失 */}
       {responding && (noOngoingResearch || !ongoingResearchIsOpen) && (
-        <LoadingAnimation className="ml-4 mb-4" />
+        <LoadingAnimation className="ml-4 mb-4 w-full max-w-[768px] mx-auto" />
       )}
     </ScrollContainer>
   );

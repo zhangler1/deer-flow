@@ -161,13 +161,12 @@ export default function Main() {
         <>
           <MessagesBlock
             className={cn(
-              "shrink-0 transition-all duration-300 ease-out",
-              "w-[768px] translate-x-[min(max(calc((100vw-538px)*0.75),575px)/2,960px/2)]",
+              "flex-1 min-w-0 transition-all duration-300 ease-out",
             )}
           />
           <ResearchBlock
             className={cn(
-              "w-[min(max(calc((100vw-538px)*0.75),575px),960px)] pb-4 transition-all duration-300 ease-out",
+              "w-0 shrink-0 overflow-hidden pb-4 transition-all duration-300 ease-out",
               "scale-0",
             )}
             researchId={openResearchId}

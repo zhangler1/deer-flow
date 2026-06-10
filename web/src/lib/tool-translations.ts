@@ -26,6 +26,7 @@ export const TOOL_NAME_TRANSLATIONS: Record<string, string> = {
   product_instance_search: "产品实例搜索",
   news_search: "新闻搜索",
   news_detail_search: "新闻详情搜索",
+  vector_search: "向量搜索",
 
   // 爬虫工具
   crawl_tool: "网页爬取",

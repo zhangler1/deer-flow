@@ -169,7 +169,7 @@ export function FeatureShowcase({ className }: { className?: string }) {
       </div>
 
       {/* 右侧内容区 */}
-      <div className="relative flex-1 min-h-[200px] sm:min-h-0 rounded-xl overflow-hidden bg-muted/40">
+      <div className="relative sm:flex-1 sm:basis-0 min-w-0 w-full sm:w-auto min-h-[200px] sm:min-h-[280px] rounded-xl overflow-hidden bg-muted/40">
         {/* Tab 描述 */}
         <div className="absolute top-2 left-3 right-3 z-10 pointer-events-none">
           <p className="text-xs text-muted-foreground/80 line-clamp-2 drop-shadow-sm">

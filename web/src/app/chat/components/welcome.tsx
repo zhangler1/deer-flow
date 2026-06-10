@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { AuroraText } from "~/components/magicui/aurora-text";
 import { cn } from "~/lib/utils";
 
-export function Welcome({ className }: { className?: string }) {
+export function Welcome({ className, hideDescription }: { className?: string; hideDescription?: boolean }) {
   const t = useTranslations("hero");
 
   return (
@@ -21,9 +21,11 @@ export function Welcome({ className }: { className?: string }) {
         <AuroraText className="mr-2">{t('title')}</AuroraText>
         <AuroraText>{t('subtitle')}</AuroraText>
       </h1>
-      <p className="max-w-3xl px-4 text-center text-base opacity-85 md:text-xl">
-        {t('description')}
-      </p>
+      {!hideDescription && (
+        <p className="max-w-3xl px-4 text-center text-base opacity-85 md:text-xl">
+          {t('description')}
+        </p>
+      )}
     </motion.div>
   );
 }

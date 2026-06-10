@@ -21,6 +21,7 @@ export interface ScrollContainerProps {
   scrollShadowColor?: string;
   autoScrollToBottom?: boolean;
   onAtBottomChange?: (atBottom: boolean) => void;
+  hideScrollbar?: boolean;
   ref?: RefObject<ScrollContainerRef | null>;
 }
 
@@ -36,6 +37,7 @@ export function ScrollContainer({
   scrollShadowColor = "var(--background)",
   autoScrollToBottom = false,
   onAtBottomChange,
+  hideScrollbar,
   ref,
 }: ScrollContainerProps) {
   const { scrollRef, contentRef, scrollToBottom, isAtBottom } =
@@ -97,7 +99,7 @@ export function ScrollContainer({
           ></div>
         </>
       )}
-      <ScrollArea ref={scrollRef} className="h-full w-full">
+      <ScrollArea ref={scrollRef} className="h-full w-full" hideScrollbar={hideScrollbar}>
         <div className="h-fit w-full" ref={contentRef}>
           {children}
         </div>

@@ -24,13 +24,17 @@ import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { env } from "~/env";
 import { cn } from "~/lib/utils";
 
-import { ConversationStarter } from "./conversation-starter";
+import { ChevronRight } from "lucide-react";
+
+import { FeatureShowcase } from "./feature-showcase";
 import { InputBox } from "./input-box";
 import { MessageListView } from "./message-list-view";
 import { Welcome } from "./welcome";
 
 export function MessagesBlock({ className }: { className?: string }) {
   const t = useTranslations("chat.messages");
+  const tChat = useTranslations("chat");
+  const questions = tChat.raw("conversationStarters") as string[];
   const messageIds = useMessageIds();
   const messageCount = messageIds.length;
   const responding = useStore((state) => state.responding);
@@ -112,27 +116,31 @@ export function MessagesBlock({ className }: { className?: string }) {
   }, []);
   return (
     <div className={cn("flex h-full flex-col", className)}>
+      {/* 可滚动区域：消息列表 或 欢迎内容（Welcome + FeatureShowcase） */}
       <MessageListView
         className="flex flex-grow"
         onFeedback={handleFeedback}
         onSendMessage={handleSend}
         onAtBottomChange={setIsAtBottom}
         scrollRef={messageListRef}
+        hideScrollbar={!responding && messageCount === 0 && !isReplay}
+        welcomeSlot={
+          !responding && messageCount === 0 && !isReplay ? (
+            <>
+              <Welcome className="mb-10" hideDescription />
+              <FeatureShowcase className="w-full max-w-[1000px]" />
+            </>
+          ) : undefined
+        }
       />
       {!isReplay ? (
-        <div className="relative flex min-h-42 shrink-0 pb-4 pl-4 pr-[26px]">
-          {!responding && messageCount === 0 && (
-            <ConversationStarter
-              className="absolute top-[-430px] left-4"
-              onSend={handleSend}
-            />
-          )}
-          {/* 输入框上方的柔和渐变遮罩：仅保留 backdrop-blur，不附加颜色，避免与父容器背景不一致 */}
+        <div className="relative flex flex-col shrink-0 pb-4 pl-4 pr-[26px]">
+          {/* 输入框上方的柔和渐变遮罩 */}
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 bottom-full z-10 h-10 backdrop-blur-[3px] [mask-image:linear-gradient(to_top,black_30%,transparent)]"
           />
-          {/* 滚动到底部按钮：完整悬浮在输入框上方，无跨边缘视觉，边框和阴影更柔和 */}
+          {/* 滚动到底部按钮 */}
           {!isAtBottom && (
             <motion.button
               type="button"
@@ -147,14 +155,40 @@ export function MessagesBlock({ className }: { className?: string }) {
               <ArrowDown size={16} />
             </motion.button>
           )}
-          <InputBox
-            className="flex-1 w-full"
-            responding={responding}
-            feedback={feedback}
-            onSend={handleSend}
-            onCancel={handleCancel}
-            onRemoveFeedback={handleRemoveFeedback}
-          />
+          {/* 内容居中限宽 */}
+          <div className="flex flex-col items-center w-full max-w-2xl mx-auto">
+            {/* 快捷问题：紧贴输入框正上方 */}
+            {!responding && messageCount === 0 && (
+              <ul className="grid grid-cols-2 gap-2.5 w-full max-w-2xl mb-3">
+                {questions.map((question, index) => (
+                  <motion.li
+                    key={question}
+                    className="flex shrink-0 active:scale-[0.98]"
+                    style={{ transition: "all 0.2s ease-out" }}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: index * 0.08 + 0.3, ease: "easeOut" }}
+                  >
+                    <div
+                      className="bg-muted/50 hover:bg-muted/80 text-foreground flex items-center justify-between h-auto w-full cursor-pointer rounded-xl px-4 py-3 leading-relaxed transition-all duration-200 hover:shadow-sm group"
+                      onClick={() => handleSend(question)}
+                    >
+                      <span className="flex-1 text-sm">{question}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0 ml-2" />
+                    </div>
+                  </motion.li>
+                ))}
+              </ul>
+            )}
+            <InputBox
+              className="w-full"
+              responding={responding}
+              feedback={feedback}
+              onSend={handleSend}
+              onCancel={handleCancel}
+              onRemoveFeedback={handleRemoveFeedback}
+            />
+          </div>
         </div>
       ) : (
         <>
@@ -189,7 +223,6 @@ export function MessagesBlock({ className }: { className?: string }) {
                       transition={{ duration: 0.3 }}
                     >
                       <video
-                        // Walking deer animation, designed by @liangzhaojun. Thank you for creating it!
                         src="/images/walking_deer.webm"
                         autoPlay
                         loop

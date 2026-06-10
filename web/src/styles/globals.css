@@ -516,3 +516,10 @@ button {
 [data-slot="scroll-area-viewport"] > div {
   display: block !important;
 }
+
+/* 条件式隐藏 ScrollArea 滚动条：仅当 data-hide-scrollbar 属性存在时生效，
+   用于首页欢迎状态等场景。滚动功能保留，只隐藏可视滚动条。 */
+[data-hide-scrollbar] [data-slot="scroll-area-scrollbar"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

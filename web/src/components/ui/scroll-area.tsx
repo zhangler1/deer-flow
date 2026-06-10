@@ -8,12 +8,16 @@ import { cn } from "~/lib/utils";
 function ScrollArea({
   className,
   children,
+  hideScrollbar,
   ref,
   ...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
+}: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
+  hideScrollbar?: boolean;
+}) {
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
+      data-hide-scrollbar={hideScrollbar || undefined}
       className={cn("relative", className)}
       {...props}
     >
