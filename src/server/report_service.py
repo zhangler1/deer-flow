@@ -14,12 +14,15 @@
 import asyncio
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from src.utils.enhanced_logger import get_enhanced_logger
 
 logger = get_enhanced_logger(__name__).logger
+
+# 北京时区 (UTC+8)
+_BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 async def handle_report_completed(
@@ -32,6 +35,9 @@ async def handle_report_completed(
     login_name: str = "",
     duration_ms: int = 0,
     report_type: str = "research",
+    status: str = "completed",
+    start_timestamp: Optional[float] = None,
+    end_timestamp: Optional[float] = None,
 ):
     """报告生成完成后的异步处理
 
@@ -44,11 +50,28 @@ async def handle_report_completed(
         title: 报告标题
         user_code: 用户工号
         user_name: 用户姓名
-        branch_id: 分行 ID
+        branch_id: 分行ID
         login_name: 登录名
         duration_ms: 生成耗时（毫秒）
         report_type: 报告类型
+        status: 报告状态（completed/cancelled/failed）
+        start_timestamp: 报告生成起始时间戳 (Unix timestamp)
+        end_timestamp: 报告生成结束时间戳 (Unix timestamp)
     """
+    # 打印起始时间和结束时间（北京时间）
+    start_time_str = (
+        datetime.fromtimestamp(start_timestamp, tz=_BEIJING_TZ).strftime("%Y-%m-%d %H:%M:%S")
+        if start_timestamp else "unknown"
+    )
+    end_time_str = (
+        datetime.fromtimestamp(end_timestamp, tz=_BEIJING_TZ).strftime("%Y-%m-%d %H:%M:%S")
+        if end_timestamp else "unknown"
+    )
+    logger.info(
+        f"[REPORT_SERVICE] 报告保存开始 | thread_id={thread_id} | status={status} | "
+        f"起始时间(CST)={start_time_str} | 结束时间(CST)={end_time_str} | "
+        f"耗时={duration_ms}ms | user={user_code} | title={title[:50]}"
+    )
     report_url = None
     file_size = None
 
@@ -76,7 +99,7 @@ async def handle_report_completed(
             report_url=report_url,
             file_size=file_size,
             report_type=report_type,
-            status="completed",
+            status=status,
         )
         report_id = await report_repository.save_report(record)
         logger.info(

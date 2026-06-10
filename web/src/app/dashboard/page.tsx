@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [filterUserCode, setFilterUserCode] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -38,7 +39,7 @@ export default function DashboardPage() {
       const [summaryData, statsData, reportsData, userData] = await Promise.all([
         fetchSummary(),
         fetchDailyStats(),
-        fetchReports({ page, page_size: 20, user_code: filterUserCode || undefined }),
+        fetchReports({ page, page_size: 20, user_code: filterUserCode || undefined, status: filterStatus || undefined }),
         fetchCurrentUser(),
       ]);
       setSummary(summaryData);
@@ -50,7 +51,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filterUserCode]);
+  }, [page, filterUserCode, filterStatus]);
 
   useEffect(() => {
     loadData();
@@ -62,6 +63,11 @@ export default function DashboardPage() {
 
   const handleFilterChange = (userCode: string) => {
     setFilterUserCode(userCode);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (status: string) => {
+    setFilterStatus(status);
     setPage(1);
   };
 
@@ -100,6 +106,15 @@ export default function DashboardPage() {
             报告列表
           </h2>
           <div className="flex items-center gap-2">
+            <select
+              value={filterStatus}
+              onChange={(e) => handleStatusFilterChange(e.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="">全部状态</option>
+              <option value="completed">已完成</option>
+              <option value="cancelled">已取消</option>
+            </select>
             <input
               type="text"
               placeholder="按用户工号筛选"

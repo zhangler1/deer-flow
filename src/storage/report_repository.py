@@ -155,10 +155,11 @@ async def get_reports_paginated(
     page: int = 1,
     page_size: int = 20,
     user_code: Optional[str] = None,
+    status: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
 ) -> tuple[List[ReportRecord], int]:
-    """分页查询报告列表（支持按用户、日期筛选）
+    """分页查询报告列表（支持按用户、日期、状态筛选）
 
     Returns:
         (报告列表, 总数)
@@ -172,6 +173,9 @@ async def get_reports_paginated(
     if user_code:
         conditions.append("user_code = %s")
         params.append(user_code)
+    if status:
+        conditions.append("status = %s")
+        params.append(status)
     if start_date:
         conditions.append("created_at >= %s")
         params.append(start_date)
@@ -246,17 +250,17 @@ async def get_daily_statistics(
 
 
 async def get_summary() -> DashboardSummary:
-    """获取看板汇总数据"""
+    """获取看板汇总数据（仅统计已完成的报告）"""
     pool = await _get_pool()
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
-            # 总报告数
-            await cur.execute("SELECT COUNT(*) FROM reports")
+            # 总报告数（仅已完成）
+            await cur.execute("SELECT COUNT(*) FROM reports WHERE status = 'completed'")
             total_reports = (await cur.fetchone())[0]
 
-            # 今日报告数
+            # 今日报告数（仅已完成）
             await cur.execute(
-                "SELECT COUNT(*) FROM reports WHERE DATE(created_at) = CURRENT_DATE"
+                "SELECT COUNT(*) FROM reports WHERE DATE(created_at) = CURRENT_DATE AND status = 'completed'"
             )
             today_reports = (await cur.fetchone())[0]
 
@@ -264,9 +268,9 @@ async def get_summary() -> DashboardSummary:
             await cur.execute("SELECT COUNT(DISTINCT user_code) FROM reports")
             total_users = (await cur.fetchone())[0]
 
-            # 平均耗时
+            # 平均耗时（仅已完成的报告）
             await cur.execute(
-                "SELECT COALESCE(AVG(duration_ms)::BIGINT, 0) FROM reports WHERE duration_ms IS NOT NULL"
+                "SELECT COALESCE(AVG(duration_ms)::BIGINT, 0) FROM reports WHERE duration_ms IS NOT NULL AND status = 'completed'"
             )
             avg_duration_ms = (await cur.fetchone())[0]
 

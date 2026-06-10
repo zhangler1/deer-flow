@@ -62,6 +62,7 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
               <th className="px-4 py-3">用户</th>
               <th className="px-4 py-3">标题</th>
               <th className="px-4 py-3">类型</th>
+              <th className="px-4 py-3">状态</th>
               <th className="px-4 py-3">耗时</th>
               <th className="px-4 py-3">生成时间</th>
               <th className="px-4 py-3">操作</th>
@@ -88,6 +89,21 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
                   <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-300">
                     {report.report_type}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  {report.status === "completed" ? (
+                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-300">
+                      已完成
+                    </span>
+                  ) : report.status === "cancelled" ? (
+                    <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                      已取消
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800 dark:bg-gray-900 dark:text-gray-300">
+                      {report.status}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                   {formatDuration(report.duration_ms)}

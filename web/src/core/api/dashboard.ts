@@ -84,6 +84,7 @@ export async function fetchReports(params: {
   page?: number;
   page_size?: number;
   user_code?: string;
+  status?: string;
   start_date?: string;
   end_date?: string;
 }): Promise<ReportListResponse> {
@@ -91,6 +92,7 @@ export async function fetchReports(params: {
   if (params.page) searchParams.set("page", String(params.page));
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
   if (params.user_code) searchParams.set("user_code", params.user_code);
+  if (params.status) searchParams.set("status", params.status);
   if (params.start_date) searchParams.set("start_date", params.start_date);
   if (params.end_date) searchParams.set("end_date", params.end_date);
 

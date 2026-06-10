@@ -745,6 +745,7 @@ async def _stream_graph_events(
     # ─── 报告内容追踪（用于生成完成后保存到 MinIO + DB）───
     _reporter_content_from_state: str = ""  # 从 reporter 节点的状态更新中获取完整报告
     _reporter_finished = False
+    _report_cancelled = False  # 报告是否被用户取消
 
     # 去重：记录已通过流式 chunk 发送过内容的消息 ID
     # LangGraph messages 流会发两次同一消息：1) LLM 流式 AIMessageChunk  2) 状态写回的完整 AIMessage
@@ -907,9 +908,10 @@ async def _stream_graph_events(
                         if "final_report" in _node_update_rpt:
                             _reporter_finished = True
                             _report_content_from_state = _node_update_rpt.get("final_report", "")
+                            _report_cancelled = _node_update_rpt.get("report_cancelled", False)
                             enhanced_logger.logger.info(
                                 f"[REPORTER_FINISHED_FROM_UPDATE] thread_id={thread_id} | "
-                                f"检测到 reporter 状态更新 | content_length={len(_report_content_from_state)}"
+                                f"检测到 reporter 状态更新 | content_length={len(_report_content_from_state)} | cancelled={_report_cancelled}"
                             )
                         break
 
@@ -1005,7 +1007,10 @@ async def _stream_graph_events(
                 try:
                     from src.server.report_service import handle_report_completed, extract_report_title
                     title = extract_report_title(full_report)
-                    duration_ms = int((time.time() - stream_start_time) * 1000)
+                    end_time = time.time()
+                    duration_ms = int((end_time - stream_start_time) * 1000)
+                    # 根据取消标志决定报告状态
+                    report_status = "cancelled" if _report_cancelled else "completed"
                     # 后台任务，不阻塞流式响应
                     asyncio.create_task(
                         handle_report_completed(
@@ -1018,6 +1023,9 @@ async def _stream_graph_events(
                             login_name=login_name,
                             duration_ms=duration_ms,
                             report_type="research",
+                            status=report_status,
+                            start_timestamp=stream_start_time,
+                            end_timestamp=end_time,
                         )
                     )
                 except Exception as _report_err:

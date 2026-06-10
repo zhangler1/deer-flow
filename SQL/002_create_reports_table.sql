@@ -30,6 +30,8 @@ CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at);
 CREATE INDEX IF NOT EXISTS idx_reports_thread_id ON reports(thread_id);
 -- 按报告类型筛选
 CREATE INDEX IF NOT EXISTS idx_reports_report_type ON reports(report_type);
+-- 按状态筛选（completed/cancelled/failed）
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
 
 -- 添加注释
 COMMENT ON TABLE reports IS '报告元数据存储（看板统计、用户绑定）';

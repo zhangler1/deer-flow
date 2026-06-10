@@ -329,7 +329,7 @@ async def reporter_node(state: State, config: RunnableConfig):
         # 如果已取消，直接返回
         if cancel_event and cancel_event.is_set():
             enhanced_logger.logger.info(f"⛔ LLM_SKIPPED | reporter | 客户端已断连，跳过报告生成")
-            return {"final_report": "报告生成已被用户取消。"}
+            return {"final_report": "报告生成已被用户取消。", "report_cancelled": True}
 
 
         # 使用 astream() 替代 stream()，允许在 chunk 之间检测取消信号
@@ -426,7 +426,11 @@ async def reporter_node(state: State, config: RunnableConfig):
         reference_index_list.sort(key=lambda x: x["index"])
         enhanced_logger.logger.info(f"📚 REFERENCE_INDEX_OUTPUT | 参考文献索引已构建 | 条数: {len(reference_index_list)}")
 
-    return {"final_report": response_content, "reference_index": reference_index_list}
+    return {
+        "final_report": response_content,
+        "reference_index": reference_index_list,
+        "report_cancelled": cancelled,
+    }
 
 
 def research_team_node(state: State):

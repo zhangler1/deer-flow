@@ -13,12 +13,8 @@ scope:
 source_files: []
 depends_on: []
 related_to:
-    - path: backend
     - path: frontend
-    - path: backend/server_api
+    - path: backend
     - path: mock_llm
     - path: mock_search
-    - path: backend/llm_providers
-    - path: backend/ppt_feature
-    - path: backend/utils
-    - path: backend/graph_engine/core_engine
+    - path: backend/server_api
