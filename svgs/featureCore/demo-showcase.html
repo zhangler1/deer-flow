@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目演示展示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .feature-core {
+            width: 100%;
+            max-width: 1400px;
+            padding: 60px 40px;
+        }
+
+        .feature-title {
+            text-align: left;
+            margin-bottom: 48px;
+        }
+
+        .feature-title h1 {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fff 0%, #a8a8a8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .feature-title p {
+            font-size: 18px;
+            color: #888;
+        }
+
+        .feature-section {
+            display: flex;
+            gap: 40px;
+            align-items: stretch;
+            min-height: 500px;
+        }
+
+        /* 左侧 Tab 面板 */
+        .tab-panel {
+            flex-shrink: 0;
+            width: 320px;
+        }
+
+        .tab-list {
+            list-style: none;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .tab-indicator {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            transition: top 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left: 3px solid #4ade80;
+        }
+
+        .tab-item {
+            position: relative;
+            padding: 20px 24px;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+            z-index: 1;
+        }
+
+        .tab-item:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .tab-item.active {
+            background: transparent;
+        }
+
+        .tab-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .tab-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            transition: color 0.2s ease;
+        }
+
+        .tab-item.active .tab-icon {
+            color: #4ade80;
+        }
+
+        .tab-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #666;
+            transition: color 0.2s ease;
+        }
+
+        .tab-item.active .tab-name {
+            color: #fff;
+        }
+
+        .tab-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+            border-radius: 4px;
+            margin-left: 4px;
+        }
+
+        .tab-desc {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.5;
+            transition: color 0.2s ease;
+        }
+
+        .tab-item.active .tab-desc {
+            color: #999;
+        }
+
+        /* 右侧内容面板 */
+        .content-panel {
+            flex: 1;
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #111;
+            min-height: 500px;
+        }
+
+        .content-wrapper {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            transform: scale(0.98);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .content-wrapper.active {
+            opacity: 1;
+            transform: scale(1);
+            z-index: 1;
+        }
+
+        .content-wrapper img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .content-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .content-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            color: #444;
+        }
+
+        .content-placeholder svg {
+            width: 64px;
+            height: 64px;
+            opacity: 0.5;
+        }
+
+        .content-placeholder span {
+            font-size: 14px;
+        }
+
+        /* 装饰元素 */
+        .decoration {
+            position: fixed;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.15;
+            pointer-events: none;
+        }
+
+        .decoration-1 {
+            top: -100px;
+            right: -100px;
+            background: #4ade80;
+        }
+
+        .decoration-2 {
+            bottom: -100px;
+            left: -100px;
+            background: #22d3ee;
+        }
+
+        /* 响应式 */
+        @media (max-width: 900px) {
+            .feature-section {
+                flex-direction: column;
+            }
+
+            .tab-panel {
+                width: 100%;
+            }
+
+            .tab-list {
+                flex-direction: row;
+                overflow-x: auto;
+            }
+
+            .tab-indicator {
+                display: none;
+            }
+
+            .tab-item {
+                white-space: nowrap;
+                padding: 12px 16px;
+            }
+
+            .tab-desc {
+                display: none;
+            }
+
+            .content-panel {
+                min-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="decoration decoration-1"></div>
+    <div class="decoration decoration-2"></div>
+
+    <div class="feature-core">
+        <div class="feature-title">
+            <h1>项目演示</h1>
+            <p>核心功能与亮点展示，点击左侧标签切换查看。</p>
+        </div>
+
+        <div class="feature-section">
+            <!-- 左侧 Tab 面板 -->
+            <div class="tab-panel">
+                <ul class="tab-list">
+                    <div class="tab-indicator" id="tabIndicator"></div>
+                    <!-- Tab 项通过 JS 动态渲染 -->
+                </ul>
+            </div>
+
+            <!-- 右侧内容面板 -->
+            <div class="content-panel" id="contentPanel">
+                <!-- 内容通过 JS 动态渲染 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== 配置数据 =====
+        // 在这里修改 tabs 数组来添加/修改展示内容
+        // type: 'image' | 'video'
+        // src: 图片或视频的路径/URL
+        // poster: (可选) 视频封面图
+        // bgImage: (可选) 背景图片
+        const tabs = [
+            {
+                name: '深度研究',
+                desc: '基于多 Agent 协作的深度研究能力，自动规划、搜索、分析并生成结构化报告。',
+                icon: 'research',
+                tag: 'Core',
+                type: 'image',
+                src: 'https://img.alicdn.com/imgextra/i4/O1CN01DNLwq91Oi3TnQtUfM_!!6000000001738-0-tps-3080-2184.jpg',
+                bgImage: ''
+            },
+            {
+                name: '智能搜索',
+                desc: '集成多种搜索引擎，智能抓取和解析网页内容，提供精准信息检索。',
+                icon: 'search',
+                tag: '',
+                type: 'video',
+                src: 'https://cloud.video.taobao.com/vod/Dk1X5H_Z_liQf2rGkCYDfm1nZgID09FgdnfTvowFPBg.mp4',
+                bgImage: ''
+            },
+            {
+                name: '报告生成',
+                desc: '自动生成专业的 Markdown 格式研究报告，支持多种风格与模板。',
+                icon: 'report',
+                tag: 'New',
+                type: 'image',
+                src: 'https://img.alicdn.com/imgextra/i4/O1CN01DNLwq91Oi3TnQtUfM_!!6000000001738-0-tps-3080-2184.jpg',
+                bgImage: ''
+            },
+            {
+                name: '工作流编排',
+                desc: '灵活的工作流编排引擎，支持自定义节点和流程控制。',
+                icon: 'workflow',
+                tag: '',
+                type: 'image',
+                src: 'https://img.alicdn.com/imgextra/i4/O1CN01DNLwq91Oi3TnQtUfM_!!6000000001738-0-tps-3080-2184.jpg',
+                bgImage: ''
+            }
+        ];
+
+        // ===== SVG 图标定义 =====
+        const icons = {
+            research: `<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M13.9875 10.626C13.9004 10.9524 13.8879 11.2942 13.951 11.6261C14.0141 11.9579 14.1513 12.2713 14.352 12.543L15.444 14.022L13.626 13.752C13.292 13.7023 12.9512 13.7284 12.6287 13.8284C12.3062 13.9284 12.0103 14.0997 11.763 14.3296L9.16642 16.746L10.0814 13.32C10.1685 12.9936 10.181 12.6517 10.1179 12.3199C10.0548 11.988 9.9178 11.6746 9.71704 11.4029L8.62495 9.92396L10.443 10.194C10.7772 10.2439 11.1184 10.2179 11.4411 10.1179C11.7639 10.0179 12.0601 9.84662 12.3075 9.61655L14.9025 7.20007L13.9875 10.626Z"></path>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M11.9999 2C17.5229 2 22 6.47697 22.0001 11.9999C22.0001 17.5229 17.5229 22.0001 11.9999 22.0001C6.47697 22 2 17.5229 2 11.9999C2.00003 6.47699 6.47699 2.00003 11.9999 2ZM11.9999 4.00005C9.87823 4.00007 7.84344 4.84288 6.34316 6.34316C4.84288 7.84344 4.00007 9.87823 4.00005 11.9999C4.00005 14.1217 4.84287 16.1566 6.34316 17.6569C7.84344 19.1572 9.87825 20 11.9999 20C14.1217 20 16.1566 19.1572 17.6569 17.6569C19.1572 16.1566 20 14.1217 20 11.9999C20 9.87825 19.1572 7.84344 17.6569 6.34316C16.1566 4.84287 14.1217 4.00005 11.9999 4.00005Z"></path>
+            </svg>`,
+            search: `<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M18.031 16.6168L22.3137 20.8995L20.8995 22.3137L16.6168 18.031C15.0769 19.263 13.124 20 11 20C6.032 20 2 15.968 2 11C2 6.032 6.032 2 11 2C15.968 2 20 6.032 20 11C20 13.124 19.263 15.0769 18.031 16.6168ZM16.0247 15.8748C17.2475 14.6146 18 12.8956 18 11C18 7.132 14.868 4 11 4C7.132 4 4 7.132 4 11C4 14.868 7.132 18 11 18C12.8956 18 14.6146 17.2475 15.8748 16.0247L16.0247 15.8748Z"></path>
+            </svg>`,
+            report: `<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M13 21V23H11V21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H9C10.1947 3 11.2671 3.52375 12 4.35418C12.7329 3.52375 13.8053 3 15 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H13ZM20 19V5H15C13.8954 5 13 5.89543 13 7V19H20ZM11 19V7C11 5.89543 10.1046 5 9 5H4V19H11Z"></path>
+            </svg>`,
+            workflow: `<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M23 20.1273H20.6714V12.5264L14.1723 19.0255L12.3712 17.5338L16.2121 13.6907H5.88459V11.3621H16.2143L12.3712 7.52125L14.1723 6.0295L20.6714 12.5264V4.92773H23V20.1273Z"></path>
+                <path d="M4.60318 12.4627L2.79648 14.2489L1 12.4525L2.80671 10.6674L4.60318 12.4627Z"></path>
+            </svg>`
+        };
+
+        // ===== 渲染逻辑 =====
+        const tabList = document.querySelector('.tab-list');
+        const contentPanel = document.getElementById('contentPanel');
+        const tabIndicator = document.getElementById('tabIndicator');
+        let activeIndex = 0;
+
+        function renderTabs() {
+            tabs.forEach((tab, index) => {
+                // 创建 Tab 项
+                const li = document.createElement('li');
+                li.className = `tab-item${index === 0 ? ' active' : ''}`;
+                li.innerHTML = `
+                    <div class="tab-title">
+                        <div class="tab-icon">${icons[tab.icon] || icons.research}</div>
+                        <span class="tab-name">${tab.name}</span>
+                        ${tab.tag ? `<span class="tab-tag">${tab.tag}</span>` : ''}
+                    </div>
+                    <div class="tab-desc">${tab.desc}</div>
+                `;
+                li.addEventListener('click', () => switchTab(index));
+                tabList.appendChild(li);
+
+                // 创建内容项
+                const contentDiv = document.createElement('div');
+                contentDiv.className = `content-wrapper${index === 0 ? ' active' : ''}`;
+                if (tab.bgImage) {
+                    contentDiv.style.backgroundImage = `url("${tab.bgImage}")`;
+                }
+
+                if (tab.type === 'video') {
+                    contentDiv.innerHTML = `
+                        <video src="${tab.src}" autoplay loop muted playsinline
+                            ${tab.poster ? `poster="${tab.poster}"` : ''}></video>
+                    `;
+                } else if (tab.type === 'image') {
+                    contentDiv.innerHTML = `<img src="${tab.src}" alt="${tab.name}" />`;
+                } else {
+                    contentDiv.innerHTML = `
+                        <div class="content-placeholder">
+                            <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M5 11.1005L7 9.1005L12.5 14.6005L16 11.1005L19 14.1005V5H5V11.1005ZM4 3H20C20.5523 3 21 3.44772 21 4V20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V4C3 3.44772 3.44772 3 4 3ZM5 13.9289V19H19V16.9289L16 13.9289L12.5 17.4289L7 11.9289L5 13.9289ZM8 10C7.17157 10 6.5 9.32843 6.5 8.5C6.5 7.67157 7.17157 7 8 7C8.82843 7 9.5 7.67157 9.5 8.5C9.5 9.32843 8.82843 10 8 10Z"></path>
+                            </svg>
+                            <span>暂无内容，请配置 src 路径</span>
+                        </div>
+                    `;
+                }
+                contentPanel.appendChild(contentDiv);
+            });
+
+            updateIndicator(0);
+        }
+
+        function switchTab(index) {
+            if (index === activeIndex) return;
+
+            // 更新 Tab 状态
+            const tabItems = tabList.querySelectorAll('.tab-item');
+            tabItems[activeIndex].classList.remove('active');
+            tabItems[index].classList.add('active');
+
+            // 更新内容状态
+            const contents = contentPanel.querySelectorAll('.content-wrapper');
+            contents[activeIndex].classList.remove('active');
+            contents[index].classList.add('active');
+
+            // 处理视频播放
+            const prevVideo = contents[activeIndex].querySelector('video');
+            const nextVideo = contents[index].querySelector('video');
+            if (prevVideo) prevVideo.pause();
+            if (nextVideo) nextVideo.play();
+
+            // 更新指示器
+            updateIndicator(index);
+            activeIndex = index;
+        }
+
+        function updateIndicator(index) {
+            const tabItems = tabList.querySelectorAll('.tab-item');
+            if (tabItems[index]) {
+                const item = tabItems[index];
+                tabIndicator.style.top = item.offsetTop + 'px';
+                tabIndicator.style.height = item.offsetHeight + 'px';
+            }
+        }
+
+        // 初始化
+        renderTabs();
+
+        // 窗口 resize 时更新指示器位置
+        window.addEventListener('resize', () => updateIndicator(activeIndex));
+    </script>
+</body>
+</html>

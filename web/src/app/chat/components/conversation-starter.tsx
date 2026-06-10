@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 
 import { cn } from "~/lib/utils";
 
+import { FeatureShowcase } from "./feature-showcase";
 import { Welcome } from "./welcome";
 
 export function ConversationStarter({
@@ -22,9 +23,11 @@ export function ConversationStarter({
   return (
     <div className={cn("flex flex-col items-center", className)}>
       <div className="pointer-events-none fixed inset-0 flex items-center justify-center">
-        <Welcome className="pointer-events-auto mb-15 w-[75%] -translate-y-24" />
+        <Welcome className="pointer-events-auto mb-15 w-[75%] -translate-y-52" />
       </div>
-      {/* 修改为单列布局，4个问题纵向排列，样式类似图片 */}
+      {/* Feature Showcase: 展示项目演示视频和图片，位于 Welcome 和快捷问题之间 */}
+      <FeatureShowcase className="mb-4 w-full max-w-2xl" />
+      {/* 快捷问题列表 */}
       <ul className="flex flex-col gap-3 w-full max-w-2xl">
         {questions.map((question, index) => (
           <motion.li
