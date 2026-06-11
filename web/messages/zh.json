@@ -41,7 +41,7 @@
       "maxStepsOfPlan": "研究计划的最大步骤数",
       "maxStepsDescription": "默认情况下，每个研究计划有 3 个步骤。",
       "maxSearchResults": "最大搜索结果数",
-      "maxSearchResultsDescription": "默认情况下，每个搜索步骤有 3 个结果。",
+      "maxSearchResultsDescription": "默认情况下，每个搜索步骤有 5 个结果。",
       "searchEngine": "搜索引擎",
       "searchEngineDescription": "选择默认的搜索引擎。自定义搜索引擎是推荐的选择，可用于企业内部搜索，Tavily 则用于外部网络搜索。",
       "selectSearchEngine": "选择搜索引擎",

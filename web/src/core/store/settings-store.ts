@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     enableBackgroundInvestigation: true,  // 默认开启背景调研
     maxPlanIterations: 2,
     maxStepNum: 5,
-    maxSearchResults: 2,
+    maxSearchResults: 5,
     searchEngine: "custom_search",
     useBudgetControlledOnlineSearch: true,  // 默认使用budget控制的在线检索
     useBudgetControlledBocomSearch: true,   // 默认使用budget控制的bocom搜索

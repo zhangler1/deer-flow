@@ -117,6 +117,7 @@ export const GeneralTab: Tab = ({
                 </FormItem>
               )}
             />
+{/* [注释] 最大计划迭代次数配置
             <FormField
               control={form.control}
               name="maxPlanIterations"
@@ -141,6 +142,7 @@ export const GeneralTab: Tab = ({
                 </FormItem>
               )}
             />
+            */}
             <FormField
               control={form.control}
               name="maxStepNum"
