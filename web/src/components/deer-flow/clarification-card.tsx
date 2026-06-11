@@ -189,7 +189,7 @@ key={currentIndex} 让 framer-motion 知道"这是不同的内容"从而触发�
                 className={cn(
                   "flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors",
                   isSelected
-                    ? "border-primary bg-primary/5"
+                    ? "border-primary bg-[#f0f4fd] dark:bg-[#0e1825]"
                     : "border-border hover:border-primary/50 hover:bg-muted/50",
                 )}
                 onClick={() => handleOptionClick(index)}
@@ -224,7 +224,7 @@ key={currentIndex} 让 framer-motion 知道"这是不同的内容"从而触发�
               className={cn(
                 "flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors",
                 isSelected
-                  ? "border-primary bg-primary/5"
+                  ? "border-primary bg-[#f0f4fd] dark:bg-[#0e1825]"
                   : "border-border hover:border-primary/50 hover:bg-muted/50",
               )}
               onClick={() => handleOptionClick(index)}

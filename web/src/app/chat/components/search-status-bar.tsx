@@ -24,7 +24,7 @@ export function SearchStatusBar({ className }: { className?: string }) {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
           className={cn(
-            "flex items-center gap-3 px-4 py-2.5 rounded-full border border-primary/20 bg-primary/5 shadow-sm",
+            "flex items-center gap-3 px-4 py-2.5 rounded-full border border-[#cce0ff] bg-[#f0f4fd] shadow-sm dark:border-[#1a4060] dark:bg-[#0e1825]",
             className
           )}
         >

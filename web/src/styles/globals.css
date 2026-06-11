@@ -452,6 +452,17 @@ textarea {
   outline: none;
 }
 
+/* 修复行内浏览器（WebView）中 Tab 点击后出现深蓝 focus 边框的问题 */
+[data-slot="tabs-trigger"] {
+  outline: none !important;
+}
+[data-slot="tabs-trigger"]:focus {
+  outline: none !important;
+}
+[data-slot="tabs-trigger"]:focus-visible {
+  outline: none !important;
+}
+
 [role="button"],
 button {
   cursor: pointer;

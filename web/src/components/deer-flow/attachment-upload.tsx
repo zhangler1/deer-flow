@@ -171,13 +171,13 @@ function UploadProgressBar({ progress, status }: { progress: number; status: Att
 
   return (
     <div className="absolute bottom-0 left-0 right-0 h-[3px] overflow-hidden rounded-b-[10px]">
-      <div className="h-full w-full bg-primary/10" />
+      <div className="h-full w-full bg-[#e8f0fe] dark:bg-[#102030]" />
       <div
         className={cn(
           "absolute top-0 left-0 h-full rounded-full transition-all duration-300 ease-out",
           status === "uploading"
             ? "bg-gradient-to-r from-blue-400 to-blue-600 animate-pulse"
-            : "bg-primary/30",
+            : "bg-[#aad0ff] dark:bg-[#225080]",
         )}
         style={{ width: `${progress}%` }}
       />
@@ -431,7 +431,7 @@ const AttachmentUpload = forwardRef<AttachmentUploadRef, AttachmentUploadProps>(
                 attachment.status === "error" &&
                   "border-destructive/50 bg-destructive/5",
                 attachment.status === "uploading" &&
-                  "border-primary/20 bg-primary/5",
+                  "border-[#cce0ff] bg-[#f0f4fd] dark:border-[#1a4060] dark:bg-[#0e1825]",
                 attachment.status === "success" && "border-border hover:border-border/80",
                 attachment.status === "pending" && "border-border/50 opacity-70",
               )}

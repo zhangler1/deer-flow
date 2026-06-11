@@ -147,12 +147,12 @@ export function FeatureShowcase({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex flex-col sm:flex-row gap-3 w-full p-3",
+        "flex flex-col sm:flex-row gap-3 w-full p-3 [transform:scale(1.25)] [transform-origin:top_center] mt-4",
         className,
       )}
     >
       {/* 左侧 Tab 列表 */}
-      <div className="relative flex sm:flex-col flex-row gap-1 sm:w-48 shrink-0 overflow-x-auto sm:overflow-x-visible">
+      <div className="relative flex sm:flex-col sm:h-full sm:justify-evenly flex-row gap-1 sm:w-48 shrink-0 overflow-x-auto sm:overflow-x-visible">
         {/* 灰色竖线背景 */}
         <div className="hidden sm:block absolute left-0 top-0 bottom-0 w-[3px] rounded-full bg-border/60" />
         {TABS.map((tab, index) => {
@@ -167,8 +167,8 @@ export function FeatureShowcase({ className }: { className?: string }) {
                 "relative flex sm:flex-col sm:items-start flex-row items-center gap-1 rounded-xl pl-4 pr-3 py-3 text-left transition-all duration-200 outline-none",
                 "flex-shrink-0 min-w-0 sm:min-w-full",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                  ? "bg-[#e8f0fe] text-primary dark:bg-[#1a3050]"
+                  : "text-muted-foreground hover:bg-[#f0f4fa] hover:text-foreground dark:hover:bg-[#1e2a3a]",
               )}
             >
               {/* 左侧高亮指示条（选中时蓝色覆盖灰色竖线） */}

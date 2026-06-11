@@ -340,7 +340,7 @@ function IterativeResearchRoundContainer({
                 "h-auto w-full justify-start rounded-xl border px-6 py-4 text-left transition-all duration-200 mb-3",
                 "hover:bg-accent hover:text-accent-foreground",
                 hasStreaming
-                  ? "border-primary/30 bg-primary/10 shadow-md"
+                  ? "border-[#cce0ff] bg-[#e8f0fe] shadow-md dark:border-[#1a4060] dark:bg-[#102030]"
                   : "border-border bg-card/50",
               )}
             >
@@ -639,7 +639,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
               "h-auto w-full justify-start rounded-xl border px-6 py-4 text-left transition-all duration-200",
               "hover:bg-accent hover:text-accent-foreground",
               message.isStreaming
-                ? "border-primary/20 bg-primary/5 shadow-sm"
+                ? "border-[#cce0ff] bg-[#f0f4fd] shadow-sm dark:border-[#1a4060] dark:bg-[#0e1825]"
                 : "border-border bg-card",
             )}
           >
@@ -701,7 +701,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
           <Card
             className={cn(
               "transition-all duration-200",
-              message.isStreaming ? "border-primary/20 bg-primary/5" : "border-border",
+              message.isStreaming ? "border-[#cce0ff] bg-[#f0f4fd] dark:border-[#1a4060] dark:bg-[#0e1825]" : "border-border",
             )}
           >
             <CardContent>
@@ -992,7 +992,7 @@ function ThoughtBlock({
               "h-auto w-full justify-start rounded-xl border px-6 py-4 text-left transition-all duration-200",
               "hover:bg-accent hover:text-accent-foreground",
               isStreaming
-                ? "border-primary/20 bg-primary/5 shadow-sm"
+                ? "border-[#cce0ff] bg-[#f0f4fd] shadow-sm dark:border-[#1a4060] dark:bg-[#0e1825]"
                 : "border-border bg-card",
             )}
           >
@@ -1032,7 +1032,7 @@ function ThoughtBlock({
           <Card
             className={cn(
               "transition-all duration-200",
-              isStreaming ? "border-primary/20 bg-primary/5" : "border-border",
+              isStreaming ? "border-[#cce0ff] bg-[#f0f4fd] dark:border-[#1a4060] dark:bg-[#0e1825]" : "border-border",
             )}
           >
             <CardContent>

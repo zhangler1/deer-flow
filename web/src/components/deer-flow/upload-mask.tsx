@@ -19,8 +19,8 @@ export function UploadMask({ visible, className }: UploadMaskProps) {
     <div
       className={cn(
         "pointer-events-none absolute inset-0 z-50 flex items-center justify-center",
-        "rounded-xl border-2 border-dashed border-primary/50",
-        "bg-primary/5 backdrop-blur-[1px]",
+        "rounded-xl border-2 border-dashed border-[#99c8ff] dark:border-[#3060a0]",
+        "bg-[#f0f4fd] dark:bg-[#0e1825] backdrop-blur-[1px]",
         "animate-in fade-in duration-200",
         className,
       )}
