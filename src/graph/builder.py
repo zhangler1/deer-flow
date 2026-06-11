@@ -101,16 +101,9 @@ def continue_to_running_research_team(state: State):
         if step_type == StepType.RESEARCH:
             next_node = "researcher"
             enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → researcher | 原因: 下一步是研究类型 | 步骤: '{step_title}'")
-        # 暂时注释掉 coder 节点的路由
-        # elif step_type == StepType.PROCESSING:
-        #     next_node = "coder"
-        #     enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → coder | 原因: 下一步是处理类型 | 步骤: '{step_title}'")
-        elif step_type == StepType.PROCESSING:
-            # 暂时跳过处理类型，直接回到 planner
-            next_node = "planner"
-            enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → planner | 原因: 处理类型暂时跳过（coder已注释） | 步骤: '{step_title}'")
         else:
-            enhanced_logger.logger.info(f"🔀 TRANSITION_DECISION | research_team → planner | 原因: 未知步骤类型 | 类型: {step_type}")
+            # PROCESSING 及其他未知类型统一回到 planner 重新规划
+            enhanced_logger.logger.warning(f"🔀 TRANSITION_DECISION | research_team → planner | 原因: 不支持的步骤类型 '{step_type}'，回到 planner 重新规划 | 步骤: '{step_title}'")
     except (AttributeError, TypeError):
         enhanced_logger.logger.warning("无法获取步骤类型，默认返回planner")
     

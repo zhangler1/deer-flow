@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { withBasePath } from "~/core/utils/base-path";
 import { cn } from "~/lib/utils";
 
 type TabItem = {
@@ -41,26 +42,26 @@ const TABS: TabItem[] = [
     desc: "基于多 Agent 协作，集成行内外知识检索，自主规划搜索、生成研究报告。",
     icon: "microscope",
     tag: "Core",
-    type: "image",
-    src: "https://img.alicdn.com/imgextra/i4/O1CN01DNLwq91Oi3TnQtUfM_!!6000000001738-0-tps-3080-2184.jpg",
+    type: "video",
+    src: withBasePath("/video/tab1.mp4"),
   },
   {
     key: "knowledge",
     name: "资料研究",
-    desc: "支持上传pdf，doc，docx，ppt，pptx，xls，xlsx，csv，txt，md，markdown格式文件",
+    desc: "支持上传pdf，docx，ppt，xlsx，csv，txt，md等格式文件（禁止上传涉密资料）",
     icon: "filesearch",
     tag: "New",
-    type: "video",
-    src: "https://cloud.video.taobao.com/vod/Dk1X5H_Z_liQf2rGkCYDfm1nZgID09FgdnfTvowFPBg.mp4",
+    type: "image",
+    src: withBasePath("/images/tab2.png"),
   },
   {
     key: "chat",
-    name: "模型更新",
-    desc: "自动生成专业 Markdown 格式研究报告，支持多种风格与模板。",
+    name: "报告编辑",
+    desc: "自动生成专业 Markdown 格式研究报告，支持线编辑和下载。",
     icon: "sparkles",
     tag: "New",
-    type: "image",
-    src: "https://img.alicdn.com/imgextra/i4/O1CN01DNLwq91Oi3TnQtUfM_!!6000000001738-0-tps-3080-2184.jpg",
+    type: "video",
+    src:  withBasePath("/video/tab3.mp4"),
   },
   {
     key: "quote",
@@ -68,8 +69,8 @@ const TABS: TabItem[] = [
     desc: "可靠的来源标注，支持点击查看原文，行内支持跳转交行知道链接。",
     tag: "New",
     icon: "bookmarked",
-    type: "image",
-    src: "https://img.alicdn.com/imgextra/i4/O1CN01DNLwq91Oi3TnQtUfM_!!6000000001738-0-tps-3080-2184.jpg",
+    type: "video",
+    src: withBasePath("/video/tab4.mp4"),
   },
 ];
 
@@ -82,11 +83,14 @@ export function FeatureShowcase({ className }: { className?: string }) {
   const handleSwitch = useCallback(
     (nextIndex: number) => {
       if (nextIndex === activeIndex) return;
-      // 暂停上一个视频
+      // 停止上一个视频（暂停并回到开头）
       const prevTab = TABS[activeIndex];
       if (prevTab?.type === "video") {
         const prevVideo = videoRefs.current.get(activeIndex);
-        if (prevVideo) prevVideo.pause();
+        if (prevVideo) {
+          prevVideo.pause();
+          prevVideo.currentTime = 0;
+        }
       }
       // 播放下一个视频
       const nextTab = TABS[nextIndex];
@@ -94,7 +98,7 @@ export function FeatureShowcase({ className }: { className?: string }) {
         const nextVideo = videoRefs.current.get(nextIndex);
         if (nextVideo) {
           nextVideo.currentTime = 0;
-          void nextVideo.play();
+          nextVideo.play().catch(() => {});
         }
       }
       setActiveIndex(nextIndex);
@@ -108,7 +112,7 @@ export function FeatureShowcase({ className }: { className?: string }) {
     autoTimerRef.current = setTimeout(() => {
       const next = (activeIndex + 1) % TABS.length;
       handleSwitch(next);
-    }, 5_000);
+    }, 7_000);
     return () => {
       if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
     };
@@ -119,9 +123,26 @@ export function FeatureShowcase({ className }: { className?: string }) {
     const firstTab = TABS[0];
     if (firstTab?.type === "video") {
       const firstVideo = videoRefs.current.get(0);
-      if (firstVideo) void firstVideo.play();
+      if (firstVideo) firstVideo.play().catch(() => {});
     }
   }, []);
+
+  // 页面不可见时暂停所有视频，可见时恢复当前视频
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        videoRefs.current.forEach((video) => video.pause());
+      } else {
+        const activeTab = TABS[activeIndex];
+        if (activeTab?.type === "video") {
+          const activeVideo = videoRefs.current.get(activeIndex);
+          if (activeVideo) activeVideo.play().catch(() => {});
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [activeIndex]);
 
   return (
     <div
@@ -193,7 +214,7 @@ export function FeatureShowcase({ className }: { className?: string }) {
       </div>
 
       {/* 右侧内容区 */}
-      <div className="relative sm:flex-1 sm:basis-0 min-w-0 w-full sm:w-auto min-h-[200px] sm:min-h-[400px] rounded-xl overflow-hidden bg-muted/40">
+      <div className="relative sm:flex-1 sm:basis-0 min-w-0 w-full sm:w-auto min-h-[200px] sm:min-h-[400px] rounded-xl bg-transparent">
         {/* 内容切换 */}
         <AnimatePresence mode="wait">
           <motion.div
@@ -209,29 +230,37 @@ export function FeatureShowcase({ className }: { className?: string }) {
               if (!tab) return null;
               if (tab.type === "video") {
                 return (
-                  <video
-                    key={`video-${activeIndex}`}
-                    ref={(el) => {
-                      if (el) videoRefs.current.set(activeIndex, el);
-                      else videoRefs.current.delete(activeIndex);
-                    }}
-                    src={tab.src}
-                    poster={tab.poster}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
+                  <div className="flex h-full w-full items-center justify-center p-6">
+                    <div className="h-full w-full shadow-[6px_8px_12px_-6px_rgba(0,0,0,0.3)] rounded-lg overflow-hidden">
+                      <video
+                        key={`video-${activeIndex}`}
+                        ref={(el) => {
+                          if (el) videoRefs.current.set(activeIndex, el);
+                          else videoRefs.current.delete(activeIndex);
+                        }}
+                        src={tab.src}
+                        poster={tab.poster}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                  </div>
                 );
               }
               return (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={tab.src}
-                  alt={tab.name}
-                  className="h-full w-full object-cover"
-                />
+                <div className="flex h-full w-full items-center justify-center p-6">
+                  <div className="h-full w-full shadow-[6px_8px_12px_-6px_rgba(0,0,0,0.3)] rounded-lg overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={tab.src}
+                      alt={tab.name}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                </div>
               );
             })()}
           </motion.div>

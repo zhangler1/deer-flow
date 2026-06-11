@@ -2,11 +2,11 @@
 schema_version: 1
 locale: zh-CN
 branch: midware
-exported_at: "2026-06-10T03:52:00Z"
+exported_at: "2026-06-10T08:53:11Z"
 modules:
     "":
-        dir_name: DeerFlow 智能体应用编排与运行时
-        title: DeerFlow 智能体应用编排与运行时
+        dir_name: DeerFlow 智能体应用编排与全栈集成
+        title: DeerFlow 智能体应用编排与全栈集成
         scope:
             - .coverage
             - .dockerignore
@@ -36,27 +36,27 @@ modules:
         depends_on: []
         related_to: []
     backend:
-        dir_name: 多模态智能体工作流编排与运行时
-        title: 多模态智能体工作流编排与运行时
+        dir_name: DeerFlow Agent 运行时中间件编排层
+        title: DeerFlow Agent 运行时中间件编排层
         scope:
             - src/
         source_files: []
         children:
-            - backend/agents_core
-            - backend/prose_feature
-            - backend/data_lists
-            - backend/server_api
+            - backend/crawler
+            - backend/graph_engine
             - backend/prompts_templates
-            - backend/prompt_enhancer_feature
-            - backend/podcast_feature
+            - backend/data_lists
+            - backend/agents_core
+            - backend/server_api
+            - backend/ppt_feature
+            - backend/rag_service
+            - backend/prose_feature
             - backend/utils
             - backend/tools_integrations
-            - backend/graph_engine
-            - backend/rag_service
-            - backend/ppt_feature
-            - backend/llm_providers
             - backend/config
-            - backend/crawler
+            - backend/prompt_enhancer_feature
+            - backend/podcast_feature
+            - backend/llm_providers
         depends_on: []
         related_to:
             - path: infra
@@ -142,14 +142,14 @@ modules:
             - path: backend/llm_providers
             - path: mock_search
     backend/graph_engine:
-        dir_name: 智能研究工作流编排引擎
-        title: 智能研究工作流编排引擎
+        dir_name: 多智能体深度研究图引擎
+        title: 多智能体深度研究图引擎
         scope:
             - src/graph/
         source_files: []
         children:
-            - backend/graph_engine/core_engine
             - backend/graph_engine/deep_research
+            - backend/graph_engine/core_engine
         depends_on: []
         related_to:
             - path: backend/config
@@ -164,7 +164,12 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: backend/graph_engine/deep_research
+            - path: backend/prompts_templates
+            - path: backend/prompt_enhancer_feature
+            - path: backend/utils
+            - path: backend/agents_core
     backend/graph_engine/deep_research:
         dir_name: 深度研究协调与规划引擎
         title: 深度研究协调与规划引擎
@@ -173,7 +178,14 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: backend/graph_engine/core_engine
+            - path: backend/prompts_templates
+            - path: backend/data_lists
+            - path: backend/prompt_enhancer_feature
+            - path: backend/agents_core
+            - path: frontend
+            - path: backend/server_api
     backend/llm_providers:
         dir_name: LLM Provider Abstraction & Management
         title: LLM Provider Abstraction & Management
@@ -308,14 +320,23 @@ modules:
             - path: frontend
             - path: mock_search
     backend/server_api:
-        dir_name: DeerFlow 后端 API 服务与流式工作流网关
-        title: DeerFlow 后端 API 服务与流式工作流网关
+        dir_name: 后端 API 服务与请求处理
+        title: 后端 API 服务与请求处理
         scope:
             - src/server/
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: frontend
+            - path: backend/utils
+            - path: backend/podcast_feature
+            - path: backend/ppt_feature
+            - path: backend/prose_feature
+            - path: backend/prompt_enhancer_feature
+            - path: backend/graph_engine
+            - path: infra
+            - path: backend/graph_engine/deep_research
     backend/tools_integrations:
         dir_name: 智能体工具集成与治理框架
         title: 智能体工具集成与治理框架
@@ -323,9 +344,9 @@ modules:
             - src/tools/
         source_files: []
         children:
+            - backend/tools_integrations/search_tools
             - backend/tools_integrations/tavily_search_adapter
             - backend/tools_integrations/utility_tools
-            - backend/tools_integrations/search_tools
         depends_on: []
         related_to:
             - path: backend/agents_core
@@ -392,8 +413,8 @@ modules:
             - path: backend/llm_providers
             - path: backend/prompt_enhancer_feature
     frontend:
-        dir_name: AI 深度研究与交互前端应用
-        title: AI 深度研究与交互前端应用
+        dir_name: AI 深度研究与智能对话前端
+        title: AI 深度研究与智能对话前端
         scope:
             - web/
         source_files: []
@@ -414,8 +435,8 @@ modules:
             - path: backend/config
             - path: backend/prompts_templates
     infra:
-        dir_name: 基础设施与运维编排
-        title: 基础设施与运维编排
+        dir_name: 基础设施与部署编排
+        title: 基础设施与部署编排
         scope:
             - nginx/
             - scripts/
@@ -428,7 +449,12 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: frontend
+            - path: backend
+            - path: mock_llm
+            - path: mock_search
+            - path: backend/server_api
     mock_llm:
         dir_name: LLM 服务模拟与连接调试
         title: LLM 服务模拟与连接调试

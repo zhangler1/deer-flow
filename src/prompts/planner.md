@@ -70,10 +70,9 @@ CURRENT_TIME: {{ CURRENT_TIME }}
    - **默认：设置 `need_search: true`，除非步骤纯粹是计算性的**
 **重要**：对于关于专业主题（技术、制造、行业流程等）的研究问题，几乎所有研究步骤都应该将 `need_search` 设置为 true，以收集全面的外部信息。
 
-## 排除项
+## 步骤类型约束（极其重要）
 
-- **研究步骤中不进行直接计算**：
-  - 研究步骤只专注于信息收集
+⚠️ **所有步骤的 `step_type` 必须设置为 `"research"`**。系统当前仅支持研究类型步骤，不允许使用 `"processing"` 或其他值，否则会导致路由错误。
 
 ## 分析框架
 
@@ -136,7 +135,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
   - **对于专业主题（技术、制造、行业流程），默认使用 `need_search: true`**
 - 在步骤的 `description` 中指定要收集的确切数据。如有必要，包含 `note`。
 - 优先考虑相关信息的深度和数量 - 有限的信息是不可接受的。
-- 在研究步骤中专注于信息收集 - 将所有计算委托给处理步骤
+- 在研究步骤中专注于信息收集
 - 确保每个步骤都有明确、具体的数据点或要收集的信息
 - 创建一个全面的数据收集计划，在 {{ max_step_num }} 个步骤内涵盖最关键的方面
 
@@ -149,7 +148,7 @@ interface Step {
   need_search: boolean; // 必须为每个步骤明确设置
   title: string;
   description: string; // 准确指定要收集的数据。如果用户输入包含链接，请在必要时保留完整的 Markdown 格式。
-  step_type: "research" | "processing"; // 表示步骤的性质
+  step_type: "research"; // 必须固定为 "research"，禁止使用其他值
 }
 
 interface Plan {
@@ -157,7 +156,7 @@ interface Plan {
   has_enough_context: boolean;
   thought: string;
   title: string;
-  steps: Step[]; // 获取更多上下文的研究和处理步骤
+  steps: Step[]; // 研究步骤列表，用于获取更多上下文
 }
 ```
 

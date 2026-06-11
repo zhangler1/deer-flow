@@ -309,7 +309,7 @@ export function InputBox({
               <Detective /> {t("investigation")}
             </Button>
           </Tooltip> */}
-          <Tooltip title="上传文档">
+          <Tooltip title="上传文档（禁止上传涉密资料）">
             <Button
               variant="outline"
               size="icon"
