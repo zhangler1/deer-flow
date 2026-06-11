@@ -177,7 +177,7 @@ function mergeToolCallMessage(
       // 回退：如果 index 无效，找最后一个有 argsChunks 的 toolCall
       if (!targetToolCall) {
         for (let i = message.toolCalls.length - 1; i >= 0; i--) {
-          if (message.toolCalls[i].argsChunks?.length) {
+          if (message.toolCalls[i]?.argsChunks?.length) {
             targetToolCall = message.toolCalls[i];
             break;
           }

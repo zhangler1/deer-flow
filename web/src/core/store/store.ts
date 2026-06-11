@@ -285,7 +285,7 @@ export async function sendMessage(
       // 调试日志：记录每个事件的类型和关键信息
       if (type === "tool_calls" || type === "tool_call_chunks" || type === "tool_call_result") {
         console.log(`[SSE调试] 收到事件 type=${type} | msgId=${data.id} | agent=${data.agent}`,
-          type === "tool_calls" ? `| tool_calls=${JSON.stringify((data as { tool_calls?: unknown[] }).tool_calls?.map((tc: { name?: string; id?: string }) => `${tc.name}:${tc.id}`))}` : '',
+          type === "tool_calls" ? `| tool_calls=${JSON.stringify((data as { tool_calls?: Array<{ name?: string; id?: string }> }).tool_calls?.map(tc => `${tc.name}:${tc.id}`))}` : '',
           type === "tool_call_result" ? `| tool_call_id=${(data as { tool_call_id?: string }).tool_call_id}` : '',
         );
       }
