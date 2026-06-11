@@ -5,10 +5,10 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  BrainCircuit,
-  Database,
-  MessageSquareCode,
-  ArrowRightCircle,
+  Microscope,
+  FileSearch,
+  Sparkles,
+  BookMarked,
   Image as ImageIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,7 +19,7 @@ type TabItem = {
   key: string;
   name: string;
   desc: string;
-  icon: "brain" | "database" | "chat" | "arrow";
+  icon: "microscope" | "filesearch" | "sparkles" | "bookmarked";
   tag?: string;
   type: "image" | "video";
   src: string;
@@ -27,10 +27,10 @@ type TabItem = {
 };
 
 const ICONS = {
-  brain: BrainCircuit,
-  database: Database,
-  chat: MessageSquareCode,
-  arrow: ArrowRightCircle,
+  microscope: Microscope,
+  filesearch: FileSearch,
+  sparkles: Sparkles,
+  bookmarked: BookMarked,
 } as const;
 
 // ===== 配置数据：在这里修改 tabs 来添加/修改展示内容 =====
@@ -38,34 +38,36 @@ const TABS: TabItem[] = [
   {
     key: "agent",
     name: "深度研究",
-    desc: "基于多 Agent 协作，自动规划、搜索、分析并生成结构化报告。",
-    icon: "brain",
+    desc: "基于多 Agent 协作，集成行内外知识检索，自主规划搜索、生成研究报告。",
+    icon: "microscope",
     tag: "Core",
     type: "image",
     src: "https://img.alicdn.com/imgextra/i4/O1CN01DNLwq91Oi3TnQtUfM_!!6000000001738-0-tps-3080-2184.jpg",
   },
   {
     key: "knowledge",
-    name: "智能搜索",
-    desc: "集成多种搜索引擎，智能抓取和解析网页内容，精准信息检索。",
-    icon: "database",
+    name: "资料研究",
+    desc: "支持上传pdf，doc，docx，ppt，pptx，xls，xlsx，csv，txt，md，markdown格式文件",
+    icon: "filesearch",
     tag: "New",
     type: "video",
     src: "https://cloud.video.taobao.com/vod/Dk1X5H_Z_liQf2rGkCYDfm1nZgID09FgdnfTvowFPBg.mp4",
   },
   {
     key: "chat",
-    name: "报告生成",
+    name: "模型更新",
     desc: "自动生成专业 Markdown 格式研究报告，支持多种风格与模板。",
-    icon: "chat",
+    icon: "sparkles",
+    tag: "New",
     type: "image",
     src: "https://img.alicdn.com/imgextra/i4/O1CN01DNLwq91Oi3TnQtUfM_!!6000000001738-0-tps-3080-2184.jpg",
   },
   {
-    key: "workflow",
-    name: "工作流编排",
-    desc: "灵活的工作流编排引擎，支持自定义节点和流程控制。",
-    icon: "arrow",
+    key: "quote",
+    name: "来源标注",
+    desc: "可靠的来源标注，支持点击查看原文，行内支持跳转交行知道链接。",
+    tag: "New",
+    icon: "bookmarked",
     type: "image",
     src: "https://img.alicdn.com/imgextra/i4/O1CN01DNLwq91Oi3TnQtUfM_!!6000000001738-0-tps-3080-2184.jpg",
   },
