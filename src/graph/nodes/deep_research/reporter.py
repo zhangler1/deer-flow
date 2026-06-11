@@ -308,7 +308,7 @@ async def reporter_node(state: State, config: RunnableConfig):
     else:
         enhanced_logger.logger.info(f"⚠️ REFERENCE_INDEX | 未从 observations 中提取到任何来源 URL")
 
-    enhanced_logger.logger.info(f"📝 REPORTER_INPUT | 输入消息数: {len(invoke_messages)} | 观察结果数: {len(observations)} | 计划标题: {plan_title}")
+    enhanced_logger.logger.debug(f"📝 REPORTER_INPUT | 输入消息数: {len(invoke_messages)} | 观察结果数: {len(observations)} | 计划标题: {plan_title}")
     
     llm_start_time = time.time()
     enhanced_logger.logger.info(f"🤖 LLM_INVOKE | reporter | 开始生成最终报告 | 消息数: {len(invoke_messages)}")
@@ -378,7 +378,7 @@ async def reporter_node(state: State, config: RunnableConfig):
         _resp_preview = f"{_resp_str[:300]}\n...[省略 {len(_resp_str) - 600} 字]...\n{_resp_str[-300:]}"
     else:
         _resp_preview = _resp_str
-    logger.info(f"reporter response: /n{_resp_preview}")
+    logger.debug(f"reporter response: /n{_resp_preview}")
 
     # # 保存 observations 为 markdown 文件
     # if observations:

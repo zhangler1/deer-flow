@@ -140,7 +140,7 @@ async def planner_node(
     enhanced_logger.log_llm_thinking("planner", len(str(messages)), len(full_response), thinking_duration)
     # ===== LLM 输出日志 =====
     _response_preview = full_response[:500] if len(full_response) > 500 else full_response
-    enhanced_logger.logger.info(
+    enhanced_logger.logger.debug(
         f"📤 PLANNER_LLM_OUTPUT | "
         f"响应长度={len(full_response)} | "
         f"耗时={thinking_duration:.2f}s | "

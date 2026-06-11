@@ -169,7 +169,7 @@ async def coordinator_node(
     enhanced_logger.logger.debug(f"🤖 COORDINATOR_LLM_INPUT | 准备调用LLM | 输入消息数: {len(messages)}")
     for i, msg in enumerate(messages):
         msg_preview = str(msg)[:200] + "..." if len(str(msg)) > 200 else str(msg)
-        enhanced_logger.logger.info(f"  消息{i+1}: {msg_preview}")
+        enhanced_logger.logger.debug(f"  消息{i+1}: {msg_preview}")
     
     llm_start_time = time.time()
     full_response = None

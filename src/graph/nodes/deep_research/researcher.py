@@ -125,7 +125,7 @@ async def researcher_node(
     if report_style == "industry_report":
         # 行业研报：searchknowledge_standard(段落级标准知识检索) + online_search
         session_id = state.get("session_id", "default")
-        logger.info(f"📚 industry_report | session_id={session_id}")
+        logger.debug(f"📚 industry_report | session_id={session_id}")
         tools = [
             research_skill_prompt_search,
         ]
@@ -149,7 +149,7 @@ async def researcher_node(
     elif report_style == "business_marketing":
         # 对公营销报告：使用完整的工具链
         session_id = state.get("session_id", "default")
-        logger.info(f"📋 business_marketing | session_id={session_id}")
+        logger.debug(f"📋 business_marketing | session_id={session_id}")
         tools = []
         tool_name_list = []
         # 根据开关决定是否添加在线搜索工具
