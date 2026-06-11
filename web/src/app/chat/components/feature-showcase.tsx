@@ -39,7 +39,7 @@ const TABS: TabItem[] = [
   {
     key: "agent",
     name: "深度研究",
-    desc: "基于多 Agent 协作，集成行内外知识检索，自主规划搜索、生成研究报告。",
+    desc: "自主规划、深度分析",
     icon: "microscope",
     tag: "Core",
     type: "video",
@@ -48,7 +48,7 @@ const TABS: TabItem[] = [
   {
     key: "knowledge",
     name: "资料研究",
-    desc: "支持上传pdf，docx，ppt，xlsx，csv，txt，md等格式文件（禁止上传涉密资料）",
+    desc: "结合资料进行研究",
     icon: "filesearch",
     tag: "New",
     type: "image",
@@ -57,7 +57,7 @@ const TABS: TabItem[] = [
   {
     key: "chat",
     name: "报告编辑",
-    desc: "自动生成专业 Markdown 格式研究报告，支持线编辑和下载。",
+    desc: "报告在线编辑和下载",
     icon: "sparkles",
     tag: "New",
     type: "video",
@@ -66,7 +66,7 @@ const TABS: TabItem[] = [
   {
     key: "quote",
     name: "来源标注",
-    desc: "可靠的来源标注，支持点击查看原文，行内支持跳转交行知道链接。",
+    desc: "可靠的来源标注",
     tag: "New",
     icon: "bookmarked",
     type: "video",
@@ -152,7 +152,7 @@ export function FeatureShowcase({ className }: { className?: string }) {
       )}
     >
       {/* 左侧 Tab 列表 */}
-      <div className="relative flex sm:flex-col sm:h-full sm:justify-evenly flex-row gap-1 sm:w-48 shrink-0 overflow-x-auto sm:overflow-x-visible">
+      <div className="relative flex sm:flex-col sm:h-full sm:justify-evenly flex-row gap-1 sm:w-48 shrink-0 overflow-x-auto sm:overflow-x-visible  sm:mt-16">
         {/* 灰色竖线背景 */}
         <div className="hidden sm:block absolute left-0 top-0 bottom-0 w-[3px] rounded-full bg-border/60" />
         {TABS.map((tab, index) => {

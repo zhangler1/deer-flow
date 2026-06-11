@@ -156,7 +156,7 @@ export function MessagesBlock({ className }: { className?: string }) {
             </motion.button>
           )}
           {/* 内容居中限宽 */}
-          <div className="flex flex-col items-center w-full max-w-2xl mx-auto">
+          <div className="flex flex-col items-center w-full max-w-4xl mx-auto">
             {/* 快捷问题：紧贴输入框正上方 */}
             {!responding && messageCount === 0 && (
               <ul className="grid grid-cols-2 gap-2 w-full max-w-2xl mb-3">
