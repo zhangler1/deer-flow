@@ -495,7 +495,7 @@ const AttachmentUpload = forwardRef<AttachmentUploadRef, AttachmentUploadProps>(
                 "w-[200px] cursor-default overflow-hidden",
                 "bg-muted/40 transition-all duration-200",
                 attachment.status === "error" &&
-                  "border-destructive/50 bg-destructive/5",
+                  "border-[rgba(235,87,87,0.5)] bg-[rgba(235,87,87,0.06)] dark:border-[rgba(248,113,113,0.5)] dark:bg-[rgba(248,113,113,0.08)]",
                 attachment.status === "uploading" &&
                   "border-[#cce0ff] bg-[#f0f4fd] dark:border-[#1a4060] dark:bg-[#0e1825]",
                 attachment.status === "success" && "border-border hover:border-border/80",
