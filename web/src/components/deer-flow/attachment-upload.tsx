@@ -38,25 +38,32 @@ export interface AttachmentUploadRef {
 
 interface AttachmentUploadProps {
   maxFiles?: number;
+  /** 默认最大文件大小（MB），当文件类型没有单独限制时使用 */
   maxSizeMB?: number;
+  /** 按文件扩展名单独限制大小（MB），示例：{ pdf: 10, docx: 5 } */
+  typeSizeLimits?: Record<string, number>;
   disabled?: boolean;
   onChange?: (attachments: AttachmentFile[]) => void;
 }
 
 const SUPPORTED_EXTENSIONS = new Set([
   "pdf",
-  "doc",
   "docx",
-  "xls",
   "xlsx",
-  "ppt",
   "pptx",
   "txt",
   "md",
   "csv",
   "json",
-  "xml",
   "html",
+]);
+
+/** 禁止上传的文件类型（会提示用户不可上传） */
+const FORBIDDEN_EXTENSIONS = new Set([
+  "doc",
+  "xls",
+  "xml",
+  "ppt",
 ]);
 
 const ACCEPT_STRING = Array.from(SUPPORTED_EXTENSIONS)
@@ -67,6 +74,17 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** 返回禁止类型的替代建议格式 */
+function getAlternativeExt(forbiddenExt: string): string {
+  const altMap: Record<string, string> = {
+    doc: "docx",
+    xls: "xlsx",
+    ppt: "pptx",
+    xml: "json",
+  };
+  return altMap[forbiddenExt] || forbiddenExt;
 }
 
 function getFileTypeLabel(filename: string): string {
@@ -100,6 +118,34 @@ function getFileStatusText(status: AttachmentFile["status"]): string {
     case "error":
       return "上传失败";
   }
+}
+
+/** 将多个扩展名归并为一类显示（如 doc,docx → Word文档） */
+export function getTypeSizeSummary(
+  typeSizeLimits?: Record<string, number>,
+  defaultMaxMB?: number,
+): string {
+  if (!typeSizeLimits || Object.keys(typeSizeLimits).length === 0) {
+    return `单个文件最大 ${defaultMaxMB ?? 2}MB`;
+  }
+
+  // 按文件类型标签归并
+  const seen = new Set<string>();
+  const groups: { label: string; size: number }[] = [];
+  for (const [ext, size] of Object.entries(typeSizeLimits)) {
+    const label = getFileTypeLabel(`file.${ext}`);
+    const key = `${label}:${size}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      groups.push({ label, size });
+    }
+  }
+
+  const parts = groups.map((g) => `${g.label}≤${g.size}MB`);
+  if (defaultMaxMB !== undefined) {
+    parts.push(`其他≤${defaultMaxMB}MB`);
+  }
+  return parts.join("、");
 }
 
 /** 文件类型图标 SVG 组件 */
@@ -186,11 +232,23 @@ function UploadProgressBar({ progress, status }: { progress: number; status: Att
 }
 
 const AttachmentUpload = forwardRef<AttachmentUploadRef, AttachmentUploadProps>(
-  ({ maxFiles = 2, maxSizeMB = 2, disabled = false, onChange }, ref) => {
+  ({ maxFiles = 2, maxSizeMB = 2, typeSizeLimits, disabled = false, onChange }, ref) => {
     const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const progressTimerRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
+
+    /** 获取指定扩展名对应的最大文件大小（字节） */
+    const getFileMaxSize = useCallback(
+      (ext: string): { bytes: number; mb: number; custom: boolean } => {
+        if (typeSizeLimits && typeSizeLimits[ext] !== undefined) {
+          const mb = typeSizeLimits[ext]!;
+          return { bytes: mb * 1024 * 1024, mb, custom: true };
+        }
+        return { bytes: maxSizeBytes, mb: maxSizeMB, custom: false };
+      },
+      [maxSizeBytes, maxSizeMB, typeSizeLimits],
+    );
 
     const updateAttachments = useCallback(
       (updater: (prev: AttachmentFile[]) => AttachmentFile[]) => {
@@ -309,6 +367,13 @@ const AttachmentUpload = forwardRef<AttachmentUploadRef, AttachmentUploadProps>(
           }
 
           const ext = file.name.split(".").pop()?.toLowerCase() || "";
+          // 禁止上传的类型单独提示
+          if (FORBIDDEN_EXTENSIONS.has(ext)) {
+            toast.warning(
+              `${file.name}: 暂不支持上传 .${ext} 格式文件，请转换为 .${getAlternativeExt(ext)} 格式后上传`,
+            );
+            continue;
+          }
           if (!SUPPORTED_EXTENSIONS.has(ext)) {
             toast.warning(
               `${file.name}: 不支持的文件类型 (.${ext})`,
@@ -326,12 +391,13 @@ const AttachmentUpload = forwardRef<AttachmentUploadRef, AttachmentUploadProps>(
             progress: 0,
           };
 
-          if (file.size > maxSizeBytes) {
+          const sizeLimit = getFileMaxSize(ext);
+          if (file.size > sizeLimit.bytes) {
             // Mark as error immediately, show in list with error state
             attachment.status = "error";
-            attachment.errorMessage = `文件过大（最大 ${maxSizeMB}MB）`;
+            attachment.errorMessage = `文件过大（最大 ${sizeLimit.mb}MB）`;
             oversizedAttachments.push(attachment);
-            toast.error(`${file.name} 文件过大（最大 ${maxSizeMB}MB）`);
+            toast.error(`${file.name} 文件过大（${getFileTypeLabel(file.name)} 类最大 ${sizeLimit.mb}MB）`);
           } else {
             newAttachments.push(attachment);
           }
@@ -351,10 +417,10 @@ const AttachmentUpload = forwardRef<AttachmentUploadRef, AttachmentUploadProps>(
         attachments.length,
         disabled,
         maxFiles,
-        maxSizeBytes,
         maxSizeMB,
         updateAttachments,
         uploadFile,
+        getFileMaxSize,
       ],
     );
 

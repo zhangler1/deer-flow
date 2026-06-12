@@ -140,6 +140,8 @@
       "enhancePromptDisabledTooltip": "Please enter a prompt first, then click to enhance",
       "sendTooltip": "Click to send message and start deep research",
       "stopTooltip": "Click to stop generating",
+      "uploadingTooltip": "File is being uploaded, please wait for upload to complete",
+      "uploadingToast": "File is being uploaded, please wait for upload to complete before sending",
       "searchEngine": "Search Engine",
       "on": "On",
       "off": "Off"

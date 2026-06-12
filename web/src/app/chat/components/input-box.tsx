@@ -5,11 +5,13 @@ import { MagicWandIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, Paperclip, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import AttachmentUpload, {
   type AttachmentFile,
   type AttachmentUploadRef,
+  getTypeSizeSummary,
 } from "~/components/deer-flow/attachment-upload";
 import { Detective } from "~/components/deer-flow/icons/detective";
 import MessageInput, {
@@ -72,11 +74,31 @@ export function InputBox({
 
   const MAX_CHARS = 3000;
 
+  // 按文件类型设置不同的大小限制（MB）
+  const TYPE_SIZE_LIMITS: Record<string, number> = {
+    pdf: 2,
+    docx: 0.15,
+    xlsx: 0.15,
+    pptx: 5,
+    txt: 0.15,
+    md: 0.15,
+    csv: 0.15,
+    json: 0.15,
+    html: 0.15,
+  };
+  const typeSizeSummary = getTypeSizeSummary(TYPE_SIZE_LIMITS);
+
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isEnhanceAnimating, setIsEnhanceAnimating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
+
+  // 检查是否有文件正在上传中
+  const isUploading = useMemo(
+    () => attachments.some((a) => a.status === "uploading" || a.status === "pending"),
+    [attachments],
+  );
 
   // 当配置加载后，如果 reporterModel 为空，则用 default 初始化
   useEffect(() => {
@@ -91,6 +113,11 @@ export function InputBox({
         onCancel?.();
       } else {
         if (message.trim() === "") {
+          return;
+        }
+        // 检查是否有文件正在上传
+        if (attachments.some((a) => a.status === "uploading" || a.status === "pending")) {
+          toast.warning(t("uploadingToast"));
           return;
         }
         if (onSend) {
@@ -110,7 +137,7 @@ export function InputBox({
         }
       }
     },
-    [responding, onCancel, onSend, feedback, onRemoveFeedback],
+    [responding, onCancel, onSend, feedback, onRemoveFeedback, attachments, t],
   );
 
   // Drag and drop handlers
@@ -194,6 +221,7 @@ export function InputBox({
         ref={attachmentRef}
         maxFiles={5}
         maxSizeMB={2}
+        typeSizeLimits={TYPE_SIZE_LIMITS}
         disabled={responding}
         onChange={setAttachments}
       />
@@ -276,6 +304,7 @@ export function InputBox({
           onEnter={handleSendMessage}
           onChange={setCurrentPrompt}
           maxLength={MAX_CHARS}
+          disableSubmit={isUploading}
         />
       </div>
       <div className="flex items-center px-4 py-2">
@@ -309,7 +338,15 @@ export function InputBox({
               <Detective /> {t("investigation")}
             </Button>
           </Tooltip> */}
-          <Tooltip title="上传文档（禁止上传涉密资料）">
+          <Tooltip
+            className="max-w-76"
+            title={
+              <div className="text-left">
+                <p>上传文档（禁止上传涉密资料）</p>
+                <p className="mt-1 text-xs opacity-80">{typeSizeSummary}</p>
+              </div>
+            }
+          >
             <Button
               variant="outline"
               size="icon"
@@ -372,13 +409,14 @@ export function InputBox({
           </Tooltip>
           <Tooltip
             className="max-w-60"
-            title={responding ? t("stopTooltip") : t("sendTooltip")}
+            title={isUploading ? t("uploadingTooltip") : responding ? t("stopTooltip") : t("sendTooltip")}
           >
             <Button
               variant="outline"
               size="icon"
               className={cn("h-10 w-10 rounded-full")}
               onClick={() => inputRef.current?.submit()}
+              disabled={isUploading}
             >
               {responding ? (
                 <div className="flex h-10 w-10 items-center justify-center">

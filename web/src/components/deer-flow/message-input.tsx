@@ -38,6 +38,7 @@ export interface MessageInputProps {
   onChange?: (markdown: string) => void;
   onEnter?: (message: string, resources: Array<Resource>) => void;
   maxLength?: number;
+  disableSubmit?: boolean;
 }
 
 function formatMessage(content: JSONContent) {
@@ -147,7 +148,7 @@ function truncateSingleNode(node: JSONContent, maxLength: number): JSONContent {
 
 const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
   (
-    { className, loading, config, onChange, onEnter, maxLength = Infinity }: MessageInputProps,
+    { className, loading, config, onChange, onEnter, maxLength = Infinity, disableSubmit = false }: MessageInputProps,
     ref,
   ) => {
     const t = useTranslations("messageInput");
@@ -155,6 +156,10 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const handleEnterRef = useRef<
       ((message: string, resources: Array<Resource>) => void) | undefined
     >(onEnter);
+    const disableSubmitRef = useRef(disableSubmit);
+    useEffect(() => {
+      disableSubmitRef.current = disableSubmit;
+    }, [disableSubmit]);
     const debouncedUpdates = useDebouncedCallback(
       async (editor: EditorInstance) => {
         if (onChange) {
@@ -182,6 +187,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         editorRef.current?.view.focus();
       },
       submit: () => {
+        if (disableSubmitRef.current) return;
         if (onEnter) {
           const { text, resources } = formatMessage(
             editorRef.current?.getJSON() ?? [],
@@ -224,6 +230,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           addKeyboardShortcuts() {
             return {
               Enter: () => {
+                if (disableSubmitRef.current) return false;
                 if (handleEnterRef.current) {
                   const { text, resources } = formatMessage(
                     this.editor.getJSON() ?? [],
