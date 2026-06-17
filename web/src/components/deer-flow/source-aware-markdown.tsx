@@ -10,8 +10,8 @@ import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
 
 import { rehypeSplitWordsIntoSpans } from "~/core/rehype";
-import { type SourceDetail } from "~/core/source-store";
-import { autoFixMarkdown } from "~/core/utils/markdown";
+import { useSourceStore, type SourceDetail } from "~/core/source-store";
+import { autoFixMarkdown, normalizeCitations } from "~/core/utils/markdown";
 import { cn } from "~/lib/utils";
 
 import Image from "./image";
@@ -54,6 +54,46 @@ export function SourceAwareMarkdown({
   checkLinkCredibility = false,
   references,
 }: SourceAwareMarkdownProps) {
+  // 总是读取全局 references（保留 index），与 props references 合并去重后归一化引用
+  const storeReferences = useSourceStore((s) => s.references);
+  const citationRefs = useMemo(() => {
+    const map = new Map<number, string>();
+    // 1) 优先使用 props 中带 index 的项（外部已按 index 排序）
+    for (const r of references ?? []) {
+      if (r.index && r.url) map.set(r.index, r.url);
+    }
+    // 2) 用 store 中带 index 的项补充
+    for (const r of storeReferences ?? []) {
+      if (r.index && r.url && !map.has(r.index)) map.set(r.index, r.url);
+    }
+    // 3) 兑底：index 缺失时（如 fallback 从 toolCalls 提取）按数组顺序 + 1 推断
+    //    仅在前面两步都未拿满时按顺序填充未占用的编号
+    const fallbacks = [
+      ...(references ?? []),
+      ...(storeReferences ?? []),
+    ];
+    let fallbackIdx = 1;
+    for (const r of fallbacks) {
+      if (r.url && !r.index) {
+        while (map.has(fallbackIdx)) fallbackIdx += 1;
+        if (fallbackIdx <= map.size + fallbacks.length) {
+          map.set(fallbackIdx, r.url);
+          fallbackIdx += 1;
+        }
+      }
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([index, url]) => ({ index, url }));
+  }, [references, storeReferences]);
+
+  const fixedMarkdown = useMemo(() => {
+    const base = autoFixMarkdown(children ?? "");
+    // 兑底归一化：后端未生效 / 流式中途到达时，把所有变体引用统一转成 [(N)](URL)
+    if (citationRefs.length === 0) return base;
+    return normalizeCitations(base, citationRefs);
+  }, [children, citationRefs]);
+
   const components: ReactMarkdownOptions["components"] = useMemo(() => {
     return {
       a: ({ href, children: linkChildren }) => {
@@ -101,7 +141,7 @@ export function SourceAwareMarkdown({
         rehypePlugins={rehypePlugins}
         components={components}
       >
-        {autoFixMarkdown(children ?? "")}
+        {fixedMarkdown}
       </ReactMarkdown>
     </div>
   );

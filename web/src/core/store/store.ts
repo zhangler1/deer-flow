@@ -376,7 +376,9 @@ export async function sendMessage(
         const refs = (data as { references: Array<{ index: number; url: string; title: string }> }).references;
         if (refs && refs.length > 0) {
           // 将后端的 reference_index 转换为 SourceDetail 格式并设置到 source-store
+          // 保留 index 字段，供前端 markdown 归一化把 (N) / （N） / 【N】 等变体替换为 [(N)](URL)
           const sourceDetails = refs.map(r => ({
+            index: r.index,
             url: r.url,
             title: r.title,
             domain: r.url ? (() => { try { return new URL(r.url).hostname.replace(/^www\./, ""); } catch { return r.url; } })() : "",

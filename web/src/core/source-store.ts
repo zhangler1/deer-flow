@@ -7,6 +7,12 @@ export interface SourceDetail {
   url: string;
   title: string;
   domain: string;
+  /**
+   * 引用编号（从 1 开始）。
+   * 来源：后端通过 SSE `reference_index` 事件提供，前端保留用于反查 URL。
+   * 缺失时（如 fallback 从 toolCall 提取）可按数组顺序推断。
+   */
+  index?: number;
   snippet?: string;
   fullContent?: string;
   aiSummary?: string;
