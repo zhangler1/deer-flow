@@ -12,7 +12,7 @@ import logging
 import time
 from typing import Literal
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
@@ -146,6 +146,17 @@ async def coordinator_node(
             elif hasattr(msg, "type") and (msg.type == "human" or msg.type == "user") and not getattr(msg, "name", None):
                 latest_human = msg
                 break
+        remove_ops = []
+        for msg in all_messages:
+            if msg is not latest_human and hasattr(msg, 'id') and msg.id:
+                remove_ops.append(RemoveMessage(id=msg.id))
+        if remove_ops:
+            enhanced_logger.logger.debug(
+                f"🗑️ REMOVE_MESSAGES | 标记删除 {len(remove_ops)} 条旧消息 | "
+                f"保留latest_human(id={getattr(latest_human, 'id', 'N/A')}) | "
+                f"旧消息总数: {len(all_messages)}"
+            )
+        state["_remove_ops"] = remove_ops
         state["messages"] = [latest_human] if latest_human else []
     # ------------------------------------------------------------------
     
@@ -256,9 +267,14 @@ async def coordinator_node(
     # 注意：必须复用 response.id，否则后端去重逻辑无法匹配
     # （LangGraph 流式发出的 chunk 用的是 response.id，手动创建的 AIMessage 如果用新 ID 就会绕过去重）
     messages = state.get("messages", [])
+    # 从 state 取出 RemoveMessage 列表（如果没有旧的已完成报告，remove_ops 为空列表）
+    remove_ops = state.pop("_remove_ops", [])
     if response.content:
         messages.append(AIMessage(content=response.content, name="coordinator", id=response.id))
         enhanced_logger.logger.info(f"📝 ADDED_MESSAGE | 添加coordinator响应到消息列表 | id={response.id}")
+    # 将 RemoveMessage 操作前置，通过 add_messages reducer 删除旧消息
+    if remove_ops:
+        messages = remove_ops + messages
     
     enhanced_logger.logger.info(f"🎯 COORDINATOR_FINAL_GOTO | 最终跳转目标: {goto}")
     enhanced_logger.logger.debug(f"📊 COORDINATOR_FINAL_UPDATE | locale: {locale}, research_topic: {research_topic}")
