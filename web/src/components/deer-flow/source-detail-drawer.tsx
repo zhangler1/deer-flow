@@ -73,8 +73,8 @@ export function SourceDetailDrawer() {
             )}
             <SheetTitle className="line-clamp-2 text-base">{title}</SheetTitle>
           </div>
-          <SheetDescription className="text-xs text-muted-foreground">
-            {domain}
+          <SheetDescription className="text-xs text-muted-foreground break-all">
+            {selectedUrl || domain}
           </SheetDescription>
         </SheetHeader>
 
