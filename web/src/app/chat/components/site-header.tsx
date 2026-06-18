@@ -3,7 +3,6 @@
 
 import { LanguageSwitcher } from "~/components/deer-flow/language-switcher";
 import { Logo } from "~/components/deer-flow/logo";
-import { ThemeToggle } from "~/components/deer-flow/theme-toggle";
 
 export function SiteHeader() {
   return (
@@ -14,7 +13,6 @@ export function SiteHeader() {
         </div>
         <div className="relative flex items-center gap-2">
           <LanguageSwitcher />
-          <ThemeToggle />
         </div>
       </div>
       <hr className="from-border/0 via-border/70 to-border/0 m-0 h-px w-full border-none bg-gradient-to-r" />

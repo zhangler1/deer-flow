@@ -3,7 +3,6 @@
 
 "use client";
 
-import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useTheme } from "next-themes";
 
@@ -34,15 +33,11 @@ export function ThemeProviderWrapper({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const isChatPage = pathname?.startsWith("/chat");
-
   return (
     <ThemeProvider
       attribute="class"
       defaultTheme={"light"}
-      enableSystem={isChatPage}
-      forcedTheme={isChatPage ? undefined : "light"}
+      forcedTheme="light"
       disableTransitionOnChange
     >
       <ThemeClassApplier>{children}</ThemeClassApplier>

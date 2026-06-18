@@ -13,7 +13,6 @@ import { Tooltip } from "~/components/deer-flow/tooltip";
 import { Button } from "~/components/ui/button";
 
 import { Logo } from "../../components/deer-flow/logo";
-import { ThemeToggle } from "../../components/deer-flow/theme-toggle";
 import { SettingsDialog } from "../settings/dialogs/settings-dialog";
 
 const Main = dynamic(() => import("./main"), {
@@ -61,7 +60,6 @@ export default function HomePage() {
           <Logo />
         </div>
         <div className="flex items-center">
-          <ThemeToggle />
           {/* <Suspense>
             <SettingsDialog />
           </Suspense> */}
