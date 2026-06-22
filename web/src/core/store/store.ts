@@ -42,6 +42,15 @@ export const useStore = create<{
     preservedSearchKeywords: string[];
     preservedCrawlUrls: string[];
   }>;
+  // 报告生成计时状态
+  researchStartTime: number | null;
+  researchPhase: string;
+  researchTotalSteps: number;
+  researchCurrentStep: number;
+  estimatedDurationMs: number;
+  // 里程碑数据（每个 researcher 步骤完成时追加，reporter 完成时单独记录）
+  researchMilestones: Array<{ title: string; completedAt: number }>;
+  reporterCompletedAt: number | null;
 
   appendMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
@@ -81,6 +90,14 @@ export const useStore = create<{
   iterationRounds: new Map<string, { iteration: number; messageIds: string[]; collapsed: boolean }>(),
   currentIteration: 0,
   messageDisplayStates: new Map(),
+  // 报告生成计时状态初始值
+  researchStartTime: null,
+  researchPhase: "",
+  researchTotalSteps: 0,
+  researchCurrentStep: -1,
+  estimatedDurationMs: 120_000, // 默认 2 分钟，会后台拉取真实均值覆盖
+  researchMilestones: [],
+  reporterCompletedAt: null,
 
   appendMessage(message: Message) {
     set((state) => ({
@@ -251,6 +268,19 @@ export async function sendMessage(
   );
 
   setResponding(true);
+  // 开始计时：记录流开始时间，后台拉取历史平均耗时
+  useStore.setState({
+    researchStartTime: Date.now(),
+    researchPhase: "coordinator",
+    researchMilestones: [],
+    reporterCompletedAt: null,
+  });
+  // 异步拉取平均耗时（不阻塞流式处理）
+  import("../api/duration").then(({ fetchAvgDuration }) => {
+    fetchAvgDuration().then((ms: number) => {
+      if (ms > 0) useStore.setState({ estimatedDurationMs: ms });
+    }).catch(() => {});
+  }).catch(() => {});
   let messageId: string | undefined;
   // Batch UI updates to reduce re-render frequency during streaming
   const pending = new Map<string, Message>();
@@ -274,6 +304,11 @@ export async function sendMessage(
 
   // console.log("[sendMessage] Starting to process stream...");
 
+  let _streamAborted = false;
+  // 缓存所有步骤标题（从 plan 中一次性获取，按索引查找）
+  let _cachedStepTitles: string[] = [];
+  // 记录最后一次 researcher 事件到达时间（用于补录最后一步的完成时间）
+  let _lastResearcherEventTime = 0;
   try {
     for await (const event of stream) {
       const { type, data } = event;
@@ -347,6 +382,93 @@ export async function sendMessage(
       
       // Handle ping events (仅心跳，无 id，直接跳过；同时让后续代码 TS 可收窄 data 到含 id 的事件类型)
       if (type === "ping") {
+        continue;
+      }
+
+      // Handle phase_progress events (工作流阶段进度，无 id，直接更新 store 计时状态)
+      if (type === "phase_progress") {
+        const phaseData = data as {
+          phase: string;
+          step_index: number;
+          total_steps: number;
+          step_title?: string;
+          step_titles?: string[];
+        };
+        const currentState = useStore.getState();
+        const currentPhase = currentState.researchPhase;
+        const currentStep = currentState.researchCurrentStep;
+        const updates: Record<string, unknown> = {
+          researchPhase: phaseData.phase,
+          researchCurrentStep: phaseData.step_index,
+          researchTotalSteps: phaseData.total_steps,
+        };
+
+        // 后端一次性发送所有步骤标题，缓存起来
+        if (phaseData.step_titles && phaseData.step_titles.length > 0) {
+          _cachedStepTitles = phaseData.step_titles;
+        }
+
+        // 辅助函数：从缓存中获取步骤标题
+        const getStepTitle = (idx: number) =>
+          (idx >= 0 && idx < _cachedStepTitles.length && _cachedStepTitles[idx])
+            ? _cachedStepTitles[idx]!
+            : `研究步骤 ${idx + 1}`;
+
+        // 检测 researcher 步骤完成：
+        // 0) 首次进入 researcher：补录已完成的步骤
+        // 1) step_index 增加：前一步完成
+        // 2) 切换到 reporter：最后一个 researcher 步骤完成
+        const wasResearcher = currentPhase === "researcher";
+        const isResearcher = phaseData.phase === "researcher";
+
+        // 记录 researcher 事件到达时间
+        if (isResearcher) {
+          _lastResearcherEventTime = Date.now();
+        }
+
+        // [调试] 打印阶段转换和里程碑记录逻辑
+        console.log(`[里程碑调试] phase=${phaseData.phase} step=${phaseData.step_index} was=${currentPhase} curStep=${currentStep} milestones=${currentState.researchMilestones.length} titles=${JSON.stringify(_cachedStepTitles)}`);
+
+        if (!wasResearcher && isResearcher) {
+          // 首次进入 researcher 阶段：补录已完成的步骤
+          // 后端 next_step_index 可能已将 step_index 推进到 N，
+          // 意味着步骤 0 到 N-1 都已完成
+          const milestones = [...currentState.researchMilestones];
+          const lastCompleted = phaseData.step_index - 1;
+          for (let i = milestones.length; i <= lastCompleted; i++) {
+            milestones.push({ title: getStepTitle(i), completedAt: Date.now() });
+          }
+          if (milestones.length > currentState.researchMilestones.length) {
+            console.log(`[里程碑调试] → 首次进入researcher，补录 ${milestones.length - currentState.researchMilestones.length} 个步骤`);
+            updates.researchMilestones = milestones;
+          }
+        } else if (wasResearcher && isResearcher) {
+          // researcher 内部：step_index 增加表示之前的步骤完成
+          if (phaseData.step_index > currentStep && currentStep >= 0) {
+            const milestones = [...currentState.researchMilestones];
+            for (let i = milestones.length; i < phaseData.step_index; i++) {
+              milestones.push({ title: getStepTitle(i), completedAt: Date.now() });
+            }
+            console.log(`[里程碑调试] → researcher内部，补录 ${milestones.length - currentState.researchMilestones.length} 个步骤`);
+            updates.researchMilestones = milestones;
+          }
+        } else if (wasResearcher && phaseData.phase === "reporter") {
+          // 切换到 reporter：补录所有未记录的 researcher 步骤
+          const milestones = [...currentState.researchMilestones];
+          if (currentStep >= 0 && milestones.length <= currentStep) {
+            // 用最后一次 researcher 事件时间作为完成时间（而非当前时间）
+            const completeTime = _lastResearcherEventTime || Date.now();
+            for (let i = milestones.length; i <= currentStep; i++) {
+              milestones.push({ title: getStepTitle(i), completedAt: completeTime });
+            }
+            console.log(`[里程碑调试] → reporter转换，补录 ${milestones.length - currentState.researchMilestones.length} 个步骤，使用lastResearcherTime=${_lastResearcherEventTime}`);
+            updates.researchMilestones = milestones;
+          } else {
+            console.log(`[里程碑调试] → reporter转换，无需补录 (curStep=${currentStep}, msLen=${milestones.length})`);
+          }
+        }
+
+        useStore.setState(updates as Parameters<typeof useStore.setState>[0]);
         continue;
       }
 
@@ -438,6 +560,7 @@ export async function sendMessage(
       }
     }
   } catch (error) {
+    _streamAborted = true;
     // 区分用户主动取消和真实错误
     const isAborted =
       (error instanceof DOMException && error.name === "AbortError") ||
@@ -492,6 +615,22 @@ export async function sendMessage(
     flushNow();
     useStore.getState().setOngoingResearch(null);
   } finally {
+    // 正常完成且处于 reporter 阶段时，记录 reporter 完成时间
+    if (!_streamAborted) {
+      const currentState = useStore.getState();
+      if (
+        currentState.researchPhase === "reporter" &&
+        currentState.reporterCompletedAt === null
+      ) {
+        useStore.setState({ reporterCompletedAt: Date.now() });
+      }
+    }
+    // 清除计时状态（保留 researchStartTime 和里程碑时间戳，下次研究开始时清除）
+    useStore.setState({
+      researchPhase: "",
+      researchCurrentStep: -1,
+      researchTotalSteps: 0,
+    });
     // Flush any remaining batched updates before finishing
     flushNow();
     setResponding(false);

@@ -177,6 +177,31 @@ async def health_check():
     return {"status": "ok", "service": "deer-flow-backend"}
 
 
+# 默认预估报告生成时长（毫秒），当无历史数据时使用此兜底值
+_DEFAULT_ESTIMATED_DURATION_MS = 120_000  # 2 分钟
+
+
+@app.get("/api/research/avg-duration")
+async def get_avg_duration():
+    """返回历史报告平均耗时（毫秒），供前端估算进度百分比。
+
+    始终返回 200；数据库不可用时 avg_duration_ms=0，前端可回退到 default_duration_ms。
+    """
+    try:
+        from src.storage import report_repository
+        avg_ms = await report_repository.get_avg_duration_ms()
+        return {
+            "avg_duration_ms": avg_ms,
+            "default_duration_ms": _DEFAULT_ESTIMATED_DURATION_MS,
+        }
+    except Exception as _e:
+        logger.debug(f"[AVG_DURATION] 查询失败（数据库可能未配置）: {_e}")
+        return {
+            "avg_duration_ms": 0,
+            "default_duration_ms": _DEFAULT_ESTIMATED_DURATION_MS,
+        }
+
+
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatRequest, raw_request: Request):
     # Check if MCP server configuration is enabled
@@ -859,6 +884,37 @@ async def _stream_graph_events(
                             if _step_index < len(steps) and not _step_title:
                                 target_step = steps[_step_index]
                                 _step_title = getattr(target_step, 'title', None) or (target_step.get('title', '') if isinstance(target_step, dict) else '')
+
+                    # 4.1) 发送阶段进度事件（phase_progress）
+                    # 在检测到工作流节点活动时，将当前阶段、步骤索引推送给前端，
+                    # 用于正计时 + 进度百分比展示。
+                    _PHASE_NODES = (
+                        "coordinator", "background_investigator", "planner",
+                        "researcher", "research_team", "reporter",
+                    )
+                    if _node_name in _PHASE_NODES:
+                        # 将 research_team 统一映射为 researcher（前端展示更清晰）
+                        _phase_name = "researcher" if _node_name == "research_team" else _node_name
+                        # 从缓存的 plan steps 中提取当前步骤标题
+                        _current_step_title = _step_title or ""
+                        if not _current_step_title and _cached_plan_steps and 0 <= _step_index < len(_cached_plan_steps):
+                            _target = _cached_plan_steps[_step_index]
+                            _current_step_title = getattr(_target, 'title', None) or (_target.get('title', '') if isinstance(_target, dict) else '')
+                        # 提取所有步骤标题（供前端按索引查找）
+                        _all_step_titles = []
+                        if _cached_plan_steps:
+                            for _s in _cached_plan_steps:
+                                _t = getattr(_s, 'title', None) or (_s.get('title', '') if isinstance(_s, dict) else '')
+                                _all_step_titles.append(_t or '')
+                        yield _make_event("phase_progress", {
+                            "thread_id": thread_id,
+                            "phase": _phase_name,
+                            "step_index": _step_index,
+                            "total_steps": len(_cached_plan_steps) if _cached_plan_steps else 0,
+                            "step_title": _current_step_title,
+                            "step_titles": _all_step_titles,
+                        })
+
                     break  # 只处理第一个节点更新
 
                 # 5) 检测 reporter 节点输出的 reference_index，发送 SSE 事件给前端

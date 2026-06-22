@@ -133,6 +133,28 @@ export interface ReferenceIndexEvent {
   };
 }
 
+export interface PhaseProgressEvent {
+  type: "phase_progress";
+  data: {
+    thread_id: string;
+    /** 当前工作流阶段节点名称 */
+    phase:
+      | "coordinator"
+      | "background_investigator"
+      | "planner"
+      | "researcher"
+      | "reporter";
+    /** 当前 plan step 索引（researcher 阶段内），-1 表示未知 */
+    step_index: number;
+    /** plan 中的总步骤数，0 表示未知 */
+    total_steps: number;
+    /** 当前步骤标题（researcher 阶段内） */
+    step_title?: string;
+    /** 所有步骤标题（从 plan 中一次性获取，供前端按索引查找） */
+    step_titles?: string[];
+  };
+}
+
 export type ChatEvent =
   | MessageChunkEvent
   | ToolCallsEvent
@@ -143,4 +165,5 @@ export type ChatEvent =
   | NodeTransitionEvent
   | PingEvent
   | ErrorEvent
-  | ReferenceIndexEvent;
+  | ReferenceIndexEvent
+  | PhaseProgressEvent;

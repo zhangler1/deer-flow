@@ -309,6 +309,30 @@ async def get_summary() -> DashboardSummary:
             )
 
 
+# ─── 平均耗时查询 ───
+
+async def get_avg_duration_ms() -> int:
+    """获取已完成报告的平均耗时（毫秒），用于前端进度估算。
+
+    Returns:
+        平均耗时（毫秒），无数据时返回 0
+    """
+    try:
+        pool = await _get_pool()
+        async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT COALESCE(AVG(duration_ms)::BIGINT, 0) "
+                    "FROM reports "
+                    "WHERE duration_ms IS NOT NULL AND status = 'completed'"
+                )
+                row = await cur.fetchone()
+                return int(row[0]) if row else 0
+    except Exception as e:
+        logger.warning(f"获取平均耗时失败（数据库可能未配置）: {e}")
+        return 0
+
+
 # ─── 辅助函数 ───
 
 def _row_to_record(row, description) -> ReportRecord:

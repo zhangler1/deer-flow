@@ -56,6 +56,8 @@ import {
 import { parseJSON } from "~/core/utils";
 import { cn } from "~/lib/utils";
 
+import { ResearchTimer } from "./research-timer";
+
 export function MessageListView({
   className,
   onFeedback,
@@ -925,6 +927,14 @@ function ResearchCard({
     onToggleResearch?.();
   }, [openResearchId, researchId, onToggleResearch]);
   const isOpen = openResearchId === researchId;
+  // 研究是否正在进行中（用于判断是否显示进度条）
+  const researchOngoing = useStore(
+    (s) => s.ongoingResearchId === researchId,
+  );
+  // 里程碑数据（完成后仍保留，用于显示历史记录）
+  const hasMilestones = useStore(
+    (s) => s.researchMilestones.length > 0 || s.reporterCompletedAt !== null,
+  );
   return (
     <Card
       className={cn(
@@ -951,6 +961,10 @@ function ResearchCard({
           </RollingText>
         </div>
       </div>
+      {/* 进度条：研究进行中 或 有已完成的里程碑 时显示 */}
+      {(researchOngoing || hasMilestones) && (
+        <ResearchTimer compact className="border-t border-primary/10" />
+      )}
     </Card>
   );
 }
