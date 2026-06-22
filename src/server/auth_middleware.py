@@ -80,31 +80,49 @@ async def _query_user_info(token: str) -> UserInfo:
     """
     token_preview = (token[:8] + "...") if token and len(token) > 8 else token
 
+    logger.info(
+        f"[AUTH] queryUserInfo 开始调用 | token={token_preview} | "
+        f"api_url={USER_INFO_API_URL} | token_len={len(token) if token else 0}"
+    )
+
     try:
         async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            req_headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "guwp-token": token,
+                "jumpCloud-Env": "BASE",
+            }
+            req_body = {
+                "REQ_BODY": {
+                    "param": {
+                        "guwpToken": token
+                    }
+                }
+            }
+            logger.debug(
+                f"[AUTH] 请求详情 | headers={req_headers} | body={req_body}"
+            )
             resp = await client.post(
                 USER_INFO_API_URL,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "guwp-token": token,
-                    "jumpCloud-Env": "BASE",
-                },
-                json={
-                    "REQ_BODY": {
-                        "param": {
-                            "guwpToken": token
-                        }
-                    }
-                },
+                headers=req_headers,
+                json=req_body,
+            )
+            logger.info(
+                f"[AUTH] queryUserInfo 响应状态 | status={resp.status_code} | "
+                f"content_type={resp.headers.get('content-type', 'N/A')} | "
+                f"body_preview={resp.text[:300] if resp.text else 'empty'}"
             )
             resp.raise_for_status()
             data = resp.json()
 
+        logger.info(f"[AUTH] 解析响应体 | data_keys={list(data.keys())} | data={data}")
+
         result = data.get("RSP_BODY", {}).get("result", {})
         if not result or not result.get("userCode"):
             logger.warning(
-                f"queryUserInfo 返回无效结果 | token={token_preview} | response={data}"
+                f"[AUTH] queryUserInfo 返回无效结果（无 userCode）| "
+                f"token={token_preview} | result={result} | full_response={data}"
             )
             return UserInfo()
 
@@ -117,23 +135,26 @@ async def _query_user_info(token: str) -> UserInfo:
             is_authenticated=True,
         )
         logger.info(
-            f"✅ queryUserInfo 成功 | token={token_preview} | "
-            f"user_code={user_info.user_code} | user_name={user_info.user_name}"
+            f"[AUTH] queryUserInfo 成功 | token={token_preview} | "
+            f"user_code={user_info.user_code} | user_name={user_info.user_name} | "
+            f"branch_id={user_info.branch_id} | login_name={user_info.login_name}"
         )
         return user_info
 
     except httpx.HTTPStatusError as e:
         logger.warning(
-            f"queryUserInfo HTTP错误 | token={token_preview} | "
-            f"status={e.response.status_code} | detail={str(e)[:200]}"
+            f"[AUTH] queryUserInfo HTTP错误 | token={token_preview} | "
+            f"status={e.response.status_code} | response_body={e.response.text[:300] if e.response.text else 'empty'} | "
+            f"detail={str(e)[:200]}"
         )
     except httpx.RequestError as e:
         logger.warning(
-            f"queryUserInfo 网络错误 | token={token_preview} | {type(e).__name__}: {str(e)[:200]}"
+            f"[AUTH] queryUserInfo 网络错误（接口不可达） | token={token_preview} | "
+            f"api_url={USER_INFO_API_URL} | {type(e).__name__}: {str(e)[:300]}"
         )
     except Exception as e:
         logger.warning(
-            f"queryUserInfo 未知错误 | token={token_preview} | {type(e).__name__}: {str(e)[:200]}"
+            f"[AUTH] queryUserInfo 未知错误 | token={token_preview} | {type(e).__name__}: {str(e)[:300]}"
         )
 
     return UserInfo()
@@ -148,14 +169,34 @@ class GuwpTokenAuthMiddleware(BaseHTTPMiddleware):
         # 从 Cookie 中获取 guwpToken
         token = request.cookies.get("guwpToken", "")
 
+        # 记录所有请求的认证入口日志（仅 API 请求，跳过静态资源）
+        path = request.url.path
+        if path.startswith("/api"):
+            cookies_keys = list(request.cookies.keys())
+            logger.info(
+                f"[AUTH] 请求进入 | path={path} | method={request.method} | "
+                f"has_guwpToken={bool(token)} | token_len={len(token) if token else 0} | "
+                f"cookie_keys={cookies_keys}"
+            )
+
         if token:
             # 先查缓存
             user_info = _get_cached_user(token)
             if user_info is None:
+                logger.info(f"[AUTH] 缓存未命中，将调用远程接口 | path={path}")
                 # 缓存未命中，调用 API
                 user_info = await _query_user_info(token)
                 _set_cached_user(token, user_info)
+            else:
+                logger.info(
+                    f"[AUTH] 缓存命中 | path={path} | "
+                    f"user_code={user_info.user_code} | user_name={user_info.user_name}"
+                )
         else:
+            logger.info(
+                f"[AUTH] 未携带 guwpToken，使用匿名用户 | path={path} | "
+                f"cookie_keys={list(request.cookies.keys())}"
+            )
             user_info = UserInfo()
 
         # 注入到 request.state
