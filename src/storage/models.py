@@ -24,6 +24,7 @@ class ReportRecord(BaseModel):
     title: str
     duration_ms: Optional[int] = None
     report_url: Optional[str] = None
+    object_name: Optional[str] = None  # MinIO 对象路径，用于直接读取报告正文
     file_size: Optional[int] = None
     report_type: str = "research"
     status: str = "completed"

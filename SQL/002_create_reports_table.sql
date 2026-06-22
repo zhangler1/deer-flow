@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS reports (
     title         VARCHAR(512) NOT NULL,                -- 报告标题
     duration_ms   BIGINT,                               -- 生成耗时（毫秒）
     report_url    VARCHAR(1024),                        -- MinIO OSS 地址
+    object_name   VARCHAR(512),                         -- MinIO 对象路径（直接用于读取报告正文）
     file_size     BIGINT,                               -- 文件大小（字节）
     report_type   VARCHAR(32) DEFAULT 'research',       -- 报告类型（research/prose/ppt/podcast）
     status        VARCHAR(16) DEFAULT 'completed',      -- 状态（completed/failed/generating）

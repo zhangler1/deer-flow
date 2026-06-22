@@ -73,11 +73,12 @@ async def handle_report_completed(
         f"耗时={duration_ms}ms | user={user_code} | title={title[:50]}"
     )
     report_url = None
+    object_name = None
     file_size = None
 
     try:
         # 1. 上传到 MinIO
-        report_url, file_size = await _upload_to_minio(
+        report_url, object_name, file_size = await _upload_to_minio(
             thread_id, report_content, report_type, title
         )
     except Exception as e:
@@ -97,6 +98,7 @@ async def handle_report_completed(
             title=title,
             duration_ms=duration_ms,
             report_url=report_url,
+            object_name=object_name,
             file_size=file_size,
             report_type=report_type,
             status=status,
@@ -133,25 +135,25 @@ async def handle_report_completed(
 
 async def _upload_to_minio(
     thread_id: str, content: str, report_type: str, title: str = ""
-) -> tuple[Optional[str], Optional[int]]:
+) -> tuple[Optional[str], Optional[str], Optional[int]]:
     """上传报告内容到 MinIO
 
     Returns:
-        (report_url, file_size) 或 (None, None) 如果上传失败
+        (report_url, object_name, file_size) 或 (None, None, None) 如果上传失败
     """
     import os
 
     # 检查是否配置了 MinIO
     if not os.getenv("MINIO_ENDPOINT"):
         logger.info(f"[REPORT_SERVICE] MINIO_ENDPOINT 未配置，跳过上传 | thread_id={thread_id}")
-        return None, None
+        return None, None, None
 
     from src.storage.minio_client import upload_report
 
     file_bytes = content.encode("utf-8")
     file_size = len(file_bytes)
 
-    # 构建对象路径: reports/{year}/{month}/{day}/{thread_id}.md
+    # 构建对象路径: reports/{year}/{month}/{day}/{thread_id}_{report_type}.md
     now = datetime.now()
     object_name = (
         f"reports/{now.year}/{now.month:02d}/{now.day:02d}/"
@@ -166,9 +168,9 @@ async def _upload_to_minio(
 
     logger.info(
         f"[REPORT_SERVICE] MinIO 上传成功 | thread_id={thread_id} | "
-        f"url={report_url} | size={file_size} | title={title[:50]}"
+        f"object={object_name} | url={report_url} | size={file_size} | title={title[:50]}"
     )
-    return report_url, file_size
+    return report_url, object_name, file_size
 
 
 def extract_report_title(content: str) -> str:

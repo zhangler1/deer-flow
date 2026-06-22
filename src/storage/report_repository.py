@@ -62,6 +62,7 @@ async def ensure_table():
                 title         VARCHAR(512) NOT NULL,
                 duration_ms   BIGINT,
                 report_url    VARCHAR(1024),
+                object_name   VARCHAR(512),
                 file_size     BIGINT,
                 report_type   VARCHAR(32) DEFAULT 'research',
                 status        VARCHAR(16) DEFAULT 'completed',
@@ -72,8 +73,14 @@ async def ensure_table():
             CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at);
             CREATE INDEX IF NOT EXISTS idx_reports_thread_id ON reports(thread_id);
         """)
+        # 幂等新增 object_name 列（兼容已存在的表）
+        await conn.execute("""
+            ALTER TABLE reports
+            ADD COLUMN IF NOT EXISTS object_name VARCHAR(512);
+            CREATE INDEX IF NOT EXISTS idx_reports_object_name ON reports(object_name);
+        """)
         await conn.commit()
-    logger.info("reports 表已确认存在")
+    logger.info("reports 表已确认存在（含 object_name 字段）")
 
 
 # ─── CRUD ───
@@ -86,8 +93,8 @@ async def save_report(report: ReportRecord) -> UUID:
             await cur.execute(
                 """
                 INSERT INTO reports (thread_id, user_code, user_name, branch_id, login_name,
-                                     title, duration_ms, report_url, file_size, report_type, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                     title, duration_ms, report_url, object_name, file_size, report_type, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -99,6 +106,7 @@ async def save_report(report: ReportRecord) -> UUID:
                     report.title,
                     report.duration_ms,
                     report.report_url,
+                    report.object_name,
                     report.file_size,
                     report.report_type,
                     report.status,
@@ -107,7 +115,7 @@ async def save_report(report: ReportRecord) -> UUID:
             row = await cur.fetchone()
             await conn.commit()
             report_id = row[0]
-            logger.info(f"✅ 报告元数据已保存 | id={report_id} | thread_id={report.thread_id} | title={report.title[:50]} | user={report.user_code}")
+            logger.info(f"报告元数据已保存 | id={report_id} | thread_id={report.thread_id} | title={report.title[:50]} | user={report.user_code}")
             return report_id
 
 
