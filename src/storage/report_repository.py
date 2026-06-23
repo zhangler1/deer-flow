@@ -133,6 +133,22 @@ async def get_report_by_id(report_id: UUID) -> Optional[ReportRecord]:
             return _row_to_record(row, cur.description)
 
 
+async def get_report_by_thread_id(thread_id: str, user_code: str) -> Optional[ReportRecord]:
+    """根据 thread_id 获取最新一条已完成报告的详情（含权限校验）"""
+    pool = await _get_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "SELECT * FROM reports WHERE thread_id = %s AND user_code = %s "
+                "AND status = 'completed' ORDER BY created_at DESC LIMIT 1",
+                (thread_id, user_code),
+            )
+            row = await cur.fetchone()
+            if row is None:
+                return None
+            return _row_to_record(row, cur.description)
+
+
 async def update_report_file_size(report_id: UUID, file_size: int) -> None:
     """更新报告文件大小"""
     pool = await _get_pool()

@@ -145,6 +145,50 @@ async def get_my_reports(
     )
 
 
+# ─── 辅助函数：报告 ID 解析（兼容 UUID 和 thread_id） ───
+
+
+async def _resolve_report_record(identifier: str, user_code: str) -> "report_repository.ReportRecord":
+    """将报告标识解析为报告记录。
+
+    identifier 可以是：
+      - 数据库 UUID（标准格式，来自 Dashboard 历史报告列表）
+      - thread_id（来自深度研究流程的前端 THREAD_ID）
+
+    Raises:
+        HTTPException 400: 无效标识符
+        HTTPException 404: 报告不存在
+        HTTPException 403: 无权访问
+    """
+    record = None
+
+    # 优先尝试 UUID 解析
+    try:
+        uid = UUID(identifier)
+        record = await report_repository.get_report_by_id(uid)
+    except ValueError:
+        pass  # 不是 UUID，继续尝试 thread_id
+
+    # 回退：按 thread_id 查询
+    if record is None:
+        record = await report_repository.get_report_by_thread_id(identifier, user_code)
+
+    if record is None:
+        raise HTTPException(status_code=404, detail="报告不存在")
+
+    if record.user_code != user_code:
+        logger.warning(
+            f"[REPORT_HISTORY] 越权访问尝试 | identifier={identifier} | "
+            f"owner={record.user_code} | requester={user_code}"
+        )
+        raise HTTPException(status_code=403, detail="无权访问此报告")
+
+    return record
+
+
+# ─── API 接口（报告内容/继续对话） ───
+
+
 @router.get("/{report_id}/content", response_model=ReportContentResponse)
 async def get_report_content(report_id: str, request: Request):
     """获取报告 Markdown 正文内容（含权限校验）"""
@@ -189,25 +233,12 @@ async def continue_report(report_id: str, request: Request):
 
 @router.put("/{report_id}", response_model=UpdateReportResponse)
 async def update_report(report_id: str, request: Request, body: UpdateReportRequest):
-    """更新报告内容（覆盖写入 MinIO + 更新数据库 file_size）"""
+    """更新报告内容（覆盖写入 MinIO + 更新数据库 file_size）
+
+    report_id 支持 UUID 或 thread_id。
+    """
     user_code = _get_current_user_code(request)
-
-    try:
-        uid = UUID(report_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="无效的报告 ID")
-
-    # 权限校验 + 获取现有记录
-    record = await report_repository.get_report_by_id(uid)
-    if record is None:
-        raise HTTPException(status_code=404, detail="报告不存在")
-
-    if record.user_code != user_code:
-        logger.warning(
-            f"[REPORT_HISTORY] 越权更新尝试 | report_id={report_id} | "
-            f"owner={record.user_code} | requester={user_code}"
-        )
-        raise HTTPException(status_code=403, detail="无权修改此报告")
+    record = await _resolve_report_record(report_id, user_code)
 
     object_name = record.object_name
     if not object_name:
@@ -232,7 +263,7 @@ async def update_report(report_id: str, request: Request, body: UpdateReportRequ
         raise HTTPException(status_code=503, detail="报告文件保存失败，请稍后重试")
 
     # 更新数据库 file_size
-    await report_repository.update_report_file_size(uid, file_size)
+    await report_repository.update_report_file_size(record.id, file_size)
 
     logger.info(
         f"[REPORT_HISTORY] 报告已更新 | report_id={report_id} | "
@@ -250,16 +281,14 @@ async def report_chat(report_id: str, request: Request, body: ReportChatRequest)
     绕过完整研究图（coordinator/planner/researcher），
     直接调用 reporter 模型，将报告内容作为上下文回答用户提问。
     返回 SSE 流式响应（格式与 /api/chat/stream 保持一致）。
+
+    report_id 支持 UUID 或 thread_id。
     """
     user_code = _get_current_user_code(request)
+    record = await _resolve_report_record(report_id, user_code)
 
-    try:
-        uid = UUID(report_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="无效的报告 ID")
-
-    # 读取报告内容（含权限校验）
-    report_content, title, _ = await _read_report_content(uid, user_code)
+    # 读取报告内容（record.id 是数据库 UUID，直接读取 MinIO）
+    report_content, title, _ = await _read_report_content(record.id, user_code)
 
     logger.info(
         f"[REPORT_CHAT] 发起直连对话 | report_id={report_id} | "

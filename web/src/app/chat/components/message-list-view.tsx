@@ -11,9 +11,11 @@ import {
   Lightbulb,
   Wrench,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useMemo, useRef, useState, useImperativeHandle } from "react";
+import { toast } from "sonner";
 
 import { ClarificationCard } from "~/components/deer-flow/clarification-card";
 import { LoadingAnimation } from "~/components/deer-flow/loading-animation";
@@ -52,9 +54,11 @@ import {
   useResearchMessage,
   useStore,
   useAllIterationRounds,
+  REPORT_CHAT_PLACEHOLDER_ID,
 } from "~/core/store";
 import { parseJSON } from "~/core/utils";
 import { cn } from "~/lib/utils";
+import { saveReportContent } from "~/core/api/dashboard";
 
 import { ResearchTimer } from "./research-timer";
 
@@ -912,6 +916,7 @@ function ResearchCard({
     (state) => hasReport && state.messages.get(reportId)!.isStreaming,
   );
   const openResearchId = useStore((state) => state.openResearchId);
+  const activeReportId = useStore((s) => s.activeReportId);
   const state = useMemo(() => {
     if (hasReport) {
       return reportGenerating ? t("generatingReport") : t("reportGenerated");
@@ -942,6 +947,43 @@ function ResearchCard({
   const hasMilestones = useStore(
     (s) => s.researchMilestones.length > 0 || s.reporterCompletedAt !== null,
   );
+  // 报告生成完毕：显示“基于报告提问”选项
+  const reportReady = hasReport && !reportGenerating;
+  const threadId = useStore((s) => s.threadId);
+  const chatModeActive = !!threadId && activeReportId === threadId;
+  const [savingForChat, setSavingForChat] = useState(false);
+  const handleToggleReportChat = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!reportId || !threadId) return;
+      const store = useStore.getState();
+      if (chatModeActive) {
+        store.toggleReportChatMode(threadId, false);
+        return;
+      }
+      setSavingForChat(true);
+      try {
+        const report = store.messages.get(reportId);
+        if (!report?.content) {
+          toast.error("报告内容为空");
+          return;
+        }
+        // threadId 作为标识符调用后端 API（后端同时支持 UUID 和 thread_id）
+        await saveReportContent(threadId, report.content);
+        store.setContinuingReportContext({
+          reportId: threadId,
+          title: report.content.split("\n")[0]?.replace(/^#+\s*/, "") || "研究报告",
+          content: report.content,
+        });
+      } catch (err) {
+        console.error("[ResearchCard] toggle report chat failed:", err);
+        toast.error("开启基于报告提问失败");
+      } finally {
+        setSavingForChat(false);
+      }
+    },
+    [reportId, threadId, chatModeActive],
+  );
   return (
     <Card
       className={cn(
@@ -967,6 +1009,37 @@ function ResearchCard({
             {state}
           </RollingText>
         </div>
+        {/* 报告生成完毕后：基于报告提问 radio */}
+        {reportReady && (
+          <label
+            className={cn(
+              "shrink-0 flex items-center gap-2 cursor-pointer select-none rounded-full px-2.5 py-1 transition-colors",
+              chatModeActive
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={chatModeActive}
+              onChange={() => handleToggleReportChat({ stopPropagation: () => {} } as React.MouseEvent)}
+            />
+            <div
+              className={cn(
+                "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors",
+                chatModeActive ? "border-primary bg-primary" : "border-muted-foreground/40",
+              )}
+            >
+              {chatModeActive && <div className="w-2 h-2 rounded-full bg-white" />}
+            </div>
+            <span className="text-sm whitespace-nowrap">
+              {savingForChat ? "保存中…" : "基于报告提问"}
+            </span>
+            {savingForChat && <Loader2 className="w-3 h-3 animate-spin" />}
+          </label>
+        )}
       </div>
       {/* 进度条：研究进行中 或 有已完成的里程碑 时显示 */}
       {(researchOngoing || hasMilestones) && (
