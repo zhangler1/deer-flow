@@ -607,9 +607,7 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
             "iteration": node_transition.get("iteration"),
             "reason": node_transition.get("reason", ""),
         }
-        logger.info(f"[SSE调试] 即将发送 node_transition 事件，payload: {event_payload}")
         sse_event = _make_event("node_transition", event_payload)
-        logger.info(f"[SSE调试] 生成的 SSE 事件内容: {sse_event[:200]}...")
         yield sse_event
         return  # 不再处理这条消息
     
