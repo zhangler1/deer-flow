@@ -100,6 +100,15 @@ export function extractSourceDetails(
         try {
           const results = parseJSON<Record<string, unknown>[]>(tc.result, []);
           if (Array.isArray(results)) {
+            // 打印原始检索结果，便于核对后端检索到的链接与内容
+            console.groupCollapsed(`[ReportReferences] ${tc.name} 检索原始结果（${results.length} 条）`);
+            for (const r of results) {
+              const u = (r.url as string) ?? "";
+              const t = (r.title as string) ?? "";
+              const c = ((r.content as string) ?? "").slice(0, 120);
+              console.log(`  · ${t || "(无标题)"} | ${u || "(无URL)"} | snippet=${c}${((r.content as string) ?? "").length > 120 ? "..." : ""}`);
+            }
+            console.groupEnd();
             for (const r of results) {
               if (r.type === "image") continue;
               const url = (r.url as string) ?? "";

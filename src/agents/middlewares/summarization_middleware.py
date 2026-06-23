@@ -197,7 +197,7 @@ class SummarizationMiddleware(AgentMiddleware):
                     mode = "CHAR"
                 self._tool_truncations_count += 1
                 logger.debug(
-                    f"✂️ ToolResult 截断 | 工具: {tool_msg.name} | "
+                    f"✂️ [ToolResult]  截断 | 工具: {tool_msg.name} | "
                     f"{original_len} → {len(tool_msg.content)} 字符 | "
                     f"模式: {mode}"
                     f"{original_len} → {max_chars} 字符 | "
@@ -205,7 +205,7 @@ class SummarizationMiddleware(AgentMiddleware):
                 )
             else:
                 logger.debug(
-                    f"ToolResult 未截断 | 工具: {tool_msg.name} | "
+                    f"[ToolResult] 未截断 | 工具: {tool_msg.name} | "
                     f"tool_msg.content: {tool_msg.content}"
                 )
         

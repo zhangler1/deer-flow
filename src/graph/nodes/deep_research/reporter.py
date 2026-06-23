@@ -9,12 +9,13 @@
 - research_team_node: 研究团队节点（协调多智能体协作）
 """
 
+import json
 import logging
 import os
 import re
 import time
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
 from src.config.agents import AGENT_LLM_MAP
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 enhanced_logger = get_enhanced_logger('graph.nodes.deep_research.reporter')
 
 
-def build_reference_index(observations: list[str]) -> tuple[str, dict]:
+def build_reference_index(observations: list[str], url_whitelist: set[str] | None = None) -> tuple[str, dict]:
     """从所有 observations 中提取 URL，构建全局来源索引。
 
     采用多层正则回退策略，确保即使模型输出格式不完全标准，也能尽可能提取来源：
@@ -42,6 +43,9 @@ def build_reference_index(observations: list[str]) -> tuple[str, dict]:
 
     Args:
         observations: Researcher 步骤的输出结果列表
+        url_whitelist: 可选的 URL 白名单集合。如果提供且非空，只有在这个集合中的 URL 才会被收录，
+                       用于过滤 LLM 杜撰的、但未实际检索过的链接。
+                       如果为 None 或为空集合，则不过滤（保留全部链接）。
 
     Returns:
         tuple: (格式化的索引文本, {url: {"index": N, "title": title}} 映射字典)
@@ -56,6 +60,22 @@ def build_reference_index(observations: list[str]) -> tuple[str, dict]:
     seen_urls: dict[str, dict] = {}  # url -> {"index": N, "title": title}
     index = 1
 
+    # 是否启用白名单过滤（whitelist 提供且非空时启用）
+    use_whitelist = bool(url_whitelist)
+    filtered_out_urls: list[str] = []
+
+    def _register(title: str, url: str) -> None:
+        """登记一条引用。白名单模式下过滤非白名单 URL；按 URL 去重；首次出现胜出。"""
+        if not title.strip():
+            return
+        if use_whitelist and url not in url_whitelist:
+            filtered_out_urls.append(url)
+            return
+        if url in seen_urls:
+            return
+        seen_urls[url] = {"index": index, "title": title.strip()}
+        index += 1
+
     for obs in observations:
         # 第一遍：提取标准 Markdown 链接
         for match in re.finditer(md_link_pattern, obs):
@@ -67,25 +87,19 @@ def build_reference_index(observations: list[str]) -> tuple[str, dict]:
             clean_title = title.strip()
             if clean_title.startswith("来自"):
                 clean_title = _extract_domain_title(url)
-            if url not in seen_urls:
-                seen_urls[url] = {"index": index, "title": clean_title}
-                index += 1
+            _register(clean_title, url)
 
         # 第二遍：提取 [来自: URL] 格式（仅提取未被模式1覆盖的）
         for match in re.finditer(from_pattern, obs):
             url = match.group(1).rstrip('.,;，。；')
-            if url not in seen_urls:
-                title = _extract_domain_title(url)
-                seen_urls[url] = {"index": index, "title": title}
-                index += 1
+            title = _extract_domain_title(url)
+            _register(title, url)
 
         # 第三遍（兜底）：提取裸 URL（仅当前两种模式都未捕获时）
         for match in re.finditer(bare_url_pattern, obs):
             url = match.group(1).rstrip('.,;，。；')
-            if url not in seen_urls:
-                title = _extract_domain_title(url)
-                seen_urls[url] = {"index": index, "title": title}
-                index += 1
+            title = _extract_domain_title(url)
+            _register(title, url)
 
     # 生成索引文本
     lines = []
@@ -95,10 +109,24 @@ def build_reference_index(observations: list[str]) -> tuple[str, dict]:
     index_text = "\n\n".join(lines)
 
     # 打印索引列表日志
-    logger.info(f"\n{'='*60}\n全局来源索引（共 {len(seen_urls)} 条）\n{'='*60}")
+    if use_whitelist:
+        logger.debug(
+            f"\n{'='*60}\n"
+            f"全局来源索引（已白名单过滤）| 最终收录: {len(seen_urls)} 条 | "
+            f"白名单总量: {len(url_whitelist)} | 被过滤: {len(set(filtered_out_urls))} 条\n"
+            f"{'='*60}"
+        )
+    else:
+        logger.debug(f"\n{'='*60}\n全局来源索引（共 {len(seen_urls)} 条）\n{'='*60}")
     for url, info in seen_urls.items():
-        logger.info(f"  [{info['index']}] {info['title']} -> {url}")
-    logger.info(f"{'='*60}")
+        logger.debug(f"  [{info['index']}] {info['title']} -> {url}")
+    # 打印被过滤的 URL（去重后取前 20 条，避免日志暴涨）
+    if use_whitelist and filtered_out_urls:
+        unique_filtered = list(dict.fromkeys(filtered_out_urls))[:20]
+        logger.debug(f"\n--- 被白名单过滤跳过的 URL（共 {len(set(filtered_out_urls))} 条，仅显示前 {len(unique_filtered)} 条）---")
+        for u in unique_filtered:
+            logger.debug(f"  [FILTERED] {u}")
+    logger.debug(f"{'='*60}")
 
     return index_text, seen_urls
 
@@ -120,6 +148,78 @@ def _extract_domain_title(url: str) -> str:
         return domain if domain else "未知来源"
     except Exception:
         return "未知来源"
+
+
+def _build_url_whitelist_from_messages(messages) -> set[str]:
+    """从 state.messages 中的所有 ToolMessage 提取实际检索过的 URL，构建白名单。
+
+    背景：
+        LLM 在生成报告时可能会杜撰一些看似合理的 URL，但这些 URL 并不在
+        任何检索/爬虫工具的真实返回结果中。把这些"幻觉链接"放进取值列表，
+        会让报告末尾出现无对应来源的伪链接。
+
+    策略：
+        遍历所有 ToolMessage，解析其 content（通常是 JSON 数组字符串），
+        提取其中所有 url 字段。同时为兼容性处理嵌套结构（dict / list / list[str]）。
+        对于非 JSON 格式的 content，使用正则提取 URL 作为兜底。
+
+    Returns:
+        URL 集合（含精确字符串）。
+    """
+    import json as _json
+
+    whitelist: set[str] = set()
+    tool_msg_count = 0
+    parse_fail_count = 0
+
+    for msg in messages or []:
+        # 仅 ToolMessage 含有工具返回结果
+        if not isinstance(msg, ToolMessage):
+            continue
+        tool_msg_count += 1
+        content = msg.content
+        # content 可能是 str 或 list[str]（多模态场景），统一转为 str
+        if isinstance(content, list):
+            content = "".join(str(x) for x in content)
+        if not isinstance(content, str) or not content.strip():
+            continue
+
+        # 尝试解析为 JSON（custom_search / crawl / vector_search 等通常返回 [{title,url,content,...}]）
+        results: list = []
+        try:
+            parsed = _json.loads(content)
+            if isinstance(parsed, list):
+                results = parsed
+            elif isinstance(parsed, dict):
+                # 个别工具可能返回 {results: [...]} 或 {data: [...]}
+                for key in ("results", "data", "items"):
+                    if key in parsed and isinstance(parsed[key], list):
+                        results = parsed[key]
+                        break
+                else:
+                    results = [parsed]
+        except (ValueError, _json.JSONDecodeError):
+            parse_fail_count += 1
+            # content 不是 JSON（可能是纯文本）。用正则提取 URL 作为兜底
+            for m in re.finditer(r'https?://[^\s\)\]<>"]+', content):
+                url = m.group(0).rstrip('.,;，。；')
+                if url:
+                    whitelist.add(url)
+            continue
+
+        # 提取所有 url 字段
+        for r in results:
+            if not isinstance(r, dict):
+                continue
+            url = r.get("url")
+            if isinstance(url, str) and url.strip():
+                whitelist.add(url.strip())
+
+    logger.info(
+        f"📋 URL_WHITELIST | 从 ToolMessage 构建白名单 | "
+        f"工具消息数: {tool_msg_count} | 解析失败: {parse_fail_count} | 白名单 URL 总数: {len(whitelist)}"
+    )
+    return whitelist
 
 
 def normalize_citations(content: str, ref_map: dict) -> str:
