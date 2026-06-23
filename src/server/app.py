@@ -72,6 +72,7 @@ from src.utils.json_utils import sanitize_args
 from src.utils.enhanced_logger import get_enhanced_logger, get_log_level_from_env, setup_enhanced_logging, current_thread_id
 from src.server.auth_middleware import GuwpTokenAuthMiddleware
 from src.server.dashboard_router import router as dashboard_router
+from src.server.report_history_router import router as report_history_router
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +159,9 @@ app.add_middleware(GuwpTokenAuthMiddleware)
 
 # 注册数据看板 API 路由
 app.include_router(dashboard_router)
+
+# 注册用户历史报告 API 路由
+app.include_router(report_history_router)
 
 # Load examples into Milvus if configured
 if load_examples is not None:

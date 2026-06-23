@@ -51,6 +51,15 @@ export const useStore = create<{
   // 里程碑数据（每个 researcher 步骤完成时追加，reporter 完成时单独记录）
   researchMilestones: Array<{ title: string; completedAt: number }>;
   reporterCompletedAt: number | null;
+  // 抽屉状态
+  drawerOpen: boolean;
+  toggleDrawer: () => void;
+  // 历史报告回看状态
+  viewingReportId: string | null;
+  viewingReportContent: string | null;
+  viewingReportTitle: string | null;
+  openReportViewer: (reportId: string, content: string, title: string) => void;
+  closeReportViewer: () => void;
 
   appendMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
@@ -98,6 +107,30 @@ export const useStore = create<{
   estimatedDurationMs: 120_000, // 默认 2 分钟，会后台拉取真实均值覆盖
   researchMilestones: [],
   reporterCompletedAt: null,
+  // 抽屉初始状态
+  drawerOpen: false,
+  toggleDrawer() {
+    set((state) => ({ drawerOpen: !state.drawerOpen }));
+  },
+  // 历史报告回看初始状态
+  viewingReportId: null,
+  viewingReportContent: null,
+  viewingReportTitle: null,
+  openReportViewer(reportId: string, content: string, title: string) {
+    set({
+      viewingReportId: reportId,
+      viewingReportContent: content,
+      viewingReportTitle: title,
+      drawerOpen: false,
+    });
+  },
+  closeReportViewer() {
+    set({
+      viewingReportId: null,
+      viewingReportContent: null,
+      viewingReportTitle: null,
+    });
+  },
 
   appendMessage(message: Message) {
     set((state) => ({

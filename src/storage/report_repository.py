@@ -174,8 +174,9 @@ async def get_reports_paginated(
     status: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    keyword: Optional[str] = None,
 ) -> tuple[List[ReportRecord], int]:
-    """分页查询报告列表（支持按用户、姓名、日期、状态筛选）
+    """分页查询报告列表（支持按用户、姓名、日期、状态、标题关键词筛选）
 
     Returns:
         (报告列表, 总数)
@@ -201,6 +202,9 @@ async def get_reports_paginated(
     if end_date:
         conditions.append("created_at < %s::date + interval '1 day'")
         params.append(end_date)
+    if keyword:
+        conditions.append("title ILIKE %s")
+        params.append(f"%{keyword}%")
 
     where_clause = " AND ".join(conditions) if conditions else "1=1"
 

@@ -3,7 +3,7 @@
 
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -11,9 +11,12 @@ import { Suspense } from "react";
 
 import { Tooltip } from "~/components/deer-flow/tooltip";
 import { Button } from "~/components/ui/button";
+import { useStore } from "~/core/store";
 
 import { Logo } from "../../components/deer-flow/logo";
-import { SettingsDialog } from "../settings/dialogs/settings-dialog";
+
+import { HistoryDrawer } from "./components/history-drawer";
+import { ReportViewer } from "./components/report-viewer";
 
 const Main = dynamic(() => import("./main"), {
   ssr: false,
@@ -27,6 +30,9 @@ const Main = dynamic(() => import("./main"), {
 export default function HomePage() {
   const t = useTranslations("chat.page");
   const router = useRouter();
+  const drawerOpen = useStore((s) => s.drawerOpen);
+  const toggleDrawer = useStore((s) => s.toggleDrawer);
+  const viewingReportId = useStore((s) => s.viewingReportId);
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -46,7 +52,21 @@ export default function HomePage() {
           WebkitBackdropFilter: "blur(8px)",
         }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <Tooltip title={drawerOpen ? "收起侧栏" : "展开历史报告"}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleDrawer}
+              className="h-9 w-9"
+            >
+              {drawerOpen ? (
+                <PanelLeftClose className="h-5 w-5" />
+              ) : (
+                <PanelLeftOpen className="h-5 w-5" />
+              )}
+            </Button>
+          </Tooltip>
           <Tooltip title="返回上一页">
             <Button
               variant="ghost"
@@ -65,7 +85,18 @@ export default function HomePage() {
           </Suspense> */}
         </div>
       </header>
-      <Main />
+
+      {/* 左侧历史报告抽屉 */}
+      <HistoryDrawer />
+
+      {/* 主内容区：报告回看 or 对话 */}
+      {viewingReportId ? (
+        <div className="h-full w-full pt-12">
+          <ReportViewer />
+        </div>
+      ) : (
+        <Main />
+      )}
     </div>
   );
 }

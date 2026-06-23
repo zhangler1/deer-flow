@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { motion } from "framer-motion";
-import { ArrowDown, FastForward, Play } from "lucide-react";
+import { ArrowDown, FastForward, FileText, Play, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState } from "react";
 
@@ -38,6 +38,8 @@ export function MessagesBlock({ className }: { className?: string }) {
   const messageIds = useMessageIds();
   const messageCount = messageIds.length;
   const responding = useStore((state) => state.responding);
+  const viewingReportContent = useStore((s) => s.viewingReportContent);
+  const viewingReportTitle = useStore((s) => s.viewingReportTitle);
   const { isReplay } = useReplay();
   const { title: replayTitle, hasError: replayHasError } = useReplayMetadata();
   const [replayStarted, setReplayStarted] = useState(false);
@@ -54,6 +56,26 @@ export function MessagesBlock({ className }: { className?: string }) {
     ) => {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
+      // 如果有历史报告上下文，注入到第一条消息
+      const reportCtx = useStore.getState().viewingReportContent;
+      const reportTitle = useStore.getState().viewingReportTitle;
+      const extraDocs: Array<{ filename: string; content: string }> = [];
+      if (reportCtx) {
+        extraDocs.push({
+          filename: reportTitle ? `${reportTitle}.md` : "historical-report.md",
+          content: reportCtx,
+        });
+        // 发送后清空报告上下文
+        useStore.setState({
+          viewingReportContent: null,
+          viewingReportTitle: null,
+          viewingReportId: null,
+        });
+      }
+      if (options?.documentContexts) {
+        extraDocs.push(...options.documentContexts);
+      }
+
       try {
         await sendMessage(
           message,
@@ -61,7 +83,7 @@ export function MessagesBlock({ className }: { className?: string }) {
             interruptFeedback:
               options?.interruptFeedback ?? feedback?.option.value,
             resources: options?.resources,
-            documentContexts: options?.documentContexts,
+            documentContexts: extraDocs.length > 0 ? extraDocs : undefined,
           },
           {
             abortSignal: abortController.signal,
@@ -179,6 +201,28 @@ export function MessagesBlock({ className }: { className?: string }) {
                   </motion.li>
                 ))}
               </ul>
+            )}
+            {/* 报告上下文指示器 */}
+            {viewingReportContent && viewingReportTitle && (
+              <div className="mb-2 flex w-full max-w-2xl items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                <FileText className="h-4 w-4 shrink-0" />
+                <span className="flex-1 truncate">
+                  基于报告《{viewingReportTitle}》继续对话
+                </span>
+                <button
+                  type="button"
+                  className="shrink-0 rounded p-0.5 hover:bg-blue-100"
+                  onClick={() =>
+                    useStore.setState({
+                      viewingReportContent: null,
+                      viewingReportTitle: null,
+                      viewingReportId: null,
+                    })
+                  }
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             )}
             <InputBox
               className="w-full"

@@ -36,6 +36,7 @@ export interface ReportRecord {
   title: string;
   duration_ms: number | null;
   report_url: string | null;
+  object_name: string | null;
   file_size: number | null;
   report_type: string;
   status: string;
@@ -110,5 +111,57 @@ export async function fetchCurrentUser(): Promise<UserInfo> {
   const url = resolveServiceURL("dashboard/user/me");
   const resp = await fetch(url, { credentials: "include" });
   if (!resp.ok) throw new Error(`Failed to fetch user: ${resp.status}`);
+  return resp.json();
+}
+
+// ─── 用户历史报告 API ───
+
+export interface ReportContentResponse {
+  content: string;
+  title: string;
+  report_url: string | null;
+}
+
+export interface ContinueReportResponse {
+  report_content: string;
+  title: string;
+}
+
+export async function fetchMyReports(params: {
+  page?: number;
+  page_size?: number;
+  keyword?: string;
+  status?: string;
+  start_date?: string;
+  end_date?: string;
+}): Promise<ReportListResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.set("page", String(params.page));
+  if (params.page_size) searchParams.set("page_size", String(params.page_size));
+  if (params.keyword) searchParams.set("keyword", params.keyword);
+  if (params.status) searchParams.set("status", params.status);
+  if (params.start_date) searchParams.set("start_date", params.start_date);
+  if (params.end_date) searchParams.set("end_date", params.end_date);
+
+  const url = resolveServiceURL(`reports/my?${searchParams.toString()}`);
+  const resp = await fetch(url, { credentials: "include" });
+  if (!resp.ok) throw new Error(`Failed to fetch my reports: ${resp.status}`);
+  return resp.json();
+}
+
+export async function fetchReportContent(reportId: string): Promise<ReportContentResponse> {
+  const url = resolveServiceURL(`reports/${reportId}/content`);
+  const resp = await fetch(url, { credentials: "include" });
+  if (!resp.ok) throw new Error(`Failed to fetch report content: ${resp.status}`);
+  return resp.json();
+}
+
+export async function continueReport(reportId: string): Promise<ContinueReportResponse> {
+  const url = resolveServiceURL(`reports/${reportId}/continue`);
+  const resp = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!resp.ok) throw new Error(`Failed to continue report: ${resp.status}`);
   return resp.json();
 }
