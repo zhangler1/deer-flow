@@ -101,6 +101,7 @@ export function MessageListView({
   );
   const researchIds = useStore((state) => state.researchIds);
   const messages = useStore((state) => state.messages);
+  const continuingReportContext = useStore((s) => s.continuingReportContext);
 
   const handleToggleResearch = useCallback(() => {
     // Fix the issue where auto-scrolling to the bottom
@@ -224,6 +225,12 @@ export function MessageListView({
         </div>
       )}
       <ul className="flex flex-col w-full max-w-[768px] mx-auto">
+        {/* 历史报告卡片 - 显示在消息列表顶部，像用户发送的一份报告 */}
+        {continuingReportContext && (
+          <li className="px-4 mb-2">
+            <HistoricalReportCard />
+          </li>
+        )}
         {organizedMessages.map((item, _index) => {
           if (item.type === 'round') {
             // 渲染轮次容器

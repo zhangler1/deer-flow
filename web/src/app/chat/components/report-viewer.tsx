@@ -170,12 +170,6 @@ export function ReportViewer({ className }: { className?: string }) {
         title: data.title,
         content: data.report_content,
       });
-      // 同时设置 viewingReportContent 供 messages-block 发送时注入
-      useStore.setState({
-        viewingReportContent: data.report_content,
-        viewingReportTitle: data.title,
-        viewingReportId: reportId,
-      });
       // 关闭报告查看器，回到对话界面
       closeReportViewer();
     } catch (err) {

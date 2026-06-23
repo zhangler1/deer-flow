@@ -27,7 +27,6 @@ import { cn } from "~/lib/utils";
 import { ChevronRight } from "lucide-react";
 
 import { FeatureShowcase } from "./feature-showcase";
-import { HistoricalReportCard } from "./message-list-view";
 import { InputBox } from "./input-box";
 import { MessageListView } from "./message-list-view";
 import { Welcome } from "./welcome";
@@ -39,8 +38,6 @@ export function MessagesBlock({ className }: { className?: string }) {
   const messageIds = useMessageIds();
   const messageCount = messageIds.length;
   const responding = useStore((state) => state.responding);
-  const viewingReportContent = useStore((s) => s.viewingReportContent);
-  const viewingReportTitle = useStore((s) => s.viewingReportTitle);
   const continuingReportContext = useStore((s) => s.continuingReportContext);
   const { isReplay } = useReplay();
   const { title: replayTitle, hasError: replayHasError } = useReplayMetadata();
@@ -58,22 +55,15 @@ export function MessagesBlock({ className }: { className?: string }) {
     ) => {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
-      // 如果有历史报告上下文，注入到第一条消息
-      const reportCtx = useStore.getState().viewingReportContent;
-      const reportTitle = useStore.getState().viewingReportTitle;
+      // 如果有历史报告上下文（从继续对话卡片），注入到第一条消息
+      const reportCtx = useStore.getState().continuingReportContext;
       const extraDocs: Array<{ filename: string; content: string }> = [];
       if (reportCtx) {
         extraDocs.push({
-          filename: reportTitle ? `${reportTitle}.md` : "historical-report.md",
-          content: reportCtx,
+          filename: reportCtx.title ? `${reportCtx.title}.md` : "historical-report.md",
+          content: reportCtx.content,
         });
-        // 发送后清空报告上下文
-        useStore.setState({
-          viewingReportContent: null,
-          viewingReportTitle: null,
-          viewingReportId: null,
-        });
-        // 清空继续对话上下文（卡片消失）
+        // 发送后清空继续对话上下文（卡片消失）
         useStore.getState().setContinuingReportContext(null);
       }
       if (options?.documentContexts) {
@@ -151,11 +141,8 @@ export function MessagesBlock({ className }: { className?: string }) {
         scrollRef={messageListRef}
         hideScrollbar={!responding && messageCount === 0 && !isReplay}
         welcomeSlot={
-          !responding && messageCount === 0 && !isReplay ? (
+          !responding && messageCount === 0 && !isReplay && !continuingReportContext ? (
             <>
-              {continuingReportContext && (
-                <HistoricalReportCard className="mb-4 max-w-[1000px]" />
-              )}
               <Welcome className="mb-4" hideDescription />
               <FeatureShowcase className="w-full max-w-[1000px] flex-1" />
             </>
@@ -210,21 +197,17 @@ export function MessagesBlock({ className }: { className?: string }) {
               </ul>
             )}
             {/* 报告上下文指示器 */}
-            {viewingReportContent && viewingReportTitle && (
+            {continuingReportContext && (
               <div className="mb-2 flex w-full max-w-2xl items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
                 <FileText className="h-4 w-4 shrink-0" />
                 <span className="flex-1 truncate">
-                  基于报告《{viewingReportTitle}》继续对话
+                  基于报告《{continuingReportContext.title}》继续对话
                 </span>
                 <button
                   type="button"
                   className="shrink-0 rounded p-0.5 hover:bg-blue-100"
                   onClick={() =>
-                    useStore.setState({
-                      viewingReportContent: null,
-                      viewingReportTitle: null,
-                      viewingReportId: null,
-                    })
+                    useStore.getState().setContinuingReportContext(null)
                   }
                 >
                   <X className="h-3.5 w-3.5" />
