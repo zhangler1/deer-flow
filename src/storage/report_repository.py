@@ -133,6 +133,19 @@ async def get_report_by_id(report_id: UUID) -> Optional[ReportRecord]:
             return _row_to_record(row, cur.description)
 
 
+async def update_report_file_size(report_id: UUID, file_size: int) -> None:
+    """更新报告文件大小"""
+    pool = await _get_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE reports SET file_size = %s, updated_at = NOW() WHERE id = %s",
+                (file_size, str(report_id)),
+            )
+            await conn.commit()
+            logger.info(f"报告文件大小已更新 | id={report_id} | file_size={file_size}")
+
+
 async def get_reports_by_user(
     user_code: str, page: int = 1, page_size: int = 20
 ) -> tuple[List[ReportRecord], int]:

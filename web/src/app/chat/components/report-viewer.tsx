@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeft, Check, ChevronsDownUp, ChevronsUpDown, Copy, Download, Loader2, MessageSquare, Pencil, Undo2, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronsDownUp, ChevronsUpDown, Copy, Download, Loader2, MessageSquare, Pencil, Save, Undo2, X } from "lucide-react";
 import { useCallback, useState } from "react";
+import { toast } from "sonner";
 
 import { ScrollContainer } from "~/components/deer-flow/scroll-container";
 import { Tooltip } from "~/components/deer-flow/tooltip";
@@ -14,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { resolveServiceURL } from "~/core/api/resolve-service-url";
-import { continueReport, fetchReportContent } from "~/core/api/dashboard";
+import { continueReport, fetchReportContent, saveReportContent } from "~/core/api/dashboard";
 import { useStore } from "~/core/store";
 import { stripThinkTags } from "~/core/utils/think-tag-parser";
 import { cn } from "~/lib/utils";
@@ -34,6 +35,8 @@ export function ReportViewer({ className }: { className?: string }) {
   const [continuing, setContinuing] = useState(false);
   const [sectionsExpanded, setSectionsExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   const filteredContent = content ? stripThinkTags(content) : "";
 
@@ -135,23 +138,45 @@ export function ReportViewer({ className }: { className?: string }) {
     (markdown: string) => {
       // 更新本地查看内容（不影响 MinIO 存储）
       useStore.setState({ viewingReportContent: markdown });
+      setDirty(true);
     },
     [],
   );
+
+  const handleSave = useCallback(async () => {
+    if (!reportId) return;
+    const currentContent = useStore.getState().viewingReportContent ?? filteredContent;
+    setSaving(true);
+    try {
+      await saveReportContent(reportId, currentContent);
+      setDirty(false);
+      toast.success("报告已保存");
+    } catch (err) {
+      console.error("[ReportViewer] save failed:", err);
+      toast.error("保存失败，请稍后重试");
+    } finally {
+      setSaving(false);
+    }
+  }, [reportId, filteredContent]);
 
   const handleContinueConversation = useCallback(async () => {
     if (!reportId) return;
     setContinuing(true);
     try {
       const data = await continueReport(reportId);
-      // 将报告内容存入 store，供 messages-block 发送第一条消息时注入
+      // 设置继续对话上下文（供消息列表显示卡片 + 发送时注入 documentContexts）
+      useStore.getState().setContinuingReportContext({
+        reportId,
+        title: data.title,
+        content: data.report_content,
+      });
+      // 同时设置 viewingReportContent 供 messages-block 发送时注入
       useStore.setState({
         viewingReportContent: data.report_content,
         viewingReportTitle: data.title,
         viewingReportId: reportId,
       });
       // 关闭报告查看器，回到对话界面
-      // 注意：不清空 viewingReportContent，让 messages-block 检测到后注入上下文
       closeReportViewer();
     } catch (err) {
       console.error("[ReportViewer] continue conversation failed:", err);
@@ -213,6 +238,27 @@ export function ReportViewer({ className }: { className?: string }) {
                 )}
               </Button>
             </Tooltip>
+
+            {(editing || dirty) && (
+              <Tooltip title={dirty ? "保存修改" : "保存"}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-8 w-8",
+                    dirty ? "text-blue-500" : "text-gray-400",
+                  )}
+                  disabled={saving || !dirty}
+                  onClick={handleSave}
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                </Button>
+              </Tooltip>
+            )}
 
             <Tooltip title="复制">
               <Button

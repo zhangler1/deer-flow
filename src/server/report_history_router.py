@@ -39,6 +39,18 @@ class ContinueReportResponse(BaseModel):
     title: str
 
 
+class UpdateReportRequest(BaseModel):
+    """更新报告内容请求"""
+    content: str
+
+
+class UpdateReportResponse(BaseModel):
+    """更新报告内容响应"""
+    success: bool
+    object_name: str
+    file_size: int
+
+
 # ─── 辅助函数 ───
 
 
@@ -161,4 +173,60 @@ async def continue_report(report_id: str, request: Request):
     )
     return ContinueReportResponse(
         report_content=content, title=title
+    )
+
+
+@router.put("/{report_id}", response_model=UpdateReportResponse)
+async def update_report(report_id: str, request: Request, body: UpdateReportRequest):
+    """更新报告内容（覆盖写入 MinIO + 更新数据库 file_size）"""
+    user_code = _get_current_user_code(request)
+
+    try:
+        uid = UUID(report_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的报告 ID")
+
+    # 权限校验 + 获取现有记录
+    record = await report_repository.get_report_by_id(uid)
+    if record is None:
+        raise HTTPException(status_code=404, detail="报告不存在")
+
+    if record.user_code != user_code:
+        logger.warning(
+            f"[REPORT_HISTORY] 越权更新尝试 | report_id={report_id} | "
+            f"owner={record.user_code} | requester={user_code}"
+        )
+        raise HTTPException(status_code=403, detail="无权修改此报告")
+
+    object_name = record.object_name
+    if not object_name:
+        raise HTTPException(status_code=404, detail="报告文件路径不存在")
+
+    # 覆盖写入 MinIO
+    try:
+        from src.storage.minio_client import upload_report
+
+        file_bytes = body.content.encode("utf-8")
+        file_size = len(file_bytes)
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None, upload_report, file_bytes, object_name, "text/markdown"
+        )
+    except Exception as e:
+        logger.error(
+            f"[REPORT_HISTORY] MinIO 更新失败 | report_id={report_id} | "
+            f"object_name={object_name} | error={e}"
+        )
+        raise HTTPException(status_code=503, detail="报告文件保存失败，请稍后重试")
+
+    # 更新数据库 file_size
+    await report_repository.update_report_file_size(uid, file_size)
+
+    logger.info(
+        f"[REPORT_HISTORY] 报告已更新 | report_id={report_id} | "
+        f"user={user_code} | object_name={object_name} | file_size={file_size}"
+    )
+    return UpdateReportResponse(
+        success=True, object_name=object_name, file_size=file_size
     )

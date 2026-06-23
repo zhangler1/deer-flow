@@ -969,6 +969,50 @@ function ResearchCard({
   );
 }
 
+/** 历史报告卡片（继续对话时显示在消息列表顶部） */
+export function HistoricalReportCard({
+  className,
+}: {
+  className?: string;
+}) {
+  const ctx = useStore((s) => s.continuingReportContext);
+  const openReportViewer = useStore((s) => s.openReportViewer);
+  const handleClick = useCallback(() => {
+    if (ctx) {
+      openReportViewer(ctx.reportId, ctx.content, ctx.title);
+    }
+  }, [ctx, openReportViewer]);
+
+  if (!ctx) return null;
+
+  return (
+    <Card
+      className={cn(
+        "w-full cursor-pointer transition-all duration-200 hover:shadow-md hover:border-gray-300",
+        "bg-[linear-gradient(to_right,white_0%,white_50%,rgb(243,247,255)_100%)]",
+        className,
+      )}
+      onClick={handleClick}
+    >
+      <div className="flex items-center py-1.5 px-2 gap-2">
+        {/* 左侧图标 */}
+        <div className="shrink-0 flex items-center justify-center w-6 h-6 rounded bg-primary/10 text-primary">
+          <FileText className="w-3.5 h-3.5" />
+        </div>
+        {/* 中间信息 */}
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm text-foreground truncate">
+            {ctx.title || "历史报告"}
+          </div>
+          <span className="text-muted-foreground text-xs">
+            历史报告 · 点击回看
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function ThoughtBlock({
   className,
   content,

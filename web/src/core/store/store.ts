@@ -60,6 +60,13 @@ export const useStore = create<{
   viewingReportTitle: string | null;
   openReportViewer: (reportId: string, content: string, title: string) => void;
   closeReportViewer: () => void;
+  // 继续对话时的历史报告上下文（用于在消息列表中显示卡片）
+  continuingReportContext: {
+    reportId: string;
+    title: string;
+    content: string;
+  } | null;
+  setContinuingReportContext: (ctx: { reportId: string; title: string; content: string } | null) => void;
 
   appendMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
@@ -130,6 +137,11 @@ export const useStore = create<{
       viewingReportContent: null,
       viewingReportTitle: null,
     });
+  },
+  // 继续对话报告上下文
+  continuingReportContext: null,
+  setContinuingReportContext(ctx) {
+    set({ continuingReportContext: ctx });
   },
 
   appendMessage(message: Message) {

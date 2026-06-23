@@ -165,3 +165,24 @@ export async function continueReport(reportId: string): Promise<ContinueReportRe
   if (!resp.ok) throw new Error(`Failed to continue report: ${resp.status}`);
   return resp.json();
 }
+
+export interface SaveReportResponse {
+  success: boolean;
+  object_name: string;
+  file_size: number;
+}
+
+export async function saveReportContent(
+  reportId: string,
+  content: string,
+): Promise<SaveReportResponse> {
+  const url = resolveServiceURL(`reports/${reportId}`);
+  const resp = await fetch(url, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!resp.ok) throw new Error(`Failed to save report: ${resp.status}`);
+  return resp.json();
+}

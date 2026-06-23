@@ -27,6 +27,7 @@ import { cn } from "~/lib/utils";
 import { ChevronRight } from "lucide-react";
 
 import { FeatureShowcase } from "./feature-showcase";
+import { HistoricalReportCard } from "./message-list-view";
 import { InputBox } from "./input-box";
 import { MessageListView } from "./message-list-view";
 import { Welcome } from "./welcome";
@@ -40,6 +41,7 @@ export function MessagesBlock({ className }: { className?: string }) {
   const responding = useStore((state) => state.responding);
   const viewingReportContent = useStore((s) => s.viewingReportContent);
   const viewingReportTitle = useStore((s) => s.viewingReportTitle);
+  const continuingReportContext = useStore((s) => s.continuingReportContext);
   const { isReplay } = useReplay();
   const { title: replayTitle, hasError: replayHasError } = useReplayMetadata();
   const [replayStarted, setReplayStarted] = useState(false);
@@ -71,6 +73,8 @@ export function MessagesBlock({ className }: { className?: string }) {
           viewingReportTitle: null,
           viewingReportId: null,
         });
+        // 清空继续对话上下文（卡片消失）
+        useStore.getState().setContinuingReportContext(null);
       }
       if (options?.documentContexts) {
         extraDocs.push(...options.documentContexts);
@@ -149,6 +153,9 @@ export function MessagesBlock({ className }: { className?: string }) {
         welcomeSlot={
           !responding && messageCount === 0 && !isReplay ? (
             <>
+              {continuingReportContext && (
+                <HistoricalReportCard className="mb-4 max-w-[1000px]" />
+              )}
               <Welcome className="mb-4" hideDescription />
               <FeatureShowcase className="w-full max-w-[1000px] flex-1" />
             </>
