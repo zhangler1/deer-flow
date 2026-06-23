@@ -1067,7 +1067,7 @@ async def _stream_graph_events(
     finally:
         total_duration = time.time() - last_event_time
 
-        # ─── 报告生成完成：异步保存到 MinIO + DB + 埋点日志 ───
+        # ─── 报告生成完成：同步保存到 MinIO + DB + 埋点日志 ───
         if _reporter_finished and _report_content_from_state:
             full_report = _report_content_from_state
             if full_report.strip():
@@ -1078,25 +1078,23 @@ async def _stream_graph_events(
                     duration_ms = int((end_time - stream_start_time) * 1000)
                     # 根据取消标志决定报告状态
                     report_status = "cancelled" if _report_cancelled else "completed"
-                    # 后台任务，不阻塞流式响应
-                    asyncio.create_task(
-                        handle_report_completed(
-                            thread_id=thread_id,
-                            report_content=full_report,
-                            title=title,
-                            user_code=user_code,
-                            user_name=user_name,
-                            branch_id=branch_id,
-                            login_name=login_name,
-                            duration_ms=duration_ms,
-                            report_type="research",
-                            status=report_status,
-                            start_timestamp=stream_start_time,
-                            end_timestamp=end_time,
-                        )
+                    # 同步等待保存完成，确保后续 API（PUT/chat）能查到记录
+                    await handle_report_completed(
+                        thread_id=thread_id,
+                        report_content=full_report,
+                        title=title,
+                        user_code=user_code,
+                        user_name=user_name,
+                        branch_id=branch_id,
+                        login_name=login_name,
+                        duration_ms=duration_ms,
+                        report_type="research",
+                        status=report_status,
+                        start_timestamp=stream_start_time,
+                        end_timestamp=end_time,
                     )
                 except Exception as _report_err:
-                    logger.error(f"[REPORT_SERVICE] 报告保存调度失败 | thread_id={thread_id} | {_report_err}")
+                    logger.error(f"[REPORT_SERVICE] 报告保存失败 | thread_id={thread_id} | {_report_err}")
 
 
 
