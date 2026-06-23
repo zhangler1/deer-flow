@@ -66,6 +66,7 @@ def build_reference_index(observations: list[str], url_whitelist: set[str] | Non
 
     def _register(title: str, url: str) -> None:
         """登记一条引用。白名单模式下过滤非白名单 URL；按 URL 去重；首次出现胜出。"""
+        nonlocal index  # 闭包内对 index 赋值需显式声明
         if not title.strip():
             return
         if use_whitelist and url not in url_whitelist:
@@ -110,23 +111,23 @@ def build_reference_index(observations: list[str], url_whitelist: set[str] | Non
 
     # 打印索引列表日志
     if use_whitelist:
-        logger.debug(
+        logger.info(
             f"\n{'='*60}\n"
             f"全局来源索引（已白名单过滤）| 最终收录: {len(seen_urls)} 条 | "
             f"白名单总量: {len(url_whitelist)} | 被过滤: {len(set(filtered_out_urls))} 条\n"
             f"{'='*60}"
         )
     else:
-        logger.debug(f"\n{'='*60}\n全局来源索引（共 {len(seen_urls)} 条）\n{'='*60}")
+        logger.info(f"\n{'='*60}\n全局来源索引（共 {len(seen_urls)} 条）\n{'='*60}")
     for url, info in seen_urls.items():
-        logger.debug(f"  [{info['index']}] {info['title']} -> {url}")
+        logger.info(f"  [{info['index']}] {info['title']} -> {url}")
     # 打印被过滤的 URL（去重后取前 20 条，避免日志暴涨）
     if use_whitelist and filtered_out_urls:
         unique_filtered = list(dict.fromkeys(filtered_out_urls))[:20]
-        logger.debug(f"\n--- 被白名单过滤跳过的 URL（共 {len(set(filtered_out_urls))} 条，仅显示前 {len(unique_filtered)} 条）---")
+        logger.info(f"\n--- 被白名单过滤跳过的 URL（共 {len(set(filtered_out_urls))} 条，仅显示前 {len(unique_filtered)} 条）---")
         for u in unique_filtered:
-            logger.debug(f"  [FILTERED] {u}")
-    logger.debug(f"{'='*60}")
+            logger.info(f"  [FILTERED] {u}")
+    logger.info(f"{'='*60}")
 
     return index_text, seen_urls
 
@@ -385,7 +386,14 @@ async def reporter_node(state: State, config: RunnableConfig):
         )
 
     # 构建全局来源索引并注入（三层保障策略 - 第1层：Prompt 约束）
-    ref_index_text, ref_map = build_reference_index(observations)
+    # 启用白名单过滤：从 state.messages 提取所有 ToolMessage 的实际检索 URL，
+    # 只保留这些 URL 作为参考文献来源，过滤 LLM 杜撰的“幻觉链接”。
+    state_messages = state.get("messages", []) if hasattr(state, "get") else []
+    url_whitelist = _build_url_whitelist_from_messages(state_messages)
+    ref_index_text, ref_map = build_reference_index(
+        observations,
+        url_whitelist=url_whitelist if url_whitelist else None,
+    )
     if ref_index_text:
         # 截断策略：来源数量过多时只保留 top-50
         max_sources = 120
@@ -526,12 +534,12 @@ async def reporter_node(state: State, config: RunnableConfig):
         reference_index_list.sort(key=lambda x: x["index"])
         enhanced_logger.logger.info(f"📚 REFERENCE_INDEX_OUTPUT | 参考文献索引已构建 | 条数: {len(reference_index_list)}")
         # 打印完整索引列表，便于核对链接与编号
-        logger.debug(
+        logger.info(
             f"\n{'='*60}\n后端传递给前端的 reference_index 列表（共 {len(reference_index_list)} 条）\n{'='*60}"
         )
         for item in reference_index_list:
-            logger.debug(f"  [{item['index']:>3}] {item['title']} -> {item['url']}")
-        logger.debug(f"{'='*60}")
+            logger.info(f"  [{item['index']:>3}] {item['title']} -> {item['url']}")
+        logger.info(f"{'='*60}")
 
     return {
         "final_report": response_content,
