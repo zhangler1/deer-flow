@@ -9,7 +9,7 @@ import { useShallow } from "zustand/react/shallow";
 import { chatStream, generatePodcast } from "../api";
 import type { Message, Resource } from "../messages";
 import { mergeMessage } from "../messages";
-import { useSourceStore } from "../source-store";
+import { useSourceStore, type SourceDetail } from "../source-store";
 import { parseJSON } from "../utils";
 
 import { getChatStreamSettings } from "./settings-store";
@@ -497,17 +497,23 @@ export async function sendMessage(
       if (type === "reference_index") {
         const refs = (data as { references: Array<{ index: number; url: string; title: string }> }).references;
         if (refs && refs.length > 0) {
-          // 将后端的 reference_index 转换为 SourceDetail 格式并设置到 source-store
-          // 保留 index 字段，供前端 markdown 归一化把 (N) / （N） / 【N】 等变体替换为 [(N)](URL)
-          const sourceDetails = refs.map(r => ({
+          // 将后端的 reference_index 转换为 SourceDetail 格式
+          // 仅包含后端能提供权威值的字段：index / url / title / domain / sourceType
+          const newRefs: SourceDetail[] = refs.map(r => ({
             index: r.index,
             url: r.url,
             title: r.title,
             domain: r.url ? (() => { try { return new URL(r.url).hostname.replace(/^www\./, ""); } catch { return r.url; } })() : "",
             sourceType: "search" as const,
           }));
-          useSourceStore.getState().setReferences(sourceDetails);
-          console.log('[reference_index] 后端参考文献索引已更新 | 条数:', refs.length);
+
+          // 合并模式：保留已有 references 中的内容字段（snippet / fullContent / aiSummary / toolName）
+          // 避免后端 reference_index 到达时覆盖掉 toolCall 已经提取的详情，导致 drawer 内容丢失。
+          // 匹配策略：先按 url 精确匹配；若失败再按 domain+title 启发式匹配（处理 LLM 改写 URL 的情况）。
+          const oldRefs = useSourceStore.getState().references;
+          const merged = mergeReferencesPreservingContent(newRefs, oldRefs);
+          useSourceStore.getState().setReferences(merged);
+          console.log('[reference_index] 后端参考文献索引已更新 | 条数:', refs.length, '| 合并后:', merged.length);
         }
         continue;
       }
@@ -1016,4 +1022,56 @@ export function useToolCalls() {
         .flat();
     }),
   );
+}
+
+// ── 工具函数 ──────────────────────────────────────────
+
+/**
+ * 合并 references：保留已有 references 中的内容字段
+ *
+ * 背景：
+ *   后端 reference_index 事件会重新设置 references，但只包含后端能提供权威值的字段
+ *   （index / url / title / domain / sourceType）。如果直接覆盖，前端从 toolCall 中提取的
+ *   snippet / fullContent / aiSummary / toolName 会丢失，导致 drawer 打开后看不到内容。
+ *
+ * 策略：
+ *   1. 以 newRefs 为主（保留后端分配的编号 / 标题 / URL）
+ *   2. 从 oldRefs 中匹配相同条目，把内容字段合并进来
+ *   3. 匹配优先级：
+ *      a) url 精确匹配
+ *      b) domain + title 规范化匹配（处理 LLM 改写 URL 的情况）
+ *   4. oldRefs 中存在但 newRefs 中不存在的条目（如已被去重的"同标题多 URL"情况）会被丢弃
+ *      —— 这是有意为之，与后端 reference_index 的语义保持一致
+ */
+function mergeReferencesPreservingContent(
+  newRefs: SourceDetail[],
+  oldRefs: SourceDetail[],
+): SourceDetail[] {
+  if (oldRefs.length === 0) return newRefs;
+
+  // 构建索引：url -> old ref
+  const oldByUrl = new Map<string, SourceDetail>();
+  // 构建索引：normalized title -> old ref（用于 url 匹配失败时的兜底）
+  const oldByTitle = new Map<string, SourceDetail>();
+
+  const normalize = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, " ");
+  for (const old of oldRefs) {
+    if (old.url) oldByUrl.set(old.url, old);
+    const key = `${normalize(old.domain || "")}::${normalize(old.title || "")}`;
+    if (old.title || old.domain) oldByTitle.set(key, old);
+  }
+
+  return newRefs.map((nr) => {
+    const old = (nr.url && oldByUrl.get(nr.url))
+      || oldByTitle.get(`${normalize(nr.domain || "")}::${normalize(nr.title || "")}`);
+    if (!old) return nr;
+    return {
+      ...nr,
+      snippet: old.snippet ?? nr.snippet,
+      fullContent: old.fullContent ?? nr.fullContent,
+      aiSummary: old.aiSummary ?? nr.aiSummary,
+      toolName: old.toolName ?? nr.toolName,
+      sourceType: old.sourceType ?? nr.sourceType,
+    };
+  });
 }

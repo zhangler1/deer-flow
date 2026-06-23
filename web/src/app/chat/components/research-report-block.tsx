@@ -19,17 +19,34 @@ import { ReportReferences } from "./report-references";
 
 // ── URL 归一化 ──────────────────────────────────────
 
-/** 对 klbs-*-bocomm.com 链接去除 query 参数，用于跨数据源匹配 */
+/** 去掉 fragment 与常见追踪 query，生成用于跨数据源匹配的“指纹 key” */
 function normalizeUrlForMatch(url: string): string {
   try {
     const u = new URL(url);
+    // 对所有域名去掉 fragment 和常见追踪参数
+    const TRACKING_PARAMS = new Set([
+      "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+      "ref", "source", "from",
+    ]);
+    const params = Array.from(u.searchParams.entries())
+      .filter(([k]) => !TRACKING_PARAMS.has(k.toLowerCase()))
+      .sort(([a], [b]) => a.localeCompare(b));
+    const qs = params.length > 0 ? "?" + params.map(([k, v]) => `${k}=${v}`).join("&") : "";
+    // klbs 域名额外去掉全部 query，只保留 origin + pathname
     if (/^klbs-.*\.bocomm\.com$/.test(u.hostname)) {
       return u.origin + u.pathname;
     }
+    return u.origin + u.pathname + qs;
   } catch {
-    // ignore parse failure
+    return url;
   }
-  return url;
+}
+
+/** 标题规范化（用于跨数据源匹配） */
+function normalizeTitleKey(title: string, domain: string): string {
+  const t = title.trim().toLowerCase().replace(/\s+/g, " ");
+  const d = domain.trim().toLowerCase();
+  return `${d}::${t}`;
 }
 
 // ── 组件 ────────────────────────────────────────────
@@ -64,21 +81,29 @@ export function ResearchReportBlock({
     if (currentRefs.length > 0) {
       // 后端 reference_index 已提供 url/title/domain，但缺少 snippet/fullContent/aiSummary
       // 从 toolCall 结果中补充内容字段
-      // 对于 klbs 链接，同时用原始 URL 和去 query 后的路径作为 key，兼容 LLM 输出时改写 URL 的情况
-      const contentMap = new Map<string, (typeof toolCallSources)[number]>();
+      // 匹配策略（优先级递减）：
+      //   a) url 精确匹配
+      //   b) url 归一化匹配（去掉 fragment / 常见追踪参数 / klbs 去全部 query）
+      //   c) domain+title 规范化匹配（处理 LLM 改写 URL 的情况）
+      const contentByUrl = new Map<string, (typeof toolCallSources)[number]>();
+      const contentByNormUrl = new Map<string, (typeof toolCallSources)[number]>();
+      const contentByTitle = new Map<string, (typeof toolCallSources)[number]>();
       for (const s of toolCallSources) {
-        if (!s.url) continue;
-        contentMap.set(s.url, s);                    // 精确 key
-        const normalized = normalizeUrlForMatch(s.url);
-        if (normalized !== s.url) {
-          contentMap.set(normalized, s);             // 去 query key（klbs 兼容）
+        if (s.url) {
+          contentByUrl.set(s.url, s);
+          const norm = normalizeUrlForMatch(s.url);
+          if (!contentByNormUrl.has(norm)) contentByNormUrl.set(norm, s);
+        }
+        if (s.title || s.domain) {
+          const key = normalizeTitleKey(s.title || "", s.domain || "");
+          if (!contentByTitle.has(key)) contentByTitle.set(key, s);
         }
       }
       const enriched = currentRefs.map((ref) => {
         if (!ref.url) return ref;
-        // 先精确匹配，再尝试归一化匹配
-        const detail = contentMap.get(ref.url)
-          ?? contentMap.get(normalizeUrlForMatch(ref.url));
+        const detail = contentByUrl.get(ref.url)
+          ?? contentByNormUrl.get(normalizeUrlForMatch(ref.url))
+          ?? contentByTitle.get(normalizeTitleKey(ref.title || "", ref.domain || ""));
         if (detail && (!ref.snippet && !ref.fullContent)) {
           return {
             ...ref,
