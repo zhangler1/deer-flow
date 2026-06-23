@@ -922,6 +922,15 @@ async def _stream_graph_events(
                     _ref_index = _node_update_ri.get("reference_index")
                     if _ref_index and isinstance(_ref_index, list) and len(_ref_index) > 0:
                         logger.info(f"[REFERENCE_INDEX] thread_id={thread_id} | 发送 reference_index 事件 | 条数: {len(_ref_index)}")
+                        # 打印完整索引列表，便于核对推送给前端的链接与编号
+                        logger.debug(
+                            f"\n{'='*60}\nSSE reference_index 推送给前端的完整列表\n{'='*60}"
+                        )
+                        for _item in _ref_index:
+                            logger.debug(
+                                f"  [{_item.get('index', '?'):>3}] {_item.get('title', '')} -> {_item.get('url', '')}"
+                            )
+                        logger.debug(f"{'='*60}")
                         yield _make_event("reference_index", {
                             "thread_id": thread_id,
                             "references": _ref_index,

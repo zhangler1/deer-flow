@@ -514,6 +514,12 @@ export async function sendMessage(
           const merged = mergeReferencesPreservingContent(newRefs, oldRefs);
           useSourceStore.getState().setReferences(merged);
           console.log('[reference_index] 后端参考文献索引已更新 | 条数:', refs.length, '| 合并后:', merged.length);
+          // 打印完整索引列表，便于核对后端推送到前端的链接与编号
+          console.groupCollapsed(`[reference_index] 后端推送完整列表（${refs.length} 条）`);
+          for (const r of refs) {
+            console.log(`  [${r.index}] ${r.title} -> ${r.url}`);
+          }
+          console.groupEnd();
         }
         continue;
       }

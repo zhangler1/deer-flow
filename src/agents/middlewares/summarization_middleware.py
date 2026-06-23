@@ -200,6 +200,13 @@ class SummarizationMiddleware(AgentMiddleware):
                     f"✂️ ToolResult 截断 | 工具: {tool_msg.name} | "
                     f"{original_len} → {len(tool_msg.content)} 字符 | "
                     f"模式: {mode}"
+                    f"{original_len} → {max_chars} 字符 | "
+                    f"tool_msg.content: {tool_msg.content}"
+                )
+            else:
+                logger.debug(
+                    f"ToolResult 未截断 | 工具: {tool_msg.name} | "
+                    f"tool_msg.content: {tool_msg.content}"
                 )
         
         return messages

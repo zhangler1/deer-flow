@@ -425,6 +425,13 @@ async def reporter_node(state: State, config: RunnableConfig):
         # 按序号排序
         reference_index_list.sort(key=lambda x: x["index"])
         enhanced_logger.logger.info(f"📚 REFERENCE_INDEX_OUTPUT | 参考文献索引已构建 | 条数: {len(reference_index_list)}")
+        # 打印完整索引列表，便于核对链接与编号
+        logger.debug(
+            f"\n{'='*60}\n后端传递给前端的 reference_index 列表（共 {len(reference_index_list)} 条）\n{'='*60}"
+        )
+        for item in reference_index_list:
+            logger.debug(f"  [{item['index']:>3}] {item['title']} -> {item['url']}")
+        logger.debug(f"{'='*60}")
 
     return {
         "final_report": response_content,
