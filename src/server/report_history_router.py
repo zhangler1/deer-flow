@@ -8,11 +8,15 @@
 """
 
 import asyncio
+import json
 import logging
-from typing import Optional
+import time
+import uuid
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.storage import report_repository
@@ -37,6 +41,13 @@ class ContinueReportResponse(BaseModel):
     """基于历史报告继续对话响应"""
     report_content: str
     title: str
+
+
+class ReportChatRequest(BaseModel):
+    """基于历史报告的直连 LLM 流式对话请求"""
+    message: str
+    history: Optional[List[dict]] = None  # 历史对话消息（role/content 格式）
+    reporter_model: Optional[str] = None  # 可选指定 reporter 模型
 
 
 class UpdateReportRequest(BaseModel):
@@ -229,4 +240,114 @@ async def update_report(report_id: str, request: Request, body: UpdateReportRequ
     )
     return UpdateReportResponse(
         success=True, object_name=object_name, file_size=file_size
+    )
+
+
+@router.post("/{report_id}/chat")
+async def report_chat(report_id: str, request: Request, body: ReportChatRequest):
+    """基于历史报告的直连 LLM 流式对话
+
+    绕过完整研究图（coordinator/planner/researcher），
+    直接调用 reporter 模型，将报告内容作为上下文回答用户提问。
+    返回 SSE 流式响应（格式与 /api/chat/stream 保持一致）。
+    """
+    user_code = _get_current_user_code(request)
+
+    try:
+        uid = UUID(report_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的报告 ID")
+
+    # 读取报告内容（含权限校验）
+    report_content, title, _ = await _read_report_content(uid, user_code)
+
+    logger.info(
+        f"[REPORT_CHAT] 发起直连对话 | report_id={report_id} | "
+        f"user={user_code} | title={title[:50]} | message={body.message[:80]}"
+    )
+
+    thread_id = str(uuid.uuid4())
+    msg_id = str(uuid.uuid4())
+
+    async def event_generator():
+        from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+        from src.config.agents import AGENT_LLM_MAP
+        from src.llms.llm import get_llm_by_type
+
+        # 构建系统提示：报告内容作为上下文
+        system_prompt = (
+            f"你是“交心深度研究”助手。用户正在基于以下历史报告继续提问。"
+            f"请仅基于报告内容回答用户的问题，不要引入额外搜索或研究。"
+            f"如果报告中未包含相关信息，请如实告知。\n\n"
+            f"# 报告标题：{title}\n\n"
+            f"# 报告全文\n{report_content}"
+        )
+
+        # 构建消息列表
+        messages = [SystemMessage(content=system_prompt)]
+
+        # 历史对话（如果有）
+        if body.history:
+            for h in body.history[-10:]:  # 最多保留最近 10 条
+                role = h.get("role", "user")
+                content = h.get("content", "")
+                if role == "user":
+                    messages.append(HumanMessage(content=content))
+                elif role == "assistant":
+                    messages.append(AIMessage(content=content))
+
+        # 当前用户消息
+        messages.append(HumanMessage(content=body.message))
+
+        # 获取 reporter LLM
+        reporter_model_key = body.reporter_model or None
+        llm = get_llm_by_type(
+            AGENT_LLM_MAP["reporter"],
+            reporter_model_key=reporter_model_key,
+        )
+
+        start_time = time.time()
+        full_content = ""
+
+        try:
+            async for chunk in llm.astream(messages):
+                content = getattr(chunk, "content", "")
+                if content:
+                    full_content += content
+                    event_data = {
+                        "id": msg_id,
+                        "thread_id": thread_id,
+                        "agent": "reporter",
+                        "role": "assistant",
+                        "content": content,
+                    }
+                    yield f"event: message_chunk\ndata: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+
+            # 发送结束事件
+            end_data = {
+                "id": msg_id,
+                "thread_id": thread_id,
+                "agent": "reporter",
+                "role": "assistant",
+                "finish_reason": "stop",
+            }
+            yield f"event: message_chunk\ndata: {json.dumps(end_data, ensure_ascii=False)}\n\n"
+
+            logger.info(
+                f"[REPORT_CHAT] 对话完成 | report_id={report_id} | "
+                f"耗时={time.time() - start_time:.2f}s | 回复长度={len(full_content)}"
+            )
+        except Exception as e:
+            logger.error(f"[REPORT_CHAT] LLM 调用失败 | report_id={report_id} | error={e}")
+            error_data = {"thread_id": thread_id, "error": str(e)}
+            yield f"event: error\ndata: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+        },
     )

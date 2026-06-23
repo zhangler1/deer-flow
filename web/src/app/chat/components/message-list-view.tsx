@@ -984,30 +984,49 @@ export function HistoricalReportCard({
 }) {
   const ctx = useStore((s) => s.continuingReportContext);
   const openReportViewer = useStore((s) => s.openReportViewer);
-  const handleClick = useCallback(() => {
+  const activeReportId = useStore((s) => s.activeReportId);
+
+  // 点击报告信息行：打开 ReportViewer 回看报告
+  const handleViewReport = useCallback(() => {
     if (ctx) {
       openReportViewer(ctx.reportId, ctx.content, ctx.title);
     }
   }, [ctx, openReportViewer]);
+
+  // Radio 切换：基于报告提问 / 深度研究
+  const isActive = !!ctx && activeReportId === ctx.reportId;
+  const handleToggle = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!ctx) return;
+      const next = !isActive;
+      useStore.getState().toggleReportChatMode(ctx.reportId, next);
+    },
+    [ctx, isActive],
+  );
 
   if (!ctx) return null;
 
   return (
     <Card
       className={cn(
-        "w-full cursor-pointer transition-all duration-200 hover:shadow-md hover:border-gray-300",
+        "w-full transition-all duration-200 hover:shadow-md hover:border-gray-300",
         "bg-[linear-gradient(to_right,white_0%,white_50%,rgb(243,247,255)_100%)]",
         className,
       )}
-      onClick={handleClick}
     >
-      <div className="flex items-center py-1.5 px-2 gap-2">
-        {/* 左侧图标 */}
-        <div className="shrink-0 flex items-center justify-center w-6 h-6 rounded bg-primary/10 text-primary">
+      <div className="flex items-center py-1.5 px-3 gap-2">
+        {/* 图标 + 报告信息：点击回看 */}
+        <div
+          className="shrink-0 flex items-center justify-center w-6 h-6 rounded bg-primary/10 text-primary cursor-pointer"
+          onClick={handleViewReport}
+        >
           <FileText className="w-3.5 h-3.5" />
         </div>
-        {/* 中间信息 */}
-        <div className="flex-1 min-w-0">
+        <div
+          className="flex-1 min-w-0 cursor-pointer"
+          onClick={handleViewReport}
+        >
           <div className="font-medium text-sm text-foreground truncate">
             {ctx.title || "历史报告"}
           </div>
@@ -1015,6 +1034,36 @@ export function HistoricalReportCard({
             历史报告 · 点击回看
           </span>
         </div>
+        {/* Radio 单选：基于报告提问 */}
+        <label
+          className={cn(
+            "shrink-0 flex items-center gap-2 cursor-pointer select-none rounded-full px-2.5 py-1 transition-colors",
+            isActive
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            className="sr-only"
+            checked={isActive}
+            onChange={() => handleToggle({ stopPropagation: () => {} } as React.MouseEvent)}
+          />
+          <div
+            className={cn(
+              "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors",
+              isActive
+                ? "border-primary bg-primary"
+                : "border-muted-foreground/40",
+            )}
+          >
+            {isActive && (
+              <div className="w-2 h-2 rounded-full bg-white" />
+            )}
+          </div>
+          <span className="text-sm whitespace-nowrap">基于报告提问</span>
+        </label>
       </div>
     </Card>
   );

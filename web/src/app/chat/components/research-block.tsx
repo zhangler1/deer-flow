@@ -18,7 +18,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { useReplay } from "~/core/replay";
-import { closeResearch, useStore } from "~/core/store";
+import { closeResearch, useStore, REPORT_CHAT_PLACEHOLDER_ID } from "~/core/store";
 import { stripThinkTags } from "~/core/utils/think-tag-parser";
 import { cn } from "~/lib/utils";
 
@@ -47,6 +47,9 @@ export function ResearchBlock({
   const researchOngoing = useStore(
     (state) => !!researchId && state.ongoingResearchId === researchId,
   );
+  // 占位符状态：直连 LLM 对话已开启右侧面板，但尚未收到 reporter 消息
+  const isPlaceholder = researchId === REPORT_CHAT_PLACEHOLDER_ID;
+
   const { isReplay } = useReplay();
   useEffect(() => {
     if (hasReport) {
@@ -195,7 +198,8 @@ export function ResearchBlock({
     <div className={cn("h-full w-full", className)}>
       <Card className={cn("relative h-full w-full pt-4", className)}>
         <div className="absolute right-4 flex h-9 items-center justify-center">
-          {hasReport && !reportStreaming && (
+          {/* 占位符状态下不显示工具栏按钮（仅保留关闭） */}
+          {!isPlaceholder && hasReport && !reportStreaming && (
             <>
               <Tooltip title={sectionsExpanded ? "折叠全部" : "展开全部"}>
                 <Button
@@ -283,6 +287,13 @@ export function ResearchBlock({
             </Button>
           </Tooltip>
         </div>
+        {isPlaceholder ? (
+          /* 占位符状态：等待用户提问 */
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-muted-foreground">
+            <FileText className="h-10 w-10 opacity-30" />
+            <p className="text-sm">已准备就绪，请在左侧输入问题</p>
+          </div>
+        ) : (
         <Tabs
           className="flex h-full w-full flex-col"
           value={activeTab}
@@ -361,6 +372,7 @@ export function ResearchBlock({
             </ScrollContainer>
           </TabsContent>
         </Tabs>
+        )}
       </Card>
     </div>
   );

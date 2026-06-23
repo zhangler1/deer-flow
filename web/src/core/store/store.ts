@@ -7,6 +7,7 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
 import { chatStream, generatePodcast } from "../api";
+import { reportChatStream } from "../api/dashboard";
 import type { Message, Resource } from "../messages";
 import { mergeMessage } from "../messages";
 import { useSourceStore, type SourceDetail } from "../source-store";
@@ -15,6 +16,9 @@ import { parseJSON } from "../utils";
 import { getChatStreamSettings } from "./settings-store";
 
 const THREAD_ID = nanoid();
+
+// 占位符 research ID，用于直连 LLM 对话时预先打开右侧面板
+export const REPORT_CHAT_PLACEHOLDER_ID = "__report_chat__";
 
 export const useStore = create<{
   responding: boolean;
@@ -67,6 +71,10 @@ export const useStore = create<{
     content: string;
   } | null;
   setContinuingReportContext: (ctx: { reportId: string; title: string; content: string } | null) => void;
+  // 切换基于报告提问模式（radio 单选控制）
+  toggleReportChatMode: (reportId: string, enabled: boolean) => void;
+  // 持久化的报告 ID，用于后续消息自动走直连 LLM 路径（不清空，直到显式重置）
+  activeReportId: string | null;
 
   appendMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
@@ -141,8 +149,36 @@ export const useStore = create<{
   // 继续对话报告上下文
   continuingReportContext: null,
   setContinuingReportContext(ctx) {
-    set({ continuingReportContext: ctx });
+    set({
+      continuingReportContext: ctx,
+      ...(ctx
+        ? {
+            activeReportId: ctx.reportId,
+            // 自动打开右侧面板（占位符，等 reporter 消息到达后替换）
+            openResearchId: REPORT_CHAT_PLACEHOLDER_ID,
+          }
+        : {}),
+    });
   },
+  toggleReportChatMode(reportId, enabled) {
+    const state = useStore.getState();
+    if (enabled) {
+      set({
+        activeReportId: reportId,
+        openResearchId: REPORT_CHAT_PLACEHOLDER_ID,
+      });
+    } else {
+      const currentOpen = state.openResearchId;
+      set({
+        activeReportId: null,
+        ...(currentOpen === REPORT_CHAT_PLACEHOLDER_ID
+          ? { openResearchId: null }
+          : {}),
+      });
+    }
+  },
+  // 持久化的报告 ID（首条消息后不清空）
+  activeReportId: null,
 
   appendMessage(message: Message) {
     set((state) => ({
@@ -755,6 +791,131 @@ export async function sendMessage(
   }
 }
 
+/**
+ * 基于历史报告直接调用 reporter LLM 流式对话。
+ * 绕过 coordinator/planner/researcher，将报告作为上下文直连 LLM。
+ */
+export async function sendReportChatMessage(
+  content: string,
+  reportId: string,
+  options: { abortSignal?: AbortSignal } = {},
+) {
+  // 追加用户消息
+  appendMessage({
+    id: nanoid(),
+    threadId: THREAD_ID,
+    role: "user",
+    content,
+    contentChunks: [content],
+  });
+
+  setResponding(true);
+
+  // 收集对话历史（用于多轮对话）
+  const store = useStore.getState();
+  const history: Array<{ role: string; content: string }> = [];
+  for (const id of store.messageIds) {
+    const m = store.messages.get(id);
+    if (!m) continue;
+    if (m.role === "user") history.push({ role: "user", content: m.content ?? "" });
+    else if (m.role === "assistant" && m.agent === "reporter") {
+      history.push({ role: "assistant", content: m.content ?? "" });
+    }
+  }
+
+  const stream = reportChatStream(
+    reportId,
+    content,
+    { history: history.slice(0, -1) }, // 排除刚加入的当前消息
+    options,
+  );
+
+  let assistantMsgId: string | undefined;
+  const pending = new Map<string, Message>();
+  let flushTimer: number | null = null;
+
+  const flushNow = () => {
+    if (pending.size) {
+      useStore.getState().updateMessages(Array.from(pending.values()));
+      pending.clear();
+    }
+  };
+  const scheduleFlush = () => {
+    if (flushTimer != null) return;
+    flushTimer = window.setTimeout(() => { flushNow(); flushTimer = null; }, 100);
+  };
+
+  try {
+    for await (const event of stream) {
+      const { type, data } = event;
+
+      // 防御性检查：跳过无 data 的事件
+      if (!data) continue;
+
+      if (type === "error") {
+        toast.error((data as { error?: string }).error ?? "服务端发生错误");
+        continue;
+      }
+      if (type === "message_chunk") {
+        const id = (data as { id?: string }).id;
+        if (!id) continue; // 跳过无 id 的事件（如 finish_reason 结束事件）
+
+        if (!assistantMsgId) assistantMsgId = id;
+
+        if (!existsMessage(id)) {
+          const msg: Message = {
+            id,
+            threadId: ((data as { thread_id?: string }).thread_id) ?? THREAD_ID,
+            agent: "reporter",
+            role: "assistant",
+            content: "",
+            contentChunks: [],
+            reasoningContent: "",
+            reasoningContentChunks: [],
+            isStreaming: true,
+          };
+          appendMessage(msg);
+        }
+
+        const msg = getMessage(id);
+        if (msg) {
+          try {
+            const updated = mergeMessage(msg, event);
+            pending.set(updated.id, updated);
+            scheduleFlush();
+          } catch (mergeErr) {
+            console.error("[sendReportChatMessage] mergeMessage failed", { id, event, mergeErr });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    const isAborted =
+      (error instanceof DOMException && error.name === "AbortError") ||
+      (error instanceof Error && error.name === "AbortError");
+    if (!isAborted) {
+      toast.error("对话失败：" + (error instanceof Error ? error.message : String(error)));
+    }
+  } finally {
+    if (flushTimer != null) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    flushNow();
+    // 终止所有还在流式中的消息
+    const s = useStore.getState();
+    const updated: Message[] = [];
+    for (const id of s.messageIds) {
+      const m = s.messages.get(id);
+      if (m?.isStreaming) {
+        updated.push({ ...m, isStreaming: false, finishReason: "stop" });
+      }
+    }
+    if (updated.length > 0) s.updateMessages(updated);
+    setResponding(false);
+  }
+}
+
 function setResponding(value: boolean) {
   useStore.setState({ responding: value });
 }
@@ -831,18 +992,28 @@ function appendResearch(researchId: string) {
     }
   }
   const messageIds = [researchId];
-  messageIds.unshift(planMessage!.id);
+  // 仅当存在 planner 消息时才将其加入（直连 LLM 场景下无 planner）
+  if (planMessage) {
+    messageIds.unshift(planMessage.id);
+  }
+
+  // 如果当前 openResearchId 是占位符，替换为真实 ID
+  const currentOpenId = useStore.getState().openResearchId;
+  const shouldReplacePlaceholder = currentOpenId === REPORT_CHAT_PLACEHOLDER_ID;
+
   useStore.setState({
     ongoingResearchId: researchId,
     researchIds: [...useStore.getState().researchIds, researchId],
     researchPlanIds: new Map(useStore.getState().researchPlanIds).set(
       researchId,
-      planMessage!.id,
+      planMessage?.id ?? "",
     ),
     researchActivityIds: new Map(useStore.getState().researchActivityIds).set(
       researchId,
       messageIds,
     ),
+    // 替换占位符 openResearchId 为真实 researchId
+    ...(shouldReplacePlaceholder ? { openResearchId: researchId } : {}),
   });
 }
 

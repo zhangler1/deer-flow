@@ -7,6 +7,8 @@
  */
 
 import { resolveServiceURL } from "./resolve-service-url";
+import { fetchStream } from "../sse";
+import type { ChatEvent } from "./types";
 
 // ─── 类型定义 ───
 
@@ -186,3 +188,52 @@ export async function saveReportContent(
   if (!resp.ok) throw new Error(`Failed to save report: ${resp.status}`);
   return resp.json();
 }
+
+// ─── 基于历史报告的直连 LLM 流式对话 ───
+
+/**
+ * 基于历史报告直接调用 reporter LLM 流式对话。
+ * 绕过 coordinator/planner/researcher，返回与 /api/chat/stream 相同格式的 SSE 事件。
+ */
+export async function* reportChatStream(
+  reportId: string,
+  message: string,
+  params?: {
+    history?: Array<{ role: string; content: string }>;
+    reporter_model?: string;
+  },
+  options?: { abortSignal?: AbortSignal },
+): AsyncGenerator<ChatEvent> {
+  const url = resolveServiceURL(`reports/${reportId}/chat`);
+  const stream = fetchStream(url, {
+    body: JSON.stringify({
+      message,
+      history: params?.history ?? [],
+      reporter_model: params?.reporter_model ?? "",
+    }),
+    signal: options?.abortSignal,
+  });
+
+  for await (const event of stream) {
+    if (event.event === "ping") continue;
+    try {
+      // 防御性检查：跳过无 data 的事件
+      if (!event.data) {
+        console.warn("[reportChatStream] Skipping event with null data:", event.event);
+        continue;
+      }
+      const parsed = JSON.parse(event.data);
+      if (!parsed) {
+        console.warn("[reportChatStream] Parsed data is null:", event);
+        continue;
+      }
+      yield {
+        type: event.event,
+        data: parsed,
+      } as ChatEvent;
+    } catch (e) {
+      console.error("[reportChatStream] Failed to parse SSE event", event, e);
+    }
+  }
+}
+
