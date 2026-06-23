@@ -163,115 +163,117 @@ export function ReportViewer({ className }: { className?: string }) {
   if (!reportId || !content) return null;
 
   return (
-    <div className={cn("h-full w-full", className)}>
-      <Card className="relative h-full w-full pt-4">
-        {/* 顶部操作栏 */}
-        <div className="absolute left-4 top-3 flex items-center gap-2">
-          <Tooltip title="返回列表">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-gray-500"
-              onClick={closeReportViewer}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Tooltip>
-          <span className="text-sm font-medium text-gray-700 line-clamp-1 max-w-[300px]">
-            {title}
-          </span>
-        </div>
-
-        <div className="absolute right-4 top-3 flex items-center gap-1">
-          <Tooltip title={sectionsExpanded ? "折叠全部" : "展开全部"}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-gray-400"
-              onClick={() => setSectionsExpanded((v) => !v)}
-            >
-              {sectionsExpanded ? (
-                <ChevronsDownUp className="h-4 w-4" />
-              ) : (
-                <ChevronsUpDown className="h-4 w-4" />
-              )}
-            </Button>
-          </Tooltip>
-
-          <Tooltip title={editing ? "退出编辑" : "编辑"}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-gray-400"
-              onClick={handleEdit}
-            >
-              {editing ? (
-                <Undo2 className="h-4 w-4" />
-              ) : (
-                <Pencil className="h-4 w-4" />
-              )}
-            </Button>
-          </Tooltip>
-
-          <Tooltip title="复制">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-gray-400"
-              onClick={handleCopy}
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </Button>
-          </Tooltip>
-
-          <DropdownMenu>
-            <Tooltip title="下载报告">
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-gray-400"
-                  disabled={downloading}
-                >
-                  {downloading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
+    <div className={cn("flex h-full w-full flex-col", className)}>
+      <Card className="flex h-full w-full flex-col">
+        {/* 顶部操作栏 —— 固定高度，不与滚动区重叠 */}
+        <div className="flex shrink-0 items-center justify-between px-4 py-2 border-b border-gray-100">
+          <div className="flex items-center gap-2 min-w-0">
+            <Tooltip title="返回列表">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 text-gray-500"
+                onClick={closeReportViewer}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
             </Tooltip>
-            <DropdownMenuContent align="end" className="min-w-[140px]">
-              <DropdownMenuItem
-                className="flex cursor-pointer items-center gap-2"
-                onClick={() => handleDownload("docx")}
-              >
-                <span>Word</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="flex cursor-pointer items-center gap-2"
-                onClick={() => handleDownload("markdown")}
-              >
-                <span>Markdown</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <span className="text-sm font-medium text-gray-700 truncate">
+              {title}
+            </span>
+          </div>
 
-          <Tooltip title="关闭">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-gray-400"
-              onClick={closeReportViewer}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </Tooltip>
+          <div className="flex shrink-0 items-center gap-1">
+            <Tooltip title={sectionsExpanded ? "折叠全部" : "展开全部"}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400"
+                onClick={() => setSectionsExpanded((v) => !v)}
+              >
+                {sectionsExpanded ? (
+                  <ChevronsDownUp className="h-4 w-4" />
+                ) : (
+                  <ChevronsUpDown className="h-4 w-4" />
+                )}
+              </Button>
+            </Tooltip>
+
+            <Tooltip title={editing ? "退出编辑" : "编辑"}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400"
+                onClick={handleEdit}
+              >
+                {editing ? (
+                  <Undo2 className="h-4 w-4" />
+                ) : (
+                  <Pencil className="h-4 w-4" />
+                )}
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="复制">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400"
+                onClick={handleCopy}
+              >
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </Tooltip>
+
+            <DropdownMenu>
+              <Tooltip title="下载报告">
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-gray-400"
+                    disabled={downloading}
+                  >
+                    {downloading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+              </Tooltip>
+              <DropdownMenuContent align="end" className="min-w-[140px]">
+                <DropdownMenuItem
+                  className="flex cursor-pointer items-center gap-2"
+                  onClick={() => handleDownload("docx")}
+                >
+                  <span>Word</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="flex cursor-pointer items-center gap-2"
+                  onClick={() => handleDownload("markdown")}
+                >
+                  <span>Markdown</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Tooltip title="关闭">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400"
+                onClick={closeReportViewer}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+          </div>
         </div>
 
         {/* 报告正文 */}
-        <ScrollContainer className="h-full px-8 pb-20" scrollShadowColor="var(--card)">
-          <div className="mx-auto max-w-3xl pt-8">
+        <ScrollContainer className="min-h-0 flex-1 px-8 pb-20" scrollShadowColor="var(--card)">
+          <div className="mx-auto max-w-3xl py-8">
             {editing ? (
               <ReportEditor
                 content={filteredContent}
