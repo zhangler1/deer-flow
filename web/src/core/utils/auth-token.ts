@@ -52,7 +52,7 @@ export function getGuwpToken(): string | null {
 /**
  * 写入 guwpToken 到 Cookie
  */
-function setGuwpTokenCookie(token: string): void {
+export function setGuwpTokenCookie(token: string): void {
   if (typeof document === "undefined") return;
 
   document.cookie = [

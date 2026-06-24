@@ -1,16 +1,19 @@
 "use client";
 
-import { Home, Search, FileText, Clock, ChevronRight } from "lucide-react";
+import { Home, Search, FileText, Clock, ChevronRight, Building2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import {
+  fetchCurrentUser,
   fetchMyReports,
   fetchReportContent,
   type ReportRecord,
+  type UserInfo,
 } from "~/core/api/dashboard";
 import { useStore } from "~/core/store";
+import { useGuipInfo } from "~/hooks/use-guip-info";
 import { cn } from "~/lib/utils";
 
 export function HistoryDrawer() {
@@ -23,6 +26,10 @@ export function HistoryDrawer() {
   const [total, setTotal] = useState(0);
   const [keyword, setKeyword] = useState("");
   const [loadingContentId, setLoadingContentId] = useState<string | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null);
+
+  // GUIP 用户信息（从 GuipAPI.xc2.js 获取）
+  const { userInfo: guipUser } = useGuipInfo();
 
   const PAGE_SIZE = 20;
   const hasMore = reports.length < total;
@@ -54,6 +61,13 @@ export function HistoryDrawer() {
     },
     [page, keyword],
   );
+
+  // 加载当前用户信息
+  useEffect(() => {
+    fetchCurrentUser()
+      .then(setUser)
+      .catch((err) => console.error("[HistoryDrawer] 加载用户信息失败:", err));
+  }, []);
 
   // 首次加载 + 搜索词变化时重置并加载
   useEffect(() => {
@@ -115,6 +129,13 @@ export function HistoryDrawer() {
     const hour = d.getHours().toString().padStart(2, "0");
     const min = d.getMinutes().toString().padStart(2, "0");
     return `${month}-${day} ${hour}:${min}`;
+  };
+
+  /** 取用户名首字符作为头像：汉字取第一个汉字，英文取首字母大写 */
+  const getAvatarChar = (name: string) => {
+    if (!name) return "?";
+    const ch = name.charAt(0);
+    return /[\u4e00-\u9fa5]/.test(ch) ? ch : ch.toUpperCase();
   };
 
   return (
@@ -233,6 +254,42 @@ export function HistoryDrawer() {
             </div>
           )}
         </div>
+        {/* 底部：用户信息（优先 GUIP，降级 dashboard） */}
+        {(() => {
+          // 优先展示 GUIP 用户信息
+          const name = guipUser?.userName || guipUser?.loginName;
+          const org = guipUser?.linkedOrgName;
+          if (name) {
+            return (
+              <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-medium text-white select-none">
+                  {getAvatarChar(name)}
+                </div>
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium text-gray-700">{name}</span>
+                  {org && (
+                    <span className="flex items-center gap-1 truncate text-xs text-gray-400">
+                      <Building2 className="h-3 w-3 shrink-0" />
+                      {org}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          }
+          // 降级：dashboard 用户信息
+          if (user?.is_authenticated) {
+            return (
+              <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-medium text-white select-none">
+                  {getAvatarChar(user.user_name || user.login_name)}
+                </div>
+                <span className="truncate text-sm text-gray-700">{user.login_name}</span>
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
     </>
   );

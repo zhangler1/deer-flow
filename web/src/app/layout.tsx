@@ -40,6 +40,11 @@ export default async function RootLayout({
     // 移除 geist.variable，使用系统默认字体
     <html lang={locale} suppressHydrationWarning>
       <head>
+        {/* GuipAPI：GUIP 框架客户端 API，必须在 hydration 前加载 */}
+        <Script
+          src={withBasePath("/GuipAPI.xc2.js")}
+          strategy="beforeInteractive"
+        />
         {/* Define isSpace function globally to fix markdown-it issues with Next.js + Turbopack
           https://github.com/markdown-it/markdown-it/issues/1082#issuecomment-2749656365 */}
         <Script id="markdown-it-fix" strategy="beforeInteractive">
