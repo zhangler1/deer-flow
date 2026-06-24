@@ -27,6 +27,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   },
   tokens: {
     guwpToken: "",
+    userInfo: null,
   },
 };
 
@@ -50,6 +51,8 @@ export type SettingsState = {
   };
   tokens: {
     guwpToken: string;
+    /** GuipAPI globalInfo 返回的完整用户信息，用于通过 X-User-Info 请求头直传给后端 */
+    userInfo: GuipUserInfo | null;
   };
 };
 
@@ -77,6 +80,10 @@ export const loadSettings = () => {
         settings.general[key as keyof SettingsState["general"]] =
           DEFAULT_SETTINGS.general[key as keyof SettingsState["general"]];
       }
+    }
+    // 向后兼容：旧版 localStorage 中没有 tokens.userInfo，默认填 null
+    if (settings.tokens && !("userInfo" in settings.tokens)) {
+      settings.tokens.userInfo = null;
     }
 
     try {
@@ -157,6 +164,7 @@ export const getChatStreamSettings = () => {
     mcpSettings,
     forceRoutingPath: general.forceRoutingPath, // 添加调试模式路由路径设置
     guwpToken: tokens.guwpToken,
+    userInfo: tokens.userInfo,
   };
 };
 
@@ -200,5 +208,16 @@ export function setEnableBackgroundInvestigation(value: boolean) {
     },
   }));
   saveSettings();
+}
+
+/**
+ * 存储 GuipAPI globalInfo 返回的完整用户信息。
+ * 由 GuwpTokenInitializer 在页面加载时调用，将 userInfo 写入 settings store，
+ * 后续请求通过 X-User-Info 请求头直传给后端。
+ */
+export function setUserInfo(userInfo: GuipUserInfo | null) {
+  useSettingsStore.setState((state) => ({
+    tokens: { ...state.tokens, userInfo },
+  }));
 }
 loadSettings();

@@ -55,7 +55,7 @@ async def get_summary():
 async def get_reports(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
-    user_code: Optional[str] = Query(None, description="按用户工号筛选"),
+    login_name: Optional[str] = Query(None, description="按登录名筛选"),
     user_name: Optional[str] = Query(None, description="按姓名模糊筛选"),
     status: Optional[str] = Query(None, description="按状态筛选（completed/cancelled/failed）"),
     start_date: Optional[str] = Query(None, description="起始日期 (YYYY-MM-DD)"),
@@ -65,7 +65,7 @@ async def get_reports(
     items, total = await report_repository.get_reports_paginated(
         page=page,
         page_size=page_size,
-        user_code=user_code,
+        login_name=login_name,
         user_name=user_name,
         status=status,
         start_date=start_date,
@@ -95,7 +95,7 @@ async def get_current_user(request: Request):
     user_info = getattr(request.state, "user_info", None)
     if user_info is None:
         return {
-            "user_code": "anonymous",
+            "user_code": "",
             "user_name": "匿名用户",
             "is_authenticated": False,
         }
@@ -106,4 +106,5 @@ async def get_current_user(request: Request):
         "login_name": user_info.login_name,
         "device": user_info.device,
         "is_authenticated": user_info.is_authenticated,
+        "source": user_info.source,
     }

@@ -40,13 +40,16 @@ export async function* fetchStream(
   url: string,
   init: RequestInit,
 ): AsyncIterable<StreamEvent> {
+  // 合并默认 headers 与调用方传入的额外 headers（避免 ...init 覆盖默认值）
+  const mergedHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-cache",
+    ...(init.headers as Record<string, string>),
+  };
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "no-cache",
-    },
     ...init,
+    headers: mergedHeaders,
   });
   if (response.status !== 200) {
     // 读取响应体的前面部分以便调试

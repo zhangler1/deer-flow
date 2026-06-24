@@ -42,6 +42,8 @@ export async function* chatStream(
       >;
     };
     guwpToken?: string;
+    /** GuipAPI globalInfo 返回的完整用户信息，通过 X-User-Info 请求头直传给后端 */
+    userInfo?: GuipUserInfo | null;
   },
   options: { abortSignal?: AbortSignal } = {},
 ) {
@@ -52,13 +54,22 @@ export async function* chatStream(
   ) 
     return yield* chatReplayStream(userMessage, params, options);
   
+  // 构建请求头，如有 userInfo 则序列化为 X-User-Info 头直传给后端
+  const extraHeaders: Record<string, string> = {};
+  if (params.userInfo) {
+    extraHeaders["X-User-Info"] = encodeURIComponent(JSON.stringify(params.userInfo));
+  }
+
   const stream = fetchStream(resolveServiceURL("chat/stream"), {
     body: JSON.stringify({
       messages: [{ role: "user", content: userMessage }],
       ...params,
       guwp_token: params.guwpToken,
+      // userInfo 不走请求体，仅通过 header 传递，此处删除避免冗余
+      userInfo: undefined,
     }),
     signal: options.abortSignal,
+    headers: extraHeaders,
   });
   
   for await (const event of stream) {

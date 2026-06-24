@@ -344,6 +344,7 @@ export async function sendMessage(
       force_routing_path: settings.forceRoutingPath, // 🐛 调试模式
       mcp_settings: settings.mcpSettings,
       guwpToken: settings.guwpToken,
+      userInfo: settings.userInfo,
     },
     options,
   );

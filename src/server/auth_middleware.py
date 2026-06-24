@@ -1,20 +1,23 @@
 # SPDX-License-Identifier: MIT
 
 """
-guwpToken 用户认证中间件
+用户认证中间件
 
-从请求 Cookie 中提取 guwpToken，调用内网 queryUserInfo API 解析用户信息，
-注入到 request.state 中，供后续路由处理函数使用。
+认证优先级：
+1. 优先从请求头 X-User-Info 解析前端传入的完整用户信息（JSON 格式，URL 编码）
+2. 失败时降级：从 Cookie 提取 guwpToken，调用内网 queryUserInfo API 解析用户信息
 
-- Token 无效或接口失败时返回 anonymous 用户，不阻断主流程
+- 认证失败时返回 anonymous 用户，不阻断主流程
 - 使用 LRU + TTL 缓存避免每次请求都调用认证接口
 """
 
+import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import unquote
 
 import httpx
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -28,14 +31,23 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class UserInfo:
-    """从 queryUserInfo 接口解析的用户信息"""
-    user_code: str = "anonymous"
+    """用户信息数据模型
+
+    来源优先级：
+    1. 前端通过 X-User-Info 请求头直接传入（来自 GuipAPI globalInfo）
+    2. 后端通过 guwpToken Cookie → queryUserInfo 内网接口解析
+
+    认证判据以 loginName 是否存在为准，login_name 作为用户唯一标识。
+    user_code（工号）仅作数据保存，不参与查询和校验。
+    """
+    user_code: str = ""  # 工号，仅数据保存
     user_name: str = "匿名用户"
     branch_id: Optional[int] = None
     login_name: str = ""
     linked_org_name: str = ""
     device: str = ""
     is_authenticated: bool = False
+    source: str = ""  # "header" | "api" | "anonymous"
 
 
 # ─── 缓存实现（LRU + TTL） ───
@@ -66,7 +78,63 @@ def _set_cached_user(token: str, user_info: UserInfo):
     _user_cache[token] = (user_info, time.time())
 
 
-# ─── 认证 API 调用 ───
+# ─── 从请求头解析用户信息（前端直传） ───
+
+
+def _parse_user_info_from_header(request: Request) -> Optional[UserInfo]:
+    """从 X-User-Info 请求头解析前端直传的用户信息。
+
+    前端将 GuipAPI globalInfo().userInfo 序列化为 JSON 并 URL 编码后放入此头。
+    解析失败或 loginName 为空时返回 None，调用方应降级到 cookie → API 流程。
+    """
+    raw = request.headers.get("x-user-info", "")
+    if not raw:
+        return None
+
+    try:
+        decoded = unquote(raw)
+        data = json.loads(decoded)
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.warning(f"[AUTH] X-User-Info 请求头解析失败: {type(e).__name__}: {e}")
+        return None
+
+    if not isinstance(data, dict):
+        logger.warning(f"[AUTH] X-User-Info 格式异常，期望 dict，实际: {type(data).__name__}")
+        return None
+
+    # 以 loginName 作为用户身份唯一标识（与 queryUserInfo 接口逻辑一致）
+    _login_name = data.get("loginName", "") or ""
+    if not _login_name:
+        logger.info("[AUTH] X-User-Info 中 loginName 为空，将降级到 cookie → API 流程")
+        return None
+
+    # branchId 可能为字符串，统一转 int
+    _branch_id = data.get("branchId") or data.get("bbosBranchCode")
+    if isinstance(_branch_id, str):
+        try:
+            _branch_id = int(_branch_id)
+        except (ValueError, TypeError):
+            _branch_id = None
+
+    user_info = UserInfo(
+        user_code=str(data.get("userCode", "") or ""),
+        user_name=data.get("userName", ""),
+        branch_id=_branch_id,
+        login_name=_login_name,
+        linked_org_name=data.get("linkedOrgName", ""),
+        device=data.get("device", ""),
+        is_authenticated=True,
+        source="header",
+    )
+    logger.info(
+        f"[AUTH] X-User-Info 解析成功 | "
+        f"login_name={user_info.login_name} | user_code={user_info.user_code} | user_name={user_info.user_name} | "
+        f"branch_id={user_info.branch_id} | linked_org_name={user_info.linked_org_name}"
+    )
+    return user_info
+
+
+# ─── 认证 API 调用（降级方案） ───
 
 USER_INFO_API_URL = os.getenv(
     "USER_INFO_API_URL",
@@ -120,26 +188,29 @@ async def _query_user_info(token: str) -> UserInfo:
         logger.info(f"[AUTH] 解析响应体 | data_keys={list(data.keys())} | data={data}")
 
         result = data.get("RSP_BODY", {}).get("result", {})
-        if not result or not result.get("userCode"):
+        # 以 loginName 作为用户身份唯一标识（而非工号 userCode）
+        _login_name = result.get("loginName", "") if result else ""
+        if not _login_name:
             logger.warning(
-                f"[AUTH] queryUserInfo 返回无效结果（无 userCode）| "
+                f"[AUTH] queryUserInfo 返回无效结果（无 loginName）| "
                 f"token={token_preview} | result={result} | full_response={data}"
             )
             return UserInfo()
 
         user_info = UserInfo(
-            user_code=str(result.get("userCode", "")),
+            user_code=str(result.get("userCode", "") or ""),
             user_name=result.get("userName", ""),
             branch_id=result.get("branchId"),
-            login_name=result.get("loginName", ""),
+            login_name=_login_name,
             linked_org_name=result.get("linkedOrgName", ""),
             device=result.get("device", ""),
             is_authenticated=True,
+            source="api",
         )
         logger.info(
             f"[AUTH] queryUserInfo 成功 | token={token_preview} | "
-            f"user_code={user_info.user_code} | user_name={user_info.user_name} | "
-            f"branch_id={user_info.branch_id} | login_name={user_info.login_name} | "
+            f"login_name={user_info.login_name} | user_code={user_info.user_code} | user_name={user_info.user_name} | "
+            f"branch_id={user_info.branch_id} | "
             f"linked_org_name={user_info.linked_org_name}"
         )
         return user_info
@@ -166,45 +237,58 @@ async def _query_user_info(token: str) -> UserInfo:
 # ─── FastAPI 中间件 ───
 
 class GuwpTokenAuthMiddleware(BaseHTTPMiddleware):
-    """从 Cookie 中提取 guwpToken 并解析用户信息注入到 request.state"""
+    """用户认证中间件
+
+    认证优先级：
+    1. X-User-Info 请求头（前端直传 GuipAPI globalInfo 的完整 userinfo）
+    2. Cookie guwpToken → 内网 queryUserInfo API（降级方案）
+    """
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        # 从 Cookie 中获取 guwpToken
-        token = request.cookies.get("guwpToken", "")
-
-        # 记录所有请求的认证入口日志（仅 API 请求，跳过静态资源）
         path = request.url.path
-        if path.startswith("/api"):
-            cookies_keys = list(request.cookies.keys())
-            logger.info(
-                f"[AUTH] 请求进入 | path={path} | method={request.method} | "
-                f"has_guwpToken={bool(token)} | token_len={len(token) if token else 0} | "
-                f"cookie_keys={cookies_keys}"
-            )
 
-        if token:
-            # 先查缓存
-            user_info = _get_cached_user(token)
-            if user_info is None:
-                logger.info(f"[AUTH] 缓存未命中，将调用远程接口 | path={path}")
-                # 缓存未命中，调用 API
-                user_info = await _query_user_info(token)
-                _set_cached_user(token, user_info)
+        # ─── 优先级 1：从 X-User-Info 请求头解析前端直传的用户信息 ───
+        user_info = _parse_user_info_from_header(request)
+
+        if user_info is not None:
+            logger.info(
+                f"[AUTH] 使用前端直传用户信息 | path={path} | "
+                f"login_name={user_info.login_name} | source={user_info.source}"
+            )
+        else:
+            # ─── 优先级 2：降级到 cookie → queryUserInfo API ───
+            token = request.cookies.get("guwpToken", "")
+
+            if path.startswith("/api"):
+                cookies_keys = list(request.cookies.keys())
+                logger.info(
+                    f"[AUTH] 降级到 cookie 认证 | path={path} | method={request.method} | "
+                    f"has_guwpToken={bool(token)} | token_len={len(token) if token else 0} | "
+                    f"cookie_keys={cookies_keys}"
+                )
+
+            if token:
+                # 先查缓存
+                user_info = _get_cached_user(token)
+                if user_info is None:
+                    logger.info(f"[AUTH] 缓存未命中，将调用远程接口 | path={path}")
+                    user_info = await _query_user_info(token)
+                    _set_cached_user(token, user_info)
+                else:
+                    logger.info(
+                        f"[AUTH] 缓存命中 | path={path} | "
+                        f"login_name={user_info.login_name} | user_name={user_info.user_name}"
+                    )
             else:
                 logger.info(
-                    f"[AUTH] 缓存命中 | path={path} | "
-                    f"user_code={user_info.user_code} | user_name={user_info.user_name}"
+                    f"[AUTH] 未携带 guwpToken 且无 X-User-Info，使用匿名用户 | path={path} | "
+                    f"cookie_keys={list(request.cookies.keys())}"
                 )
-        else:
-            logger.info(
-                f"[AUTH] 未携带 guwpToken，使用匿名用户 | path={path} | "
-                f"cookie_keys={list(request.cookies.keys())}"
-            )
-            user_info = UserInfo()
+                user_info = UserInfo()
 
         # 注入到 request.state
         request.state.user_info = user_info
-        request.state.guwp_token = token
+        request.state.guwp_token = request.cookies.get("guwpToken", "")
 
         response = await call_next(request)
         return response

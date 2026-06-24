@@ -55,7 +55,7 @@ async def ensure_table():
             CREATE TABLE IF NOT EXISTS reports (
                 id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 thread_id     VARCHAR(64),
-                user_code     VARCHAR(32) NOT NULL,
+                user_code     VARCHAR(128) NOT NULL,                -- 登录名 loginName（数据隔离主键）
                 user_name     VARCHAR(64),
                 branch_id     BIGINT,
                 login_name    VARCHAR(64),
@@ -83,6 +83,11 @@ async def ensure_table():
         await conn.execute("""
             ALTER TABLE reports
             ADD COLUMN IF NOT EXISTS linked_org_name VARCHAR(128);
+        """)
+        # 幂等扩宽 user_code 列（原始 VARCHAR(32) 存工号，现改为 VARCHAR(128) 存 loginName）
+        await conn.execute("""
+            ALTER TABLE reports
+            ALTER COLUMN user_code TYPE VARCHAR(128);
         """)
         await conn.commit()
     logger.info("reports 表已确认存在（含 object_name 字段）")
