@@ -76,7 +76,7 @@ services:
       - ./web/public:/app/public
       - ./web/messages:/app/messages
       - ./web/next.config.js:/app/next.config.js:ro
-      - ./web/.env.local:/app/.env.local:ro   # 修正目标路径
+      # - ./web/.env.local:/app/.env.local:ro   # 修正目标路径
       # ② 用匿名卷保护镜像内的 node_modules 和 .next
       - /app/node_modules
       - /app/.next
