@@ -41,9 +41,9 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 - **输出要求**: 使用几段文字全面介绍企业基本信息
 
 ### 步骤2: 商机分析
-- **目标**: 分析企业商机数据和业务动态，从现有商机推断营销方向，匹配合适的银行产品
-- **执行**: 由专门的researcher执行"商机分析"技能
-- **内容**: 企业商机数据（股权质押、专利、中标、分红、资质审批等）、营销推断、产品推荐
+- **目标**: 分析企业商机数据和业务动态，通过深度推理链（商机事件→经营画像→业务链条发散→产品需求）推断营销方向，匹配银行产品
+- **执行**: 由专门的researcher执行“商机分析”技能
+- **内容**: 企业商机数据（股权质押、专利、中标、分红、资质审批等）、深度推理链分析、产品推荐
 - **数据来源**:
   - 必须首先使用 `business_opportunity_search` 工具查询企业商机数据
   - 必须使用 `online_search` 工具补充查询企业商机数据
@@ -51,6 +51,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
   - 最后使用 `product_instance_search` 工具检索具体的产品实例
   - **重要：推荐的产品实例必须是 `product_instance_search` 工具返回的结果**
   - **重要：必须从现有商机推断营销方向，不可假设前提**
+  - **重要：必须完成三轮深度推理链分析**（商机事件→经营画像→业务链条发散→产品需求），禁止跳过推理直接搜索产品
 
 ### 步骤3: 舆情分析
 - **目标**: 分析企业舆情状况和声誉风险
@@ -170,7 +171,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 每个步骤必须包含:
 - `step_type`: "research"
 - `need_search`: true
-- `title`: 步骤名称(从上述6个中选择)
+- `title`: 步骤名称(从上述13个中选择)
 - `description`: 明确说明该步骤需要收集的信息和内容
 
 ### 输入信息提取
@@ -187,7 +188,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 ```ts
 interface Step {
   need_search: boolean; // 必须为 true
-  title: string; // 必须是上述7个步骤名称之一
+  title: string; // 必须是上述13个步骤名称之一
   description: string; // 明确说明该步骤要收集的信息
   step_type: "research"; // 必须是 "research"
 }
