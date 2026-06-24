@@ -35,6 +35,7 @@ export interface ReportRecord {
   user_name: string | null;
   branch_id: number | null;
   login_name: string | null;
+  linked_org_name: string | null;
   title: string;
   duration_ms: number | null;
   report_url: string | null;

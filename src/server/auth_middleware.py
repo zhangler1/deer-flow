@@ -33,6 +33,7 @@ class UserInfo:
     user_name: str = "匿名用户"
     branch_id: Optional[int] = None
     login_name: str = ""
+    linked_org_name: str = ""
     device: str = ""
     is_authenticated: bool = False
 
@@ -131,13 +132,15 @@ async def _query_user_info(token: str) -> UserInfo:
             user_name=result.get("userName", ""),
             branch_id=result.get("branchId"),
             login_name=result.get("loginName", ""),
+            linked_org_name=result.get("linkedOrgName", ""),
             device=result.get("device", ""),
             is_authenticated=True,
         )
         logger.info(
             f"[AUTH] queryUserInfo 成功 | token={token_preview} | "
             f"user_code={user_info.user_code} | user_name={user_info.user_name} | "
-            f"branch_id={user_info.branch_id} | login_name={user_info.login_name}"
+            f"branch_id={user_info.branch_id} | login_name={user_info.login_name} | "
+            f"linked_org_name={user_info.linked_org_name}"
         )
         return user_info
 

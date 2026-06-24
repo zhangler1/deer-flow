@@ -21,6 +21,7 @@ class ReportRecord(BaseModel):
     user_name: Optional[str] = None
     branch_id: Optional[int] = None
     login_name: Optional[str] = None
+    linked_org_name: Optional[str] = None
     title: str
     duration_ms: Optional[int] = None
     report_url: Optional[str] = None

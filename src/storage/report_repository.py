@@ -79,6 +79,11 @@ async def ensure_table():
             ADD COLUMN IF NOT EXISTS object_name VARCHAR(512);
             CREATE INDEX IF NOT EXISTS idx_reports_object_name ON reports(object_name);
         """)
+        # 幂等新增 linked_org_name 列
+        await conn.execute("""
+            ALTER TABLE reports
+            ADD COLUMN IF NOT EXISTS linked_org_name VARCHAR(128);
+        """)
         await conn.commit()
     logger.info("reports 表已确认存在（含 object_name 字段）")
 
@@ -92,9 +97,9 @@ async def save_report(report: ReportRecord) -> UUID:
         async with conn.cursor() as cur:
             await cur.execute(
                 """
-                INSERT INTO reports (thread_id, user_code, user_name, branch_id, login_name,
+                INSERT INTO reports (thread_id, user_code, user_name, branch_id, login_name, linked_org_name,
                                      title, duration_ms, report_url, object_name, file_size, report_type, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -103,6 +108,7 @@ async def save_report(report: ReportRecord) -> UUID:
                     report.user_name,
                     report.branch_id,
                     report.login_name,
+                    report.linked_org_name,
                     report.title,
                     report.duration_ms,
                     report.report_url,

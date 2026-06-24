@@ -33,6 +33,7 @@ async def handle_report_completed(
     user_name: str,
     branch_id: Optional[int] = None,
     login_name: str = "",
+    linked_org_name: str = "",
     duration_ms: int = 0,
     report_type: str = "research",
     status: str = "completed",
@@ -52,6 +53,7 @@ async def handle_report_completed(
         user_name: 用户姓名
         branch_id: 分行ID
         login_name: 登录名
+        linked_org_name: 行政机构名称
         duration_ms: 生成耗时（毫秒）
         report_type: 报告类型
         status: 报告状态（completed/cancelled/failed）
@@ -95,6 +97,7 @@ async def handle_report_completed(
             user_name=user_name,
             branch_id=branch_id,
             login_name=login_name,
+            linked_org_name=linked_org_name,
             title=title,
             duration_ms=duration_ms,
             report_url=report_url,

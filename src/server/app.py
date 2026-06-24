@@ -749,6 +749,7 @@ async def _stream_graph_events(
     graph_instance, workflow_input, workflow_config, thread_id,
     user_code: str = "anonymous", user_name: str = "",
     branch_id: int = None, login_name: str = "",
+    linked_org_name: str = "",
     stream_start_time: float = None,
 ):
     """Stream events from the graph and process them.
@@ -1087,6 +1088,7 @@ async def _stream_graph_events(
                         user_name=user_name,
                         branch_id=branch_id,
                         login_name=login_name,
+                        linked_org_name=linked_org_name,
                         duration_ms=duration_ms,
                         report_type="research",
                         status=report_status,
@@ -1256,6 +1258,7 @@ async def _astream_workflow_generator(
     _user_name = ""
     _branch_id = None
     _login_name = ""
+    _linked_org_name = ""
     if guwp_token:
         from src.server.auth_middleware import _get_cached_user
         cached = _get_cached_user(guwp_token)
@@ -1264,6 +1267,7 @@ async def _astream_workflow_generator(
             _user_name = cached.user_name
             _branch_id = cached.branch_id
             _login_name = cached.login_name
+            _linked_org_name = cached.linked_org_name
 
     _stream_start = time.time()
 
@@ -1280,6 +1284,7 @@ async def _astream_workflow_generator(
                     graph, workflow_input, workflow_config, thread_id,
                     user_code=_user_code, user_name=_user_name,
                     branch_id=_branch_id, login_name=_login_name,
+                    linked_org_name=_linked_org_name,
                     stream_start_time=_stream_start,
                 ):
                     yield event
@@ -1289,6 +1294,7 @@ async def _astream_workflow_generator(
                 graph, workflow_input, workflow_config, thread_id,
                 user_code=_user_code, user_name=_user_name,
                 branch_id=_branch_id, login_name=_login_name,
+                linked_org_name=_linked_org_name,
                 stream_start_time=_stream_start,
             ):
                 yield event
@@ -1298,6 +1304,7 @@ async def _astream_workflow_generator(
             graph, workflow_input, workflow_config, thread_id,
             user_code=_user_code, user_name=_user_name,
             branch_id=_branch_id, login_name=_login_name,
+            linked_org_name=_linked_org_name,
             stream_start_time=_stream_start,
         ):
             yield event
