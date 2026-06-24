@@ -8,10 +8,10 @@
 CREATE TABLE IF NOT EXISTS reports (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     thread_id     VARCHAR(64),                          -- 关联对话线程
-    user_code     VARCHAR(32) NOT NULL,                 -- 用户工号
+    user_code     VARCHAR(32),                          -- 工号，仅数据保存，不参与查询
     user_name     VARCHAR(64),                          -- 用户姓名
     branch_id     BIGINT,                               -- 分行ID
-    login_name    VARCHAR(64),                          -- 登录名
+    login_name    VARCHAR(64) NOT NULL,                 -- 登录名 loginName（数据隔离主键，来自 queryUserInfo.loginName）
     title         VARCHAR(512) NOT NULL,                -- 报告标题
     duration_ms   BIGINT,                               -- 生成耗时（毫秒）
     report_url    VARCHAR(1024),                        -- MinIO OSS 地址
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS reports (
 );
 
 -- 按用户工号查询
-CREATE INDEX IF NOT EXISTS idx_reports_user_code ON reports(user_code);
+CREATE INDEX IF NOT EXISTS idx_reports_login_name ON reports(login_name);
 -- 按创建时间查询（看板统计按天聚合）
 CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at);
 -- 按线程ID关联对话
@@ -36,6 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
 
 -- 添加注释
 COMMENT ON TABLE reports IS '报告元数据存储（看板统计、用户绑定）';
-COMMENT ON COLUMN reports.user_code IS '用户工号，来自 queryUserInfo 接口';
+COMMENT ON COLUMN reports.user_code IS '工号，仅作数据保存，不参与查询和校验';
+COMMENT ON COLUMN reports.login_name IS '登录名 loginName，来自 queryUserInfo 接口（用户唯一标识）';
 COMMENT ON COLUMN reports.report_url IS 'MinIO 对象存储返回的文件访问地址';
 COMMENT ON COLUMN reports.duration_ms IS '报告生成耗时（毫秒），从请求开始到报告输出完成';

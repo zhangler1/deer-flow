@@ -29,10 +29,10 @@ async def handle_report_completed(
     thread_id: str,
     report_content: str,
     title: str,
-    user_code: str,
+    login_name: str,
     user_name: str,
+    user_code: str = "",
     branch_id: Optional[int] = None,
-    login_name: str = "",
     linked_org_name: str = "",
     duration_ms: int = 0,
     report_type: str = "research",
@@ -49,10 +49,10 @@ async def handle_report_completed(
         thread_id: 对话线程 ID
         report_content: 报告 Markdown 内容
         title: 报告标题
-        user_code: 用户工号
+        login_name: 登录名（用户唯一标识）
         user_name: 用户姓名
+        user_code: 工号（仅数据保存，不参与校验）
         branch_id: 分行ID
-        login_name: 登录名
         linked_org_name: 行政机构名称
         duration_ms: 生成耗时（毫秒）
         report_type: 报告类型
@@ -72,7 +72,7 @@ async def handle_report_completed(
     logger.info(
         f"[REPORT_SERVICE] 报告保存开始 | thread_id={thread_id} | status={status} | "
         f"起始时间(CST)={start_time_str} | 结束时间(CST)={end_time_str} | "
-        f"耗时={duration_ms}ms | user={user_code} | title={title[:50]}"
+        f"耗时={duration_ms}ms | login_name={login_name} | title={title[:50]}"
     )
     report_url = None
     object_name = None
@@ -109,11 +109,11 @@ async def handle_report_completed(
         report_id = await report_repository.save_report(record)
         logger.info(
             f"[REPORT_SERVICE] 报告元数据已保存 | thread_id={thread_id} | "
-            f"report_id={report_id} | user={user_code} | title={title[:50]}"
+            f"report_id={report_id} | login_name={login_name} | title={title[:50]}"
         )
     except Exception as e:
         logger.error(
-            f"[REPORT_SERVICE] 元数据保存失败 | thread_id={thread_id} | user={user_code} | {e}"
+            f"[REPORT_SERVICE] 元数据保存失败 | thread_id={thread_id} | login_name={login_name} | {e}"
         )
 
     try:
@@ -122,7 +122,7 @@ async def handle_report_completed(
 
         log_report_generated(
             thread_id=thread_id,
-            user_code=user_code,
+            login_name=login_name,
             user_name=user_name,
             title=title,
             duration_ms=duration_ms,
@@ -132,7 +132,7 @@ async def handle_report_completed(
         )
     except Exception as e:
         logger.error(
-            f"[REPORT_SERVICE] 统计日志写入失败 | thread_id={thread_id} | user={user_code} | {e}"
+            f"[REPORT_SERVICE] 统计日志写入失败 | thread_id={thread_id} | login_name={login_name} | {e}"
         )
 
 

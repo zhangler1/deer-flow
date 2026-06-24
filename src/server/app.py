@@ -747,7 +747,7 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
 
 async def _stream_graph_events(
     graph_instance, workflow_input, workflow_config, thread_id,
-    user_code: str = "anonymous", user_name: str = "",
+    user_name: str = "", user_code: str = "",
     branch_id: int = None, login_name: str = "",
     linked_org_name: str = "",
     stream_start_time: float = None,
@@ -1084,10 +1084,10 @@ async def _stream_graph_events(
                         thread_id=thread_id,
                         report_content=full_report,
                         title=title,
-                        user_code=user_code,
-                        user_name=user_name,
-                        branch_id=branch_id,
                         login_name=login_name,
+                        user_name=user_name,
+                        user_code=user_code,
+                        branch_id=branch_id,
                         linked_org_name=linked_org_name,
                         duration_ms=duration_ms,
                         report_type="research",
@@ -1254,7 +1254,7 @@ async def _astream_workflow_generator(
     # 内部已自动启用 autocommit=True。如需自定义连接参数，
     # 请改用 AsyncConnectionPool + AsyncPostgresSaver(pool)。
     # ─── 解析用户信息（从 auth_middleware 缓存获取，避免重复调用 API）───
-    _user_code = "anonymous"
+    _user_code = ""
     _user_name = ""
     _branch_id = None
     _login_name = ""
@@ -1282,7 +1282,7 @@ async def _astream_workflow_generator(
                 graph.store = in_memory_store
                 async for event in _stream_graph_events(
                     graph, workflow_input, workflow_config, thread_id,
-                    user_code=_user_code, user_name=_user_name,
+                    user_name=_user_name, user_code=_user_code,
                     branch_id=_branch_id, login_name=_login_name,
                     linked_org_name=_linked_org_name,
                     stream_start_time=_stream_start,
@@ -1292,7 +1292,7 @@ async def _astream_workflow_generator(
             logger.warning(f"Unsupported checkpoint URL scheme: {checkpoint_url}. Only postgresql:// is supported.")
             async for event in _stream_graph_events(
                 graph, workflow_input, workflow_config, thread_id,
-                user_code=_user_code, user_name=_user_name,
+                user_name=_user_name, user_code=_user_code,
                 branch_id=_branch_id, login_name=_login_name,
                 linked_org_name=_linked_org_name,
                 stream_start_time=_stream_start,
@@ -1302,7 +1302,7 @@ async def _astream_workflow_generator(
         # Use graph without checkpointer
         async for event in _stream_graph_events(
             graph, workflow_input, workflow_config, thread_id,
-            user_code=_user_code, user_name=_user_name,
+            user_name=_user_name, user_code=_user_code,
             branch_id=_branch_id, login_name=_login_name,
             linked_org_name=_linked_org_name,
             stream_start_time=_stream_start,

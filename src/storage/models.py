@@ -17,10 +17,10 @@ class ReportRecord(BaseModel):
     """报告元数据记录"""
     id: Optional[UUID] = None
     thread_id: Optional[str] = None
-    user_code: str
+    user_code: str = ""  # 工号，仅数据保存，不参与查询
     user_name: Optional[str] = None
     branch_id: Optional[int] = None
-    login_name: Optional[str] = None
+    login_name: str  # 登录名（数据隔离主键）
     linked_org_name: Optional[str] = None
     title: str
     duration_ms: Optional[int] = None

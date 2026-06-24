@@ -55,10 +55,11 @@ async def ensure_table():
             CREATE TABLE IF NOT EXISTS reports (
                 id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 thread_id     VARCHAR(64),
-                user_code     VARCHAR(128) NOT NULL,                -- 登录名 loginName（数据隔离主键）
+                user_code     VARCHAR(32),                            -- 工号，仅数据保存，不参与查询
                 user_name     VARCHAR(64),
                 branch_id     BIGINT,
-                login_name    VARCHAR(64),
+                login_name    VARCHAR(64) NOT NULL,                   -- 登录名（数据隔离主键）
+                linked_org_name VARCHAR(128),
                 title         VARCHAR(512) NOT NULL,
                 duration_ms   BIGINT,
                 report_url    VARCHAR(1024),
@@ -69,7 +70,7 @@ async def ensure_table():
                 created_at    TIMESTAMP DEFAULT NOW(),
                 updated_at    TIMESTAMP DEFAULT NOW()
             );
-            CREATE INDEX IF NOT EXISTS idx_reports_user_code ON reports(user_code);
+            CREATE INDEX IF NOT EXISTS idx_reports_login_name ON reports(login_name);
             CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at);
             CREATE INDEX IF NOT EXISTS idx_reports_thread_id ON reports(thread_id);
         """)
@@ -84,10 +85,9 @@ async def ensure_table():
             ALTER TABLE reports
             ADD COLUMN IF NOT EXISTS linked_org_name VARCHAR(128);
         """)
-        # 幂等扩宽 user_code 列（原始 VARCHAR(32) 存工号，现改为 VARCHAR(128) 存 loginName）
+        # 幂等补充 login_name 索引
         await conn.execute("""
-            ALTER TABLE reports
-            ALTER COLUMN user_code TYPE VARCHAR(128);
+            CREATE INDEX IF NOT EXISTS idx_reports_login_name ON reports(login_name);
         """)
         await conn.commit()
     logger.info("reports 表已确认存在（含 object_name 字段）")
@@ -126,7 +126,7 @@ async def save_report(report: ReportRecord) -> UUID:
             row = await cur.fetchone()
             await conn.commit()
             report_id = row[0]
-            logger.info(f"报告元数据已保存 | id={report_id} | thread_id={report.thread_id} | title={report.title[:50]} | user={report.user_code}")
+            logger.info(f"报告元数据已保存 | id={report_id} | thread_id={report.thread_id} | title={report.title[:50]} | login_name={report.login_name}")
             return report_id
 
 
@@ -144,15 +144,15 @@ async def get_report_by_id(report_id: UUID) -> Optional[ReportRecord]:
             return _row_to_record(row, cur.description)
 
 
-async def get_report_by_thread_id(thread_id: str, user_code: str) -> Optional[ReportRecord]:
+async def get_report_by_thread_id(thread_id: str, login_name: str) -> Optional[ReportRecord]:
     """根据 thread_id 获取最新一条已完成报告的详情（含权限校验）"""
     pool = await _get_pool()
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
-                "SELECT * FROM reports WHERE thread_id = %s AND user_code = %s "
+                "SELECT * FROM reports WHERE thread_id = %s AND login_name = %s "
                 "AND status = 'completed' ORDER BY created_at DESC LIMIT 1",
-                (thread_id, user_code),
+                (thread_id, login_name),
             )
             row = await cur.fetchone()
             if row is None:
@@ -174,7 +174,7 @@ async def update_report_file_size(report_id: UUID, file_size: int) -> None:
 
 
 async def get_reports_by_user(
-    user_code: str, page: int = 1, page_size: int = 20
+    login_name: str, page: int = 1, page_size: int = 20
 ) -> tuple[List[ReportRecord], int]:
     """分页查询用户的报告列表
 
@@ -187,19 +187,19 @@ async def get_reports_by_user(
         async with conn.cursor() as cur:
             # 总数
             await cur.execute(
-                "SELECT COUNT(*) FROM reports WHERE user_code = %s",
-                (user_code,),
+                "SELECT COUNT(*) FROM reports WHERE login_name = %s",
+                (login_name,),
             )
             total = (await cur.fetchone())[0]
 
             # 分页数据
             await cur.execute(
                 """
-                SELECT * FROM reports WHERE user_code = %s
+                SELECT * FROM reports WHERE login_name = %s
                 ORDER BY created_at DESC
                 LIMIT %s OFFSET %s
                 """,
-                (user_code, page_size, offset),
+                (login_name, page_size, offset),
             )
             rows = await cur.fetchall()
             records = [_row_to_record(row, cur.description) for row in rows]
@@ -209,7 +209,7 @@ async def get_reports_by_user(
 async def get_reports_paginated(
     page: int = 1,
     page_size: int = 20,
-    user_code: Optional[str] = None,
+    login_name: Optional[str] = None,
     user_name: Optional[str] = None,
     status: Optional[str] = None,
     start_date: Optional[str] = None,
@@ -227,9 +227,9 @@ async def get_reports_paginated(
     # 构建 WHERE 条件
     conditions = []
     params = []
-    if user_code:
-        conditions.append("user_code = %s")
-        params.append(user_code)
+    if login_name:
+        conditions.append("login_name = %s")
+        params.append(login_name)
     if user_name:
         conditions.append("user_name ILIKE %s")
         params.append(f"%{user_name}%")
@@ -335,13 +335,13 @@ async def get_summary() -> DashboardSummary:
 
             # 月活用户（近 30 天内生成过报告的去重用户数）
             await cur.execute(
-                "SELECT COUNT(DISTINCT user_code) FROM reports WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'"
+                "SELECT COUNT(DISTINCT login_name) FROM reports WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'"
             )
             mau = (await cur.fetchone())[0]
 
             # 日活用户（今日生成过报告的去重用户数）
             await cur.execute(
-                "SELECT COUNT(DISTINCT user_code) FROM reports WHERE DATE(created_at) = CURRENT_DATE"
+                "SELECT COUNT(DISTINCT login_name) FROM reports WHERE DATE(created_at) = CURRENT_DATE"
             )
             dau = (await cur.fetchone())[0]
 

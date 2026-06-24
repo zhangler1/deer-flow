@@ -6,7 +6,7 @@
 采用独立的结构化 JSONL 日志文件（每行一个 JSON），与应用日志分离。
 - 按天 rotate
 - 保留 90 天
-- 包含 event、timestamp、thread_id、user_code、user_name 等字段
+- 包含 event、timestamp、thread_id、login_name、user_name 等字段
 """
 
 import json
@@ -68,7 +68,7 @@ def _get_stats_logger() -> logging.Logger:
 
 def log_report_generated(
     thread_id: str,
-    user_code: str,
+    login_name: str,
     user_name: str,
     title: str,
     duration_ms: int,
@@ -80,7 +80,7 @@ def log_report_generated(
 
     Args:
         thread_id: 对话线程 ID
-        user_code: 用户工号
+        login_name: 登录名
         user_name: 用户姓名
         title: 报告标题
         duration_ms: 生成耗时（毫秒）
@@ -92,7 +92,7 @@ def log_report_generated(
         "event": "report_generated",
         "timestamp": datetime.now().isoformat(),
         "thread_id": thread_id,
-        "user_code": user_code,
+        "login_name": login_name,
         "user_name": user_name,
         "title": title,
         "duration_ms": duration_ms,
@@ -105,12 +105,12 @@ def log_report_generated(
     stats_logger.info(json.dumps(event, ensure_ascii=False))
 
 
-def log_user_login(user_code: str, user_name: str, device: str = ""):
+def log_user_login(login_name: str, user_name: str, device: str = ""):
     """记录用户登录事件"""
     event = {
         "event": "user_login",
         "timestamp": datetime.now().isoformat(),
-        "user_code": user_code,
+        "login_name": login_name,
         "user_name": user_name,
         "device": device,
     }
@@ -121,7 +121,7 @@ def log_user_login(user_code: str, user_name: str, device: str = ""):
 
 def log_research_started(
     thread_id: str,
-    user_code: str,
+    login_name: str,
     user_name: str,
     query: str,
     report_type: str = "research",
@@ -131,7 +131,7 @@ def log_research_started(
         "event": "research_started",
         "timestamp": datetime.now().isoformat(),
         "thread_id": thread_id,
-        "user_code": user_code,
+        "login_name": login_name,
         "user_name": user_name,
         "query": query[:200],  # 截断过长的查询
         "report_type": report_type,

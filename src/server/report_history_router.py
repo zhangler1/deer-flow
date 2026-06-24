@@ -4,7 +4,7 @@
 用户历史报告 API 路由
 
 提供当前登录用户查看自己历史报告列表、获取报告正文内容、
-基于历史报告继续对话等接口。所有接口均以 user_code 做数据隔离。
+基于历史报告继续对话等接口。所有接口均以 login_name 做数据隔离。
 """
 
 import asyncio
@@ -65,15 +65,15 @@ class UpdateReportResponse(BaseModel):
 # ─── 辅助函数 ───
 
 
-def _get_current_user_code(request: Request) -> str:
-    """从 auth 中间件注入的 request.state 中提取当前用户工号"""
+def _get_current_login_name(request: Request) -> str:
+    """从 auth 中间件注入的 request.state 中提取当前用户登录名"""
     user_info = getattr(request.state, "user_info", None)
     if user_info is None or not user_info.is_authenticated:
         raise HTTPException(status_code=401, detail="未登录或认证已过期")
-    return user_info.user_code
+    return user_info.login_name
 
 
-async def _read_report_content(report_id: UUID, user_code: str) -> tuple[str, str, Optional[str]]:
+async def _read_report_content(report_id: UUID, login_name: str) -> tuple[str, str, Optional[str]]:
     """读取报告正文（含权限校验）
 
     Returns:
@@ -88,10 +88,10 @@ async def _read_report_content(report_id: UUID, user_code: str) -> tuple[str, st
     if record is None:
         raise HTTPException(status_code=404, detail="报告不存在")
 
-    if record.user_code != user_code:
+    if record.login_name != login_name:
         logger.warning(
             f"[REPORT_HISTORY] 越权访问尝试 | report_id={report_id} | "
-            f"owner={record.user_code} | requester={user_code}"
+            f"owner={record.login_name} | requester={login_name}"
         )
         raise HTTPException(status_code=403, detail="无权访问此报告")
 
@@ -128,13 +128,13 @@ async def get_my_reports(
     start_date: Optional[str] = Query(None, description="起始日期 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="结束日期 (YYYY-MM-DD)"),
 ):
-    """获取当前用户的报告列表（强制 user_code 隔离，支持标题搜索）"""
-    user_code = _get_current_user_code(request)
+    """获取当前用户的报告列表（强制 login_name 隔离，支持标题搜索）"""
+    login_name = _get_current_login_name(request)
 
     items, total = await report_repository.get_reports_paginated(
         page=page,
         page_size=page_size,
-        user_code=user_code,
+        login_name=login_name,
         status=status,
         start_date=start_date,
         end_date=end_date,
@@ -148,7 +148,7 @@ async def get_my_reports(
 # ─── 辅助函数：报告 ID 解析（兼容 UUID 和 thread_id） ───
 
 
-async def _resolve_report_record(identifier: str, user_code: str) -> "report_repository.ReportRecord":
+async def _resolve_report_record(identifier: str, login_name: str) -> "report_repository.ReportRecord":
     """将报告标识解析为报告记录。
 
     identifier 可以是：
@@ -171,15 +171,15 @@ async def _resolve_report_record(identifier: str, user_code: str) -> "report_rep
 
     # 回退：按 thread_id 查询
     if record is None:
-        record = await report_repository.get_report_by_thread_id(identifier, user_code)
+        record = await report_repository.get_report_by_thread_id(identifier, login_name)
 
     if record is None:
         raise HTTPException(status_code=404, detail="报告不存在")
 
-    if record.user_code != user_code:
+    if record.login_name != login_name:
         logger.warning(
             f"[REPORT_HISTORY] 越权访问尝试 | identifier={identifier} | "
-            f"owner={record.user_code} | requester={user_code}"
+            f"owner={record.login_name} | requester={login_name}"
         )
         raise HTTPException(status_code=403, detail="无权访问此报告")
 
@@ -192,18 +192,18 @@ async def _resolve_report_record(identifier: str, user_code: str) -> "report_rep
 @router.get("/{report_id}/content", response_model=ReportContentResponse)
 async def get_report_content(report_id: str, request: Request):
     """获取报告 Markdown 正文内容（含权限校验）"""
-    user_code = _get_current_user_code(request)
+    login_name = _get_current_login_name(request)
 
     try:
         uid = UUID(report_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="无效的报告 ID")
 
-    content, title, report_url = await _read_report_content(uid, user_code)
+    content, title, report_url = await _read_report_content(uid, login_name)
 
     logger.info(
         f"[REPORT_HISTORY] 读取报告内容 | report_id={report_id} | "
-        f"user={user_code} | title={title[:50]} | content_len={len(content)}"
+        f"login_name={login_name} | title={title[:50]} | content_len={len(content)}"
     )
     return ReportContentResponse(
         content=content, title=title, report_url=report_url
@@ -213,18 +213,18 @@ async def get_report_content(report_id: str, request: Request):
 @router.post("/{report_id}/continue", response_model=ContinueReportResponse)
 async def continue_report(report_id: str, request: Request):
     """基于历史报告发起新对话（返回报告内容供前端注入上下文）"""
-    user_code = _get_current_user_code(request)
+    login_name = _get_current_login_name(request)
 
     try:
         uid = UUID(report_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="无效的报告 ID")
 
-    content, title, _ = await _read_report_content(uid, user_code)
+    content, title, _ = await _read_report_content(uid, login_name)
 
     logger.info(
         f"[REPORT_HISTORY] 继续对话 | report_id={report_id} | "
-        f"user={user_code} | title={title[:50]}"
+        f"login_name={login_name} | title={title[:50]}"
     )
     return ContinueReportResponse(
         report_content=content, title=title
@@ -237,8 +237,8 @@ async def update_report(report_id: str, request: Request, body: UpdateReportRequ
 
     report_id 支持 UUID 或 thread_id。
     """
-    user_code = _get_current_user_code(request)
-    record = await _resolve_report_record(report_id, user_code)
+    login_name = _get_current_login_name(request)
+    record = await _resolve_report_record(report_id, login_name)
 
     object_name = record.object_name
     if not object_name:
@@ -267,7 +267,7 @@ async def update_report(report_id: str, request: Request, body: UpdateReportRequ
 
     logger.info(
         f"[REPORT_HISTORY] 报告已更新 | report_id={report_id} | "
-        f"user={user_code} | object_name={object_name} | file_size={file_size}"
+        f"login_name={login_name} | object_name={object_name} | file_size={file_size}"
     )
     return UpdateReportResponse(
         success=True, object_name=object_name, file_size=file_size
@@ -284,15 +284,15 @@ async def report_chat(report_id: str, request: Request, body: ReportChatRequest)
 
     report_id 支持 UUID 或 thread_id。
     """
-    user_code = _get_current_user_code(request)
-    record = await _resolve_report_record(report_id, user_code)
+    login_name = _get_current_login_name(request)
+    record = await _resolve_report_record(report_id, login_name)
 
     # 读取报告内容（record.id 是数据库 UUID，直接读取 MinIO）
-    report_content, title, _ = await _read_report_content(record.id, user_code)
+    report_content, title, _ = await _read_report_content(record.id, login_name)
 
     logger.info(
         f"[REPORT_CHAT] 发起直连对话 | report_id={report_id} | "
-        f"user={user_code} | title={title[:50]} | message={body.message[:80]}"
+        f"login_name={login_name} | title={title[:50]} | message={body.message[:80]}"
     )
 
     thread_id = str(uuid.uuid4())
