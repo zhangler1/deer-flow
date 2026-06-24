@@ -111,23 +111,23 @@ def build_reference_index(observations: list[str], url_whitelist: set[str] | Non
 
     # 打印索引列表日志
     if use_whitelist:
-        logger.info(
+        enhanced_logger.logger.info(
             f"\n{'='*60}\n"
             f"全局来源索引（已白名单过滤）| 最终收录: {len(seen_urls)} 条 | "
             f"白名单总量: {len(url_whitelist)} | 被过滤: {len(set(filtered_out_urls))} 条\n"
             f"{'='*60}"
         )
     else:
-        logger.info(f"\n{'='*60}\n全局来源索引（共 {len(seen_urls)} 条）\n{'='*60}")
+        enhanced_logger.logger.info(f"\n{'='*60}\n全局来源索引（共 {len(seen_urls)} 条）\n{'='*60}")
     for url, info in seen_urls.items():
-        logger.info(f"  [{info['index']}] {info['title']} -> {url}")
+        enhanced_logger.logger.info(f"  [{info['index']}] {info['title']} -> {url}")
     # 打印被过滤的 URL（去重后取前 20 条，避免日志暴涨）
     if use_whitelist and filtered_out_urls:
         unique_filtered = list(dict.fromkeys(filtered_out_urls))[:20]
-        logger.info(f"\n--- 被白名单过滤跳过的 URL（共 {len(set(filtered_out_urls))} 条，仅显示前 {len(unique_filtered)} 条）---")
+        enhanced_logger.logger.info(f"\n--- 被白名单过滤跳过的 URL（共 {len(set(filtered_out_urls))} 条，仅显示前 {len(unique_filtered)} 条）---")
         for u in unique_filtered:
-            logger.info(f"  [FILTERED] {u}")
-    logger.info(f"{'='*60}")
+            enhanced_logger.logger.info(f"  [FILTERED] {u}")
+    enhanced_logger.logger.info(f"{'='*60}")
 
     return index_text, seen_urls
 
@@ -216,7 +216,7 @@ def _build_url_whitelist_from_messages(messages) -> set[str]:
             if isinstance(url, str) and url.strip():
                 whitelist.add(url.strip())
 
-    logger.info(
+    enhanced_logger.logger.info(
         f"📋 URL_WHITELIST | 从 ToolMessage 构建白名单 | "
         f"工具消息数: {tool_msg_count} | 解析失败: {parse_fail_count} | 白名单 URL 总数: {len(whitelist)}"
     )
@@ -310,7 +310,7 @@ def normalize_citations(content: str, ref_map: dict) -> str:
     content = re.sub(r'\[\[(\d+)\]\]', _replace_double_bracket, content)
 
     if fix_count > 0:
-        logger.info(f"[normalize_citations] 修正了 {fix_count} 处引用格式")
+        enhanced_logger.logger.info(f"[normalize_citations] 修正了 {fix_count} 处引用格式")
 
     return content
 
@@ -534,12 +534,12 @@ async def reporter_node(state: State, config: RunnableConfig):
         reference_index_list.sort(key=lambda x: x["index"])
         enhanced_logger.logger.info(f"📚 REFERENCE_INDEX_OUTPUT | 参考文献索引已构建 | 条数: {len(reference_index_list)}")
         # 打印完整索引列表，便于核对链接与编号
-        logger.info(
+        enhanced_logger.logger.info(
             f"\n{'='*60}\n后端传递给前端的 reference_index 列表（共 {len(reference_index_list)} 条）\n{'='*60}"
         )
         for item in reference_index_list:
-            logger.info(f"  [{item['index']:>3}] {item['title']} -> {item['url']}")
-        logger.info(f"{'='*60}")
+            enhanced_logger.logger.info(f"  [{item['index']:>3}] {item['title']} -> {item['url']}")
+        enhanced_logger.logger.info(f"{'='*60}")
 
     return {
         "final_report": response_content,
