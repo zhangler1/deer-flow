@@ -22,9 +22,14 @@ RESEARCH_SKILLS_LIST = [
     "description": "企业商机数据分析和产品匹配,包括股权质押、专利、中标、分红、资质审批等商机信息,以及银行产品推荐"
   },
   {
-    "name": "舆情分析",
-    "filepath": "src/prompts/business_marketing/research_skills/舆情分析.md",
-    "description": "基于舆情数据分析企业声誉风险和潜在影响"
+    "name": "舆情风险分析(一)",
+    "filepath": "src/prompts/business_marketing/research_skills/舆情风险分析(一).md",
+    "description": "检索和分析企业高危硬风险舆情数据,包括法律诉讼、债务担保、监管处罚、股票债券风险、财务风险等维度"
+  },
+  {
+    "name": "舆情风险分析(二)",
+    "filepath": "src/prompts/business_marketing/research_skills/舆情风险分析(二).md",
+    "description": "检索和分析企业治理与经营软风险舆情数据,包括人员变动、股东控制权、经营资质、审计意见、重大交易等维度"
   },
   {
     "name": "区域经济环境分析",
