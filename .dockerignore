@@ -47,3 +47,19 @@ examples/
 assets/
 tests/
 *.log
+
+# Large files not needed in image
+scripts/
+.git/
+.gitignore
+.langgraph_api/
+.pytest_cache/
+.qoder/
+.lingma/
+logs/
+svgs/
+langfuse/
+.SQL/
+init-scripts/
+stresstest/
+*.patch
