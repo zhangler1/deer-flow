@@ -211,6 +211,18 @@ export function setEnableBackgroundInvestigation(value: boolean) {
 }
 
 /**
+ * userInfo 就绪 Promise：API 调用可 await 此 Promise，确保 X-User-Info 头已可用。
+ * - setUserInfo 被调用时立即 resolve
+ * - 若 globalInfo() 始终未返回（如外网环境），3 秒后超时 resolve，避免请求永久挂起
+ */
+let _resolveUserInfoReady: () => void;
+export const userInfoReady: Promise<void> = new Promise<void>((resolve) => {
+  _resolveUserInfoReady = resolve;
+});
+// 超时兆底：globalInfo 不可用时 3s 后放行，API 调用降级走 cookie 认证
+setTimeout(() => _resolveUserInfoReady?.(), 3000);
+
+/**
  * 存储 GuipAPI globalInfo 返回的完整用户信息。
  * 由 GuwpTokenInitializer 在页面加载时调用，将 userInfo 写入 settings store，
  * 后续请求通过 X-User-Info 请求头直传给后端。
@@ -219,5 +231,6 @@ export function setUserInfo(userInfo: GuipUserInfo | null) {
   useSettingsStore.setState((state) => ({
     tokens: { ...state.tokens, userInfo },
   }));
+  _resolveUserInfoReady?.();
 }
 loadSettings();

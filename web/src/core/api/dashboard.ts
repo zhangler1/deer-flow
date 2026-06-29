@@ -9,13 +9,15 @@
 import { resolveServiceURL } from "./resolve-service-url";
 import { fetchStream } from "../sse";
 import type { ChatEvent } from "./types";
-import { useSettingsStore } from "../store/settings-store";
+import { useSettingsStore, userInfoReady } from "../store/settings-store";
 
 /**
  * 从 settings store 读取 userInfo，构造 X-User-Info 请求头。
- * 所有 dashboard API 调用都应合并此头，使后端无需降级走 cookie → queryUserInfo。
+ * await userInfoReady 确保 GuipAPI globalInfo 已就绪，避免组件 mount 时发请求早于 userInfo 写入。
+ * 超时 3s 后自动降级（globalInfo 不可用时走 cookie 认证）。
  */
-function authHeaders(): Record<string, string> {
+async function authHeaders(): Promise<Record<string, string>> {
+  await userInfoReady;
   const userInfo = useSettingsStore.getState().tokens.userInfo;
   if (!userInfo) return {};
   return { "X-User-Info": encodeURIComponent(JSON.stringify(userInfo)) };
@@ -85,14 +87,14 @@ export async function fetchDailyStats(
   if (endDate) params.set("end_date", endDate);
 
   const url = resolveServiceURL(`dashboard/stats/daily?${params.toString()}`);
-  const resp = await fetch(url, { credentials: "include", headers: authHeaders() });
+  const resp = await fetch(url, { credentials: "include", headers: await authHeaders() });
   if (!resp.ok) throw new Error(`Failed to fetch daily stats: ${resp.status}`);
   return resp.json();
 }
 
 export async function fetchSummary(): Promise<DashboardSummary> {
   const url = resolveServiceURL("dashboard/stats/summary");
-  const resp = await fetch(url, { credentials: "include", headers: authHeaders() });
+  const resp = await fetch(url, { credentials: "include", headers: await authHeaders() });
   if (!resp.ok) throw new Error(`Failed to fetch summary: ${resp.status}`);
   return resp.json();
 }
@@ -116,14 +118,14 @@ export async function fetchReports(params: {
   if (params.end_date) searchParams.set("end_date", params.end_date);
 
   const url = resolveServiceURL(`dashboard/reports?${searchParams.toString()}`);
-  const resp = await fetch(url, { credentials: "include", headers: authHeaders() });
+  const resp = await fetch(url, { credentials: "include", headers: await authHeaders() });
   if (!resp.ok) throw new Error(`Failed to fetch reports: ${resp.status}`);
   return resp.json();
 }
 
 export async function fetchCurrentUser(): Promise<UserInfo> {
   const url = resolveServiceURL("dashboard/user/me");
-  const resp = await fetch(url, { credentials: "include", headers: authHeaders() });
+  const resp = await fetch(url, { credentials: "include", headers: await authHeaders() });
   if (!resp.ok) throw new Error(`Failed to fetch user: ${resp.status}`);
   return resp.json();
 }
@@ -158,14 +160,14 @@ export async function fetchMyReports(params: {
   if (params.end_date) searchParams.set("end_date", params.end_date);
 
   const url = resolveServiceURL(`reports/my?${searchParams.toString()}`);
-  const resp = await fetch(url, { credentials: "include", headers: authHeaders() });
+  const resp = await fetch(url, { credentials: "include", headers: await authHeaders() });
   if (!resp.ok) throw new Error(`Failed to fetch my reports: ${resp.status}`);
   return resp.json();
 }
 
 export async function fetchReportContent(reportId: string): Promise<ReportContentResponse> {
   const url = resolveServiceURL(`reports/${reportId}/content`);
-  const resp = await fetch(url, { credentials: "include", headers: authHeaders() });
+  const resp = await fetch(url, { credentials: "include", headers: await authHeaders() });
   if (!resp.ok) throw new Error(`Failed to fetch report content: ${resp.status}`);
   return resp.json();
 }
@@ -175,7 +177,7 @@ export async function continueReport(reportId: string): Promise<ContinueReportRe
   const resp = await fetch(url, {
     method: "POST",
     credentials: "include",
-    headers: authHeaders(),
+    headers: await authHeaders(),
   });
   if (!resp.ok) throw new Error(`Failed to continue report: ${resp.status}`);
   return resp.json();
@@ -195,7 +197,7 @@ export async function saveReportContent(
   const resp = await fetch(url, {
     method: "PUT",
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({ content }),
   });
   if (!resp.ok) throw new Error(`Failed to save report: ${resp.status}`);
@@ -218,6 +220,7 @@ export async function* reportChatStream(
   options?: { abortSignal?: AbortSignal },
 ): AsyncGenerator<ChatEvent> {
   const url = resolveServiceURL(`reports/${reportId}/chat`);
+  const headers = await authHeaders();
   const stream = fetchStream(url, {
     body: JSON.stringify({
       message,
@@ -225,7 +228,7 @@ export async function* reportChatStream(
       reporter_model: params?.reporter_model ?? "",
     }),
     signal: options?.abortSignal,
-    headers: authHeaders(),
+    headers,
   });
 
   for await (const event of stream) {
