@@ -272,6 +272,7 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                 system_context=system_context,
                 force_routing_path=request.force_routing_path,
                 guwp_token=request.guwp_token,
+                user_info=raw_request.state.user_info,
                 use_budget_controlled_online_search=request.use_budget_controlled_online_search if request.use_budget_controlled_online_search is not None else True,
                 use_budget_controlled_bocom_search=request.use_budget_controlled_bocom_search if request.use_budget_controlled_bocom_search is not None else True,
                 cancel_event=cancel_event,
@@ -1119,6 +1120,7 @@ async def _astream_workflow_generator(
     system_context: str = "",  # 系统背景上下文
     force_routing_path: str = None,  # 🐛 调试模式：强制路由路径
     guwp_token: Optional[str] = None,
+    user_info=None,  # UserInfo 对象，来自 auth_middleware（request.state.user_info）
     use_budget_controlled_online_search: bool = True,  # 是否使用预算控制的在线搜索
     use_budget_controlled_bocom_search: bool = True,  # 是否使用预算控制的交行搜索
     cancel_event: asyncio.Event = None,  # 客户端断连取消信号
@@ -1253,21 +1255,27 @@ async def _astream_workflow_generator(
     # psycopg 级别的 kwargs（如 autocommit / row_factory / prepare_threshold），
     # 内部已自动启用 autocommit=True。如需自定义连接参数，
     # 请改用 AsyncConnectionPool + AsyncPostgresSaver(pool)。
-    # ─── 解析用户信息（从 auth_middleware 缓存获取，避免重复调用 API）───
+    # ─── 解析用户信息（直接从 auth_middleware 注入的 request.state.user_info 获取）───
     _user_code = ""
     _user_name = ""
     _branch_id = None
     _login_name = ""
     _linked_org_name = ""
-    if guwp_token:
-        from src.server.auth_middleware import _get_cached_user
-        cached = _get_cached_user(guwp_token)
-        if cached and cached.is_authenticated:
-            _user_code = cached.user_code
-            _user_name = cached.user_name
-            _branch_id = cached.branch_id
-            _login_name = cached.login_name
-            _linked_org_name = cached.linked_org_name
+    if user_info and user_info.is_authenticated:
+        _user_code = user_info.user_code
+        _user_name = user_info.user_name
+        _branch_id = user_info.branch_id
+        _login_name = user_info.login_name
+        _linked_org_name = user_info.linked_org_name
+        logger.info(
+            f"[REPORT_USER_INFO] source={user_info.source} | login_name={_login_name} | "
+            f"user_code={_user_code} | user_name={_user_name} | branch_id={_branch_id}"
+        )
+    else:
+        logger.warning(
+            f"[REPORT_USER_INFO] 用户信息未认证 | user_info={'None' if user_info is None else 'not_authenticated'} | "
+            f"guwp_token={'有' if guwp_token else '无'} | 报告将以空用户信息保存"
+        )
 
     _stream_start = time.time()
 
@@ -1816,7 +1824,7 @@ def generate_conversation_id(
 # 该接口功能被更强大的 /api/research/simple/stream 替代
 
 @app.post("/api/research/simple/stream")
-async def simple_research_stream(request: SimpleResearchRequest):
+async def simple_research_stream(request: SimpleResearchRequest, raw_request: Request):
     """
     简化流式研究接口：使用完整的 LangGraph 工作流，返回原生SSE格式
     
@@ -1851,7 +1859,8 @@ async def simple_research_stream(request: SimpleResearchRequest):
     return StreamingResponse(
         _full_workflow_sse_generator(
             request=request,
-            thread_id=thread_id
+            thread_id=thread_id,
+            user_info=raw_request.state.user_info,
         ),
         media_type="text/event-stream",
         headers={
@@ -1919,7 +1928,8 @@ async def simple_research_stream_openai(request: SimpleResearchRequest):
 
 async def _full_workflow_sse_generator(
     request: SimpleResearchRequest,
-    thread_id: str
+    thread_id: str,
+    user_info=None,  # UserInfo 对象，来自 auth_middleware
 ):
     """
     完整工作流SSE生成器：使用完整的 LangGraph 工作流，返回原生SSE格式事件流
@@ -1973,7 +1983,8 @@ async def _full_workflow_sse_generator(
             enable_deep_thinking=request.enable_deep_thinking or False,
                         reporter_model=request.reporter_model or "",
             system_context=get_str_env("SYSTEM_CONTEXT", ""),  # 从环境变量读取
-            force_routing_path=request.force_routing_path,  # 🐛 调试模式：支持测试迭代研究
+            force_routing_path=request.force_routing_path,  # 🐛 调试模式：支持测试强制路由
+            user_info=user_info,
         ):
             yield event
             
