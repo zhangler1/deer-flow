@@ -10,10 +10,14 @@
 #
 #   同时叠加 Mock：
 #     docker compose -f docker-compose.uat.yml -f docker-compose.local.yml -f docker-compose.easyparse.yml up -d
+# 
+# curl -X POST http://localhost:5000/convert \
+#   -F "file=@/path/to/your/presentation.pptx" \
+#   -F "imgNum=0" \
 # ===========================================================
 
 services:
-  easyparse-1:
+  easyparse:
     image: easyparse:latest
     container_name: deer-flow-easyparse-1
     # volumes:
@@ -34,8 +38,8 @@ services:
       - LOG_DIR=${LOG_DIR:-/tmp/shared_all/logs}
       - LIMIT_MAX_REQUESTS=${LIMIT_MAX_REQUESTS:-200}
       - TIMEOUT_GRACEFUL_SHUTDOWN=${TIMEOUT_GRACEFUL_SHUTDOWN:-30}
-    expose:
-      - "5000"
+    ports:
+      - "5000:5000"
     restart: unless-stopped
     networks:
       - deer-flow-network
@@ -56,57 +60,20 @@ services:
       --workers ${SERVER_WORKERS:-4}
       --limit-max-requests ${LIMIT_MAX_REQUESTS:-200}
       --timeout-graceful-shutdown ${TIMEOUT_GRACEFUL_SHUTDOWN:-30}
-  easyparse-2:
-    image: easyparse:latest
-    container_name: deer-flow-easyparse-2
-    # volumes:
-    #   - ../easyparse/routers:/app/routers
-    #   - ../easyparse/md2word:/app/md2word
-    #   - ../easyparse/utils:/app/utils
-    #   - ../easyparse/server.py:/app/server.py:ro
-    #   - ../easyparse/log_manager.py:/app/log_manager.py:ro
-    #   - ../easyparse/config.py:/app/config.py:ro
-    environment:
-      - PYTHONUNBUFFERED=1
-    expose:
-      - "5000"
-    restart: unless-stopped
-    networks:
-      - deer-flow-network
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import socket;s=socket.socket();s.settimeout(3);s.connect(('127.0.0.1',5000));s.close()",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    command: >
-      --port 5000
-      --workers ${SERVER_WORKERS:-4}
-      --limit-max-requests ${LIMIT_MAX_REQUESTS:-200}
-      --timeout-graceful-shutdown ${TIMEOUT_GRACEFUL_SHUTDOWN:-30}
-
   # 覆盖 backend：注入 EasyParse 环境变量
   backend:
     environment:
       - EASYPARSE_SERVICE_URL=http://nginx
     depends_on:
-      easyparse-1:
+      easyparse:
         condition: service_healthy
-      easyparse-2:
-        condition: service_healthy
+
 
   # 覆盖 nginx：挂载 EasyParse 的 upstream 和 location 配置
   nginx:
     volumes:
       - ./nginx/conf.d/easypase.conf:/etc/nginx/conf.d/easypase.conf:ro
     depends_on:
-      easyparse-1:
+      easyparse:
         condition: service_healthy
-      easyparse-2:
-        condition: service_healthy
+
