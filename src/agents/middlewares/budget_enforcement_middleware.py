@@ -141,20 +141,33 @@ class BudgetEnforcementMiddleware(AgentMiddleware):
         call_next: Callable,
         context: dict,
     ) -> ToolMessage:
-        # 未启用或非受控工具：直接放行
+        # 未启用时直接放行
         if not self.config.enabled or self._budget is None:
-            return await call_next(tool_name, tool_args, tool_call_id)
-        if tool_name not in self.config.controlled_tool_names:
             return await call_next(tool_name, tool_args, tool_call_id)
 
         # ── 0. 注入 guwp_token（vector_search 需要，从 state 读取） ──
-        # vector_search 已去掉实例属性，改为每次调用时由中间件从 context.input 注入
+        # ⚠️ 必须在 controlled_tool_names 检查之前执行，否则当 vector_search 不在白名单时 token 不会被注入
         if tool_name == "vector_search":
             input_state = context.get("input", {})
             if isinstance(input_state, dict):
                 guwp_token = input_state.get("guwp_token")
+                token_preview = (guwp_token[:8] + "...") if guwp_token and len(guwp_token) > 8 else guwp_token
                 if guwp_token:
                     tool_args["guwp_token"] = guwp_token
+                    logger.info(
+                        f"🔑 BudgetEnforcement | inject guwp_token | tool={tool_name} | "
+                        f"token={token_preview} | token_len={len(guwp_token)}"
+                    )
+                else:
+                    logger.warning(
+                        f"⚠️ BudgetEnforcement | guwp_token 为空 | tool={tool_name} | "
+                        f"input_state keys={list(input_state.keys())} | "
+                        f"将依赖环境变量 GUWP_TOKEN 兜底"
+                    )
+
+        # 非受控工具：直接放行（token 已注入，不影响 vector_search）
+        if tool_name not in self.config.controlled_tool_names:
+            return await call_next(tool_name, tool_args, tool_call_id)
 
         self._total_calls += 1
         budget = self._budget
