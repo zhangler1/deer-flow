@@ -327,7 +327,7 @@ async def reporter_node(state: State, config: RunnableConfig):
     current_plan = state.get("current_plan")
     
     # 处理 current_plan 的类型差异
-    if hasattr(current_plan, 'title') and hasattr(current_plan, 'thought'):
+    if not isinstance(current_plan, (str, dict)) and hasattr(current_plan, 'title') and hasattr(current_plan, 'thought'):
         plan_title = current_plan.title
         plan_thought = current_plan.thought
     elif isinstance(current_plan, dict):

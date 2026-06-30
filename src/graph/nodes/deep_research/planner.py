@@ -304,7 +304,7 @@ def human_feedback_node(
     
     try:
         # 检查 current_plan 的类型
-        if hasattr(current_plan, 'title') and hasattr(current_plan, 'steps'):
+        if not isinstance(current_plan, (str, dict)) and hasattr(current_plan, 'title') and hasattr(current_plan, 'steps'):
             # current_plan 已经是 Plan 对象
             enhanced_logger.logger.info("📋 PLAN_OBJECT_DETECTED | 检测到Plan对象，直接验证")
             validated_plan = current_plan

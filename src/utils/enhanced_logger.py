@@ -312,7 +312,7 @@ class EnhancedLogger:
             if key in state:
                 if key == 'messages':
                     formatted[key] = f"消息数量: {len(state[key])}"
-                elif key == 'current_plan' and hasattr(state[key], 'title'):
+                elif key == 'current_plan' and not isinstance(state[key], (str, dict)) and hasattr(state[key], 'title'):
                     formatted[key] = f"计划: {state[key].title}"
                 else:
                     formatted[key] = str(state[key])[:100] + "..." if len(str(state[key])) > 100 else state[key]
