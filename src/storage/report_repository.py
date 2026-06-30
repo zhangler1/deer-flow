@@ -110,8 +110,17 @@ async def ensure_table():
             VALUES ('admin', '系统管理员')
             ON CONFLICT DO NOTHING;
         """)
+        # 幂等新增 token 追踪 + 逻辑删除字段
+        await conn.execute("""
+            ALTER TABLE reports
+                ADD COLUMN IF NOT EXISTS researcher_chars BIGINT DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS reporter_chars   BIGINT DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS estimated_tokens BIGINT DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS is_deleted       BOOLEAN DEFAULT FALSE;
+            CREATE INDEX IF NOT EXISTS idx_reports_is_deleted ON reports(is_deleted);
+        """)
         await conn.commit()
-    logger.info("reports 表已确认存在（含 object_name 字段）")
+    logger.info("reports 表已确认存在（含 object_name / token_tracking / is_deleted 字段）")
 
 
 # ─── 权限查询 ───
@@ -142,8 +151,9 @@ async def save_report(report: ReportRecord) -> UUID:
             await cur.execute(
                 """
                 INSERT INTO reports (thread_id, user_code, user_name, branch_id, login_name, linked_org_name,
-                                     title, duration_ms, report_url, object_name, file_size, report_type, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                     title, duration_ms, report_url, object_name, file_size, report_type, status,
+                                     researcher_chars, reporter_chars, estimated_tokens)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -160,22 +170,26 @@ async def save_report(report: ReportRecord) -> UUID:
                     report.file_size,
                     report.report_type,
                     report.status,
+                    report.researcher_chars or 0,
+                    report.reporter_chars or 0,
+                    report.estimated_tokens or 0,
                 ),
             )
             row = await cur.fetchone()
             await conn.commit()
             report_id = row[0]
-            logger.info(f"报告元数据已保存 | id={report_id} | thread_id={report.thread_id} | title={report.title[:50]} | login_name={report.login_name}")
+            logger.info(f"报告元数据已保存 | id={report_id} | thread_id={report.thread_id} | title={report.title[:50]} | login_name={report.login_name} | est_tokens={report.estimated_tokens}")
             return report_id
 
 
 async def get_report_by_id(report_id: UUID) -> Optional[ReportRecord]:
-    """根据 ID 获取报告详情"""
+    """根据 ID 获取报告详情（排除已逻辑删除）"""
     pool = await _get_pool()
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
-                "SELECT * FROM reports WHERE id = %s", (str(report_id),)
+                "SELECT * FROM reports WHERE id = %s AND (is_deleted = FALSE OR is_deleted IS NULL)",
+                (str(report_id),),
             )
             row = await cur.fetchone()
             if row is None:
@@ -184,13 +198,14 @@ async def get_report_by_id(report_id: UUID) -> Optional[ReportRecord]:
 
 
 async def get_report_by_thread_id(thread_id: str, login_name: str) -> Optional[ReportRecord]:
-    """根据 thread_id 获取最新一条已完成报告的详情（含权限校验）"""
+    """根据 thread_id 获取最新一条已完成报告的详情（含权限校验，排除已逻辑删除）"""
     pool = await _get_pool()
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
                 "SELECT * FROM reports WHERE thread_id = %s AND login_name = %s "
-                "AND status = 'completed' ORDER BY created_at DESC LIMIT 1",
+                "AND status = 'completed' AND (is_deleted = FALSE OR is_deleted IS NULL) "
+                "ORDER BY created_at DESC LIMIT 1",
                 (thread_id, login_name),
             )
             row = await cur.fetchone()
@@ -226,7 +241,7 @@ async def get_reports_by_user(
         async with conn.cursor() as cur:
             # 总数
             await cur.execute(
-                "SELECT COUNT(*) FROM reports WHERE login_name = %s",
+                "SELECT COUNT(*) FROM reports WHERE login_name = %s AND (is_deleted = FALSE OR is_deleted IS NULL)",
                 (login_name,),
             )
             total = (await cur.fetchone())[0]
@@ -234,7 +249,7 @@ async def get_reports_by_user(
             # 分页数据
             await cur.execute(
                 """
-                SELECT * FROM reports WHERE login_name = %s
+                SELECT * FROM reports WHERE login_name = %s AND (is_deleted = FALSE OR is_deleted IS NULL)
                 ORDER BY created_at DESC
                 LIMIT %s OFFSET %s
                 """,
@@ -285,6 +300,9 @@ async def get_reports_paginated(
         conditions.append("title ILIKE %s")
         params.append(f"%{keyword}%")
 
+    # 逻辑删除过滤（基础条件，始终追加）
+    conditions.append("(is_deleted = FALSE OR is_deleted IS NULL)")
+
     where_clause = " AND ".join(conditions) if conditions else "1=1"
 
     async with pool.connection() as conn:
@@ -322,11 +340,12 @@ async def get_daily_statistics(
     Returns:
         每日统计列表
     """
+    _NOT_DELETED_DS = "(is_deleted = FALSE OR is_deleted IS NULL)"
     pool = await _get_pool()
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
-                """
+                f"""
                 SELECT
                     DATE(created_at) as report_date,
                     COUNT(*) as count,
@@ -334,6 +353,7 @@ async def get_daily_statistics(
                     AVG(duration_ms)::BIGINT as avg_duration_ms
                 FROM reports
                 WHERE created_at >= %s AND created_at < %s::date + interval '1 day'
+                  AND {_NOT_DELETED_DS}
                 GROUP BY DATE(created_at)
                 ORDER BY report_date
                 """,
@@ -353,40 +373,41 @@ async def get_daily_statistics(
 
 async def get_summary() -> DashboardSummary:
     """获取看板汇总数据（仅统计已完成的报告）"""
+    _NOT_DELETED = "(is_deleted = FALSE OR is_deleted IS NULL)"
     pool = await _get_pool()
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
-            # 总报告数（仅已完成）
-            await cur.execute("SELECT COUNT(*) FROM reports WHERE status = 'completed'")
+            # 总报告数（仅已完成，未删除）
+            await cur.execute(f"SELECT COUNT(*) FROM reports WHERE status = 'completed' AND {_NOT_DELETED}")
             total_reports = (await cur.fetchone())[0]
 
-            # 今日报告数（仅已完成）
+            # 今日报告数（仅已完成，未删除）
             await cur.execute(
-                "SELECT COUNT(*) FROM reports WHERE DATE(created_at) = CURRENT_DATE AND status = 'completed'"
+                f"SELECT COUNT(*) FROM reports WHERE DATE(created_at) = CURRENT_DATE AND status = 'completed' AND {_NOT_DELETED}"
             )
             today_reports = (await cur.fetchone())[0]
 
-            # 本月报告数（仅已完成）
+            # 本月报告数（仅已完成，未删除）
             await cur.execute(
-                "SELECT COUNT(*) FROM reports WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE) AND status = 'completed'"
+                f"SELECT COUNT(*) FROM reports WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE) AND status = 'completed' AND {_NOT_DELETED}"
             )
             month_reports = (await cur.fetchone())[0]
 
-            # 月活用户（近 30 天内生成过报告的去重用户数）
+            # 月活用户（近 30 天内生成过报告的去重用户数，未删除）
             await cur.execute(
-                "SELECT COUNT(DISTINCT login_name) FROM reports WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'"
+                f"SELECT COUNT(DISTINCT login_name) FROM reports WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' AND {_NOT_DELETED}"
             )
             mau = (await cur.fetchone())[0]
 
-            # 日活用户（今日生成过报告的去重用户数）
+            # 日活用户（今日生成过报告的去重用户数，未删除）
             await cur.execute(
-                "SELECT COUNT(DISTINCT login_name) FROM reports WHERE DATE(created_at) = CURRENT_DATE"
+                f"SELECT COUNT(DISTINCT login_name) FROM reports WHERE DATE(created_at) = CURRENT_DATE AND {_NOT_DELETED}"
             )
             dau = (await cur.fetchone())[0]
 
-            # 平均耗时（仅已完成的报告）
+            # 平均耗时（仅已完成的报告，未删除）
             await cur.execute(
-                "SELECT COALESCE(AVG(duration_ms)::BIGINT, 0) FROM reports WHERE duration_ms IS NOT NULL AND status = 'completed'"
+                f"SELECT COALESCE(AVG(duration_ms)::BIGINT, 0) FROM reports WHERE duration_ms IS NOT NULL AND status = 'completed' AND {_NOT_DELETED}"
             )
             avg_duration_ms = (await cur.fetchone())[0]
 
@@ -398,6 +419,27 @@ async def get_summary() -> DashboardSummary:
                 dau=dau,
                 avg_duration_ms=avg_duration_ms,
             )
+
+
+# ─── 逻辑删除 ───
+
+async def soft_delete_report(report_id: UUID, login_name: str) -> bool:
+    """逻辑删除报告（标记 is_deleted=TRUE），返回是否成功删除了记录"""
+    pool = await _get_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE reports SET is_deleted = TRUE, updated_at = NOW() "
+                "WHERE id = %s AND login_name = %s AND (is_deleted = FALSE OR is_deleted IS NULL)",
+                (str(report_id), login_name),
+            )
+            affected = cur.rowcount
+            await conn.commit()
+            if affected > 0:
+                logger.info(f"报告已逻辑删除 | id={report_id} | login_name={login_name}")
+            else:
+                logger.warning(f"报告逻辑删除无影响 | id={report_id} | login_name={login_name}（不存在或已删除）")
+            return affected > 0
 
 
 # ─── 平均耗时查询 ───

@@ -5,7 +5,7 @@
 /**
  * 报告列表表格组件
  *
- * 展示报告列表，支持分页、跳转报告地址。
+ * 展示报告列表，支持分页、Token 列。
  */
 
 import type { ReportListResponse } from "~/core/api/dashboard";
@@ -13,6 +13,17 @@ import type { ReportListResponse } from "~/core/api/dashboard";
 interface ReportTableProps {
   data: ReportListResponse;
   onPageChange: (page: number) => void;
+}
+
+/**
+ * 格式化 token 数量（>= 1000 显示为 "xk"）
+ */
+function formatTokens(tokens: number | null | undefined): string {
+  if (tokens == null || tokens <= 0) return "-";
+  if (tokens >= 1000) {
+    return `${(tokens / 1000).toFixed(1)}k`;
+  }
+  return String(tokens);
 }
 
 export function ReportTable({ data, onPageChange }: ReportTableProps) {
@@ -63,6 +74,7 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
               <th className="px-4 py-3">标题</th>
               <th className="px-4 py-3">类型</th>
               <th className="px-4 py-3">状态</th>
+              <th className="px-4 py-3">Token</th>
               <th className="px-4 py-3">耗时</th>
               <th className="px-4 py-3">生成时间</th>
               <th className="px-4 py-3">操作</th>
@@ -104,6 +116,22 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
                       {report.status}
                     </span>
                   )}
+                </td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                  <span
+                    className={
+                      (report.estimated_tokens ?? 0) > 10000
+                        ? "font-medium text-orange-600 dark:text-orange-400"
+                        : ""
+                    }
+                    title={
+                      report.estimated_tokens
+                        ? `${report.estimated_tokens.toLocaleString()} tokens`
+                        : "暂无数据"
+                    }
+                  >
+                    {formatTokens(report.estimated_tokens)}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                   {formatDuration(report.duration_ms)}

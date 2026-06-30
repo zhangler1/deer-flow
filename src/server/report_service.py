@@ -39,6 +39,8 @@ async def handle_report_completed(
     status: str = "completed",
     start_timestamp: Optional[float] = None,
     end_timestamp: Optional[float] = None,
+    researcher_chars: int = 0,
+    reporter_chars: int = 0,
 ):
     """报告生成完成后的异步处理
 
@@ -59,6 +61,8 @@ async def handle_report_completed(
         status: 报告状态（completed/cancelled/failed）
         start_timestamp: 报告生成起始时间戳 (Unix timestamp)
         end_timestamp: 报告生成结束时间戳 (Unix timestamp)
+        researcher_chars: researcher 节点总输出字符数
+        reporter_chars: reporter 节点总输出字符数
     """
     # 打印起始时间和结束时间（北京时间）
     start_time_str = (
@@ -91,6 +95,10 @@ async def handle_report_completed(
         from src.storage import report_repository
         from src.storage.models import ReportRecord
 
+        # 计算估算 token 数（2.5 字符 ≈ 1 token，适用于中英文混合场景）
+        _total_chars = (researcher_chars or 0) + (reporter_chars or 0)
+        _estimated_tokens = int(_total_chars / 2.5) if _total_chars > 0 else 0
+
         record = ReportRecord(
             thread_id=thread_id,
             user_code=user_code,
@@ -105,6 +113,9 @@ async def handle_report_completed(
             file_size=file_size,
             report_type=report_type,
             status=status,
+            researcher_chars=researcher_chars,
+            reporter_chars=reporter_chars,
+            estimated_tokens=_estimated_tokens,
         )
         report_id = await report_repository.save_report(record)
         logger.info(

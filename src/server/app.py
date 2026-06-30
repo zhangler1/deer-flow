@@ -776,6 +776,10 @@ async def _stream_graph_events(
     _reporter_finished = False
     _report_cancelled = False  # 报告是否被用户取消
 
+    # ─── Token 追踪：累计 researcher / reporter 输出字符数 ───
+    _researcher_total_chars = 0  # researcher 节点所有 AIMessageChunk 的字符总数
+    _reporter_total_chars = 0    # reporter 节点所有 AIMessageChunk 的字符总数
+
     # 去重：记录已通过流式 chunk 发送过内容的消息 ID
     # LangGraph messages 流会发两次同一消息：1) LLM 流式 AIMessageChunk  2) 状态写回的完整 AIMessage
     # 前端 mergeMessage 用 += 拼接，如果不去重会导致内容翻倍
@@ -1026,6 +1030,14 @@ async def _stream_graph_events(
             ):
                 yield event
 
+            # ─── Token 追踪：仅从流式 AIMessageChunk 累加（避免 AIMessage 重复计入）───
+            if isinstance(message_chunk, AIMessageChunk) and hasattr(message_chunk, 'content') and message_chunk.content:
+                _chunk_len = len(message_chunk.content)
+                if agent_name == "researcher":
+                    _researcher_total_chars += _chunk_len
+                elif agent_name == "reporter":
+                    _reporter_total_chars += _chunk_len
+
             # ─── 检测 reporter 完成标志（通过 LLM finish_reason）───
             _msg_node_rt = message_metadata.get("langgraph_node", "") if isinstance(message_metadata, dict) else ""
             if (_msg_node_rt == "reporter" or agent_name == "reporter") and hasattr(message_chunk, 'content') and message_chunk.content:
@@ -1095,6 +1107,8 @@ async def _stream_graph_events(
                         status=report_status,
                         start_timestamp=stream_start_time,
                         end_timestamp=end_time,
+                        researcher_chars=_researcher_total_chars,
+                        reporter_chars=_reporter_total_chars,
                     )
                 except Exception as _report_err:
                     logger.error(f"[REPORT_SERVICE] 报告保存失败 | thread_id={thread_id} | {_report_err}")

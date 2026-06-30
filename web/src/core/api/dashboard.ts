@@ -56,6 +56,7 @@ export interface ReportRecord {
   file_size: number | null;
   report_type: string;
   status: string;
+  estimated_tokens: number | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -254,4 +255,3 @@ export async function* reportChatStream(
     }
   }
 }
-

@@ -29,6 +29,10 @@ class ReportRecord(BaseModel):
     file_size: Optional[int] = None
     report_type: str = "research"
     status: str = "completed"
+    researcher_chars: Optional[int] = 0   # researcher 节点总输出字符数
+    reporter_chars: Optional[int] = 0     # reporter 节点总输出字符数
+    estimated_tokens: Optional[int] = 0   # 估算 token = (researcher_chars + reporter_chars) / 2.5
+    is_deleted: Optional[bool] = False    # 逻辑删除标记
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
