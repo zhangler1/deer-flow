@@ -50,12 +50,12 @@ async def planner_node(
     _existing_plan = state.get("current_plan")
     _existing_plan_info = "None"
     if _existing_plan:
-        if hasattr(_existing_plan, 'title'):
-            _existing_plan_info = f"Plan对象(title='{_existing_plan.title}', steps={len(_existing_plan.steps)})"
-        elif isinstance(_existing_plan, str):
+        if isinstance(_existing_plan, str):
             _existing_plan_info = f"字符串(前100字={_existing_plan[:100]})"
         elif isinstance(_existing_plan, dict):
             _existing_plan_info = f"字典(title='{_existing_plan.get('title', 'N/A')}', steps={len(_existing_plan.get('steps', []))})"
+        elif hasattr(_existing_plan, 'title') and hasattr(_existing_plan, 'steps'):
+            _existing_plan_info = f"Plan对象(title='{_existing_plan.title}', steps={len(_existing_plan.steps)})"
     _state_messages = state.get("messages", [])
     _last_user_msg = ""
     for _m in reversed(_state_messages):
