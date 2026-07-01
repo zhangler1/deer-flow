@@ -19,7 +19,7 @@
 services:
   easyparse:
     image: easyparse:latest
-    container_name: deer-flow-easyparse-1
+    container_name: deer-flow-easyparse
     # volumes:
     #   - ../easyparse/routers:/app/routers
     #   - ../easyparse/md2word:/app/md2word
@@ -39,7 +39,7 @@ services:
       - LIMIT_MAX_REQUESTS=${LIMIT_MAX_REQUESTS:-200}
       - TIMEOUT_GRACEFUL_SHUTDOWN=${TIMEOUT_GRACEFUL_SHUTDOWN:-30}
     ports:
-      - "5000:5000"
+      - "5001:5000"
     restart: unless-stopped
     networks:
       - deer-flow-network
