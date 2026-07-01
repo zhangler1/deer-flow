@@ -10,7 +10,7 @@ import logging
 from datetime import date, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from src.storage import report_repository
 from src.storage.models import (
@@ -25,6 +25,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
+# ─── 权限依赖 ───
+
+async def require_admin(request: Request):
+    """FastAPI 依赖：验证当前用户是管理员，否则返回 403"""
+    user_info = getattr(request.state, "user_info", None)
+    if not user_info or not user_info.is_authenticated:
+        raise HTTPException(status_code=401, detail="未登录或认证已过期")
+    if not await report_repository.is_user_admin(user_info.login_name):
+        raise HTTPException(status_code=403, detail="无管理员权限")
+    return user_info
+
+
 @router.get("/stats/daily", response_model=list[DailyStat])
 async def get_daily_stats(
     start_date: Optional[str] = Query(
@@ -33,8 +45,9 @@ async def get_daily_stats(
     end_date: Optional[str] = Query(
         None, description="结束日期 (YYYY-MM-DD)，默认今天"
     ),
+    _=Depends(require_admin),
 ):
-    """按日期范围返回每日报告数量统计"""
+    """按日期范围返回每日报告数量统计（仅管理员）"""
     if not end_date:
         end_date = date.today().isoformat()
     if not start_date:
@@ -45,8 +58,8 @@ async def get_daily_stats(
 
 
 @router.get("/stats/summary", response_model=DashboardSummary)
-async def get_summary():
-    """总报告数、总用户数、平均耗时等汇总"""
+async def get_summary(_=Depends(require_admin)):
+    """总报告数、总用户数、平均耗时等汇总（仅管理员）"""
     summary = await report_repository.get_summary()
     return summary
 
@@ -60,8 +73,9 @@ async def get_reports(
     status: Optional[str] = Query(None, description="按状态筛选（completed/cancelled/failed）"),
     start_date: Optional[str] = Query(None, description="起始日期 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="结束日期 (YYYY-MM-DD)"),
+    _=Depends(require_admin),
 ):
-    """分页查询报告列表（支持按用户、姓名、日期、状态筛选）"""
+    """分页查询报告列表（仅管理员，支持按用户、姓名、日期、状态筛选）"""
     items, total = await report_repository.get_reports_paginated(
         page=page,
         page_size=page_size,
@@ -77,8 +91,8 @@ async def get_reports(
 
 
 @router.get("/reports/{report_id}", response_model=Optional[ReportRecord])
-async def get_report_detail(report_id: str):
-    """获取报告详情"""
+async def get_report_detail(report_id: str, _=Depends(require_admin)):
+    """获取报告详情（仅管理员）"""
     from uuid import UUID
 
     try:
@@ -91,14 +105,20 @@ async def get_report_detail(report_id: str):
 
 @router.get("/user/me")
 async def get_current_user(request: Request):
-    """获取当前用户信息（从认证中间件注入的 request.state 读取）"""
+    """获取当前用户信息（含 is_admin 权限标志）"""
     user_info = getattr(request.state, "user_info", None)
     if user_info is None:
         return {
             "user_code": "",
             "user_name": "匿名用户",
             "is_authenticated": False,
+            "is_admin": False,
         }
+    is_admin = (
+        await report_repository.is_user_admin(user_info.login_name)
+        if user_info.is_authenticated
+        else False
+    )
     return {
         "user_code": user_info.user_code,
         "user_name": user_info.user_name,
@@ -106,5 +126,6 @@ async def get_current_user(request: Request):
         "login_name": user_info.login_name,
         "device": user_info.device,
         "is_authenticated": user_info.is_authenticated,
-        "source": user_info.source,
+        "source": getattr(user_info, "source", ""),
+        "is_admin": is_admin,
     }

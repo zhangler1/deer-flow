@@ -3,14 +3,15 @@
 
 "use client";
 
-import { ChevronLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { BarChart3, ChevronLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { Tooltip } from "~/components/deer-flow/tooltip";
 import { Button } from "~/components/ui/button";
+import { fetchCurrentUser, type UserInfo } from "~/core/api/dashboard";
 import { useStore } from "~/core/store";
 
 import { Logo } from "../../components/deer-flow/logo";
@@ -33,6 +34,13 @@ export default function HomePage() {
   const drawerOpen = useStore((s) => s.drawerOpen);
   const toggleDrawer = useStore((s) => s.toggleDrawer);
   const viewingReportId = useStore((s) => s.viewingReportId);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetchCurrentUser()
+      .then((u) => setIsAdmin(u.is_admin === true))
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -79,7 +87,19 @@ export default function HomePage() {
           </Tooltip>
           <Logo />
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center gap-1">
+          {isAdmin && (
+            <Tooltip title="数据看板">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push("/dashboard")}
+                className="h-9 w-9"
+              >
+                <BarChart3 className="h-5 w-5" />
+              </Button>
+            </Tooltip>
+          )}
           {/* <Suspense>
             <SettingsDialog />
           </Suspense> */}

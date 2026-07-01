@@ -74,6 +74,7 @@ export interface UserInfo {
   login_name: string;
   device: string;
   is_authenticated: boolean;
+  is_admin: boolean;
 }
 
 // ─── API 函数 ───

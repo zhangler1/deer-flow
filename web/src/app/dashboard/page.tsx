@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { DailyChart } from "~/components/dashboard/daily-chart";
 import { ReportTable } from "~/components/dashboard/report-table";
@@ -28,17 +29,32 @@ import {
 
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
   const [reports, setReports] = useState<ReportListResponse | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   const [page, setPage] = useState(1);
   const [filterUserCode, setFilterUserCode] = useState("");
   const [filterUserName, setFilterUserName] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
+
+  // 先检查管理员权限，非管理员直接跳回首页
+  useEffect(() => {
+    fetchCurrentUser()
+      .then((u) => {
+        if (!u.is_admin) {
+          router.replace("/chat");
+        } else {
+          setAuthChecked(true);
+        }
+      })
+      .catch(() => router.replace("/chat"));
+  }, [router]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -69,8 +85,10 @@ export default function DashboardPage() {
   }, [page, filterUserCode, filterUserName, filterStatus, filterStartDate, filterEndDate]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (authChecked) {
+      loadData();
+    }
+  }, [authChecked, loadData]);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);

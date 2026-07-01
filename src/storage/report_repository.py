@@ -89,8 +89,47 @@ async def ensure_table():
         await conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_reports_login_name ON reports(login_name);
         """)
+        # 幂等创建角色权限表（管理员看板）
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS roles (
+                id          SERIAL PRIMARY KEY,
+                name        VARCHAR(32) NOT NULL UNIQUE,
+                description VARCHAR(128)
+            );
+            CREATE TABLE IF NOT EXISTS user_roles (
+                id          SERIAL PRIMARY KEY,
+                login_name  VARCHAR(64) NOT NULL,
+                role_name   VARCHAR(32) NOT NULL REFERENCES roles(name),
+                created_at  TIMESTAMP DEFAULT NOW(),
+                UNIQUE(login_name, role_name)
+            );
+        """)
+        # 预置管理员角色（幂等）
+        await conn.execute("""
+            INSERT INTO roles (name, description)
+            VALUES ('admin', '系统管理员')
+            ON CONFLICT DO NOTHING;
+        """)
         await conn.commit()
     logger.info("reports 表已确认存在（含 object_name 字段）")
+
+
+# ─── 权限查询 ───
+
+async def is_user_admin(login_name: str) -> bool:
+    """查询用户是否拥有 admin 角色"""
+    try:
+        pool = await _get_pool()
+        async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT 1 FROM user_roles WHERE login_name = %s AND role_name = 'admin' LIMIT 1",
+                    (login_name,),
+                )
+                return (await cur.fetchone()) is not None
+    except Exception as e:
+        logger.warning(f"查询管理员角色失败 | login_name={login_name} | {e}")
+        return False
 
 
 # ─── CRUD ───
