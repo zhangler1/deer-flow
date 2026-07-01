@@ -371,6 +371,8 @@ function transformPastedHTML(html: string) {
   try {
     const tempEl = document.createElement("div");
     tempEl.innerHTML = html;
+    // 移除 <style> 和 <script> 标签，防止从 Word 等富文本编辑器粘贴时带入格式信息
+    tempEl.querySelectorAll("style, script").forEach(el => el.remove());
 
     return tempEl.textContent || tempEl.innerText || "";
   } catch (error) {
