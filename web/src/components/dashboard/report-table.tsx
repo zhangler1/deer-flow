@@ -77,7 +77,6 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
               <th className="px-4 py-3">Token</th>
               <th className="px-4 py-3">耗时</th>
               <th className="px-4 py-3">生成时间</th>
-              <th className="px-4 py-3">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -138,20 +137,6 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
                 </td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                   {formatTime(report.created_at)}
-                </td>
-                <td className="px-4 py-3">
-                  {report.report_url ? (
-                    <a
-                      href={report.report_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline dark:text-blue-400"
-                    >
-                      查看
-                    </a>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
                 </td>
               </tr>
             ))}
