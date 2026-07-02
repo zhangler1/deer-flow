@@ -5,9 +5,10 @@
 /**
  * 每日报告量折线图组件
  *
- * 使用纯 SVG 实现轻量折线图，无需额外依赖。
- * 如果后续需要更复杂的图表可替换为 recharts。
+ * 使用纯 SVG 实现轻量折线图，支持鼠标悬停吸附数据点、虚线指示、tooltip 显示。
  */
+
+import { useCallback, useRef, useState } from "react";
 
 import type { DailyStat } from "~/core/api/dashboard";
 
@@ -16,6 +17,9 @@ interface DailyChartProps {
 }
 
 export function DailyChart({ data }: DailyChartProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
   if (!data || data.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-gray-400">
@@ -53,12 +57,39 @@ export function DailyChart({ data }: DailyChartProps) {
     Math.round((maxCount / 4) * i)
   );
 
+  // 鼠标移动：吸附到最近的数据点
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      // 将屏幕坐标转换为 SVG viewBox 坐标
+      const scaleX = width / rect.width;
+      const svgX = (e.clientX - rect.left) * scaleX;
+      // 找到最近的点
+      const idx = Math.round((svgX - padding.left) / xStep);
+      const clamped = Math.max(0, Math.min(data.length - 1, idx));
+      setActiveIndex(clamped);
+    },
+    [data.length, xStep, padding.left]
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    setActiveIndex(null);
+  }, []);
+
+  const activePoint = activeIndex !== null ? points[activeIndex] : null;
+  const activeData = activeIndex !== null ? data[activeIndex] : null;
+
   return (
     <div className="w-full overflow-x-auto">
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
         className="w-full min-w-[600px]"
         preserveAspectRatio="xMidYMid meet"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
       >
         {/* 网格线 */}
         {yTicks.map((tick, index) => {
@@ -105,10 +136,10 @@ export function DailyChart({ data }: DailyChartProps) {
             key={i}
             cx={p.x}
             cy={p.y}
-            r={3}
-            fill="#3b82f6"
+            r={activeIndex === i ? 5 : 3}
+            fill={activeIndex === i ? "#2563eb" : "#3b82f6"}
             stroke="white"
-            strokeWidth={1.5}
+            strokeWidth={activeIndex === i ? 2 : 1.5}
           />
         ))}
 
@@ -129,6 +160,85 @@ export function DailyChart({ data }: DailyChartProps) {
             </text>
           );
         })}
+
+        {/* 悬停指示：垂直虚线 + tooltip */}
+        {activePoint && activeData && (
+          <>
+            {/* 垂直虚线 */}
+            <line
+              x1={activePoint.x}
+              y1={padding.top}
+              x2={activePoint.x}
+              y2={padding.top + chartHeight}
+              stroke="#3b82f6"
+              strokeWidth={1}
+              strokeDasharray="4 3"
+              opacity={0.6}
+            />
+            {/* 水平虚线 */}
+            <line
+              x1={padding.left}
+              y1={activePoint.y}
+              x2={padding.left + chartWidth}
+              y2={activePoint.y}
+              stroke="#3b82f6"
+              strokeWidth={1}
+              strokeDasharray="4 3"
+              opacity={0.4}
+            />
+            {/* Tooltip 背景 */}
+            <rect
+              x={
+                activePoint.x + 10 + 90 > width
+                  ? activePoint.x - 100
+                  : activePoint.x + 10
+              }
+              y={
+                activePoint.y - 36 < 0
+                  ? activePoint.y + 8
+                  : activePoint.y - 36
+              }
+              width={90}
+              height={30}
+              rx={4}
+              fill="rgba(17,24,39,0.85)"
+            />
+            {/* Tooltip 日期 */}
+            <text
+              x={
+                activePoint.x + 10 + 90 > width
+                  ? activePoint.x - 55
+                  : activePoint.x + 55
+              }
+              y={
+                activePoint.y - 36 < 0
+                  ? activePoint.y + 20
+                  : activePoint.y - 24
+              }
+              textAnchor="middle"
+              className="fill-white text-[10px]"
+            >
+              {activeData.date}
+            </text>
+            {/* Tooltip 数量 */}
+            <text
+              x={
+                activePoint.x + 10 + 90 > width
+                  ? activePoint.x - 55
+                  : activePoint.x + 55
+              }
+              y={
+                activePoint.y - 36 < 0
+                  ? activePoint.y + 33
+                  : activePoint.y - 11
+              }
+              textAnchor="middle"
+              className="fill-white text-[11px] font-bold"
+            >
+              报告数：{activeData.count}
+            </text>
+          </>
+        )}
 
         {/* 渐变定义 */}
         <defs>
