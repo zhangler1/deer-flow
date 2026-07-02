@@ -997,9 +997,7 @@ function ResearchCard({
     >
       <div className="flex items-center py-1.5 px-2 gap-2">
         {/* 左侧图标 */}
-        <div className="shrink-0 flex items-center justify-center w-6 h-6 rounded bg-primary/10 text-primary">
-          <FileText className="w-3.5 h-3.5" />
-        </div>
+        <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3b82f6]" />
         {/* 中间信息 */}
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm text-foreground truncate">
@@ -1090,12 +1088,10 @@ export function HistoricalReportCard({
     >
       <div className="flex items-center py-1.5 px-3 gap-2">
         {/* 图标 + 报告信息：点击回看 */}
-        <div
-          className="shrink-0 flex items-center justify-center w-6 h-6 rounded bg-primary/10 text-primary cursor-pointer"
+        <FileText
+          className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer text-[#3b82f6]"
           onClick={handleViewReport}
-        >
-          <FileText className="w-3.5 h-3.5" />
-        </div>
+        />
         <div
           className="flex-1 min-w-0 cursor-pointer"
           onClick={handleViewReport}

@@ -214,7 +214,7 @@ export function HistoryDrawer() {
                   disabled={loadingContentId === report.id}
                 >
                   <div className="flex items-start gap-2">
-                    <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+                    <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3b82f6]" />
                     <span className="line-clamp-2 text-sm font-medium text-gray-800 leading-tight">
                       {report.title}
                     </span>
