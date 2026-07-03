@@ -5,6 +5,7 @@ import base64
 from datetime import datetime
 import asyncio
 import json
+import mimetypes
 import tempfile
 from langchain_core.messages.base import BaseMessage
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -1437,6 +1438,10 @@ def _make_event(event_type: str, data: Dict[str, Any]):
 # ============================================================
 
 EASYPARSE_SERVICE_URL = os.getenv("EASYPARSE_SERVICE_URL", "http://nginx")
+ENCRYPT_API_URL = os.getenv(
+    "ENCRYPT_API_URL",
+    "http://eaip-chn-slb-7006.bocomm.com/ELLM.ELLM-OFFICE.V-1.0/pptEncryptFile.upload",
+)
 
 # 文档上传支持的文件类型
 ALLOWED_UPLOAD_EXTENSIONS = {
@@ -1606,6 +1611,205 @@ async def markdown_to_word(request: MarkdownToWordRequest):
         raise
     except Exception as e:
         logger.exception(f"Markdown 转 Word 异常: {e}")
+        raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
+# ─── 文件加密辅助函数 ───
+
+async def _encrypt_docx(
+    docx_bytes: bytes,
+    filename: str,
+    encrypt_api_url: str,
+    guwp_token: str,
+) -> tuple[bytes, str] | None:
+    """
+    将 docx 文件上传至加密服务进行加密。
+
+    Args:
+        docx_bytes: easyparse 返回的原始 docx 字节流
+        filename: 文件名（不含扩展名）
+        encrypt_api_url: 加密服务 URL
+        guwp_token: GUWP 鉴权令牌
+
+    Returns:
+        (加密后的文件字节流, 加密服务返回的原始文件名)；失败返回 None
+    """
+    if not encrypt_api_url or not guwp_token:
+        logger.warning("加密服务 URL 或 GUWP_TOKEN 未配置，跳过加密")
+        return None
+
+    # 将 docx 写入临时文件，供加密服务 multipart 上传
+    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp_docx:
+        tmp_docx.write(docx_bytes)
+        tmp_docx_path = tmp_docx.name
+
+    try:
+        mime_type = (
+            mimetypes.guess_type(tmp_docx_path)[0]
+            or "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+        async with httpx.AsyncClient(
+            timeout=60.0, trust_env=False, proxy=None
+        ) as client:
+            with open(tmp_docx_path, "rb") as f:
+                encrypt_response = await client.post(
+                    encrypt_api_url,
+                    headers={
+                        "Accept": "*/*",
+                        "guwp-token": guwp_token,
+                    },
+                    files={"file": (f"{filename}.docx", f, mime_type)},
+                )
+
+        if encrypt_response.status_code == 200:
+            content_type = encrypt_response.headers.get("Content-Type", "")
+            if "application/json" in content_type:
+                # 加密服务返回 JSON 错误信息
+                logger.error(f"加密服务返回错误: {encrypt_response.text[:500]}")
+                return None
+
+            # 从加密服务响应头提取原始文件名（含扩展名）
+            disposition = encrypt_response.headers.get("Content-Disposition", "")
+            encrypted_filename = f"{filename}.docx"  # fallback
+            if "filename=" in disposition:
+                encrypted_filename = disposition.split("filename=")[-1].strip('"')
+
+            logger.info(
+                f"加密服务返回文件，大小: {len(encrypt_response.content)} 字节，"
+                f"文件名: {encrypted_filename}"
+            )
+            return encrypt_response.content, encrypted_filename
+        else:
+            logger.error(
+                f"加密服务请求失败: status={encrypt_response.status_code}, "
+                f"response={encrypt_response.text[:500]}"
+            )
+            return None
+
+    except httpx.ConnectError:
+        logger.error(f"无法连接加密服务: {encrypt_api_url}")
+        return None
+    except Exception as e:
+        logger.exception(f"加密过程异常: {e}")
+        return None
+    finally:
+        try:
+            os.unlink(tmp_docx_path)
+        except OSError:
+            pass
+
+
+# ─── Markdown 转 Word（加密版） ───
+
+@app.post("/api/markdown/to_word/encrypted")
+async def markdown_to_word_encrypted(request: MarkdownToWordRequest):
+    """
+    将 Markdown 内容转换为加密 Word 文档。
+
+    流程：
+    1. 调用 easyparse 服务将 markdown 转为 docx
+    2. 将 docx 上传至加密服务进行加密
+    3. 返回加密后的 docx；加密失败时自动降级返回未加密 docx
+    """
+    easyparse_url = f"{EASYPARSE_SERVICE_URL}/markdown_to_word"
+
+    # 读取 DOCX_FOOTER 配置
+    docx_footer_config = load_yaml_config(
+        os.path.join(os.getcwd(), "conf.yaml")
+    ).get("DOCX_FOOTER", {})
+    footer_data = {}
+    if docx_footer_config.get("enabled", True) and docx_footer_config.get("text"):
+        footer_data["footer_text"] = docx_footer_config["text"]
+        footer_data["footer_enabled"] = "true"
+    elif not docx_footer_config.get("enabled", True):
+        footer_data["footer_enabled"] = "false"
+
+    logger.info(
+        f"[encrypted] Using easyparse footer text: "
+        f"{footer_data.get('footer_text', 'none')}"
+    )
+
+    # 将 markdown 写入临时文件
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, encoding="utf-8"
+    ) as tmp:
+        tmp.write(request.content)
+        tmp_path = tmp.name
+
+    try:
+        # Step 1: 调用 easyparse 将 markdown 转为 docx
+        async with httpx.AsyncClient(
+            timeout=60.0, trust_env=False, proxy=None
+        ) as client:
+            with open(tmp_path, "rb") as f:
+                response = await client.post(
+                    easyparse_url,
+                    files={"file": ("report.md", f, "text/markdown")},
+                    data=footer_data,
+                )
+
+        if response.status_code != 200:
+            logger.error(
+                f"[encrypted] easyparse 转换失败: status={response.status_code}"
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=f"Markdown 转 Word 失败: easyparse 返回 {response.status_code}",
+            )
+
+        docx_bytes = response.content
+        filename = request.filename or "research-report"
+
+        # Step 2: 上传至加密服务进行加密
+        # 优先从 Cookie（auth 中间件注入 request.state），降级读环境变量
+        guwp_token = request.state.guwp_token or os.getenv("GUWP_TOKEN", "")
+
+        encrypted_result = await _encrypt_docx(
+            docx_bytes, filename, ENCRYPT_API_URL, guwp_token
+        )
+
+        if encrypted_result is not None:
+            # 加密成功，使用加密服务返回的原始文件名
+            encrypted_bytes, encrypted_filename = encrypted_result
+            logger.info(f"[encrypted] 文件加密成功: {encrypted_filename}")
+            return Response(
+                content=encrypted_bytes,
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{encrypted_filename}"',
+                },
+            )
+        else:
+            # 加密失败，降级返回未加密文件
+            logger.warning(
+                f"[encrypted] 加密失败，降级返回未加密文件: {filename}.docx"
+            )
+            return Response(
+                content=docx_bytes,
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}.docx"',
+                },
+            )
+
+    except httpx.ConnectError:
+        logger.error(
+            f"[encrypted] 无法连接 easyparse 服务: {EASYPARSE_SERVICE_URL}"
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=f"无法连接 easyparse 服务({EASYPARSE_SERVICE_URL})，请确认服务已启动",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"[encrypted] Markdown 转 Word 加密异常: {e}")
         raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
     finally:
         try:

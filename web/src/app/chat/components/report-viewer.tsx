@@ -65,31 +65,16 @@ export function ReportViewer({ className }: { className?: string }) {
   }, [filteredContent]);
 
   const handleDownload = useCallback(
-    async (format: "docx" | "markdown") => {
+    async () => {
       if (!filteredContent) return;
       const now = new Date();
       const pad = (n: number) => n.toString().padStart(2, "0");
       const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
       const filename = `research-report-${timestamp}`;
 
-      if (format === "markdown") {
-        const blob = new Blob([filteredContent], { type: "text/markdown" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${filename}.md`;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 0);
-        return;
-      }
-
       try {
         setDownloading(true);
-        const res = await fetch(resolveServiceURL("markdown/to_word"), {
+        const res = await fetch(resolveServiceURL("markdown/to_word/encrypted"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: filteredContent, filename }),
@@ -108,24 +93,14 @@ export function ReportViewer({ className }: { className?: string }) {
           }, 0);
           return;
         }
+        console.warn(`[ReportViewer] Word 转换失败 (status=${res.status})`);
+        toast.error("文档下载失败，请稍后重试");
       } catch (err) {
         console.warn("[ReportViewer] Word conversion failed:", err);
+        toast.error("网络异常，下载失败");
       } finally {
         setDownloading(false);
       }
-
-      // Fallback: download markdown
-      const blob = new Blob([filteredContent], { type: "text/markdown" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${filename}.md`;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 0);
     },
     [filteredContent],
   );
@@ -285,15 +260,9 @@ export function ReportViewer({ className }: { className?: string }) {
               <DropdownMenuContent align="end" className="min-w-[140px]">
                 <DropdownMenuItem
                   className="flex cursor-pointer items-center gap-2"
-                  onClick={() => handleDownload("docx")}
+                  onClick={() => handleDownload()}
                 >
                   <span>Word</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="flex cursor-pointer items-center gap-2"
-                  onClick={() => handleDownload("markdown")}
-                >
-                  <span>Markdown</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
