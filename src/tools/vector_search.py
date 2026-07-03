@@ -392,14 +392,14 @@ def call_vector_search(
 # ============================================================================
 
 
-@tool
-def vector_search(query: str) -> List[Dict[str, Any]]:
-    """基于向量相似度精准检索内部知识库，支持混合召回和重排序。
+# @tool
+# def vector_search(query: str) -> List[Dict[str, Any]]:
+#     """基于向量相似度精准检索内部知识库，支持混合召回和重排序。
 
-    直接传入查询字符串，令牌默认从环境变量 GUWP_TOKEN 读取；
-    如需预算控制和 token 注入，请使用 VectorSearchBaseTool + BudgetControlledSearchTool。
-    """
-    return call_vector_search(query=query, max_results=10)
+#     直接传入查询字符串，令牌默认从环境变量 GUWP_TOKEN 读取；
+#     如需预算控制和 token 注入，请使用 VectorSearchBaseTool + BudgetControlledSearchTool。
+#     """
+#     return call_vector_search(query=query, max_results=10)
 
 
 # ============================================================================
