@@ -1144,6 +1144,15 @@ async def _astream_workflow_generator(
     # 设置 thread_id 到 contextvars，该请求链路内所有日志自动携带此 ID
     current_thread_id.set(thread_id)
 
+    # ── guwp_token 接收日志：确认前端是否成功传递 token ──
+    _token_len = len(guwp_token) if guwp_token else 0
+    logger.info(
+        f"🔑 [guwptoken] GUWP_TOKEN_RECV | thread_id={thread_id} | "
+        f"token={'有' if guwp_token else '无'} | "
+        f"token_len={_token_len} | "
+        f"token_value={'(空)' if not guwp_token else guwp_token}"
+    )
+
     # Process initial messages
     for message in messages:
         if isinstance(message, dict) and "content" in message:

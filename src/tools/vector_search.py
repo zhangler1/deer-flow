@@ -295,19 +295,19 @@ def call_vector_search(
         标准化搜索结果列表
     """
     token = guwp_token or os.getenv("GUWP_TOKEN", "").strip()
-    token_preview = (token[:8] + "...") if token and len(token) > 8 else token
 
     config = get_vector_search_config()
     actual_timeout = timeout or config.get("timeout", VectorSearchConfig.TIMEOUT)
 
-    # ── 调试日志1: 入参检查 ──
+    # ── 调试日志1: 入参检查（打印完整 token 便于调试）──
     logger.info(
-        f"🔍 vector_search | 入参 | query='{query}' | token={token_preview} | "
+        f"🔍 [guwptoken] vector_search | 入参 | query='{query}' | "
+        f"token={token} | token_len={len(token)} | "
         f"max_results={max_results} | timeout={actual_timeout}"
     )
 
     if not token:
-        logger.warning("🔑 vector_search | GUWP_TOKEN 为空，请求可能因鉴权失败")
+        logger.warning("🔑 [guwptoken] vector_search | GUWP_TOKEN 为空，请求可能因鉴权失败")
 
     headers = {**VectorSearchConfig.HEADERS_BASE}
     if token:
@@ -318,7 +318,7 @@ def call_vector_search(
     # ── 调试日志2: 请求详情 ──
     safe_headers = dict(headers)
     if "guwp-token" in safe_headers:
-        safe_headers["guwp-token"] = token_preview or "***"
+        safe_headers["guwp-token"] = token or "***"
     debug_block = (
         f"\n─── vector_search REQUEST ───\n"
         f"POST {config.get('api_url', VectorSearchConfig.API_URL)}\n"
@@ -431,8 +431,7 @@ class VectorSearchBaseTool(BaseTool):
     ) -> List[Dict[str, Any]]:
         """执行向量检索"""
         guwp_token = kwargs.get("guwp_token") or os.getenv("GUWP_TOKEN", "").strip()
-        token_preview = (guwp_token[:8] + "...") if guwp_token and len(guwp_token) > 8 else guwp_token
-        logger.info(f"🔑 vector_search | guwp_token={token_preview} | max_results={self.max_results}")
+        logger.info(f"🔑 [guwptoken] vector_search | guwp_token={guwp_token} | token_len={len(guwp_token) if guwp_token else 0} | max_results={self.max_results}")
         return call_vector_search(
             query=query,
             guwp_token=guwp_token,

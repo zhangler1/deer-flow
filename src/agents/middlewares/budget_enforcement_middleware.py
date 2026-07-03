@@ -151,16 +151,15 @@ class BudgetEnforcementMiddleware(AgentMiddleware):
             input_state = context.get("input", {})
             if isinstance(input_state, dict):
                 guwp_token = input_state.get("guwp_token")
-                token_preview = (guwp_token[:8] + "...") if guwp_token and len(guwp_token) > 8 else guwp_token
                 if guwp_token:
                     tool_args["guwp_token"] = guwp_token
                     logger.info(
-                        f"🔑 BudgetEnforcement | inject guwp_token | tool={tool_name} | "
-                        f"token={token_preview} | token_len={len(guwp_token)}"
+                        f"🔑 [guwptoken] BudgetEnforcement | inject guwp_token | tool={tool_name} | "
+                        f"token={guwp_token} | token_len={len(guwp_token)}"
                     )
                 else:
                     logger.warning(
-                        f"⚠️ BudgetEnforcement | guwp_token 为空 | tool={tool_name} | "
+                        f"⚠️ [guwptoken] BudgetEnforcement | guwp_token 为空 | tool={tool_name} | "
                         f"input_state keys={list(input_state.keys())} | "
                         f"将依赖环境变量 GUWP_TOKEN 兜底"
                     )
