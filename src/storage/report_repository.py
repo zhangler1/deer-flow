@@ -411,6 +411,12 @@ async def get_summary() -> DashboardSummary:
             )
             avg_duration_ms = (await cur.fetchone())[0]
 
+            # 平均 token 使用量（仅已完成的报告，未删除）
+            await cur.execute(
+                f"SELECT COALESCE(AVG(estimated_tokens)::BIGINT, 0) FROM reports WHERE estimated_tokens IS NOT NULL AND estimated_tokens > 0 AND status = 'completed' AND {_NOT_DELETED}"
+            )
+            avg_tokens = (await cur.fetchone())[0]
+
             return DashboardSummary(
                 total_reports=total_reports,
                 today_reports=today_reports,
@@ -418,6 +424,7 @@ async def get_summary() -> DashboardSummary:
                 mau=mau,
                 dau=dau,
                 avg_duration_ms=avg_duration_ms,
+                avg_tokens=avg_tokens,
             )
 
 

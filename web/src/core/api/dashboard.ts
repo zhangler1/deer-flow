@@ -39,6 +39,7 @@ export interface DashboardSummary {
   mau: number;
   dau: number;
   avg_duration_ms: number;
+  avg_tokens: number;
 }
 
 export interface ReportRecord {
