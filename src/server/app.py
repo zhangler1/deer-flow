@@ -1777,6 +1777,8 @@ async def markdown_to_word_encrypted(request: MarkdownToWordRequest, raw_request
         if encrypted_result is not None:
             # 加密成功，使用加密服务返回的原始文件名
             encrypted_bytes, encrypted_filename = encrypted_result
+            # 在 .edlp 扩展名前插入 .docx，使下载文件名体现原始文档格式
+            encrypted_filename = encrypted_filename.replace('.edlp', '.docx.edlp')
             logger.info(f"[encrypted] 文件加密成功: {encrypted_filename}")
             return Response(
                 content=encrypted_bytes,
@@ -1786,17 +1788,9 @@ async def markdown_to_word_encrypted(request: MarkdownToWordRequest, raw_request
                 },
             )
         else:
-            # 加密失败，降级返回未加密文件
-            logger.warning(
-                f"[encrypted] 加密失败，降级返回未加密文件: {filename}.docx"
-            )
-            return Response(
-                content=docx_bytes,
-                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}.docx"',
-                },
-            )
+            # 加密失败，不降级，直接报错
+            logger.error(f"[encrypted] 加密失败，请求的加密文件不可用")
+            raise HTTPException(status_code=502, detail="文档下载失败")
 
     except httpx.ConnectError:
         logger.error(
