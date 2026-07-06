@@ -8,12 +8,6 @@ import { ScrollContainer } from "~/components/deer-flow/scroll-container";
 import { Tooltip } from "~/components/deer-flow/tooltip";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
 import { resolveServiceURL } from "~/core/api/resolve-service-url";
 import { continueReport, fetchReportContent, saveReportContent } from "~/core/api/dashboard";
 import { useStore } from "~/core/store";
@@ -84,7 +78,9 @@ export function ReportViewer({ className }: { className?: string }) {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = `${filename}.docx`;
+          const disposition = res.headers.get('Content-Disposition');
+        const serverFilename = disposition?.split('filename=')[1]?.trim()?.replace(/"/g, '');
+        a.download = serverFilename || `${filename}.docx`;
           document.body.appendChild(a);
           a.click();
           setTimeout(() => {
@@ -240,32 +236,21 @@ export function ReportViewer({ className }: { className?: string }) {
               </Button>
             </Tooltip>
 
-            <DropdownMenu>
-              <Tooltip title="下载报告">
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-gray-400"
-                    disabled={downloading}
-                  >
-                    {downloading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="min-w-[140px]">
-                <DropdownMenuItem
-                  className="flex cursor-pointer items-center gap-2"
-                  onClick={() => handleDownload()}
-                >
-                  <span>Word</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Tooltip title="下载报告">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400"
+                disabled={downloading}
+                onClick={() => handleDownload()}
+              >
+                {downloading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+              </Button>
+            </Tooltip>
 
             <Tooltip title="关闭">
               <Button

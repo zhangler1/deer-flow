@@ -1708,7 +1708,7 @@ async def _encrypt_docx(
 # ─── Markdown 转 Word（加密版） ───
 
 @app.post("/api/markdown/to_word/encrypted")
-async def markdown_to_word_encrypted(request: MarkdownToWordRequest):
+async def markdown_to_word_encrypted(request: MarkdownToWordRequest, raw_request: Request):
     """
     将 Markdown 内容转换为加密 Word 文档。
 
@@ -1767,8 +1767,8 @@ async def markdown_to_word_encrypted(request: MarkdownToWordRequest):
         filename = request.filename or "research-report"
 
         # Step 2: 上传至加密服务进行加密
-        # 优先从 Cookie（auth 中间件注入 request.state），降级读环境变量
-        guwp_token = request.state.guwp_token or os.getenv("GUWP_TOKEN", "")
+        # 优先从 Cookie（auth 中间件注入 raw_request.state），降级读环境变量
+        guwp_token = raw_request.state.guwp_token or os.getenv("GUWP_TOKEN", "")
 
         encrypted_result = await _encrypt_docx(
             docx_bytes, filename, ENCRYPT_API_URL, guwp_token
