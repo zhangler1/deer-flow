@@ -53,6 +53,7 @@ class DashboardSummary(BaseModel):
     mau: int = 0  # 月活用户：近30天内生成过报告的去重用户数
     dau: int = 0  # 日活用户：今日生成过报告的去重用户数
     avg_duration_ms: int = 0
+    avg_tokens: int = 0  # 平均 token 使用量（估算值）
 
 
 class ReportListResponse(BaseModel):

@@ -45,6 +45,13 @@ export function StatsCards({ summary }: StatsCardsProps) {
       bgColor: "bg-orange-50 dark:bg-orange-900/20",
     },
     {
+      title: "平均 Token",
+      value: summary.avg_tokens ?? 0,
+      unit: "枚",
+      color: "text-amber-600",
+      bgColor: "bg-amber-50 dark:bg-amber-900/20",
+    },
+    {
       title: "月活用户",
       value: summary.mau,
       unit: "人",
@@ -61,7 +68,7 @@ export function StatsCards({ summary }: StatsCardsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
       {cards.map((card) => (
         <div
           key={card.title}

@@ -114,8 +114,7 @@ services:
       - MINIO_ROOT_USER=deerflow
       - MINIO_ROOT_PASSWORD=deerflow_minio_2025
     ports:
-      - "9000:9000"   # API 端口
-      - "9001:9001"   # 控制台端口
+      - "9005:9001"   # 控制台端口
     volumes:
       - minio_data:/data
     restart: unless-stopped
