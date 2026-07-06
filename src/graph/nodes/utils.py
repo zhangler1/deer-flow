@@ -360,6 +360,7 @@ async def _execute_agent_step(
 
     step_duration = time.time() - step_start_time
     enhanced_logger.logger.info(f"✅ STEP_DONE | {agent_type} | '{current_step.title}' | 耗时: {step_duration:.2f}s")
+    enhanced_logger.logger.debug(f"📋 STEP_OUTPUT | {agent_type} | '{current_step.title}' |\n{response_content}")
 
     # 提取 ReactLoop 内部的 ToolMessages，将它们加入 Command 的 messages 更新中，
     # 使 LangGraph 能够流式传输 tool_call_result 事件到前端（供参考资料渲染使用）
