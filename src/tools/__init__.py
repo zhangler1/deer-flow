@@ -60,7 +60,7 @@ from .bocom_search import (
     call_bocomsearch,
 )
 from .vector_search import (
-    vector_search,
+    # vector_search,
     call_vector_search,
     VectorSearchConfig,
     get_vector_search_config,
@@ -116,7 +116,7 @@ __all__ = [
     "BudgetManagerStore",
     "bocomsearch",
     "call_bocomsearch",
-    "vector_search",
+    # "vector_search",
     "call_vector_search",
     "VectorSearchConfig",
     "get_vector_search_config",
