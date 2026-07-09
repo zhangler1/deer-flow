@@ -3,13 +3,12 @@
 
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Microscope,
   FileSearch,
   Sparkles,
   BookMarked,
-  Image as ImageIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -79,53 +78,36 @@ export function FeatureShowcase({ className }: { className?: string }) {
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 切换 Tab 时控制视频播放/暂停
-  const handleSwitch = useCallback(
-    (nextIndex: number) => {
-      if (nextIndex === activeIndex) return;
-      // 停止上一个视频（暂停并回到开头）
-      const prevTab = TABS[activeIndex];
-      if (prevTab?.type === "video") {
-        const prevVideo = videoRefs.current.get(activeIndex);
-        if (prevVideo) {
-          prevVideo.pause();
-          prevVideo.currentTime = 0;
-        }
-      }
-      // 播放下一个视频
-      const nextTab = TABS[nextIndex];
-      if (nextTab?.type === "video") {
-        const nextVideo = videoRefs.current.get(nextIndex);
-        if (nextVideo) {
-          nextVideo.currentTime = 0;
-          nextVideo.play().catch(() => {});
-        }
-      }
-      setActiveIndex(nextIndex);
-    },
-    [activeIndex],
-  );
+  // 切换 Tab：仅更新索引，播放/暂停由下方 effect 统一处理
+  const handleSwitch = useCallback((nextIndex: number) => {
+    setActiveIndex((prev) => (prev === nextIndex ? prev : nextIndex));
+  }, []);
 
-  // 每 10s 自动切换 Tab，手动点击时重置计时
+  // 每 7s 自动切换 Tab，手动点击（activeIndex 变化）时重置计时
   useEffect(() => {
     if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
     autoTimerRef.current = setTimeout(() => {
-      const next = (activeIndex + 1) % TABS.length;
-      handleSwitch(next);
+      setActiveIndex((prev) => (prev + 1) % TABS.length);
     }, 7_000);
     return () => {
       if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
     };
-  }, [activeIndex, handleSwitch]);
+  }, [activeIndex]);
 
-  // 组件挂载后自动播放首个视频（如果有）
+  // activeIndex 变化时：播放当前视频，暂停其余（并回到开头）
+  // 组件首次挂载也会执行一次，自动播放首个视频
   useEffect(() => {
-    const firstTab = TABS[0];
-    if (firstTab?.type === "video") {
-      const firstVideo = videoRefs.current.get(0);
-      if (firstVideo) firstVideo.play().catch(() => {});
-    }
-  }, []);
+    videoRefs.current.forEach((video, index) => {
+      if (index === activeIndex) {
+        video.currentTime = 0;
+        // preload="none" 的视频在此处首次触发加载
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+        video.currentTime = 0;
+      }
+    });
+  }, [activeIndex]);
 
   // 页面不可见时暂停所有视频，可见时恢复当前视频
   useEffect(() => {
@@ -133,15 +115,12 @@ export function FeatureShowcase({ className }: { className?: string }) {
       if (document.hidden) {
         videoRefs.current.forEach((video) => video.pause());
       } else {
-        const activeTab = TABS[activeIndex];
-        if (activeTab?.type === "video") {
-          const activeVideo = videoRefs.current.get(activeIndex);
-          if (activeVideo) activeVideo.play().catch(() => {});
-        }
+        videoRefs.current.get(activeIndex)?.play().catch(() => {});
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [activeIndex]);
 
   return (
@@ -213,65 +192,53 @@ export function FeatureShowcase({ className }: { className?: string }) {
         })}
       </div>
 
-      {/* 右侧内容区 */}
+      {/* 右侧内容区：一次性渲染所有内容，用 opacity 叠放切换，不用变化的 key */}
       <div className="relative sm:flex-1 sm:basis-0 min-w-0 w-full sm:w-auto min-h-[200px] sm:min-h-[400px] rounded-xl bg-transparent">
-        {/* 内容切换 */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeIndex}
-            className="absolute inset-0"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.02 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-          >
-            {(() => {
-              const tab = TABS[activeIndex];
-              if (!tab) return null;
-              if (tab.type === "video") {
-                return (
-                  <div className="flex h-full w-full items-center justify-center p-6">
-                    <div className="h-full w-full shadow-[6px_8px_12px_-6px_rgba(0,0,0,0.3)] rounded-lg overflow-hidden">
-                      <video
-                        key={`video-${activeIndex}`}
-                        ref={(el) => {
-                          if (el) videoRefs.current.set(activeIndex, el);
-                          else videoRefs.current.delete(activeIndex);
-                        }}
-                        src={tab.src}
-                        poster={tab.poster}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        className="h-full w-full object-contain"
-                      />
-                    </div>
-                  </div>
-                );
-              }
-              return (
-                <div className="flex h-full w-full items-center justify-center p-6">
-                  <div className="h-full w-full shadow-[6px_8px_12px_-6px_rgba(0,0,0,0.3)] rounded-lg overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+        {TABS.map((tab, index) => {
+          const isActive = index === activeIndex;
+          return (
+            <motion.div
+              key={tab.key}
+              className="absolute inset-0"
+              animate={{
+                opacity: isActive ? 1 : 0,
+                scale: isActive ? 1 : 0.98,
+              }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              style={{
+                pointerEvents: isActive ? "auto" : "none",
+                zIndex: isActive ? 1 : 0,
+              }}
+            >
+              <div className="flex h-full w-full items-center justify-center p-6">
+                <div className="h-full w-full shadow-[6px_8px_12px_-6px_rgba(0,0,0,0.3)] rounded-lg overflow-hidden">
+                  {tab.type === "video" ? (
+                    <video
+                      ref={(el) => {
+                        if (el) videoRefs.current.set(index, el);
+                        else videoRefs.current.delete(index);
+                      }}
+                      src={tab.src}
+                      poster={tab.poster}
+                      loop
+                      muted
+                      playsInline
+                      preload={isActive ? "auto" : "none"}
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={tab.src}
                       alt={tab.name}
                       className="h-full w-full object-contain"
                     />
-                  </div>
+                  )}
                 </div>
-              );
-            })()}
-          </motion.div>
-        </AnimatePresence>
-
-        {/* 空状态兜底 */}
-        {!TABS[activeIndex] && (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground/50">
-            <ImageIcon size={32} />
-          </div>
-        )}
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );
