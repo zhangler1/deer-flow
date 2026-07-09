@@ -76,23 +76,18 @@ const TABS: TabItem[] = [
 export function FeatureShowcase({ className }: { className?: string }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
-  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 切换 Tab：仅更新索引，播放/暂停由下方 effect 统一处理
   const handleSwitch = useCallback((nextIndex: number) => {
     setActiveIndex((prev) => (prev === nextIndex ? prev : nextIndex));
   }, []);
 
-  // 每 7s 自动切换 Tab，手动点击（activeIndex 变化）时重置计时
-  useEffect(() => {
-    if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
-    autoTimerRef.current = setTimeout(() => {
-      setActiveIndex((prev) => (prev + 1) % TABS.length);
-    }, 7_000);
-    return () => {
-      if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
-    };
-  }, [activeIndex]);
+  // 视频播放结束后自动切换到下一个 Tab；图片不自动切换，由用户点击
+  const handleVideoEnded = useCallback((index: number) => {
+    setActiveIndex((prev) =>
+      prev === index ? (prev + 1) % TABS.length : prev,
+    );
+  }, []);
 
   // activeIndex 变化时：播放当前视频，暂停其余（并回到开头）
   // 组件首次挂载也会执行一次，自动播放首个视频
@@ -220,10 +215,10 @@ export function FeatureShowcase({ className }: { className?: string }) {
                       }}
                       src={tab.src}
                       poster={tab.poster}
-                      loop
                       muted
                       playsInline
                       preload={isActive ? "auto" : "none"}
+                      onEnded={() => handleVideoEnded(index)}
                       className="h-full w-full object-contain"
                     />
                   ) : (
