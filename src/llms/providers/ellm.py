@@ -119,10 +119,13 @@ class EllmChatModel(ChatOpenAI):
 
         # Inject the real key as a custom header.
         # The ELLM gateway expects "api-key" header, not "Authorization: Bearer".
-        self.default_headers = {
-            **(self.default_headers or {}),
-            "api-key": current_key,
-        }
+        # Mutate in-place so the dict reference is shared with the underlying
+        # OpenAI HTTP client (root_client._custom_headers).  If we create a new
+        # dict here, _inject_latest_api_key() would later write to a different
+        # object and the HTTP client would never see the refreshed key.
+        if self.default_headers is None:
+            self.default_headers = {}
+        self.default_headers["api-key"] = current_key
 
         logger.info(
             "EllmChatModel initialised (scene_code=%s, model=%s)",
@@ -133,16 +136,35 @@ class EllmChatModel(ChatOpenAI):
         super().model_post_init(__context)
 
     def _inject_latest_api_key(self) -> None:
-        """Update default_headers with the latest API key from the manager."""
+        """Update default_headers with the latest API key from the manager.
+
+        Mutates the dict **in-place** so that the underlying OpenAI HTTP
+        clients (``root_client._custom_headers`` / ``root_async_client._custom_headers``)
+        see the refreshed key.  Reassigning ``self.default_headers`` would
+        create a new dict and break the reference — the HTTP clients would
+        keep using the old (possibly expired) key forever.
+        """
         # No key manager → using static api_key, nothing to inject.
         if self._key_manager is None:
             return
         try:
             current_key = self._key_manager.get_api_key()
-            self.default_headers = {
-                **(self.default_headers or {}),
-                "api-key": current_key,
-            }
+
+            # 1) Mutate the Pydantic model's default_headers in-place.
+            #    This dict is the same object referenced by the OpenAI HTTP
+            #    client's _custom_headers (set during model_post_init before
+            #    super().model_post_init() created the client).
+            if self.default_headers is None:
+                self.default_headers = {}
+            self.default_headers["api-key"] = current_key
+
+            # 2) Safety net: also sync the underlying OpenAI HTTP clients
+            #    directly.  If a previous code path ever reassigned
+            #    self.default_headers (breaking the shared reference), this
+            #    ensures the clients still pick up the new key.
+            for client in (self.root_client, self.root_async_client):
+                if client is not None:
+                    client._custom_headers["api-key"] = current_key
             # Observability: surface key age / remaining TTL / refresh-thread health.
             # At DEBUG for normal calls; escalate to WARNING when the key is
             # about to expire or the background refresh thread has died —
