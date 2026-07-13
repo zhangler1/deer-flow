@@ -61,6 +61,7 @@ export default function HomePage() {
         }}
       >
         <div className="flex items-center gap-1">
+          {/* 展开历史报告按钮
           <Tooltip title={drawerOpen ? "收起侧栏" : "展开历史报告"}>
             <Button
               variant="ghost"
@@ -75,6 +76,7 @@ export default function HomePage() {
               )}
             </Button>
           </Tooltip>
+          */}
           <Tooltip title="返回上一页">
             <Button
               variant="ghost"
