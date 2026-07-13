@@ -1007,8 +1007,8 @@ function ResearchCard({
             {state}
           </RollingText>
         </div>
-        {/* 报告生成完毕后：基于报告提问 radio */}
-        {reportReady && (
+        {/* 报告生成完毕后：基于报告提问 radio —— 已隐去 */}
+        {/* {reportReady && (
           <label
             className={cn(
               "shrink-0 flex items-center gap-2 cursor-pointer select-none rounded-full px-2.5 py-1 transition-colors",
@@ -1037,7 +1037,7 @@ function ResearchCard({
             </span>
             {savingForChat && <Loader2 className="w-3 h-3 animate-spin" />}
           </label>
-        )}
+        )} */}
       </div>
       {/* 进度条：研究进行中 或 有已完成的里程碑 时显示 */}
       {(researchOngoing || hasMilestones) && (
