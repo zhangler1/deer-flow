@@ -109,7 +109,8 @@ export function DailyChart({ data }: DailyChartProps) {
                 x={padding.left - 8}
                 y={y + 4}
                 textAnchor="end"
-                className="fill-gray-500 text-[10px]"
+                fill="#6b7280"
+                className="text-[10px]"
               >
                 {tick}
               </text>
@@ -154,7 +155,8 @@ export function DailyChart({ data }: DailyChartProps) {
               x={x}
               y={padding.top + chartHeight + 20}
               textAnchor="middle"
-              className="fill-gray-500 text-[10px]"
+              fill="#6b7280"
+              className="text-[10px]"
             >
               {label}
             </text>
@@ -216,7 +218,8 @@ export function DailyChart({ data }: DailyChartProps) {
                   : activePoint.y - 24
               }
               textAnchor="middle"
-              className="fill-white text-[10px]"
+              fill="#fff"
+              className="text-[10px]"
             >
               {activeData.date}
             </text>
@@ -233,7 +236,8 @@ export function DailyChart({ data }: DailyChartProps) {
                   : activePoint.y - 11
               }
               textAnchor="middle"
-              className="fill-white text-[11px] font-bold"
+              fill="#fff"
+              className="text-[11px] font-bold"
             >
               报告数：{activeData.count}
             </text>

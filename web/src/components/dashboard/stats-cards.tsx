@@ -6,34 +6,92 @@
  * 顶部统计卡片组件
  */
 
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
+
 import type { DashboardSummary } from "~/core/api/dashboard";
 
 interface StatsCardsProps {
   summary: DashboardSummary;
 }
 
+/** 各卡片色值（light / dark 文字色 / dark 背景色） */
+const CARD_COLORS: Record<
+  string,
+  { lightText: string; lightBg: string; darkText: string; darkBg: string }
+> = {
+  blue: {
+    lightText: "#2563eb",
+    lightBg: "#eff6ff",
+    darkText: "#93c5fd",
+    darkBg: "rgba(30,58,95,0.22)",
+  },
+  green: {
+    lightText: "#16a34a",
+    lightBg: "#f0fdf4",
+    darkText: "#86efac",
+    darkBg: "rgba(20,83,45,0.22)",
+  },
+  teal: {
+    lightText: "#0d9488",
+    lightBg: "#f0fdfa",
+    darkText: "#5eead4",
+    darkBg: "rgba(19,78,74,0.22)",
+  },
+  orange: {
+    lightText: "#ea580c",
+    lightBg: "#fff7ed",
+    darkText: "#fdba74",
+    darkBg: "rgba(124,45,18,0.22)",
+  },
+  amber: {
+    lightText: "#d97706",
+    lightBg: "#fffbeb",
+    darkText: "#fcd34d",
+    darkBg: "rgba(120,53,15,0.22)",
+  },
+  purple: {
+    lightText: "#9333ea",
+    lightBg: "#faf5ff",
+    darkText: "#c4b5fd",
+    darkBg: "rgba(88,28,135,0.22)",
+  },
+  pink: {
+    lightText: "#db2777",
+    lightBg: "#fdf2f8",
+    darkText: "#f9a8d4",
+    darkBg: "rgba(131,24,67,0.22)",
+  },
+};
+
 export function StatsCards({ summary }: StatsCardsProps) {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted && resolvedTheme === "dark";
+
   const cards = [
     {
       title: "总报告数",
       value: summary.total_reports,
       unit: "份",
-      color: "text-blue-600",
-      bgColor: "bg-blue-50 dark:bg-blue-900/20",
+      colorKey: "blue",
     },
     {
       title: "今日生成",
       value: summary.today_reports,
       unit: "份",
-      color: "text-green-600",
-      bgColor: "bg-green-50 dark:bg-green-900/20",
+      colorKey: "green",
     },
     {
       title: "本月生成",
       value: summary.month_reports,
       unit: "份",
-      color: "text-teal-600",
-      bgColor: "bg-teal-50 dark:bg-teal-900/20",
+      colorKey: "teal",
     },
     {
       title: "平均耗时",
@@ -41,50 +99,72 @@ export function StatsCards({ summary }: StatsCardsProps) {
         ? Math.round(summary.avg_duration_ms / 1000)
         : 0,
       unit: "秒",
-      color: "text-orange-600",
-      bgColor: "bg-orange-50 dark:bg-orange-900/20",
+      colorKey: "orange",
     },
     {
       title: "平均 Token",
       value: summary.avg_tokens ?? 0,
       unit: "枚",
-      color: "text-amber-600",
-      bgColor: "bg-amber-50 dark:bg-amber-900/20",
+      colorKey: "amber",
     },
     {
       title: "月活用户",
       value: summary.mau,
       unit: "人",
-      color: "text-purple-600",
-      bgColor: "bg-purple-50 dark:bg-purple-900/20",
+      colorKey: "purple",
     },
     {
       title: "日活用户",
       value: summary.dau,
       unit: "人",
-      color: "text-pink-600",
-      bgColor: "bg-pink-50 dark:bg-pink-900/20",
+      colorKey: "pink",
     },
   ];
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-      {cards.map((card) => (
-        <div
-          key={card.title}
-          className={`rounded-lg border border-gray-200 p-5 dark:border-gray-700 ${card.bgColor}`}
-        >
-          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-            {card.title}
+      {cards.map((card) => {
+        const c = CARD_COLORS[card.colorKey]!;
+        return (
+          <div
+            key={card.title}
+            className="rounded-lg border p-5"
+            style={{
+              borderColor: isDark
+                ? "rgba(255,255,255,0.1)"
+                : "rgb(229,231,235)",
+              backgroundColor: isDark ? c.darkBg : c.lightBg,
+            }}
+          >
+            <div
+              className="text-sm font-medium"
+              style={{
+                color: isDark
+                  ? "rgb(156,163,175)"
+                  : "rgb(107,114,128)",
+              }}
+            >
+              {card.title}
+            </div>
+            <div
+              className="mt-2 text-3xl font-bold"
+              style={{ color: isDark ? c.darkText : c.lightText }}
+            >
+              {card.value.toLocaleString()}
+              <span
+                className="ml-1 text-sm font-normal"
+                style={{
+                  color: isDark
+                    ? "rgb(156,163,175)"
+                    : "rgb(107,114,128)",
+                }}
+              >
+                {card.unit}
+              </span>
+            </div>
           </div>
-          <div className={`mt-2 text-3xl font-bold ${card.color}`}>
-            {card.value.toLocaleString()}
-            <span className="ml-1 text-sm font-normal text-gray-500">
-              {card.unit}
-            </span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

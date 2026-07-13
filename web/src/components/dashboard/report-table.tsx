@@ -8,12 +8,45 @@
  * 展示报告列表，支持分页、Token 列。
  */
 
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
+
 import type { ReportListResponse } from "~/core/api/dashboard";
 
 interface ReportTableProps {
   data: ReportListResponse;
   onPageChange: (page: number) => void;
 }
+
+/** 状态徽章色值 */
+const STATUS_COLORS: Record<
+  string,
+  {
+    lightBg: string;
+    lightText: string;
+    darkBg: string;
+    darkText: string;
+  }
+> = {
+  completed: {
+    lightBg: "#dcfce7",
+    lightText: "#166534",
+    darkBg: "rgba(20,83,45,0.35)",
+    darkText: "#86efac",
+  },
+  cancelled: {
+    lightBg: "#fef9c3",
+    lightText: "#854d0e",
+    darkBg: "rgba(120,53,15,0.35)",
+    darkText: "#fcd34d",
+  },
+  __default: {
+    lightBg: "#f3f4f6",
+    lightText: "#1f2937",
+    darkBg: "rgba(55,65,81,0.4)",
+    darkText: "#d1d5db",
+  },
+};
 
 /**
  * 格式化 token 数量（>= 1000 显示为 "xk"）
@@ -27,8 +60,16 @@ function formatTokens(tokens: number | null | undefined): string {
 }
 
 export function ReportTable({ data, onPageChange }: ReportTableProps) {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const { items, total, page, page_size } = data;
   const totalPages = Math.ceil(total / page_size);
+  const isDark = mounted && resolvedTheme === "dark";
 
   /**
    * 格式化耗时（毫秒转为可读字符串）
@@ -59,7 +100,9 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
 
   if (items.length === 0) {
     return (
-      <div className="py-8 text-center text-gray-400">暂无报告数据</div>
+      <div className="py-8 text-center" style={{ color: "#9ca3af" }}>
+        暂无报告数据
+      </div>
     );
   }
 
@@ -68,7 +111,15 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
       {/* 表格 */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-xs uppercase text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+          <thead
+            className="text-xs uppercase"
+            style={{
+              backgroundColor: isDark
+                ? "rgb(55,65,81)"
+                : "rgb(249,250,251)",
+              color: isDark ? "rgb(156,163,175)" : "rgb(107,114,128)",
+            }}
+          >
             <tr>
               <th className="px-4 py-3">用户</th>
               <th className="px-4 py-3">标题</th>
@@ -79,67 +130,154 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
               <th className="px-4 py-3">生成时间</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {items.map((report) => (
-              <tr
-                key={report.id}
-                className="hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    {report.user_name || report.user_code}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {report.user_code}
-                  </div>
-                </td>
-                <td className="max-w-[240px] truncate px-4 py-3 text-gray-900 dark:text-white">
-                  {report.title}
-                </td>
-                <td className="px-4 py-3">
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                    {report.report_type}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  {report.status === "completed" ? (
-                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-300">
-                      已完成
-                    </span>
-                  ) : report.status === "cancelled" ? (
-                    <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
-                      已取消
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800 dark:bg-gray-900 dark:text-gray-300">
-                      {report.status}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                  <span
-                    className={
-                      (report.estimated_tokens ?? 0) > 10000
-                        ? "font-medium text-orange-600 dark:text-orange-400"
-                        : ""
-                    }
-                    title={
-                      report.estimated_tokens
-                        ? `${report.estimated_tokens.toLocaleString()} tokens`
-                        : "暂无数据"
-                    }
+          <tbody
+            style={{
+              borderColor: isDark
+                ? "rgb(55,65,81)"
+                : "rgb(229,231,235)",
+            }}
+          >
+            {items.map((report) => {
+              const statusStyle =
+                STATUS_COLORS[report.status] ?? STATUS_COLORS.__default!;
+              return (
+                <tr
+                  key={report.id}
+                  className="border-b"
+                  style={{
+                    borderColor: isDark
+                      ? "rgb(55,65,81)"
+                      : "rgb(229,231,235)",
+                  }}
+                  onMouseEnter={(e) => {
+                    (
+                      e.currentTarget as HTMLElement
+                    ).style.backgroundColor = isDark
+                      ? "rgb(31,41,55)"
+                      : "rgb(249,250,251)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.backgroundColor =
+                      "";
+                  }}
+                >
+                  <td className="px-4 py-3">
+                    <div
+                      className="font-medium"
+                      style={{
+                        color: isDark
+                          ? "rgb(243,244,246)"
+                          : "rgb(17,24,39)",
+                      }}
+                    >
+                      {report.user_name || report.user_code}
+                    </div>
+                    <div
+                      className="text-xs"
+                      style={{
+                        color: isDark
+                          ? "rgb(156,163,175)"
+                          : "rgb(107,114,128)",
+                      }}
+                    >
+                      {report.user_code}
+                    </div>
+                  </td>
+                  <td
+                    className="max-w-[240px] truncate px-4 py-3"
+                    style={{
+                      color: isDark
+                        ? "rgb(243,244,246)"
+                        : "rgb(17,24,39)",
+                    }}
                   >
-                    {formatTokens(report.estimated_tokens)}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                  {formatDuration(report.duration_ms)}
-                </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                  {formatTime(report.created_at)}
-                </td>
-              </tr>
-            ))}
+                    {report.title}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{
+                        backgroundColor: isDark
+                          ? "rgba(30,58,95,0.4)"
+                          : "#dbeafe",
+                        color: isDark ? "#93c5fd" : "#1e40af",
+                      }}
+                    >
+                      {report.report_type}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{
+                        backgroundColor: isDark
+                          ? statusStyle.darkBg
+                          : statusStyle.lightBg,
+                        color: isDark
+                          ? statusStyle.darkText
+                          : statusStyle.lightText,
+                      }}
+                    >
+                      {report.status === "completed"
+                        ? "已完成"
+                        : report.status === "cancelled"
+                          ? "已取消"
+                          : report.status}
+                    </span>
+                  </td>
+                  <td
+                    className="px-4 py-3"
+                    style={{
+                      color: isDark
+                        ? "rgb(156,163,175)"
+                        : "rgb(107,114,128)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight:
+                          (report.estimated_tokens ?? 0) > 10000
+                            ? 500
+                            : undefined,
+                        color:
+                          (report.estimated_tokens ?? 0) > 10000
+                            ? isDark
+                              ? "#fb923c"
+                              : "#ea580c"
+                            : undefined,
+                      }}
+                      title={
+                        report.estimated_tokens
+                          ? `${report.estimated_tokens.toLocaleString()} tokens`
+                          : "暂无数据"
+                      }
+                    >
+                      {formatTokens(report.estimated_tokens)}
+                    </span>
+                  </td>
+                  <td
+                    className="px-4 py-3"
+                    style={{
+                      color: isDark
+                        ? "rgb(156,163,175)"
+                        : "rgb(107,114,128)",
+                    }}
+                  >
+                    {formatDuration(report.duration_ms)}
+                  </td>
+                  <td
+                    className="px-4 py-3"
+                    style={{
+                      color: isDark
+                        ? "rgb(156,163,175)"
+                        : "rgb(107,114,128)",
+                    }}
+                  >
+                    {formatTime(report.created_at)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -147,21 +285,40 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
       {/* 分页 */}
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div
+            className="text-sm"
+            style={{
+              color: isDark ? "rgb(156,163,175)" : "rgb(107,114,128)",
+            }}
+          >
             共 {total} 条，第 {page}/{totalPages} 页
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => onPageChange(page - 1)}
               disabled={page <= 1}
-              className="rounded-md border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600"
+              className="rounded-md px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              style={{
+                border: `1px solid ${isDark ? "rgb(75,85,99)" : "rgb(209,213,219)"}`,
+                color: isDark ? "rgb(243,244,246)" : "rgb(17,24,39)",
+                backgroundColor: isDark
+                  ? "rgb(31,41,55)"
+                  : "transparent",
+              }}
             >
               上一页
             </button>
             <button
               onClick={() => onPageChange(page + 1)}
               disabled={page >= totalPages}
-              className="rounded-md border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600"
+              className="rounded-md px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              style={{
+                border: `1px solid ${isDark ? "rgb(75,85,99)" : "rgb(209,213,219)"}`,
+                color: isDark ? "rgb(243,244,246)" : "rgb(17,24,39)",
+                backgroundColor: isDark
+                  ? "rgb(31,41,55)"
+                  : "transparent",
+              }}
             >
               下一页
             </button>

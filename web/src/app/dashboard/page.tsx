@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 
 import { DailyChart } from "~/components/dashboard/daily-chart";
 import { ReportTable } from "~/components/dashboard/report-table";
@@ -25,11 +26,10 @@ import {
   type UserInfo,
 } from "~/core/api/dashboard";
 
-
-
-
 export default function DashboardPage() {
   const router = useRouter();
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
   const [reports, setReports] = useState<ReportListResponse | null>(null);
@@ -42,6 +42,12 @@ export default function DashboardPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted && resolvedTheme === "dark";
 
   // 先检查管理员权限，非管理员直接跳回首页
   useEffect(() => {
@@ -119,19 +125,46 @@ export default function DashboardPage() {
     setPage(1);
   };
 
+  // 通用样式常量
+  const sectionStyle = {
+    border: `1px solid ${isDark ? "rgb(55,65,81)" : "rgb(229,231,235)"}`,
+    borderRadius: "0.5rem",
+    backgroundColor: isDark ? "rgb(31,41,55)" : "rgb(255,255,255)",
+    padding: "1.5rem",
+  };
+
+  const headingStyle = {
+    fontWeight: 500,
+    color: isDark ? "rgb(243,244,246)" : "rgb(17,24,39)",
+  };
+
+  const inputStyle = {
+    border: `1px solid ${isDark ? "rgb(75,85,99)" : "rgb(209,213,219)"}`,
+    borderRadius: "0.375rem",
+    padding: "0.375rem 0.5rem",
+    fontSize: "0.875rem",
+    backgroundColor: isDark ? "rgb(55,65,81)" : "transparent",
+    color: isDark ? "rgb(243,244,246)" : "inherit",
+  };
+
   if (loading && !summary) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-gray-500">加载中...</div>
+        <div style={{ color: "#6b7280" }}>加载中...</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       {/* 当前用户信息 */}
       {user?.is_authenticated && (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div
+          className="text-sm"
+          style={{
+            color: isDark ? "rgb(156,163,175)" : "rgb(107,114,128)",
+          }}
+        >
           当前用户：{user.user_name}（{user.user_code}）
         </div>
       )}
@@ -140,42 +173,76 @@ export default function DashboardPage() {
       {summary && <StatsCards summary={summary} />}
 
       {/* 每日报告量折线图 */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <h2 className="mb-4 text-lg font-medium text-gray-900 dark:text-white">
+      <div style={sectionStyle}>
+        <h2 className="mb-4 text-lg" style={headingStyle}>
           最近 30 天报告生成趋势
         </h2>
         <DailyChart data={dailyStats} />
       </div>
 
       {/* 报告列表 */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+      <div style={sectionStyle}>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+          <h2 className="text-lg" style={headingStyle}>
             报告列表
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
-              <label className="text-xs text-gray-500 dark:text-gray-400">从</label>
+              <label
+                className="text-xs"
+                style={{
+                  color: isDark ? "rgb(156,163,175)" : "rgb(107,114,128)",
+                }}
+              >
+                从
+              </label>
               <input
                 type="date"
                 value={filterStartDate}
                 onChange={(e) => handleStartDateChange(e.target.value)}
-                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                style={inputStyle}
               />
             </div>
             <div className="flex items-center gap-1">
-              <label className="text-xs text-gray-500 dark:text-gray-400">至</label>
+              <label
+                className="text-xs"
+                style={{
+                  color: isDark ? "rgb(156,163,175)" : "rgb(107,114,128)",
+                }}
+              >
+                至
+              </label>
               <input
                 type="date"
                 value={filterEndDate}
                 onChange={(e) => handleEndDateChange(e.target.value)}
-                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                style={inputStyle}
               />
             </div>
             {(filterStartDate || filterEndDate) && (
               <button
-                onClick={() => { setFilterStartDate(""); setFilterEndDate(""); setPage(1); }}
-                className="rounded-md px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+                onClick={() => {
+                  setFilterStartDate("");
+                  setFilterEndDate("");
+                  setPage(1);
+                }}
+                className="rounded-md px-2 py-1.5 text-xs"
+                style={{
+                  color: isDark ? "rgb(156,163,175)" : "rgb(107,114,128)",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = isDark
+                    ? "rgb(229,231,235)"
+                    : "rgb(55,65,81)";
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    isDark ? "rgb(55,65,81)" : "rgb(243,244,246)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = isDark
+                    ? "rgb(156,163,175)"
+                    : "rgb(107,114,128)";
+                  (e.currentTarget as HTMLElement).style.backgroundColor = "";
+                }}
               >
                 清除日期
               </button>
@@ -183,7 +250,7 @@ export default function DashboardPage() {
             <select
               value={filterStatus}
               onChange={(e) => handleStatusFilterChange(e.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              style={inputStyle}
             >
               <option value="">全部状态</option>
               <option value="completed">已完成</option>
@@ -194,14 +261,14 @@ export default function DashboardPage() {
               placeholder="按姓名筛选"
               value={filterUserName}
               onChange={(e) => handleNameFilterChange(e.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              style={inputStyle}
             />
             <input
               type="text"
               placeholder="按用户工号筛选"
               value={filterUserCode}
               onChange={(e) => handleFilterChange(e.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              style={inputStyle}
             />
           </div>
         </div>
