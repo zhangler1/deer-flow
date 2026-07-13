@@ -141,6 +141,39 @@ async def is_user_admin(login_name: str) -> bool:
         return False
 
 
+async def list_admins() -> list[dict]:
+    """列出所有管理员（login_name 及授予时间），按授予时间倒序"""
+    pool = await _get_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "SELECT login_name, created_at FROM user_roles "
+                "WHERE role_name = 'admin' ORDER BY created_at DESC"
+            )
+            rows = await cur.fetchall()
+            return [
+                {
+                    "login_name": r[0],
+                    "created_at": r[1].isoformat() if r[1] else None,
+                }
+                for r in rows
+            ]
+
+
+async def add_admin(login_name: str) -> None:
+    """授予某 login_name 管理员角色（幂等，重复授予不报错）"""
+    pool = await _get_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "INSERT INTO user_roles (login_name, role_name) VALUES (%s, 'admin') "
+                "ON CONFLICT (login_name, role_name) DO NOTHING",
+                (login_name,),
+            )
+            await conn.commit()
+    logger.info(f"已授予管理员角色 | login_name={login_name}")
+
+
 # ─── CRUD ───
 
 async def save_report(report: ReportRecord) -> UUID:

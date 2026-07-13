@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 
+import { AdminManagerDialog } from "~/components/dashboard/admin-manager-dialog";
 import { DailyChart } from "~/components/dashboard/daily-chart";
 import { ReportTable } from "~/components/dashboard/report-table";
 import { StatsCards } from "~/components/dashboard/stats-cards";
@@ -42,6 +43,7 @@ export default function DashboardPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
+  const [showAdminModal, setShowAdminModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -160,12 +162,21 @@ export default function DashboardPage() {
       {/* 当前用户信息 */}
       {user?.is_authenticated && (
         <div
-          className="text-sm"
+          className="flex items-center justify-between text-sm"
           style={{
             color: isDark ? "rgb(156,163,175)" : "rgb(107,114,128)",
           }}
         >
-          当前用户：{user.user_name}（{user.login_name}）
+          <span>
+            当前用户：{user.user_name}（{user.login_name}）
+          </span>
+          <button
+            onClick={() => setShowAdminModal(true)}
+            className="rounded-md px-3 py-1.5 text-sm text-white"
+            style={{ backgroundColor: "rgb(37,99,235)" }}
+          >
+            管理员管理
+          </button>
         </div>
       )}
 
@@ -279,6 +290,13 @@ export default function DashboardPage() {
           />
         )}
       </div>
+
+      {showAdminModal && (
+        <AdminManagerDialog
+          isDark={isDark}
+          onClose={() => setShowAdminModal(false)}
+        />
+      )}
     </div>
   );
 }

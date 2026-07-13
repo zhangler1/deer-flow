@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
 
 from src.storage import report_repository
 from src.storage.models import (
@@ -129,3 +130,25 @@ async def get_current_user(request: Request):
         "source": getattr(user_info, "source", ""),
         "is_admin": is_admin,
     }
+
+
+# ─── 管理员管理（仅管理员） ───
+
+class AddAdminRequest(BaseModel):
+    login_name: str
+
+
+@router.get("/admins")
+async def list_admins(_=Depends(require_admin)):
+    """列出所有管理员（仅管理员）"""
+    return await report_repository.list_admins()
+
+
+@router.post("/admins")
+async def add_admin(body: AddAdminRequest, _=Depends(require_admin)):
+    """新增管理员（仅管理员）"""
+    login_name = body.login_name.strip()
+    if not login_name:
+        raise HTTPException(status_code=400, detail="login_name 不能为空")
+    await report_repository.add_admin(login_name)
+    return {"success": True, "login_name": login_name}

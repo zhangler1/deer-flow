@@ -133,6 +133,34 @@ export async function fetchCurrentUser(): Promise<UserInfo> {
   return resp.json();
 }
 
+// ─── 管理员管理 API ───
+
+export interface AdminRecord {
+  login_name: string;
+  created_at: string | null;
+}
+
+export async function fetchAdmins(): Promise<AdminRecord[]> {
+  const url = resolveServiceURL("dashboard/admins");
+  const resp = await fetch(url, { credentials: "include", headers: await authHeaders() });
+  if (!resp.ok) throw new Error(`Failed to fetch admins: ${resp.status}`);
+  return resp.json();
+}
+
+export async function addAdmin(loginName: string): Promise<void> {
+  const url = resolveServiceURL("dashboard/admins");
+  const resp = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify({ login_name: loginName }),
+  });
+  if (!resp.ok) {
+    const msg = await resp.text().catch(() => "");
+    throw new Error(msg || `Failed to add admin: ${resp.status}`);
+  }
+}
+
 // ─── 用户历史报告 API ───
 
 export interface ReportContentResponse {
