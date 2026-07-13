@@ -190,7 +190,7 @@ key={currentIndex} 让 framer-motion 知道"这是不同的内容"从而触发�
                   "flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors",
                   isSelected
                     ? "border-primary bg-[#f0f4fd] dark:bg-[#0e1825]"
-                    : "border-border hover:border-primary/50 hover:bg-muted/50",
+                    : "border-border hover:border-[rgba(2,101,220,0.5)] dark:hover:border-[rgba(52,168,235,0.5)] hover:bg-[rgba(235,237,245,0.5)] dark:hover:bg-[rgba(38,46,60,0.5)]",
                 )}
                 onClick={() => handleOptionClick(index)}
               >
@@ -225,7 +225,7 @@ key={currentIndex} 让 framer-motion 知道"这是不同的内容"从而触发�
                 "flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors",
                 isSelected
                   ? "border-primary bg-[#f0f4fd] dark:bg-[#0e1825]"
-                  : "border-border hover:border-primary/50 hover:bg-muted/50",
+                  : "border-border hover:border-[rgba(2,101,220,0.5)] dark:hover:border-[rgba(52,168,235,0.5)] hover:bg-[rgba(235,237,245,0.5)] dark:hover:bg-[rgba(38,46,60,0.5)]",
               )}
               onClick={() => handleOptionClick(index)}
             >

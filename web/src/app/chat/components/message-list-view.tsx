@@ -677,7 +677,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
                 <span
                   className={cn(
                     "ml-2 max-w-[500px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal transition-colors duration-200",
-                    message.isStreaming ? "text-primary/80" : "text-muted-foreground",
+                    message.isStreaming ? "text-[rgba(2,101,220,0.8)] dark:text-[rgba(52,168,235,0.8)]" : "text-muted-foreground",
                   )}
                 >
                   : {(currentStreamingKeywords.length > 0 ? currentStreamingKeywords : displayState.preservedSearchKeywords).join(" | ")}
@@ -688,7 +688,7 @@ function IterativeResearchCard({ message }: { message: Message }) {
                 <span
                   className={cn(
                     "ml-2 max-w-[500px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-normal transition-colors duration-200",
-                    message.isStreaming ? "text-primary/80" : "text-muted-foreground",
+                    message.isStreaming ? "text-[rgba(2,101,220,0.8)] dark:text-[rgba(52,168,235,0.8)]" : "text-muted-foreground",
                   )}
                 >
                   : {(currentStreamingUrls.length > 0 ? currentStreamingUrls : displayState.preservedCrawlUrls).join(" | ")}
@@ -989,7 +989,7 @@ function ResearchCard({
       className={cn(
         "w-full cursor-pointer transition-all duration-200 hover:shadow-md hover:border-gray-300",
         isOpen
-          ? "bg-[linear-gradient(109deg,rgb(243,247,255)_0%,white_50%,white_100%)] !bg-transparent ring-1 ring-primary/20 border-primary/30"
+          ? "bg-[linear-gradient(109deg,rgb(243,247,255)_0%,white_50%,white_100%)] !bg-transparent ring-1 ring-[rgba(2,101,220,0.2)] dark:ring-[rgba(52,168,235,0.25)] border-[rgba(2,101,220,0.3)] dark:border-[rgba(52,168,235,0.35)]"
           : "bg-[linear-gradient(to_right,white_0%,white_50%,rgb(243,247,255)_100%)]",
         className,
       )}
@@ -1013,7 +1013,7 @@ function ResearchCard({
             className={cn(
               "shrink-0 flex items-center gap-2 cursor-pointer select-none rounded-full px-2.5 py-1 transition-colors",
               chatModeActive
-                ? "bg-primary/10 text-primary"
+                ? "bg-[rgba(2,101,220,0.1)] dark:bg-[rgba(52,168,235,0.15)] text-primary"
                 : "text-muted-foreground hover:text-foreground",
             )}
             onClick={(e) => e.stopPropagation()}
@@ -1041,7 +1041,7 @@ function ResearchCard({
       </div>
       {/* 进度条：研究进行中 或 有已完成的里程碑 时显示 */}
       {(researchOngoing || hasMilestones) && (
-        <ResearchTimer compact className="border-t border-primary/10" />
+        <ResearchTimer compact className="border-t border-[rgba(2,101,220,0.1)] dark:border-[rgba(52,168,235,0.15)]" />
       )}
     </Card>
   );
@@ -1108,7 +1108,7 @@ export function HistoricalReportCard({
           className={cn(
             "shrink-0 flex items-center gap-2 cursor-pointer select-none rounded-full px-2.5 py-1 transition-colors",
             isActive
-              ? "bg-primary/10 text-primary"
+              ? "bg-[rgba(2,101,220,0.1)] dark:bg-[rgba(52,168,235,0.15)] text-primary"
               : "text-muted-foreground hover:text-foreground",
           )}
           onClick={(e) => e.stopPropagation()}

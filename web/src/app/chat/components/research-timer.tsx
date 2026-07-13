@@ -118,7 +118,7 @@ function MilestoneDot({
       sideOffset={6}
     >
       <div
-        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full border-2 border-white bg-green-500 shadow-sm transition-all duration-300 z-10 cursor-pointer"
+        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full border-2 border-white bg-[#22c55e] shadow-sm transition-all duration-300 z-10 cursor-pointer"
         style={{
           left: `${position}%`,
           width: size,
@@ -202,7 +202,7 @@ export function ResearchTimer({ className, compact = false }: ResearchTimerProps
       <div className="flex items-center justify-between mb-1">
         <span className={cn(
           "text-xs font-medium",
-          reporterCompletedAt ? "text-green-600" : "text-primary",
+          reporterCompletedAt ? "text-[#16a34a]" : "text-primary",
         )}>
           {phaseLabel}
         </span>
@@ -211,7 +211,7 @@ export function ResearchTimer({ className, compact = false }: ResearchTimerProps
           <span className="mx-1 text-muted-foreground/50">·</span>
           <span className={cn(
             "font-medium",
-            reporterCompletedAt ? "text-green-600" : "text-primary",
+            reporterCompletedAt ? "text-[#16a34a]" : "text-primary",
           )}>
             {progress}%
           </span>
@@ -220,7 +220,7 @@ export function ResearchTimer({ className, compact = false }: ResearchTimerProps
 
       {/* 进度条（含里程碑圆点） */}
       <div className={cn(
-        "relative w-full rounded-full bg-primary/15",
+        "relative w-full rounded-full bg-[rgba(2,101,220,0.15)] dark:bg-[rgba(52,168,235,0.2)]",
         compact ? "h-1" : "h-1.5",
         compact ? "my-1.5" : "my-2",
       )}>
@@ -228,7 +228,7 @@ export function ResearchTimer({ className, compact = false }: ResearchTimerProps
         <div
           className={cn(
             "absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out",
-            reporterCompletedAt ? "bg-green-500" : "bg-primary",
+            reporterCompletedAt ? "bg-[#22c55e]" : "bg-primary",
           )}
           style={{ width: `${progress}%` }}
         />
