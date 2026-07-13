@@ -105,7 +105,7 @@ export async function fetchSummary(): Promise<DashboardSummary> {
 export async function fetchReports(params: {
   page?: number;
   page_size?: number;
-  user_code?: string;
+  login_name?: string;
   user_name?: string;
   status?: string;
   start_date?: string;
@@ -114,7 +114,7 @@ export async function fetchReports(params: {
   const searchParams = new URLSearchParams();
   if (params.page) searchParams.set("page", String(params.page));
   if (params.page_size) searchParams.set("page_size", String(params.page_size));
-  if (params.user_code) searchParams.set("user_code", params.user_code);
+  if (params.login_name) searchParams.set("login_name", params.login_name);
   if (params.user_name) searchParams.set("user_name", params.user_name);
   if (params.status) searchParams.set("status", params.status);
   if (params.start_date) searchParams.set("start_date", params.start_date);

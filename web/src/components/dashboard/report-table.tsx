@@ -170,7 +170,7 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
                           : "rgb(17,24,39)",
                       }}
                     >
-                      {report.user_name || report.user_code}
+                      {report.user_name || report.login_name}
                     </div>
                     <div
                       className="text-xs"
@@ -180,7 +180,7 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
                           : "rgb(107,114,128)",
                       }}
                     >
-                      {report.user_code}
+                      {report.login_name}
                     </div>
                   </td>
                   <td

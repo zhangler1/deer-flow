@@ -282,8 +282,8 @@ async def get_reports_paginated(
     conditions = []
     params = []
     if login_name:
-        conditions.append("login_name = %s")
-        params.append(login_name)
+        conditions.append("login_name ILIKE %s")
+        params.append(f"%{login_name}%")
     if user_name:
         conditions.append("user_name ILIKE %s")
         params.append(f"%{user_name}%")

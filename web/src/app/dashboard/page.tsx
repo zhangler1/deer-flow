@@ -37,7 +37,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [page, setPage] = useState(1);
-  const [filterUserCode, setFilterUserCode] = useState("");
+  const [filterLoginName, setFilterLoginName] = useState("");
   const [filterUserName, setFilterUserName] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterStartDate, setFilterStartDate] = useState("");
@@ -71,7 +71,7 @@ export default function DashboardPage() {
         fetchReports({
           page,
           page_size: 20,
-          user_code: filterUserCode || undefined,
+          login_name: filterLoginName || undefined,
           user_name: filterUserName || undefined,
           status: filterStatus || undefined,
           start_date: filterStartDate || undefined,
@@ -88,7 +88,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filterUserCode, filterUserName, filterStatus, filterStartDate, filterEndDate]);
+  }, [page, filterLoginName, filterUserName, filterStatus, filterStartDate, filterEndDate]);
 
   useEffect(() => {
     if (authChecked) {
@@ -100,8 +100,8 @@ export default function DashboardPage() {
     setPage(newPage);
   };
 
-  const handleFilterChange = (userCode: string) => {
-    setFilterUserCode(userCode);
+  const handleFilterChange = (loginName: string) => {
+    setFilterLoginName(loginName);
     setPage(1);
   };
 
@@ -165,7 +165,7 @@ export default function DashboardPage() {
             color: isDark ? "rgb(156,163,175)" : "rgb(107,114,128)",
           }}
         >
-          当前用户：{user.user_name}（{user.user_code}）
+          当前用户：{user.user_name}（{user.login_name}）
         </div>
       )}
 
@@ -265,8 +265,8 @@ export default function DashboardPage() {
             />
             <input
               type="text"
-              placeholder="按用户工号筛选"
-              value={filterUserCode}
+              placeholder="按OA筛选"
+              value={filterLoginName}
               onChange={(e) => handleFilterChange(e.target.value)}
               style={inputStyle}
             />
