@@ -113,6 +113,8 @@ services:
     environment:
       - MINIO_ROOT_USER=deerflow
       - MINIO_ROOT_PASSWORD=deerflow_minio_2025
+      # 子路径反代 Console 必需：nginx 对外可访问的完整地址（协议+域名+子路径）
+      - MINIO_BROWSER_REDIRECT_URL=http://eaip-chn-slb-7006.bocomm.com/deep-research-deerflow/minio-console
     ports:
       - "9005:9001"   # 控制台端口
     volumes:
