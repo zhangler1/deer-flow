@@ -87,7 +87,7 @@ const starterKit = StarterKit.configure({
   },
   orderedList: {
     HTMLAttributes: {
-      class: cx("list-decimal list-outside leading-3 -mt-2"),
+      class: cx("list-decimal list-outside"),
     },
   },
   listItem: {
