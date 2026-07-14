@@ -68,11 +68,11 @@ export function Markdown({
           dropMarkdownQuote(processKatexInMarkdown(children ?? "")) ?? "",
         )}
       </ReactMarkdown>
-      {enableCopy && typeof children === "string" && (
+      {/* {enableCopy && typeof children === "string" && (
         <div className="flex">
           <CopyButton content={children} />
         </div>
-      )}
+      )} */}
     </div>
   );
 }
