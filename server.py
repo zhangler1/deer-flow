@@ -40,6 +40,15 @@ if os.getenv("ELLM_LOG_DEBUG", "").lower() in ("1", "true", "yes"):
     logging.getLogger("src.llms.providers.ellm_apikey_manager").setLevel(logging.DEBUG)
     logger.info("ELLM_LOG_DEBUG enabled: src.llms.providers.ellm[_apikey_manager] -> DEBUG")
 
+# ── 内存诊断开关 ──
+# 设置 MEM_DEBUG=1（或 true / yes）时开启 tracemalloc，配合 /debug/tracemalloc 端点
+# 定位内存分配的具体代码行。容器 reload=False、单进程，此处开启即覆盖全部分配。
+# 仅用于临时排查内存缓慢增长，问题定位后应移除。
+if os.getenv("MEM_DEBUG", "").lower() in ("1", "true", "yes"):
+    import tracemalloc
+    tracemalloc.start(25)  # 25 = 保留 25 层调用栈
+    logger.info("MEM_DEBUG enabled: tracemalloc.start(25) 已开启，/debug/* 端点可用")
+
 # To ensure compatibility with Windows event loop issues when using Uvicorn and Asyncio Checkpointer,
 # This is necessary because some libraries expect a selector-based event loop.
 # This is a workaround for issues with Uvicorn and Watchdog on Windows.

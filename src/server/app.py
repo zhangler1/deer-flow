@@ -182,6 +182,175 @@ async def health_check():
     return {"status": "ok", "service": "deer-flow-backend"}
 
 
+# ========== 临时内存诊断端点（排查内存缓慢增长用，定位后请删除） ==========
+# 三个 /debug/* 端点统一由环境变量 MEM_DEBUG 门控，未开启一律 404，
+# 避免生产环境长期暴露调试接口。
+
+
+def _require_mem_debug() -> None:
+    """未开启 MEM_DEBUG 时抛 404，隐藏调试端点。"""
+    if os.getenv("MEM_DEBUG", "").lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
+# 保存上一次各类型实例数快照，用于计算增量
+_MEM_SNAPSHOT: dict[str, int] = {}
+
+
+@app.get("/debug/memory")
+async def debug_memory(top: int = 30, reset: bool = False):
+    """诊断内存增长：对比两次调用之间各类型实例数的增量。
+
+    用法：
+    - 第一次调用：记录基线，返回当前实例数最多的 Top N 类型。
+    - 间隔一段时间（让内存继续涨）再调用：返回相对上一次快照
+      增长最多的类型，delta 最大的即为泄漏嫌疑对象。
+    - reset=true：重置基线重新开始。
+
+    纯标准库实现（gc + Counter），无需额外依赖。仅用于临时排查，
+    问题定位后应删除本端点。
+    """
+    _require_mem_debug()
+    import gc
+    from collections import Counter
+
+    global _MEM_SNAPSHOT
+    gc.collect()  # 先触发回收，排除待回收对象的干扰
+
+    counts: Counter = Counter()
+    for obj in gc.get_objects():
+        counts[type(obj).__name__] += 1
+
+    total = sum(counts.values())
+
+    # 首次调用或显式重置：只记基线
+    if reset or not _MEM_SNAPSHOT:
+        _MEM_SNAPSHOT = dict(counts)
+        return {
+            "mode": "baseline",
+            "total_objects": total,
+            "top_types": counts.most_common(top),
+        }
+
+    # 计算相对上一次快照的增量，按 delta 降序
+    growth = sorted(
+        (
+            {"type": name, "count": cnt, "delta": cnt - _MEM_SNAPSHOT.get(name, 0)}
+            for name, cnt in counts.items()
+        ),
+        key=lambda x: x["delta"],
+        reverse=True,
+    )
+    _MEM_SNAPSHOT = dict(counts)  # 刷新基线为本次，便于下次看"距上次"增量
+    return {
+        "mode": "growth",
+        "total_objects": total,
+        "top_growth": growth[:top],
+    }
+
+
+# 保存上一次 tracemalloc 快照，用于计算分配增量
+_TM_SNAPSHOT = None
+
+
+@app.get("/debug/tracemalloc")
+async def debug_tracemalloc(top: int = 20, reset: bool = False):
+    """诊断内存分配来源：对比两次快照，定位到具体的分配代码行。
+
+    前置条件：需在 server.py 启动处开启 tracemalloc（MEM_DEBUG=1 时自动开启）。
+    用法：
+    - 第一次调用：记录基线快照。
+    - 间隔一段时间（让内存继续涨）再调用：返回按 size_diff 降序的
+      Top N 代码行（文件:行号 + 增量大小 + 增量对象数）。
+    - reset=true：重置基线重新开始。
+    """
+    _require_mem_debug()
+    import tracemalloc
+
+    global _TM_SNAPSHOT
+    if not tracemalloc.is_tracing():
+        return {
+            "error": "tracemalloc 未开启",
+            "hint": "请确认 MEM_DEBUG=1 且 server.py 启动处已调用 tracemalloc.start(25)",
+        }
+
+    snapshot = tracemalloc.take_snapshot()
+
+    if reset or _TM_SNAPSHOT is None:
+        _TM_SNAPSHOT = snapshot
+        return {"mode": "baseline", "msg": "已记录基线，稍后再调一次查看增量"}
+
+    stats = snapshot.compare_to(_TM_SNAPSHOT, "lineno")
+    _TM_SNAPSHOT = snapshot  # 刷新基线为本次
+    return {
+        "mode": "diff",
+        "top": [
+            {
+                "where": str(s.traceback),
+                "size_diff_kb": s.size_diff // 1024,
+                "count_diff": s.count_diff,
+                "cur_size_kb": s.size // 1024,
+            }
+            for s in stats[:top]
+        ],
+    }
+
+
+@app.get("/debug/refchain")
+async def debug_refchain(type_name: str = Query(..., alias="type"), limit: int = 3):
+    """诊断引用持有者：为指定类型的实例生成反向引用链，定位"谁在持有它"。
+
+    参数：
+    - type：类名（如 AIMessage / dict），取该类型的样本对象。
+    - limit：采样对象个数（默认 3）。
+
+    使用 objgraph 生成文本引用链，输出到挂载目录 /app/src/ 便于宿主机查看。
+    依赖 objgraph（需已安装），仅文本输出，不依赖系统 graphviz。
+    """
+    _require_mem_debug()
+    try:
+        import objgraph
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="objgraph 未安装，请先 uv pip install objgraph",
+        )
+
+    objs = objgraph.by_type(type_name)
+    if not objs:
+        return {"type": type_name, "count": 0, "msg": "当前无该类型实例"}
+
+    out_path = f"/app/src/refchain_{type_name}.txt"
+    samples = objs[-limit:]  # 取较新的若干个样本
+    chains = []
+    for i, obj in enumerate(samples):
+        chain = objgraph.find_backref_chain(obj, objgraph.is_proper_module)
+        chains.append(
+            {
+                "sample": i,
+                "chain_len": len(chain),
+                "chain": [type(o).__name__ for o in chain],
+            }
+        )
+
+    # 为最后一个样本生成详细引用链文本文件
+    try:
+        objgraph.show_chain(
+            objgraph.find_backref_chain(samples[-1], objgraph.is_proper_module),
+            filename=out_path,
+        )
+    except Exception as e:  # 画链失败不影响返回摘要
+        logger.warning(f"[DEBUG_REFCHAIN] show_chain 失败: {e}")
+
+    return {
+        "type": type_name,
+        "count": len(objs),
+        "sampled": len(samples),
+        "chains": chains,
+        "detail_file": out_path,
+    }
+
+
 # 默认预估报告生成时长（毫秒），当无历史数据时使用此兜底值
 _DEFAULT_ESTIMATED_DURATION_MS = 120_000  # 2 分钟
 

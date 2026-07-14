@@ -38,6 +38,8 @@ services:
       - NODE_ID=docker-${HOSTNAME}
     expose:
       - "8000"
+    cap_add:
+      - SYS_PTRACE
     volumes:
       - ./conf.yaml:/app/conf.yaml:ro
       - ./conf.internal.yaml:/app/conf.internal.yaml:ro
