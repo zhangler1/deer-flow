@@ -44,6 +44,7 @@ services:
       - ./conf.yaml:/app/conf.yaml:ro
       - ./conf.internal.yaml:/app/conf.internal.yaml:ro
       - ./pyproject.toml:/app/pyproject.toml
+      - ./server.py:/app/server.py
       - ./src:/app/src
       - ./tests:/app/tests
       - ./skills:/app/skills
