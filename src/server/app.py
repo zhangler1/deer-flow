@@ -319,6 +319,14 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                 _graph_task.cancel()
             cancel_event.set()  # 确保无论如何都通知下游停止
             _cancel_registry.unregister(thread_id)
+
+            # ─── 兜底清理：不管流如何结束，都清掉 InMemoryStore 中的 SSE chunk ───
+            try:
+                from src.graph.checkpoint import _default_manager
+                _default_manager.cleanup_thread(thread_id)
+            except Exception as _cleanup_err:
+                logger.debug(f"[CLEANUP] 兜底清理失败 | thread_id={thread_id} | {_cleanup_err}")
+
             _stream_total = time.time() - _stream_start
             enhanced_logger.logger.info(
                 f"✅ STREAM_FINISHED | thread_id={thread_id} | "

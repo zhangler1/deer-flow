@@ -3,6 +3,7 @@
 
 import json
 import logging
+import sys
 import uuid
 from datetime import datetime
 from typing import List, Optional, Tuple
@@ -12,6 +13,7 @@ from psycopg.rows import dict_row
 from langgraph.store.memory import InMemoryStore
 from src.config.loader import get_bool_env, get_str_env
 
+logger = logging.getLogger(__name__)
 
 class ChatStreamManager:
     """Manages chat stream messages with persistent storage and in-memory caching.
@@ -254,6 +256,42 @@ class ChatStreamManager:
             if self.postgres_conn:
                 self.postgres_conn.rollback()
             return False
+
+    def cleanup_thread(self, thread_id: str) -> int:
+        """清理指定 thread_id 在 InMemoryStore 中的所有 chunk，释放内存。
+
+        用于流异常结束（断连/取消/超时）时的兜底清理，
+        避免 InMemoryStore 无限增长。
+
+        Args:
+            thread_id: 要清理的会话线程 ID
+
+        Returns:
+            int: 清理的 chunk 数量，-1 表示出错
+        """
+        store_namespace: Tuple[str, str] = ("messages", thread_id)
+        try:
+            cursor = self.store.get(store_namespace, "cursor")
+            if cursor is None:
+                return 0
+            final_index = int(cursor.value.get("index", 0))
+            total_bytes = 0
+            for i in range(final_index + 1):
+                item = self.store.get(store_namespace, f"chunk_{i}")
+                if item is not None:
+                    total_bytes += sys.getsizeof(str(item.value))
+                self.store.delete(store_namespace, f"chunk_{i}")
+            self.store.delete(store_namespace, "cursor")
+            logger.info(
+                f"Finally cleaned up {final_index + 1} chunks ({total_bytes / 1024:.1f} KB) "
+                f"from memory for thread {thread_id}"
+            )
+            return final_index + 1
+        except Exception as e:
+            logger.warning(
+                f"Failed to clean up memory store for thread {thread_id}: {e}"
+            )
+            return -1
 
     def close(self) -> None:
         """Close database connections."""
