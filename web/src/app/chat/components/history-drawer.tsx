@@ -1,11 +1,20 @@
 "use client";
 
-import { Home, Search, FileText, Clock, ChevronRight, Building2 } from "lucide-react";
+import { Home, Search, FileText, Clock, ChevronRight, Building2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "~/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import {
+  deleteReport,
   fetchCurrentUser,
   fetchMyReports,
   fetchReportContent,
@@ -27,6 +36,10 @@ export function HistoryDrawer() {
   const [keyword, setKeyword] = useState("");
   const [loadingContentId, setLoadingContentId] = useState<string | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
+
+  // 待确认删除的报告（非 null 时弹出确认对话框）
+  const [pendingDelete, setPendingDelete] = useState<ReportRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // GUIP 用户信息（从 GuipAPI.xc2.js 获取）
   const { userInfo: guipUser } = useGuipInfo();
@@ -110,6 +123,21 @@ export function HistoryDrawer() {
     useStore.getState().closeReportViewer();
     useStore.setState({ drawerOpen: false });
   }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await deleteReport(pendingDelete.id);
+      setReports((prev) => prev.filter((r) => r.id !== pendingDelete.id));
+      setTotal((prev) => Math.max(0, prev - 1));
+      setPendingDelete(null);
+    } catch (err) {
+      console.error("[HistoryDrawer] 删除报告失败:", err);
+    } finally {
+      setDeleting(false);
+    }
+  }, [pendingDelete]);
 
   const formatDuration = (ms: number | null) => {
     if (!ms) return "";
@@ -204,32 +232,48 @@ export function HistoryDrawer() {
           ) : (
             <div className="flex flex-col gap-0.5">
               {reports.map((report) => (
-                <button
+                <div
                   key={report.id}
                   className={cn(
-                    "flex w-full flex-col gap-1 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-gray-50",
+                    "group relative flex w-full rounded-lg transition-colors hover:bg-gray-50",
                     loadingContentId === report.id && "opacity-60",
                   )}
-                  onClick={() => handleClickReport(report)}
-                  disabled={loadingContentId === report.id}
                 >
-                  <div className="flex items-start gap-2">
-                    <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3b82f6]" />
-                    <span className="line-clamp-2 text-sm font-medium text-gray-800 leading-tight">
-                      {report.title}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 pl-5.5 text-xs text-gray-400">
-                    <span>{formatDate(report.created_at)}</span>
-                    {report.duration_ms && (
-                      <>
-                        <span>·</span>
-                        <Clock className="h-3 w-3" />
-                        <span>{formatDuration(report.duration_ms)}</span>
-                      </>
-                    )}
-                  </div>
-                </button>
+                  <button
+                    className="flex min-w-0 flex-1 flex-col gap-1 px-3 py-2.5 text-left"
+                    onClick={() => handleClickReport(report)}
+                    disabled={loadingContentId === report.id}
+                  >
+                    <div className="flex items-start gap-2 pr-5">
+                      <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3b82f6]" />
+                      <span className="line-clamp-2 text-sm font-medium text-gray-800 leading-tight">
+                        {report.title}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 pl-5.5 text-xs text-gray-400">
+                      <span>{formatDate(report.created_at)}</span>
+                      {report.duration_ms && (
+                        <>
+                          <span>·</span>
+                          <Clock className="h-3 w-3" />
+                          <span>{formatDuration(report.duration_ms)}</span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                  {/* 删除按钮：悬浮时显示 */}
+                  <button
+                    className="absolute right-1.5 top-1.5 rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 hover:text-red-500 focus:opacity-100 group-hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingDelete(report);
+                    }}
+                    title="删除报告"
+                    aria-label="删除报告"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -291,6 +335,39 @@ export function HistoryDrawer() {
           return null;
         })()}
       </div>
+
+      {/* 删除确认对话框 */}
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDelete(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>删除报告</DialogTitle>
+            <DialogDescription>
+              确定要删除报告“{pendingDelete?.title}”吗？删除后将不再显示在历史列表中。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPendingDelete(null)}
+              disabled={deleting}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={deleting}
+            >
+              {deleting ? "删除中..." : "删除"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -203,6 +203,17 @@ export async function fetchReportContent(reportId: string): Promise<ReportConten
   return resp.json();
 }
 
+/** 逻辑删除报告（软删除，后端标记 is_deleted=TRUE）。reportId 支持 UUID 或 thread_id。 */
+export async function deleteReport(reportId: string): Promise<void> {
+  const url = resolveServiceURL(`reports/${reportId}`);
+  const resp = await fetch(url, {
+    method: "DELETE",
+    credentials: "include",
+    headers: await authHeaders(),
+  });
+  if (!resp.ok) throw new Error(`Failed to delete report: ${resp.status}`);
+}
+
 export async function continueReport(reportId: string): Promise<ContinueReportResponse> {
   const url = resolveServiceURL(`reports/${reportId}/continue`);
   const resp = await fetch(url, {

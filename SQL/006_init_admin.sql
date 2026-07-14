@@ -11,7 +11,10 @@
 -- 特性：幂等，可安全重复执行（表、角色、管理员均使用 IF NOT EXISTS / ON CONFLICT）。
 --
 -- 执行方式（示例）：
+-- psql -U deerflow -d deerflow_checkpoint -c "select * from user_roles limit 20; " 
 --   psql -h <host> -U <user> -d <database> -f SQL/006_init_admin.sql
+-- docker exec -i deer-flow-postgres psql -U deerflow -d deerflow_checkpoint < SQL/002_create_reports_table.sql
+-- docker exec -it deer-flow-postgres psql -U deerflow -d deerflow_checkpoint -c "\dt"
 -- ============================================================================
 
 BEGIN;

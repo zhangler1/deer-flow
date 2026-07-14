@@ -62,6 +62,11 @@ class UpdateReportResponse(BaseModel):
     file_size: int
 
 
+class DeleteReportResponse(BaseModel):
+    """逻辑删除报告响应"""
+    success: bool
+
+
 # ─── 辅助函数 ───
 
 
@@ -272,6 +277,26 @@ async def update_report(report_id: str, request: Request, body: UpdateReportRequ
     return UpdateReportResponse(
         success=True, object_name=object_name, file_size=file_size
     )
+
+
+@router.delete("/{report_id}", response_model=DeleteReportResponse)
+async def delete_report(report_id: str, request: Request):
+    """逻辑删除报告（标记 is_deleted=TRUE，不物理删除 MinIO 文件）
+
+    report_id 支持 UUID 或 thread_id，含 login_name 权限校验。
+    """
+    login_name = _get_current_login_name(request)
+    record = await _resolve_report_record(report_id, login_name)
+
+    deleted = await report_repository.soft_delete_report(record.id, login_name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="报告不存在或已删除")
+
+    logger.info(
+        f"[REPORT_HISTORY] 报告已逻辑删除 | report_id={report_id} | "
+        f"login_name={login_name} | title={record.title[:50]}"
+    )
+    return DeleteReportResponse(success=True)
 
 
 @router.post("/{report_id}/chat")
