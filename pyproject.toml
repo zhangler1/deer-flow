@@ -28,7 +28,6 @@ dependencies = [
     "langchain-mcp-adapters>=0.2.2",
     "langchain-deepseek>=0.1.3",
     "langchain-google-genai>=4.2.2",
-    "tavily-python>=0.7.17",  # Tavily 搜索 SDK（对齐 2.0，替代 langchain-community 的 tavily 子模块）
     # "langgraph-checkpoint-mongodb>=0.1.4",  # removed: 对齐 2.0，不再使用 MongoDB checkpoint
     # "mongomock>=4.3.0",  # removed: 不再使用 MongoDB，mongomock 不再需要
     "langgraph-checkpoint-postgres>=3.0.5",
@@ -50,6 +49,8 @@ dependencies = [
     "aiohttp>=3.8.4",
     "minio>=7.2.0",
     # "langchain-community>=0.3.19",  # removed: Tavily 已迁移到 tavily-python（对齐 2.0）；其他搜索工具（DuckDuckGo/Brave/Arxiv/Wikipedia）可选安装
+    "py-spy>=0.4.2",
+    "objgraph>=3.6.2",
 ]
 
 [project.optional-dependencies]
