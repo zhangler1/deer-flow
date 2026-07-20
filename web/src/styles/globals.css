@@ -156,38 +156,38 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: rgb(10, 10, 10);
   --app-background: var(--background);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 20%);
-  --input: oklch(1 0 0 / 25%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --foreground: rgb(250, 250, 250);
+  --card: rgb(23, 23, 23);
+  --card-foreground: rgb(250, 250, 250);
+  --popover: rgb(23, 23, 23);
+  --popover-foreground: rgb(250, 250, 250);
+  --primary: rgb(229, 229, 229);
+  --primary-foreground: rgb(23, 23, 23);
+  --secondary: rgb(38, 38, 38);
+  --secondary-foreground: rgb(250, 250, 250);
+  --muted: rgb(38, 38, 38);
+  --muted-foreground: rgb(161, 161, 161);
+  --accent: rgb(38, 38, 38);
+  --accent-foreground: rgb(250, 250, 250);
+  --destructive: rgb(255, 100, 103);
+  --border: rgba(255, 255, 255, 0.2);
+  --input: rgba(255, 255, 255, 0.25);
+  --ring: rgb(115, 115, 115);
+  --chart-1: rgb(20, 71, 230);
+  --chart-2: rgb(0, 188, 125);
+  --chart-3: rgb(254, 154, 0);
+  --chart-4: rgb(173, 70, 255);
+  --chart-5: rgb(255, 32, 86);
+  --sidebar: rgb(23, 23, 23);
+  --sidebar-foreground: rgb(250, 250, 250);
+  --sidebar-primary: rgb(20, 71, 230);
+  --sidebar-primary-foreground: rgb(250, 250, 250);
+  --sidebar-accent: rgb(38, 38, 38);
+  --sidebar-accent-foreground: rgb(250, 250, 250);
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: rgb(115, 115, 115);
   --brand: rgb(17, 103, 234);
 
   --novel-highlight-default: #000000;
@@ -203,24 +203,24 @@
 
 .theme-sunset {
   --app-background: #fff1e6;
-  --background: oklch(1 0 0);
+  --background: rgb(255, 255, 255);
   --foreground: rgba(0, 0, 0, 0.85);
   --card: var(--background);
   --card-foreground: var(--foreground);
   --popover: var(--background);
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.7 0.16 30);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0.03 30);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0.02 30);
-  --muted-foreground: oklch(0.45 0.02 30);
-  --accent: oklch(0.96 0.05 20);
-  --accent-foreground: oklch(0.22 0.02 30);
-  --destructive: oklch(0.65 0.22 30);
-  --border: oklch(0.93 0 0);
-  --input: oklch(0.93 0 0);
-  --ring: oklch(0.70 0 0);
+  --primary: rgb(241, 114, 96);
+  --primary-foreground: rgb(250, 250, 250);
+  --secondary: rgb(255, 238, 233);
+  --secondary-foreground: rgb(23, 23, 23);
+  --muted: rgb(255, 241, 237);
+  --muted-foreground: rgb(96, 81, 79);
+  --accent: rgb(255, 229, 228);
+  --accent-foreground: rgb(35, 23, 21);
+  --destructive: rgb(248, 67, 49);
+  --border: rgb(232, 232, 232);
+  --input: rgb(232, 232, 232);
+  --ring: rgb(158, 158, 158);
   --brand: #ff7a59;
 }
 
