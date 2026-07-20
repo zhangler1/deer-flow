@@ -10,6 +10,7 @@ import { useTranslations } from "next-intl";
 import { Suspense, useEffect, useState } from "react";
 
 import { Tooltip } from "~/components/deer-flow/tooltip";
+import { withBasePath } from "~/core/utils/base-path";
 import { Button } from "~/components/ui/button";
 import { fetchCurrentUser, type UserInfo } from "~/core/api/dashboard";
 import { useStore } from "~/core/store";
@@ -43,11 +44,7 @@ export default function HomePage() {
   }, []);
 
   const handleBack = () => {
-    if (window.history.length > 1) {
-      router.back();
-    } else {
-      router.push('/');
-    }
+    window.location.href = withBasePath('/chat');
   };
 
   return (
@@ -75,7 +72,7 @@ export default function HomePage() {
               )}
             </Button>
           </Tooltip>
-          <Tooltip title="返回上一页">
+          <Tooltip title="返回主页">
             <Button
               variant="ghost"
               size="icon"

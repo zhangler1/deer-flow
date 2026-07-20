@@ -282,7 +282,7 @@ export function ReportViewer({ className }: { className?: string }) {
               />
             )}
 
-            {/* 继续对话按钮 */}
+            {/* 继续对话按钮 — 临时注释
             <div className="mt-12 flex justify-center border-t border-gray-100 pt-8">
               <Button
                 variant="default"
@@ -299,6 +299,7 @@ export function ReportViewer({ className }: { className?: string }) {
                 基于此报告继续对话
               </Button>
             </div>
+            */}
           </div>
         </ScrollContainer>
       </Card>
