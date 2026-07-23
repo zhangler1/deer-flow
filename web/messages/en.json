@@ -142,6 +142,8 @@
       "stopTooltip": "Click to stop generating",
       "uploadingTooltip": "File is being uploaded, please wait for upload to complete",
       "uploadingToast": "File is being uploaded, please wait for upload to complete before sending",
+      "attachmentErrorTooltip": "Attachment has an error, please remove it before sending",
+      "attachmentErrorToast": "Attachment has an error (e.g., file size exceeded), please remove it before sending",
       "searchEngine": "Search Engine",
       "on": "On",
       "off": "Off"

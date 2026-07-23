@@ -140,6 +140,8 @@
       "stopTooltip": "点击停止生成",
       "uploadingTooltip": "文件正在上传中，请等待上传完成",
       "uploadingToast": "文件正在上传中，请等待上传完成后再发送",
+      "attachmentErrorTooltip": "附件存在错误，请先移出后再发送",
+      "attachmentErrorToast": "附件存在错误（如文件超出大小限制），请先移出后再发送",
       "searchEngine": "搜索引擎",
       "on": "开启",
       "off": "关闭"
