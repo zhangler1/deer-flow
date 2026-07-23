@@ -100,6 +100,14 @@ export function InputBox({
     [attachments],
   );
 
+  // 检查是否有附件存在错误（如文件超出大小限制）
+  const hasAttachmentError = useMemo(
+    () => attachments.some((a) => a.status === "error"),
+    [attachments],
+  );
+
+  const cannotSend = isUploading || hasAttachmentError;
+
   // 当配置加载后，如果 reporterModel 为空，则用 default 初始化
   useEffect(() => {
     if (config?.reporter_options?.default && !reporterModel) {
@@ -118,6 +126,11 @@ export function InputBox({
         // 检查是否有文件正在上传
         if (attachments.some((a) => a.status === "uploading" || a.status === "pending")) {
           toast.warning(t("uploadingToast"));
+          return;
+        }
+        // 检查是否有附件存在错误（如文件超出大小限制）
+        if (attachments.some((a) => a.status === "error")) {
+          toast.warning(t("attachmentErrorToast"));
           return;
         }
         if (onSend) {
@@ -304,7 +317,7 @@ export function InputBox({
           onEnter={handleSendMessage}
           onChange={setCurrentPrompt}
           maxLength={MAX_CHARS}
-          disableSubmit={isUploading}
+          disableSubmit={cannotSend}
         />
       </div>
       <div className="flex items-center px-4 py-2">
@@ -409,14 +422,14 @@ export function InputBox({
           </Tooltip>
           <Tooltip
             className="max-w-60"
-            title={isUploading ? t("uploadingTooltip") : responding ? t("stopTooltip") : t("sendTooltip")}
+            title={cannotSend ? (hasAttachmentError ? t("attachmentErrorTooltip") : t("uploadingTooltip")) : responding ? t("stopTooltip") : t("sendTooltip")}
           >
             <Button
               variant="outline"
               size="icon"
               className={cn("h-10 w-10 rounded-full")}
               onClick={() => inputRef.current?.submit()}
-              disabled={isUploading}
+              disabled={cannotSend}
             >
               {responding ? (
                 <div className="flex h-10 w-10 items-center justify-center">
