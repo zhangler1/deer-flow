@@ -114,6 +114,9 @@ _message_content_buffer: Dict[str, str] = {}
 # Key: message_id, Value: tuple (tag, matched_text)
 _round_progress_detected: Dict[str, tuple] = {}
 
+# 首次请求开始时间缓存（keyed by thread_id，用于跨 interrupt-resume 累积耗时）
+_first_start_times: dict[str, float] = {}
+
 INTERNAL_SERVER_ERROR_DETAIL = "Internal Server Error"
 
 app = FastAPI(
@@ -488,6 +491,7 @@ async def chat_stream(request: ChatRequest, raw_request: Request):
                 _graph_task.cancel()
             cancel_event.set()  # 确保无论如何都通知下游停止
             _cancel_registry.unregister(thread_id)
+            _first_start_times.pop(thread_id, None)  # 清理首次请求开始时间缓存，防止内存泄漏
 
             # ─── 兜底清理：不管流如何结束，都清掉 InMemoryStore 中的 SSE chunk ───
             try:
@@ -930,6 +934,9 @@ async def _stream_graph_events(
     branch_id: int = None, login_name: str = "",
     linked_org_name: str = "",
     stream_start_time: float = None,
+    cancel_event: asyncio.Event = None,
+    research_topic: str = "",
+    first_request_start_time: float = None,
 ):
     """Stream events from the graph and process them.
 
@@ -953,10 +960,13 @@ async def _stream_graph_events(
     _reporter_content_from_state: str = ""  # 从 reporter 节点的状态更新中获取完整报告
     _reporter_finished = False
     _report_cancelled = False  # 报告是否被用户取消
+    _work_started = False  # 是否已开始处理工作事件（用于取消场景判断）
+    _plan_title = ""  # 当前计划标题，用于取消时作为显示标题
 
-    # ─── Token 追踪：累计 researcher / reporter 输出字符数 ───
+    # ─── Token 追踪：累计 researcher / reporter / planner 输出字符数 ───
     _researcher_total_chars = 0  # researcher 节点所有 AIMessageChunk 的字符总数
     _reporter_total_chars = 0    # reporter 节点所有 AIMessageChunk 的字符总数
+    _planner_total_chars = 0     # planner 节点所有 AIMessageChunk 的字符总数
 
     # 去重：记录已通过流式 chunk 发送过内容的消息 ID
     # LangGraph messages 流会发两次同一消息：1) LLM 流式 AIMessageChunk  2) 状态写回的完整 AIMessage
@@ -1001,6 +1011,7 @@ async def _stream_graph_events(
                 continue
 
             event_count += 1
+            _work_started = True
             current_time = time.time()
             last_event_time = current_time
 
@@ -1056,6 +1067,11 @@ async def _stream_graph_events(
                     #    - step 完成后：step_index 已更新，取对应步骤的标题
                     if "current_plan" in _node_update:
                         plan_obj = _node_update["current_plan"]
+                        # 提取计划标题
+                        if hasattr(plan_obj, 'title') and plan_obj.title:
+                            _plan_title = plan_obj.title
+                        elif isinstance(plan_obj, dict) and plan_obj.get('title'):
+                            _plan_title = plan_obj['title']
                         steps = None
                         if hasattr(plan_obj, 'steps'):
                             steps = plan_obj.steps
@@ -1215,6 +1231,8 @@ async def _stream_graph_events(
                     _researcher_total_chars += _chunk_len
                 elif agent_name == "reporter":
                     _reporter_total_chars += _chunk_len
+                elif agent_name == "planner":
+                    _planner_total_chars += _chunk_len
 
             # ─── 检测 reporter 完成标志（通过 LLM finish_reason）───
             _msg_node_rt = message_metadata.get("langgraph_node", "") if isinstance(message_metadata, dict) else ""
@@ -1282,14 +1300,60 @@ async def _stream_graph_events(
                         linked_org_name=linked_org_name,
                         duration_ms=duration_ms,
                         report_type="research",
+                        template_type=(
+                            workflow_config.get("configurable", {}).get(
+                                "report_style", "academic"
+                            )
+                            if isinstance(workflow_config, dict)
+                            else "academic"
+                        ),
                         status=report_status,
                         start_timestamp=stream_start_time,
                         end_timestamp=end_time,
                         researcher_chars=_researcher_total_chars,
                         reporter_chars=_reporter_total_chars,
+                        planner_chars=_planner_total_chars,
                     )
                 except Exception as _report_err:
                     logger.error(f"[REPORT_SERVICE] 报告保存失败 | thread_id={thread_id} | {_report_err}")
+
+        # ─── 取消任务记录：如果任务已启动但 reporter 未完成，且检测到取消信号 ───
+        if _work_started and not _reporter_finished and cancel_event and cancel_event.is_set():
+            try:
+                from src.server.report_service import handle_report_completed
+                title = (_plan_title or research_topic).strip() or "未命名研究任务"
+                end_time = time.time()
+                effective_start = first_request_start_time or stream_start_time
+                duration_ms = int((end_time - effective_start) * 1000)
+                await handle_report_completed(
+                    thread_id=thread_id,
+                    report_content="",
+                    title=title,
+                    login_name=login_name,
+                    user_name=user_name,
+                    user_code=user_code,
+                    branch_id=branch_id,
+                    linked_org_name=linked_org_name,
+                    duration_ms=duration_ms,
+                    report_type="research",
+                    template_type=(
+                        workflow_config.get("configurable", {}).get(
+                            "report_style", "academic"
+                        )
+                        if isinstance(workflow_config, dict)
+                        else "academic"
+                    ),
+                    status="cancelled",
+                    start_timestamp=stream_start_time,
+                    end_timestamp=end_time,
+                    researcher_chars=_researcher_total_chars,
+                    reporter_chars=_reporter_total_chars,
+                    planner_chars=_planner_total_chars,
+                )
+            except Exception as _cancel_save_err:
+                logger.error(
+                    f"[CANCEL_SAVE] 取消任务记录保存失败 | thread_id={thread_id} | {_cancel_save_err}"
+                )
 
 
 
@@ -1479,6 +1543,9 @@ async def _astream_workflow_generator(
         )
 
     _stream_start = time.time()
+    # 若非 resume 请求，记录首次请求开始时间
+    if not interrupt_feedback:
+        _first_start_times[thread_id] = _stream_start
 
     if checkpoint_saver and checkpoint_url != "":
         if checkpoint_url.startswith("postgresql://"):
@@ -1495,6 +1562,9 @@ async def _astream_workflow_generator(
                     branch_id=_branch_id, login_name=_login_name,
                     linked_org_name=_linked_org_name,
                     stream_start_time=_stream_start,
+                    cancel_event=cancel_event,
+                    research_topic=workflow_input.get("research_topic", "") if isinstance(workflow_input, dict) else "",
+                    first_request_start_time=_first_start_times.get(thread_id),
                 ):
                     yield event
         else:
@@ -1505,6 +1575,9 @@ async def _astream_workflow_generator(
                 branch_id=_branch_id, login_name=_login_name,
                 linked_org_name=_linked_org_name,
                 stream_start_time=_stream_start,
+                cancel_event=cancel_event,
+                research_topic=workflow_input.get("research_topic", "") if isinstance(workflow_input, dict) else "",
+                first_request_start_time=_first_start_times.get(thread_id),
             ):
                 yield event
     else:
@@ -1515,6 +1588,9 @@ async def _astream_workflow_generator(
             branch_id=_branch_id, login_name=_login_name,
             linked_org_name=_linked_org_name,
             stream_start_time=_stream_start,
+            cancel_event=cancel_event,
+            research_topic=workflow_input.get("research_topic", "") if isinstance(workflow_input, dict) else "",
+            first_request_start_time=_first_start_times.get(thread_id),
         ):
             yield event
 

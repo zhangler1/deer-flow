@@ -56,6 +56,7 @@ export interface ReportRecord {
   object_name: string | null;
   file_size: number | null;
   report_type: string;
+  template_type: string | null;
   status: string;
   estimated_tokens: number | null;
   created_at: string | null;
@@ -68,6 +69,25 @@ export interface ReportListResponse {
   page: number;
   page_size: number;
 }
+
+export interface TemplateStat {
+  template_type: string;
+  count: number;
+  month_count: number;
+  today_count: number;
+}
+
+/** 模板类型（写作风格）枚举值 → 中文显示名，未知值原样显示 */
+export const TEMPLATE_TYPE_LABELS: Record<string, string> = {
+  academic: "自由生成",
+  popular_science: "科普",
+  news: "新闻",
+  social_media: "社交媒体",
+  business_marketing: "对公营销报告",
+  business_marketing_client: "对公营销报告-战客版",
+  industry_report: "行业研报",
+  industry_research: "行业研究报告",
+};
 
 export interface UserInfo {
   user_code: string;
@@ -99,6 +119,13 @@ export async function fetchSummary(): Promise<DashboardSummary> {
   const url = resolveServiceURL("dashboard/stats/summary");
   const resp = await fetch(url, { credentials: "include", headers: await authHeaders() });
   if (!resp.ok) throw new Error(`Failed to fetch summary: ${resp.status}`);
+  return resp.json();
+}
+
+export async function fetchTemplateStats(): Promise<TemplateStat[]> {
+  const url = resolveServiceURL("dashboard/stats/template");
+  const resp = await fetch(url, { credentials: "include", headers: await authHeaders() });
+  if (!resp.ok) throw new Error(`Failed to fetch template stats: ${resp.status}`);
   return resp.json();
 }
 

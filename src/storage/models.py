@@ -28,6 +28,7 @@ class ReportRecord(BaseModel):
     object_name: Optional[str] = None  # MinIO 对象路径，用于直接读取报告正文
     file_size: Optional[int] = None
     report_type: str = "research"
+    template_type: Optional[str] = None   # 用户选择的写作风格（模板类型），如 academic / industry_research
     status: str = "completed"
     researcher_chars: Optional[int] = 0   # researcher 节点总输出字符数
     reporter_chars: Optional[int] = 0     # reporter 节点总输出字符数
@@ -54,6 +55,14 @@ class DashboardSummary(BaseModel):
     dau: int = 0  # 日活用户：今日生成过报告的去重用户数
     avg_duration_ms: int = 0
     avg_tokens: int = 0  # 平均 token 使用量（估算值）
+
+
+class TemplateStat(BaseModel):
+    """模板类型统计"""
+    template_type: str
+    count: int = 0                # 总份数
+    month_count: int = 0          # 本月生成份数
+    today_count: int = 0          # 今日生成份数
 
 
 class ReportListResponse(BaseModel):

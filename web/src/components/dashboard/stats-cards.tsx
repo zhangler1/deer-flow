@@ -9,10 +9,12 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 
-import type { DashboardSummary } from "~/core/api/dashboard";
+import { TEMPLATE_TYPE_LABELS } from "~/core/api/dashboard";
+import type { DashboardSummary, TemplateStat } from "~/core/api/dashboard";
 
 interface StatsCardsProps {
   summary: DashboardSummary;
+  templateStats?: TemplateStat[];
 }
 
 /** 各卡片色值（light / dark 文字色 / dark 背景色） */
@@ -64,7 +66,7 @@ const CARD_COLORS: Record<
   },
 };
 
-export function StatsCards({ summary }: StatsCardsProps) {
+export function StatsCards({ summary, templateStats = [] }: StatsCardsProps) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -121,50 +123,158 @@ export function StatsCards({ summary }: StatsCardsProps) {
     },
   ];
 
+  const colorKeys = Object.keys(CARD_COLORS);
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-      {cards.map((card) => {
-        const c = CARD_COLORS[card.colorKey]!;
-        return (
-          <div
-            key={card.title}
-            className="rounded-lg border p-5"
-            style={{
-              borderColor: isDark
-                ? "rgba(255,255,255,0.1)"
-                : "rgb(229,231,235)",
-              backgroundColor: isDark ? c.darkBg : c.lightBg,
-            }}
-          >
+    <div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {cards.map((card) => {
+          const c = CARD_COLORS[card.colorKey]!;
+          return (
             <div
-              className="text-sm font-medium"
+              key={card.title}
+              className="rounded-lg border p-5"
               style={{
-                color: isDark
-                  ? "rgb(156,163,175)"
-                  : "rgb(107,114,128)",
+                borderColor: isDark
+                  ? "rgba(255,255,255,0.1)"
+                  : "rgb(229,231,235)",
+                backgroundColor: isDark ? c.darkBg : c.lightBg,
               }}
             >
-              {card.title}
-            </div>
-            <div
-              className="mt-2 text-3xl font-bold"
-              style={{ color: isDark ? c.darkText : c.lightText }}
-            >
-              {card.value.toLocaleString()}
-              <span
-                className="ml-1 text-sm font-normal"
+              <div
+                className="text-sm font-medium"
                 style={{
                   color: isDark
                     ? "rgb(156,163,175)"
                     : "rgb(107,114,128)",
                 }}
               >
-                {card.unit}
-              </span>
+                {card.title}
+              </div>
+              <div
+                className="mt-2 text-3xl font-bold"
+                style={{ color: isDark ? c.darkText : c.lightText }}
+              >
+                {card.value.toLocaleString()}
+                <span
+                  className="ml-1 text-sm font-normal"
+                  style={{
+                    color: isDark
+                      ? "rgb(156,163,175)"
+                      : "rgb(107,114,128)",
+                  }}
+                >
+                  {card.unit}
+                </span>
+              </div>
             </div>
+          );
+        })}
+      </div>
+
+      {/* 各模板统计（Chrome 108 兼容：颜色沿用 CARD_COLORS 的 #hex/rgba 格式） */}
+      {templateStats.length > 0 && (
+        <div className="mt-4">
+          <div
+            className="mb-3 text-sm font-medium"
+            style={{
+              color: isDark ? "rgb(156,163,175)" : "rgb(107,114,128)",
+            }}
+          >
+            模板统计
           </div>
-        );
-      })}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {templateStats.map((stat, index) => {
+              const colorKey =
+                colorKeys[index % colorKeys.length] ?? "blue";
+              const c = CARD_COLORS[colorKey]!;
+              const label =
+                TEMPLATE_TYPE_LABELS[stat.template_type] ??
+                stat.template_type ??
+                "未知";
+              return (
+                <div
+                  key={stat.template_type}
+                  className="rounded-lg border p-5"
+                  style={{
+                    borderColor: isDark
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgb(229,231,235)",
+                    backgroundColor: isDark ? c.darkBg : c.lightBg,
+                  }}
+                >
+                  <div
+                    className="text-sm font-medium"
+                    style={{
+                      color: isDark
+                        ? "rgb(156,163,175)"
+                        : "rgb(107,114,128)",
+                    }}
+                  >
+                    {label}
+                  </div>
+                  <div className="mt-3 flex items-end justify-center gap-20">
+                    <div>
+                      <div
+                        className="text-3xl font-bold"
+                        style={{ color: isDark ? c.darkText : c.lightText }}
+                      >
+                        {stat.count.toLocaleString()}
+                      </div>
+                      <div
+                        className="mt-0.5 text-xs"
+                        style={{
+                          color: isDark
+                            ? "rgb(156,163,175)"
+                            : "rgb(107,114,128)",
+                        }}
+                      >
+                        总数
+                      </div>
+                    </div>
+                    <div>
+                      <div
+                        className="text-3xl font-bold"
+                        style={{ color: isDark ? c.darkText : c.lightText }}
+                      >
+                        {stat.month_count.toLocaleString()}
+                      </div>
+                      <div
+                        className="mt-0.5 text-xs"
+                        style={{
+                          color: isDark
+                            ? "rgb(156,163,175)"
+                            : "rgb(107,114,128)",
+                        }}
+                      >
+                        本月
+                      </div>
+                    </div>
+                    <div>
+                      <div
+                        className="text-3xl font-bold"
+                        style={{ color: isDark ? c.darkText : c.lightText }}
+                      >
+                        {stat.today_count.toLocaleString()}
+                      </div>
+                      <div
+                        className="mt-0.5 text-xs"
+                        style={{
+                          color: isDark
+                            ? "rgb(156,163,175)"
+                            : "rgb(107,114,128)",
+                        }}
+                      >
+                        今日
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -15,7 +15,12 @@ from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
 
-from src.storage.models import DailyStat, DashboardSummary, ReportRecord
+from src.storage.models import (
+    DailyStat,
+    DashboardSummary,
+    ReportRecord,
+    TemplateStat,
+)
 from src.utils.enhanced_logger import get_enhanced_logger
 
 logger = get_enhanced_logger(__name__).logger
@@ -121,6 +126,16 @@ async def ensure_table():
         """)
         await conn.commit()
     logger.info("reports 表已确认存在（含 object_name / token_tracking / is_deleted 字段）")
+    # 幂等新增 template_type 列（用户前端选择的写作风格）
+    pool = await _get_pool()
+    async with pool.connection() as conn:
+        await conn.execute("""
+            ALTER TABLE reports
+            ADD COLUMN IF NOT EXISTS template_type VARCHAR(64) DEFAULT 'academic';
+            CREATE INDEX IF NOT EXISTS idx_reports_template_type ON reports(template_type);
+        """)
+        await conn.commit()
+    logger.info("template_type 列已确认存在")
 
 
 # ─── 权限查询 ───
@@ -184,9 +199,9 @@ async def save_report(report: ReportRecord) -> UUID:
             await cur.execute(
                 """
                 INSERT INTO reports (thread_id, user_code, user_name, branch_id, login_name, linked_org_name,
-                                     title, duration_ms, report_url, object_name, file_size, report_type, status,
+                                     title, duration_ms, report_url, object_name, file_size, report_type, template_type, status,
                                      researcher_chars, reporter_chars, estimated_tokens)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -202,6 +217,7 @@ async def save_report(report: ReportRecord) -> UUID:
                     report.object_name,
                     report.file_size,
                     report.report_type,
+                    report.template_type or "academic",
                     report.status,
                     report.researcher_chars or 0,
                     report.reporter_chars or 0,
@@ -459,6 +475,41 @@ async def get_summary() -> DashboardSummary:
                 avg_duration_ms=avg_duration_ms,
                 avg_tokens=avg_tokens,
             )
+
+
+async def get_template_type_stats() -> List[TemplateStat]:
+    """各模板类型（写作风格）统计：总数 / 本月 / 今日（仅已完成、未删除），按总数倒序"""
+    _NOT_DELETED_TS = "(is_deleted = FALSE OR is_deleted IS NULL)"
+    pool = await _get_pool()
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                f"""
+                SELECT
+                    template_type,
+                    COUNT(*) AS count,
+                    COUNT(*) FILTER (
+                        WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                    ) AS month_count,
+                    COUNT(*) FILTER (
+                        WHERE DATE(created_at) = CURRENT_DATE
+                    ) AS today_count
+                FROM reports
+                WHERE status = 'completed' AND {_NOT_DELETED_TS}
+                GROUP BY template_type
+                ORDER BY count DESC
+                """,
+            )
+            rows = await cur.fetchall()
+            return [
+                TemplateStat(
+                    template_type=row[0],
+                    count=row[1],
+                    month_count=row[2],
+                    today_count=row[3],
+                )
+                for row in rows
+            ]
 
 
 # ─── 逻辑删除 ───

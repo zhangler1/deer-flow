@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 
+import { TEMPLATE_TYPE_LABELS } from "~/core/api/dashboard";
 import type { ReportListResponse } from "~/core/api/dashboard";
 
 interface ReportTableProps {
@@ -124,6 +125,7 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
               <th className="px-4 py-3">用户</th>
               <th className="px-4 py-3">标题</th>
               <th className="px-4 py-3">类型</th>
+              <th className="px-4 py-3">模板类型</th>
               <th className="px-4 py-3">状态</th>
               <th className="px-4 py-3">Token</th>
               <th className="px-4 py-3">耗时</th>
@@ -211,6 +213,21 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
                       className="rounded-full px-2 py-0.5 text-xs font-medium"
                       style={{
                         backgroundColor: isDark
+                          ? "rgba(30,58,95,0.4)"
+                          : "#dbeafe",
+                        color: isDark ? "#93c5fd" : "#1e40af",
+                      }}
+                    >
+                      {TEMPLATE_TYPE_LABELS[report.template_type ?? ""] ??
+                        report.template_type ??
+                        "-"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{
+                        backgroundColor: isDark
                           ? statusStyle.darkBg
                           : statusStyle.lightBg,
                         color: isDark
@@ -252,7 +269,9 @@ export function ReportTable({ data, onPageChange }: ReportTableProps) {
                           : "暂无数据"
                       }
                     >
-                      {formatTokens(report.estimated_tokens)}
+                      {report.status === "cancelled"
+                        ? "已取消"
+                        : formatTokens(report.estimated_tokens)}
                     </span>
                   </td>
                   <td

@@ -36,11 +36,13 @@ async def handle_report_completed(
     linked_org_name: str = "",
     duration_ms: int = 0,
     report_type: str = "research",
+    template_type: str = "academic",   # 用户选择的写作风格（模板类型）
     status: str = "completed",
     start_timestamp: Optional[float] = None,
     end_timestamp: Optional[float] = None,
     researcher_chars: int = 0,
     reporter_chars: int = 0,
+    planner_chars: int = 0,
 ):
     """报告生成完成后的异步处理
 
@@ -58,11 +60,13 @@ async def handle_report_completed(
         linked_org_name: 行政机构名称
         duration_ms: 生成耗时（毫秒）
         report_type: 报告类型
+        template_type: 用户选择的写作风格（模板类型）
         status: 报告状态（completed/cancelled/failed）
         start_timestamp: 报告生成起始时间戳 (Unix timestamp)
         end_timestamp: 报告生成结束时间戳 (Unix timestamp)
         researcher_chars: researcher 节点总输出字符数
         reporter_chars: reporter 节点总输出字符数
+        planner_chars: planner 节点总输出字符数
     """
     # 打印起始时间和结束时间（北京时间）
     start_time_str = (
@@ -83,10 +87,15 @@ async def handle_report_completed(
     file_size = None
 
     try:
-        # 1. 上传到 MinIO
-        report_url, object_name, file_size = await _upload_to_minio(
-            thread_id, report_content, report_type, title
-        )
+        # 1. 上传到 MinIO（仅当有内容时）
+        if report_content.strip():
+            report_url, object_name, file_size = await _upload_to_minio(
+                thread_id, report_content, report_type, title
+            )
+        else:
+            logger.info(
+                f"[REPORT_SERVICE] 报告内容为空，跳过 MinIO 上传 | thread_id={thread_id} | status={status}"
+            )
     except Exception as e:
         logger.error(f"[REPORT_SERVICE] MinIO 上传失败 | thread_id={thread_id} | {e}")
 
@@ -96,7 +105,7 @@ async def handle_report_completed(
         from src.storage.models import ReportRecord
 
         # 计算估算 token 数（2.5 字符 ≈ 1 token，适用于中英文混合场景）
-        _total_chars = (researcher_chars or 0) + (reporter_chars or 0)
+        _total_chars = (planner_chars or 0) + (researcher_chars or 0) + (reporter_chars or 0)
         _estimated_tokens = int(_total_chars / 2.5) if _total_chars > 0 else 0
 
         record = ReportRecord(
@@ -112,6 +121,7 @@ async def handle_report_completed(
             object_name=object_name,
             file_size=file_size,
             report_type=report_type,
+            template_type=template_type,
             status=status,
             researcher_chars=researcher_chars,
             reporter_chars=reporter_chars,

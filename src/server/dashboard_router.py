@@ -19,6 +19,7 @@ from src.storage.models import (
     DashboardSummary,
     ReportListResponse,
     ReportRecord,
+    TemplateStat,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,12 @@ async def get_summary(_=Depends(require_admin)):
     """总报告数、总用户数、平均耗时等汇总（仅管理员）"""
     summary = await report_repository.get_summary()
     return summary
+
+
+@router.get("/stats/template", response_model=list[TemplateStat])
+async def get_template_stats(_=Depends(require_admin)):
+    """各模板类型已生成报告份数统计（仅管理员）"""
+    return await report_repository.get_template_type_stats()
 
 
 @router.get("/reports", response_model=ReportListResponse)

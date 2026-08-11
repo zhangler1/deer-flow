@@ -20,10 +20,12 @@ import {
   fetchDailyStats,
   fetchReports,
   fetchSummary,
+  fetchTemplateStats,
   fetchCurrentUser,
   type DailyStat,
   type DashboardSummary,
   type ReportListResponse,
+  type TemplateStat,
   type UserInfo,
 } from "~/core/api/dashboard";
 
@@ -33,6 +35,7 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
+  const [templateStats, setTemplateStats] = useState<TemplateStat[]>([]);
   const [reports, setReports] = useState<ReportListResponse | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,22 +70,25 @@ export default function DashboardPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryData, statsData, reportsData, userData] = await Promise.all([
-        fetchSummary(),
-        fetchDailyStats(),
-        fetchReports({
-          page,
-          page_size: 20,
-          login_name: filterLoginName || undefined,
-          user_name: filterUserName || undefined,
-          status: filterStatus || undefined,
-          start_date: filterStartDate || undefined,
-          end_date: filterEndDate || undefined,
-        }),
-        fetchCurrentUser(),
-      ]);
+      const [summaryData, statsData, templateStatsData, reportsData, userData] =
+        await Promise.all([
+          fetchSummary(),
+          fetchDailyStats(),
+          fetchTemplateStats(),
+          fetchReports({
+            page,
+            page_size: 20,
+            login_name: filterLoginName || undefined,
+            user_name: filterUserName || undefined,
+            status: filterStatus || undefined,
+            start_date: filterStartDate || undefined,
+            end_date: filterEndDate || undefined,
+          }),
+          fetchCurrentUser(),
+        ]);
       setSummary(summaryData);
       setDailyStats(statsData);
+      setTemplateStats(templateStatsData);
       setReports(reportsData);
       setUser(userData);
     } catch (err) {
@@ -181,7 +187,7 @@ export default function DashboardPage() {
       )}
 
       {/* 顶部统计卡片 */}
-      {summary && <StatsCards summary={summary} />}
+      {summary && <StatsCards summary={summary} templateStats={templateStats} />}
 
       {/* 每日报告量折线图 */}
       <div style={sectionStyle}>
